@@ -1,0 +1,58 @@
+{
+    "@@locale": "en",
+
+    "tabAccounts": "Accounts",
+    "tabTemplates": "Templates",
+    "tabSettings": "Settings",
+
+    "accountsTitle": "Accounts",
+    "searchAccountsHint": "Search accounts or emails...",
+    "noAccounts": "No accounts",
+    "unknownTemplate": "Unknown",
+    "edit": "Edit",
+    "delete": "Delete",
+    "deleteAccount": "Delete Account",
+    "deleteAccountConfirm": "Are you sure you want to delete this account? This action cannot be undone.",
+    "cancel": "Cancel",
+
+    "addAccount": "Add Account",
+    "editAccount": "Edit Account",
+    "accountNameLabel": "Account Name",
+    "accountNameRequired": "Please enter a name",
+    "accountEmailLabel": "Linked Email/Account Note",
+    "templateType": "Template Type",
+    "fillRequiredField": "Required field missing: {fieldName}",
+    "@fillRequiredField": {
+        "placeholders": {
+            "fieldName": { "type": "String" }
+        }
+    },
+
+    "templatesTitle": "Templates",
+    "builtinTag": "Built-in",
+    "addTemplate": "New Template",
+    "editTemplate": "Edit Template",
+    "templateTitleField": "Title",
+    "templateSubtitleField": "Subtitle",
+    "requireTemplateTitle": "Please enter a template title",
+    "fieldsList": "Fields List",
+    "addField": "Add Field",
+    "customField": "Custom Field",
+    "fieldTypeText": "Type: {type}",
+    "@fieldTypeText": {
+        "placeholders": {
+            "type": { "type": "String" }
+        }
+    },
+
+    "settingsTitle": "Settings",
+    "securitySettingsTitle": "Security",
+    "securitySettingsSubtitle": "2FA, Master Password...",
+    "dataSyncTitle": "Sync Data",
+    "dataSyncSubtitle": "Sync to cloud",
+    "aboutSecretRoy": "About SecretRoy",
+    "versionNumber": "Version 1.0.0",
+
+    "btnSave": "Save",
+    "btnClose": "Close"
+}

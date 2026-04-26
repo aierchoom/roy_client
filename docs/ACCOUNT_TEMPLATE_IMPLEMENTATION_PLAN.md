@@ -1,0 +1,471 @@
+# 账户与模板实施方案
+
+**生成日期**: 2026-04-19
+**适用范围**: `roy_client`
+**目标**: 消除模板相关的静默数据丢失风险，并逐步建立可控的模板变更机制
+
+---
+
+## 1. 实施目标
+
+本方案的核心目标有四个：
+
+1. 防止账户保存时静默删除模板外字段
+2. 防止模板缺失或字段缺失时继续破坏账户数据
+3. 将模板危险操作升级为可提示、可迁移、可追踪的流程
+4. 在不大改数据库结构的前提下，完成第一轮安全重构
+
+---
+
+## 2. 实施策略
+
+采用三阶段推进：
+
+- 第一阶段：止血
+- 第二阶段：编辑器重构
+- 第三阶段：模板迁移与治理
+
+每一阶段都应保证：
+
+- 可单独上线
+- 对现有数据兼容
+- 不要求一次性迁移所有账户
+
+---
+
+## 3. 第一阶段：止血方案
+
+目标：先解决最危险的静默数据丢失问题。
+
+## 3.1 改造项一：账户保存改为合并式保存
+
+### 现状
+
+当前账户保存时，`data` 主要由当前页面可见字段重新组装，存在覆盖旧字段风险。
+
+### 改造目标
+
+保存逻辑改为：
+
+1. 读取旧 `data`
+2. 用当前可见字段值覆盖同名 key
+3. 对模板外旧字段默认保留
+4. 仅对用户明确删除的字段执行移除
+
+### 涉及位置
+
+- [account_edit_view.dart](/C:/Users/choom/Desktop/CodeRepo/roy/roy_client/lib/views/accounts/account_edit_view.dart:220)
+
+### 交付标准
+
+- 删除模板字段后，打开账户再保存，不会自动丢失旧值
+- 切模板后，如果用户未明确处理旧字段，旧字段仍被保留
+
+---
+
+## 3.2 改造项二：模板缺失账户默认禁止保存
+
+### 现状
+
+当账户引用的模板不存在时，仍可能进入风险编辑流程。
+
+### 改造目标
+
+当 `template_id` 找不到模板时：
+
+- 页面进入只读
+- 顶部展示风险说明
+- 保存按钮禁用
+
+### 涉及位置
+
+- [account_edit_view.dart](/C:/Users/choom/Desktop/CodeRepo/roy/roy_client/lib/views/accounts/account_edit_view.dart:160)
+
+### 交付标准
+
+- 模板缺失账户不能直接覆盖保存
+- 用户必须先恢复模板或后续完成迁移
+
+---
+
+## 3.3 改造项三：删除模板下沉到客户端服务层校验
+
+### 现状
+
+删除模板的“引用检查”主要在 UI 层。
+
+### 改造目标
+
+在客户端服务层增加统一规则：
+
+- 查询模板引用账户数
+- 被引用时拒绝删除
+
+### 责任分层
+
+- 页面层：只负责提示和确认
+- Provider：负责协调调用
+- 服务层：负责执行业务规则
+- 存储层：负责具体 SQL
+
+### 新增建议方法
+
+- `SecureStorageService.countAccountsByTemplate(String templateId)`
+- `ServiceManager.deleteTemplateSafely(String templateId)`
+- `EnhancedAppProvider.deleteCustomTemplateSafely(String templateId)`
+
+### 涉及位置
+
+- [template_list_view.dart](/C:/Users/choom/Desktop/CodeRepo/roy/roy_client/lib/views/templates/template_list_view.dart:67)
+- [service_manager.dart](/C:/Users/choom/Desktop/CodeRepo/roy/roy_client/lib/services/service_manager.dart)
+- [secure_storage_service.dart](/C:/Users/choom/Desktop/CodeRepo/roy/roy_client/lib/services/secure_storage_service.dart:316)
+
+### 交付标准
+
+- 无论从哪个入口删模板，只要仍被账户使用，就删除失败
+
+---
+
+## 3.4 改造项四：删除字段前增加影响确认
+
+### 现状
+
+模板编辑页删除字段是直接移除，没有任何影响提示。
+
+### 改造目标
+
+删除字段前至少展示：
+
+- 字段名称
+- 受影响账户数
+- 删除后历史值默认保留，但不再属于模板字段
+
+### 涉及位置
+
+- [template_edit_view.dart](/C:/Users/choom/Desktop/CodeRepo/roy/roy_client/lib/views/templates/template_edit_view.dart:777)
+
+### 交付标准
+
+- 用户删除字段前必须经过确认
+- 确认文案明确说明风险
+
+---
+
+## 3.5 改造项五：账户切模板增加风险提示
+
+### 现状
+
+切模板当前是普通下拉框选择，风险暴露不足。
+
+### 改造目标
+
+切模板时增加确认弹窗，说明：
+
+- 旧字段不会自动迁移
+- 当前版本先保留旧字段
+- 后续会在历史字段区继续处理
+
+### 涉及位置
+
+- [account_edit_view.dart](/C:/Users/choom/Desktop/CodeRepo/roy/roy_client/lib/views/accounts/account_edit_view.dart:490)
+
+### 交付标准
+
+- 用户明确确认后才切模板
+
+---
+
+## 4. 第二阶段：编辑器重构方案
+
+目标：让账户编辑器真正编辑“账户完整状态”，而不是只编辑模板当前可见区域。
+
+## 4.1 编辑器状态重构
+
+建议引入统一编辑态模型：
+
+```dart
+class AccountEditState {
+  final Map<String, String> visibleValues;
+  final Map<String, String> legacyValues;
+  final Set<String> deletedKeys;
+}
+```
+
+### 用途
+
+- `visibleValues`：当前模板字段
+- `legacyValues`：账户历史字段 / 未映射字段
+- `deletedKeys`：用户明确删除的字段
+
+### 好处
+
+- 保存逻辑可控
+- 字段删除是显式行为
+- 模板外字段不再被隐式吞掉
+
+---
+
+## 4.2 编辑页增加“历史字段区”
+
+### 设计目标
+
+当账户存在模板外字段时，编辑页必须显式展示，而不是隐藏。
+
+### UI 建议
+
+增加一个单独区块：
+
+- 标题：历史字段 / 未映射字段
+- 字段内容：key、值、来源
+- 可执行操作：保留、删除、映射
+
+### 涉及页面
+
+- [account_edit_view.dart](/C:/Users/choom/Desktop/CodeRepo/roy/roy_client/lib/views/accounts/account_edit_view.dart)
+
+### 交付标准
+
+- 模板删字段后，用户能在账户页看见历史字段
+- 用户可以明确选择保留或删除
+
+---
+
+## 4.3 列表页风险状态展示
+
+### 设计目标
+
+让用户在进入账户前就知道哪些账户存在结构问题。
+
+### 建议状态
+
+- 未知模板
+- 存在历史字段
+- 待迁移
+
+### 涉及页面
+
+- [account_list_view.dart](/C:/Users/choom/Desktop/CodeRepo/roy/roy_client/lib/views/accounts/account_list_view.dart)
+
+### 交付标准
+
+- 风险账户在列表中可识别
+
+---
+
+## 5. 第三阶段：模板迁移与治理
+
+目标：让危险模板操作从普通编辑升级为结构变更流程。
+
+## 5.1 引入模板版本
+
+### 建议新增字段
+
+模板增加：
+
+- `version`
+
+账户增加：
+
+- `templateVersion`
+- `migrationState`
+
+### 作用
+
+- 判断账户是否滞后于模板
+- 判断是否需要迁移确认
+
+---
+
+## 5.2 模板结构变更分类
+
+建议将模板修改分成两类：
+
+### 展示变更
+
+- 改标题
+- 改说明
+- 改顺序
+- 改分类
+
+这类可以直接保存。
+
+### 结构变更
+
+- 删字段
+- 改字段 key
+- 改字段类型
+- 新增必填字段
+
+这类进入迁移流程。
+
+---
+
+## 5.3 账户侧懒迁移
+
+当前阶段推荐采用“懒迁移”：
+
+1. 模板先完成变更
+2. 账户在下次打开时检测版本差异
+3. 若涉及结构变更，则弹迁移提示
+4. 用户确认后再真正调整账户结构
+
+### 选择理由
+
+- 改造成本较低
+- 与当前本地 SQLite 架构兼容
+- 不需要一次性批量修库
+
+---
+
+## 5.4 切模板迁移向导
+
+中长期建议将切模板从普通下拉改为迁移向导。
+
+### 向导步骤建议
+
+1. 选择新模板
+2. 展示旧模板字段
+3. 展示新模板字段
+4. 自动匹配同名/近似字段
+5. 用户手动处理剩余字段
+6. 预览保存结果
+7. 确认提交
+
+---
+
+## 6. 代码改造建议
+
+## 6.1 页面层
+
+### `template_edit_view.dart`
+
+新增：
+
+- 字段删除确认
+- 危险变更提示
+- 结构变更标记
+
+### `template_list_view.dart`
+
+新增：
+
+- 安全删除流程
+- 模板风险提示
+
+### `account_edit_view.dart`
+
+重点改造：
+
+- 合并式保存
+- 模板缺失只读
+- 历史字段区
+- 切模板确认
+
+### `account_list_view.dart`
+
+新增：
+
+- 风险状态显示
+- 未知模板高亮
+
+---
+
+## 6.2 Provider 层
+
+### `EnhancedAppProvider`
+
+建议补充：
+
+- `countAccountsByTemplate`
+- `getAccountsByTemplate`
+- 风险账户计算方法
+
+---
+
+## 6.3 服务层
+
+### `ServiceManager`
+
+建议补充：
+
+- `deleteTemplateSafely`
+- 模板/账户迁移协调接口
+
+### `SecureStorageService`
+
+建议补充：
+
+- `countAccountsByTemplate`
+- 账户风险数据查询方法
+
+---
+
+## 7. 实施排期建议
+
+## 第 1 周
+
+- 合并式保存
+- 模板缺失禁保存
+- 服务层模板删除校验
+
+## 第 2 周
+
+- 删字段确认
+- 切模板确认
+- 列表页风险标记
+
+## 第 3 周
+
+- 历史字段区
+- 显式删除字段逻辑
+
+## 第 4 周
+
+- 基础字段映射
+- 编辑器状态模型重构
+
+## 第 5 周及以后
+
+- 模板版本
+- 迁移状态
+- 懒迁移机制
+
+---
+
+## 8. 验收标准
+
+上线第一阶段后，至少应满足：
+
+1. 删除模板字段后，历史账户再次保存不会静默丢失旧值
+2. 模板缺失账户不能直接保存
+3. 被引用模板不能从底层直接删掉
+4. 切模板前用户能看到风险提示
+
+第二阶段完成后，应再满足：
+
+1. 历史字段在账户编辑页可见
+2. 用户可以显式保留或删除历史字段
+3. 风险账户在列表页可识别
+
+第三阶段完成后，应再满足：
+
+1. 模板结构变更可追踪
+2. 账户可识别是否需要迁移
+3. 切模板具备基础映射能力
+
+---
+
+## 9. 推荐决策
+
+建议立即启动第一阶段。
+
+原因很明确：
+
+- 当前已经存在静默数据丢失路径
+- 问题不是偶发，而是设计必然产物
+- 第一阶段改造成本相对可控
+- 能显著降低后续模板运营风险
+
+最终推荐路线是：
+
+**短期止血，中期重构编辑器，长期建立模板迁移机制。**

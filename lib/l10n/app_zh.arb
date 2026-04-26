@@ -1,0 +1,58 @@
+{
+    "@@locale": "zh",
+    
+    "tabAccounts": "账户",
+    "tabTemplates": "模板",
+    "tabSettings": "设置",
+
+    "accountsTitle": "账户管理",
+    "searchAccountsHint": "搜索账户或邮箱...",
+    "noAccounts": "暂无账户",
+    "unknownTemplate": "未知",
+    "edit": "编辑",
+    "delete": "删除",
+    "deleteAccount": "删除账户",
+    "deleteAccountConfirm": "确认删除此账户吗？操作不可逆。",
+    "cancel": "取消",
+
+    "addAccount": "新增账户",
+    "editAccount": "编辑账户",
+    "accountNameLabel": "账户名称",
+    "accountNameRequired": "请填写名称",
+    "accountEmailLabel": "绑定邮箱/账号说明",
+    "templateType": "模板类型",
+    "fillRequiredField": "请填写必填字段：{fieldName}",
+    "@fillRequiredField": {
+        "placeholders": {
+            "fieldName": { "type": "String" }
+        }
+    },
+
+    "templatesTitle": "模板管理",
+    "builtinTag": "内置",
+    "addTemplate": "新建模板",
+    "editTemplate": "编辑模板",
+    "templateTitleField": "标题",
+    "templateSubtitleField": "副标题",
+    "requireTemplateTitle": "请输入模板标题",
+    "fieldsList": "字段列表",
+    "addField": "添加字段",
+    "customField": "自定义字段",
+    "fieldTypeText": "类型: {type}",
+    "@fieldTypeText": {
+        "placeholders": {
+            "type": { "type": "String" }
+        }
+    },
+
+    "settingsTitle": "设置",
+    "securitySettingsTitle": "安全设置",
+    "securitySettingsSubtitle": "开启二次验证、修改主密码等",
+    "dataSyncTitle": "数据同步",
+    "dataSyncSubtitle": "同步数据到云端",
+    "aboutSecretRoy": "关于 SecretRoy",
+    "versionNumber": "版本 1.0.0",
+
+    "btnSave": "保存",
+    "btnClose": "关闭"
+}
