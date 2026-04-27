@@ -14,6 +14,7 @@ codebase snapshot. Historical proposal material lives under `docs/archive/`.
 | [04-enterprise-improvement-plan.md](04-enterprise-improvement-plan.md) | Enterprise-quality improvement plan |
 | [05-distributed-system-quality-iteration-plan.md](05-distributed-system-quality-iteration-plan.md) | Distributed-system quality iteration plan |
 | [06-distributed-system-implementation-backlog.md](06-distributed-system-implementation-backlog.md) | Implementation backlog with acceptance criteria |
+| [../todo.md](../todo.md) | Project-level TODO derived from the architecture conclusion |
 | [architecture-deep-dive.md](architecture-deep-dive.md) | Single-file deep architecture reference |
 | [storage-and-sync-architecture-report.md](storage-and-sync-architecture-report.md) | Historical storage/sync risk analysis retained for context |
 
@@ -23,3 +24,4 @@ Recommended quick path:
 2. [02-runtime-and-sync.md](02-runtime-and-sync.md)
 3. [03-risks-and-roadmap.md](03-risks-and-roadmap.md)
 4. [06-distributed-system-implementation-backlog.md](06-distributed-system-implementation-backlog.md)
+5. [../todo.md](../todo.md)
