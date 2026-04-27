@@ -11,6 +11,7 @@ Scanned all Markdown documentation under `roy_client/docs`, root project Markdow
 | Documentation index | `docs/README.md` |
 | Wiki entry | `docs/wiki/Home.md` |
 | Key sync and vault linking implementation | `docs/07_Key_Sync_Implementation.md` |
+| Local database encryption | `docs/08_Local_Database_Encryption.md` |
 | Vault linking design | `docs/06_Vault_Linking_Design.md` |
 | Public API notes | `docs/wiki/API_Reference.md` |
 | User-facing sync guidance | `docs/wiki/User_Manual.md` |
@@ -25,6 +26,10 @@ Scanned all Markdown documentation under `roy_client/docs`, root project Markdow
 - Marked older technical reports and quality convergence documents as historical where they still describe pre-hardening behavior.
 - Refreshed root `README.md` and `SECURITY_FEATURES.md` so project entry points match the current secure key-sync implementation.
 - Updated last-modified dates on wiki and implementation notes changed during this audit.
+- Added the local database encryption reference for the `secret_roy_vault.db.enc`
+  AES-GCM-256 file envelope, wrapped random DB data key, runtime working
+  database cleanup, and no-compatibility handling of the old intermediate
+  plaintext SQLite file.
 
 ## Historical Documents
 
@@ -38,4 +43,4 @@ The following documents are intentionally retained as historical snapshots. They
 
 ## Known Follow-Up
 
-Local SQLite at-rest encryption remains separate from the key-sync hardening described in `docs/07_Key_Sync_Implementation.md`. The current hardening covers master password verification, secure vault link code exchange, and LAN pairing code entropy/readability.
+Local SQLite at-rest encryption is now implemented separately from the key-sync hardening described in `docs/07_Key_Sync_Implementation.md`; see `docs/08_Local_Database_Encryption.md`. Remaining security follow-up covers runtime hardening while the vault is unlocked, production remote authentication/authorization, certificate pinning, and transport hardening.

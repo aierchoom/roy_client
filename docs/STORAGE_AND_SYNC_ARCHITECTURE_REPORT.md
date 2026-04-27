@@ -1,6 +1,6 @@
 # SecretRoy 密码存储与账号同步架构分析报告
 
-> Current delta (2026-04-28): this is a historical risk report from 2026-04-18. Master password verification has since been hardened with `master_password_v2` PBKDF2-HMAC-SHA256 storage, secure vault link codes now use `sroy-secure-v2:` with AES-GCM-256, and LAN pairing uses 8 readable characters. Local SQLite-at-rest encryption remains a separate hardening item unless implemented in a later change.
+> Current delta (2026-04-28): this is a historical risk report from 2026-04-18. Master password verification has since been hardened with `master_password_v2` PBKDF2-HMAC-SHA256 storage, secure vault link codes now use `sroy-secure-v2:` with AES-GCM-256, LAN pairing uses 8 readable characters, and local SQLite-at-rest encryption is now implemented as `secret_roy_vault.db.enc` with a Dart AES-GCM-256 binary file envelope. See `08_Local_Database_Encryption.md` for the current storage security model.
 
 **生成日期**: 2026-04-18  
 **分析范围**: 密码管理、本地存储、远程同步三层架构
@@ -20,26 +20,27 @@
 
 ### 1. 加密层架构
 
-#### 当前实现 (EnhancedCryptoService)
+#### 当前实现 (EnhancedCryptoService + DatabaseFileCipher)
 
 ```dart
-// 2026-04-18 历史状态：未接入本地加密层
-encryptData(plainText) → plainText
-decryptData(data) → data
+// 2026-04-28 当前状态
+initMasterKey(password) → PBKDF2 verifier 校验/建立
+createDatabaseFileCipher() → 解开 32-byte random DB data key
+DatabaseFileCipher.encrypt(sqliteBytes) → secret_roy_vault.db.enc
 ```
 
 | 指标       | 当前状态              |
 | ---------- | --------------------- |
-| 加密算法   | 无 (NONE)             |
-| 密钥派生   | 无 (KDF v1/v2 已失效) |
-| 主密钥管理 | 仅内存标记            |
-| 盐值使用   | 无                    |
-| 密钥迭代   | 0 次                  |
+| 加密算法   | AES-GCM-256 文件信封 |
+| 密钥派生   | PBKDF2-HMAC-SHA256 |
+| 主密钥管理 | `master_password_v2` verifier + 解锁态内存密钥 |
+| 盐值使用   | 主密码 verifier salt + `database_key_salt_v1` |
+| 密钥迭代   | 100000 次 |
 
-**问题严重性**: ⚠️ 严重  
-- 所有密码以明文方式存储
-- 设备被盗/恶意App无法窃取密码数据
-- 不符合任何安全标准 (OWASP, PCI-DSS 等)
+**剩余风险**: ⚠️ 中高
+- 解锁期间仍需要临时 runtime SQLite 工作库
+- 生物识别解锁仍依赖 secure storage 中的主密码材料
+- 远端传输、服务端认证和密钥撤销仍需要继续加固
 
 ---
 
@@ -47,14 +48,15 @@ decryptData(data) → data
 
 #### 数据库结构
 
-**数据库文件**: `secret_roy_vault.db` (SQLite)
+**长期数据库文件**: `secret_roy_vault.db.enc` (AES-GCM-256 binary envelope)
+**运行时工作库**: `secret_roy_vault.runtime.db` (temporary SQLite, unlocked session only)
 
 | 表名            | 存储内容                              | 加密状态 |
 | --------------- | ------------------------------------- | -------- |
-| `accounts`      | 账号记录 (id, name, email, data JSON) | ❌ 明文   |
-| `templates`     | 账号模板定义                          | ❌ 明文   |
-| `settings`      | 应用设置                              | ❌ 明文   |
-| `sync_metadata` | 同步版本/向量时钟                     | ❌ 明文   |
+| `accounts`      | 账号记录 (id, name, email, data JSON) | 长期落盘加密；运行时临时明文 |
+| `templates`     | 账号模板定义                          | 长期落盘加密；运行时临时明文 |
+| `settings`      | 应用设置                              | 长期落盘加密；运行时临时明文 |
+| `conflict_logs` | 并发编辑冲突记录                      | 长期落盘加密；运行时临时明文 |
 
 **关键字段**:
 ```sql
@@ -74,13 +76,15 @@ CREATE TABLE accounts (
 - ✅ 使用 SQLite (跨平台支持)
 - ✅ 事务支持 (原子性)
 - ✅ 索引优化 (快速查询)
-- ❌ **无加密** (所有数据明文存储)
-- ❌ **无访问控制** (任何进程可读取)
-- ❌ 无完整性校验
+- ✅ 长期落盘文件使用 AES-GCM-256 加密并带认证标签
+- ✅ 锁定/关闭时重新封装并删除 runtime 工作库
+- ⚠️ 解锁期间 runtime SQLite 仍依赖 OS 权限与应用锁定清理
+- ⚠️ 尚未使用 SQLCipher/page-level 加密
 
 **数据暴露面**:
-- 数据库文件: `~/Documents/secret_roy_vault.db`
-- 内存: 解密后的数据在内存中明文存储
+- 数据库文件: `~/Documents/secret_roy_vault.db.enc`
+- 运行时临时文件: OS temp/secret_roy/`secret_roy_vault.runtime.db`，仅解锁态存在
+- 内存: 解锁后的数据在内存中明文使用
 - SharedPreferences: 同步配置/版本号明文存储
 
 ---
@@ -114,23 +118,19 @@ CREATE TABLE accounts (
     ┌────────▼────────┐
     │  同步服务器Node.js  │
     ├─────────────────┤
-    │ vault.db.enc    │
-    │ sync_version.json │
+    │ vault_<id>.json │
+    │ record payloads │
     └─────────────────┘
 ```
 
 **同步算法**:
 
 ```
-if (isDirty) {
-  if (localVersion <= serverVersion) {
-    localVersion = serverVersion + 1  // 冲突自动递增
-  }
-  push(database, localVersion)
-  isDirty = false
-} else if (serverVersion > localVersion) {
-  pull(database)  // 覆盖本地
-}
+pull changes since localVersion
+merge remote account/template records with CRDT rules
+push local pending records with expected_base_version
+server accepts only if expected_base_version matches stored version
+persist accepted versions and conflict notices locally
 ```
 
 #### 服务器端实现
@@ -139,10 +139,10 @@ if (isDirty) {
 
 | 功能       | 实现       | 问题                   |
 | ---------- | ---------- | ---------------------- |
-| 版本存储   | JSON 文件  | 无原子性保证           |
-| 数据库存储 | 二进制文件 | 无压缩/去重            |
-| 多设备支持 | 版本号控制 | 无向量时钟(冲突检测弱) |
-| 并发控制   | 无         | 可能数据丢失           |
+| 版本存储   | `vault_<id>.json` currentVersion | 原子写 + bak，仍是弱服务器文件存储 |
+| 数据存储 | 记录级 `encrypted_signed_payload` | 无压缩/去重 |
+| 多设备支持 | record version + HLC/CRDT | 身份和密钥体系仍需正式化 |
+| 并发控制   | expected_base_version | 可拒绝陈旧推送，但复杂协作仍依赖客户端合并 |
 | 认证授权   | 无         | 任何人可访问           |
 | 加密传输   | HTTP 明文  | 中间人攻击风险         |
 
@@ -150,16 +150,15 @@ if (isDirty) {
 
 ```javascript
 // 版本冲突检查
-if (clientVersion <= serverVersion) {
-  return 409 Conflict  // 拒绝
-} else {
-  update(db, clientVersion)
+if (push.expected_base_version !== storedItem.version) {
+  return 409 Conflict  // 拒绝陈旧记录推送
 }
+acceptRecord(push.encrypted_signed_payload)
 ```
 
 ---
 
-### 4. 当前同步流程的问题
+### 4. 2026-04-18 历史同步流程问题（当前已部分缓解）
 
 #### 场景: 三台设备同步
 
@@ -182,12 +181,12 @@ T4                                   v2:push()  ──→ [冲突!]
 T5   v2:idle      v2:同步            v2:retry   ───→ ?
 ```
 
-**问题**:
-1. ❌ **不支持并发编辑**: C设备编辑时A已推送，导致冲突丢失
-2. ❌ **无冲突合并**: 版本冲突仅拒绝，不合并
-3. ❌ **无编辑历史**: 版本冲突时无法恢复之前的修改
-4. ❌ **全库覆盖**: 小改动也要同步整个数据库
-5. ❌ **无离线支持**: 离线期间多设备编辑会产生冲突
+**当前结论**:
+1. ✅ 已从整库覆盖收敛为记录级同步。
+2. ✅ 账号/模板带 HLC、serverVersion、syncStatus，并有冲突日志。
+3. ✅ 客户端通过 `CrdtMergeEngine` 合并并发编辑。
+4. ⚠️ 服务端仍只是弱文件存储与版本守门，不承担复杂合并。
+5. ⚠️ 身份、密钥撤销、服务端认证和传输安全仍未达到外部 Beta 要求。
 
 ---
 
@@ -197,30 +196,28 @@ T5   v2:idle      v2:同步            v2:retry   ───→ ?
 
 | 问题         | 严重性 | 影响                        |
 | ------------ | ------ | --------------------------- |
-| 密码明文存储 | 🔴 严重 | 设备盗窃、恶意App、备份泄露 |
+| 运行时明文窗口 | 🟠 重要 | 解锁期间 runtime SQLite 和内存仍需 OS 权限保护 |
 | 无传输加密   | 🔴 严重 | WiFi窃听、中间人攻击        |
 | 无身份认证   | 🔴 严重 | 服务器任何人可访问          |
-| 无访问控制   | 🟠 重要 | 其他应用可读取数据库        |
-| 无完整性校验 | 🟠 重要 | 数据篡改无法检测            |
+| 无访问控制   | 🟠 重要 | 解锁运行期仍依赖系统权限边界 |
+| 自定义加密实现 | 🟠 重要 | sync payload 需要替换为标准 AEAD/E2EE |
 
 ### 功能性问题
 
 | 问题             | 影响                 |
 | ---------------- | -------------------- |
-| 版本冲突丢失     | 设备编辑丢失         |
-| 无离线支持       | 离线期间编辑产生冲突 |
-| 全库覆盖效率低   | 网络慢时同步困难     |
-| 无编辑历史       | 无法恢复             |
-| 无多设备编辑合并 | 多设备使用不友好     |
+| 服务端弱认证     | 任何知道地址的人都可尝试访问 |
+| 远端密钥治理不足 | 撤销、轮换、设备加入仍需正式设计 |
+| 冲突体验仍需打磨 | 已有 ConflictInbox，但仍需更多 UI/测试 |
+| 弱服务器文件存储 | 可用但缺少数据库级查询和审计 |
 
 ### 可维护性问题
 
 | 问题             | 技术债               |
 | ---------------- | -------------------- |
-| 向量时钟已删除   | 无法准确检测因果关系 |
-| 冲突解决器已删除 | 无备用冲突处理方案   |
-| 加密逻辑占位符   | 需要重新设计         |
-| 服务器无数据库   | 难以扩展功能         |
+| sync metadata 仍分散 | settings key、服务端版本和本机偏好需要继续收敛 |
+| 自定义 payload codec | 当前有 HMAC/nonce/ciphertext，但应替换为标准 AEAD |
+| 服务器无数据库   | 弱服务器场景可接受，但扩展能力有限 |
 
 ---
 

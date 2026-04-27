@@ -1,5 +1,7 @@
 # Bug Fix: 同步后账号数量显示0 & 账号列表不刷新
 
+> Current delta (2026-04-28): this dev log records a resolved historical bug. `SyncResult` no longer exposes `accountCount`; current sync UI should rely on `version`, `conflictCount`, `notice`, and provider refresh after `ServiceManager.notifyListeners()`.
+
 **日期**: 2026-04-18  
 **影响文件**: `service_manager.dart`, `security_settings_view.dart`  
 **严重性**: 🟠 重要（功能性错误，影响用户体验）

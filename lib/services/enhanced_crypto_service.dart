@@ -1,8 +1,12 @@
 import 'dart:convert';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:cryptography/cryptography.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
+import 'database_file_cipher.dart';
+import 'database_file_key_manager.dart';
 
 class EnhancedCryptoService {
   static const String _masterPasswordKeyV1 = 'master_password_v1';
@@ -13,6 +17,7 @@ class EnhancedCryptoService {
 
   final FlutterSecureStorage _secureStorage;
   bool _isUnlocked = false;
+  Uint8List? _databaseKeyBytes;
 
   EnhancedCryptoService({FlutterSecureStorage? secureStorage})
     : _secureStorage = secureStorage ?? const FlutterSecureStorage();
@@ -20,27 +25,31 @@ class EnhancedCryptoService {
   bool get hasMasterKey => _isUnlocked;
 
   Future<bool> initMasterKey(String masterPassword) async {
-    final v2Hash = await _secureStorage.read(key: _masterPasswordKeyV2);
+    final v2Hash = await _readSecureValue(_masterPasswordKeyV2);
     if (v2Hash != null) {
       final verified = await _verifyPbkdf2(masterPassword, v2Hash);
-      _isUnlocked = verified;
+      if (verified) {
+        await _unlockWithPassword(masterPassword);
+      } else {
+        logout();
+      }
       return verified;
     }
 
-    final v1Password = await _secureStorage.read(key: _masterPasswordKeyV1);
+    final v1Password = await _readSecureValue(_masterPasswordKeyV1);
     if (v1Password != null) {
       if (v1Password != masterPassword) {
-        _isUnlocked = false;
+        logout();
         return false;
       }
       await _storePbkdf2Hash(masterPassword);
-      await _secureStorage.delete(key: _masterPasswordKeyV1);
-      _isUnlocked = true;
+      await _deleteSecureValue(_masterPasswordKeyV1);
+      await _unlockWithPassword(masterPassword);
       return true;
     }
 
     await _storePbkdf2Hash(masterPassword);
-    _isUnlocked = true;
+    await _unlockWithPassword(masterPassword);
     return true;
   }
 
@@ -48,34 +57,54 @@ class EnhancedCryptoService {
     String oldPassword,
     String newPassword,
   ) async {
-    final v2Hash = await _secureStorage.read(key: _masterPasswordKeyV2);
+    final v2Hash = await _readSecureValue(_masterPasswordKeyV2);
     if (v2Hash != null) {
       final verified = await _verifyPbkdf2(oldPassword, v2Hash);
       if (!verified) return false;
+      final databaseKeyBytes = await _unlockDatabaseFileKey(oldPassword);
+      await _rotateDatabaseKeyEnvelope(newPassword, databaseKeyBytes);
       await _storePbkdf2Hash(newPassword);
+      await _unlockWithPassword(newPassword);
       return true;
     }
 
-    final v1Password = await _secureStorage.read(key: _masterPasswordKeyV1);
+    final v1Password = await _readSecureValue(_masterPasswordKeyV1);
     if (v1Password != null && v1Password == oldPassword) {
+      final databaseKeyBytes = await _unlockDatabaseFileKey(oldPassword);
+      await _rotateDatabaseKeyEnvelope(newPassword, databaseKeyBytes);
       await _storePbkdf2Hash(newPassword);
-      await _secureStorage.delete(key: _masterPasswordKeyV1);
+      await _deleteSecureValue(_masterPasswordKeyV1);
+      await _unlockWithPassword(newPassword);
       return true;
     }
     return false;
   }
 
   Future<bool> verifyMasterPassword(String masterPassword) async {
-    final v2Hash = await _secureStorage.read(key: _masterPasswordKeyV2);
+    final v2Hash = await _readSecureValue(_masterPasswordKeyV2);
     if (v2Hash != null) {
       return _verifyPbkdf2(masterPassword, v2Hash);
     }
-    final v1Password = await _secureStorage.read(key: _masterPasswordKeyV1);
+    final v1Password = await _readSecureValue(_masterPasswordKeyV1);
     return v1Password == masterPassword;
   }
 
   void logout() {
     _isUnlocked = false;
+    _databaseKeyBytes = null;
+  }
+
+  DatabaseFileCipher createDatabaseFileCipher() {
+    final keyBytes = _databaseKeyBytes;
+    if (!_isUnlocked || keyBytes == null) {
+      throw StateError('Master key is locked.');
+    }
+    return DatabaseFileCipher(keyBytes: keyBytes);
+  }
+
+  Future<void> _unlockWithPassword(String masterPassword) async {
+    _databaseKeyBytes = await _unlockDatabaseFileKey(masterPassword);
+    _isUnlocked = true;
   }
 
   Future<void> _storePbkdf2Hash(String password) async {
@@ -95,7 +124,7 @@ class EnhancedCryptoService {
     final hashBytes = await secretKey.extractBytes();
     final encoded =
         'pbkdf2\$$_pbkdf2Iterations\$${base64Encode(salt)}\$${base64Encode(hashBytes)}';
-    await _secureStorage.write(key: _masterPasswordKeyV2, value: encoded);
+    await _writeSecureValue(_masterPasswordKeyV2, encoded);
   }
 
   Future<bool> _verifyPbkdf2(String password, String encoded) async {
@@ -125,6 +154,41 @@ class EnhancedCryptoService {
     );
     final hashBytes = await secretKey.extractBytes();
     return _constantTimeEquals(hashBytes, expectedHash);
+  }
+
+  Future<Uint8List> _unlockDatabaseFileKey(String password) async {
+    return _databaseFileKeyManager().unlock(password);
+  }
+
+  Future<void> _rotateDatabaseKeyEnvelope(
+    String newPassword,
+    Uint8List databaseKeyBytes,
+  ) async {
+    await _databaseFileKeyManager().rotateEnvelope(
+      newPassword: newPassword,
+      databaseKeyBytes: databaseKeyBytes,
+    );
+  }
+
+  Future<String?> _readSecureValue(String key) {
+    return _secureStorage.read(key: key);
+  }
+
+  Future<void> _writeSecureValue(String key, String value) {
+    return _secureStorage.write(key: key, value: value);
+  }
+
+  Future<void> _deleteSecureValue(String key) {
+    return _secureStorage.delete(key: key);
+  }
+
+  DatabaseFileKeyManager _databaseFileKeyManager() {
+    return DatabaseFileKeyManager(
+      read: ({required key}) => _readSecureValue(key),
+      write: ({required key, required value}) => _writeSecureValue(key, value),
+      delete: ({required key}) => _deleteSecureValue(key),
+      pbkdf2Iterations: _pbkdf2Iterations,
+    );
   }
 
   static bool _constantTimeEquals(List<int> a, List<int> b) {

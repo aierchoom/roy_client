@@ -14,7 +14,7 @@ Related: [SECRETROY_ARCHITECTURE_DEEP_DIVE.md](C:\Users\choom\Desktop\CodeRepo\r
 | Scope | Maturity, risks, readiness, migration and next-stage planning |
 | Owner | Repository maintainers (formal owner TBD) |
 | Review Status | Draft - Unapproved |
-| Last Updated | 2026-04-20 |
+| Last Updated | 2026-04-28 |
 
 ## 1. Maturity Assessment
 
@@ -22,6 +22,7 @@ Related: [SECRETROY_ARCHITECTURE_DEEP_DIVE.md](C:\Users\choom\Desktop\CodeRepo\r
 
 - 客户端分层清晰
 - 本地优先设计明确
+- 本地数据库已具备 AES-GCM-256 文件信封加密
 - 模板系统具备扩展性
 - 同步与冲突模型相对成熟
 
@@ -33,7 +34,7 @@ Related: [SECRETROY_ARCHITECTURE_DEEP_DIVE.md](C:\Users\choom\Desktop\CodeRepo\r
 
 ### Still Prototype-Level
 
-- 安全能力
+- 同步 payload 加密/认证
 - 身份与密钥体系
 - 服务端持久化与认证
 - 观测与恢复能力
@@ -45,7 +46,7 @@ Related: [SECRETROY_ARCHITECTURE_DEEP_DIVE.md](C:\Users\choom\Desktop\CodeRepo\r
 |---|---|
 | Offline Capability | 强 |
 | Consistency | 中等偏强 |
-| Security | 架构方向合理，实现偏弱 |
+| Security | 本地 at-rest 保护已加强，同步协议与服务端安全仍偏弱 |
 | Modifiability | 较强 |
 | Observability | 偏弱 |
 | Testability | 中等 |
@@ -54,7 +55,7 @@ Related: [SECRETROY_ARCHITECTURE_DEEP_DIVE.md](C:\Users\choom\Desktop\CodeRepo\r
 
 - 离线与本地优先是当前系统最强的属性之一。
 - 一致性设计比普通原型好，但缺少更高强度验证。
-- 安全能力是当前最大短板。
+- 安全能力的最大短板已经从“本地库明文落盘”转向“同步 payload、服务端认证和解锁期间运行时保护”。
 
 ## 3. Operational Readiness
 
@@ -78,11 +79,11 @@ Related: [SECRETROY_ARCHITECTURE_DEEP_DIVE.md](C:\Users\choom\Desktop\CodeRepo\r
 
 - 用户、vault、device 的最终关系
 
-### OQ-02. 加密边界最终落在哪里
+### OQ-02. 加密边界还剩哪些缺口
 
 仍需明确：
 
-- 本地库加密
+- 解锁期间 runtime SQLite 工作库的系统级防护边界
 - payload 加密
 - 签名验证边界
 
@@ -128,10 +129,11 @@ Related: [SECRETROY_ARCHITECTURE_DEEP_DIVE.md](C:\Users\choom\Desktop\CodeRepo\r
 问题：
 
 - SQLite 是主存储，损坏会直接影响系统可用性
+- 长期落盘已经加密，但损坏恢复、导出备份和密文完整性诊断仍不完整
 
 建议：
 
-- 增强完整性校验、备份、恢复与导出能力
+- 增强密文完整性诊断、备份、恢复与导出能力
 
 ### R-04. 服务端存储扩展性不足
 
@@ -159,8 +161,8 @@ Related: [SECRETROY_ARCHITECTURE_DEEP_DIVE.md](C:\Users\choom\Desktop\CodeRepo\r
 
 建议顺序：
 
-1. 正式主密钥派生
-2. 本地数据库进入保护边界
+1. 强化主密钥派生参数与无密码模式边界
+2. 完善本地数据库密文备份、恢复与运行时保护
 3. 同步 payload 正式加密/认证
 4. 生物识别与密钥持有关系重构
 

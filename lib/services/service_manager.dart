@@ -109,6 +109,9 @@ class ServiceManager extends ChangeNotifier {
 
     _autoLockListener = () {
       if (_autoLockService.isLocked && _state == ServiceManagerState.unlocked) {
+        unawaited(_closeStorageForLock());
+        unawaited(_syncService.disconnect());
+        unawaited(_lanPairingService.stopHosting());
         _syncService.reset();
         _updateState(ServiceManagerState.locked);
       }
@@ -140,16 +143,20 @@ class ServiceManager extends ChangeNotifier {
   Future<UnlockResult> _completeUnlock(String password) async {
     try {
       await _identityService.initialize();
-      await _secureStorageService.initialize(
-        deviceId: _identityService.deviceId,
-      );
       final didUnlock = await _cryptoService.initMasterKey(password);
       if (!didUnlock) {
         await _secureStorageService.close();
+        _secureStorageService.clearDatabaseCipher();
         await _syncService.disconnect();
         _updateState(ServiceManagerState.locked);
         return UnlockResult.invalidPassword;
       }
+      _secureStorageService.setDatabaseCipher(
+        _cryptoService.createDatabaseFileCipher(),
+      );
+      await _secureStorageService.initialize(
+        deviceId: _identityService.deviceId,
+      );
       _autoLockService.unlock();
       await _syncService.initialize();
 
@@ -194,10 +201,22 @@ class ServiceManager extends ChangeNotifier {
 
   void lock() {
     _autoLockService.lock();
-    unawaited(_secureStorageService.close());
+    unawaited(_closeStorageForLock());
     unawaited(_syncService.disconnect());
     unawaited(_lanPairingService.stopHosting());
     _updateState(ServiceManagerState.locked);
+  }
+
+  Future<void> _closeStorageForLock() async {
+    try {
+      await _secureStorageService.close();
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Failed to close encrypted storage while locking: $e');
+      }
+    } finally {
+      _secureStorageService.clearDatabaseCipher();
+    }
   }
 
   Future<void> logout() async {
@@ -230,6 +249,9 @@ class ServiceManager extends ChangeNotifier {
       newPassword,
     );
     if (success) {
+      await _secureStorageService.rotateDatabaseCipher(
+        _cryptoService.createDatabaseFileCipher(),
+      );
       if (newPassword.isNotEmpty) {
         await disableNoPasswordMode();
       } else {
@@ -244,7 +266,12 @@ class ServiceManager extends ChangeNotifier {
   }
 
   Future<void> resetApplication() async {
-    await logout();
+    _autoLockService.lock();
+    await _syncService.disconnect();
+    await _lanPairingService.stopHosting();
+    await _secureStorageService.close();
+    _secureStorageService.clearDatabaseCipher();
+    _cryptoService.logout();
     await _secureStorageService.deleteDatabaseFile();
 
     // Clear Secure Storage (Identity, Master Password mode, etc)
@@ -725,7 +752,7 @@ class ServiceManager extends ChangeNotifier {
     _autoLockService.dispose();
     _syncService.dispose();
     _lanPairingService.dispose();
-    unawaited(_secureStorageService.close());
+    unawaited(_closeStorageForLock());
     super.dispose();
   }
 }

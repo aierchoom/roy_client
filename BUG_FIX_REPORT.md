@@ -1,5 +1,7 @@
 # SecretRoy 同步 Bug 修复总结
 
+> Current delta (2026-04-28): this is a historical 2026-04-18 bug report. `SyncResult` no longer exposes `accountCount`; current sync status is expressed through `version`, `conflictCount`, and `notice`, while UI refresh is driven by `ServiceManager.notifyListeners()`.
+
 **日期**: 2026-04-18  
 **修复内容**: 同步成功后无法正确显示账号数量和列表的两个 Bug
 

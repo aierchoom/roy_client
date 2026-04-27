@@ -1,6 +1,8 @@
 # SecretRoy Beta 风险清单
 
-更新日期：2026-04-19
+> 2026-04-28 delta: Local SQLite at-rest encryption is now implemented with `secret_roy_vault.db.enc`, a Dart AES-GCM-256 binary file envelope, and a random DB data key wrapped by a master-password-derived key-encryption key. The external security Beta blockers are now sync payload encryption/authentication, server authentication/authorization, transport hardening, and runtime protection while the vault is unlocked.
+
+更新日期：2026-04-28
 
 ## 结论
 
@@ -27,10 +29,10 @@
 
 | 等级 | 状态 | 风险 | 影响 | 当前结论 |
 |---|---|---|---|---|
-| P0 | 未关闭 | 本地账户数据仍保存在明文 SQLite 中 | 设备被直接读取时，账户字段与密码可能被恢复 | 外部 Beta 阻塞 |
-| P0 | 未关闭 | 同步 payload 仍是 Base64 mock，不是真正的 E2EE | 服务端与链路无法提供真实机密性 | 外部 Beta 阻塞 |
+| P0 | 已缓解 | 本地账户数据长期落盘已加密为 `secret_roy_vault.db.enc` | 单独拷走 DB 文件时只能得到 AES-GCM-256 密文；解锁运行期 runtime DB 仍需依赖系统防护 | 外部 Beta 阻塞已从本地明文转移到运行期、同步和服务端风险 |
+| P0 | 未关闭 | 同步 payload 已有 nonce/ciphertext/HMAC 信封，但仍不是标准 AEAD/E2EE | 服务端与链路仍不能被视作零知识安全边界 | 外部 Beta 阻塞 |
 | P0 | 未关闭 | 同步服务端没有身份认证/授权 | 任意知道地址的人都可读写 vault | 外部 Beta 阻塞 |
-| P0 | 未关闭 | 主密码当前保存在安全存储中做比对，不是 KDF/零知识方案 | 无法达到密码管理器应有的安全级别 | 外部 Beta 阻塞 |
+| P1 | 已缓解 | 主密码 verifier 已升级为 PBKDF2-HMAC-SHA256 | 不再直接用主密码明文做比对；后续仍需评估 KDF 参数、no-password 模式和生物识别密钥托管 | Beta 前安全复核项 |
 | P1 | 已缓解 | 数据库打开失败会自动删库 | 会在损坏或异常时直接丢失本地数据 | 已改为保留损坏备份并抛错 |
 | P1 | 已缓解 | 生物识别解锁会卡在 `alreadyInProgress` | 生物识别无法稳定进入主流程 | 已修复 |
 | P1 | 已缓解 | 删除记录不会进入待同步队列 | 多设备会出现“本地删了，远端还在” | 已修复 |

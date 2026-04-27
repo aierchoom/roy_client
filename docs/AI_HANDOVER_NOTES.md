@@ -1,6 +1,6 @@
 # AI Developer Handover Notes (AI 开发交接手册)
 
-> Current delta (2026-04-28): this handover was originally based on the 2026-04-18 code scan. Since then, `EnhancedCryptoService` has been upgraded to store `master_password_v2` PBKDF2-HMAC-SHA256 verifiers and migrate legacy `master_password_v1` after successful verification. Secure vault link export/import now uses `sroy-secure-v2:` with PBKDF2-HMAC-SHA256 plus AES-GCM-256, and LAN pairing uses 8 readable characters. Treat `docs/07_Key_Sync_Implementation.md` as the canonical key-sync reference.
+> Current delta (2026-04-28): this handover was originally based on the 2026-04-18 code scan. Since then, `EnhancedCryptoService` has been upgraded to store `master_password_v2` PBKDF2-HMAC-SHA256 verifiers, unwrap a random local DB data key after unlock, and migrate legacy `master_password_v1` after successful verification. Secure vault link export/import now uses `sroy-secure-v2:` with PBKDF2-HMAC-SHA256 plus AES-GCM-256, LAN pairing uses 8 readable characters, and local SQLite now persists as `secret_roy_vault.db.enc` through a Dart AES-GCM-256 binary file envelope. Treat `docs/07_Key_Sync_Implementation.md` and `docs/08_Local_Database_Encryption.md` as the canonical security references.
 
 > **致未来的 AI 助手：**
 > 本文档基于 2026-04-18 对所有源代码的全面扫描编写。
@@ -8,24 +8,26 @@
 
 ## 1. 核心硬性约束
 
-### 1.1 数据库必须是明文 SQLite
+### 1.1 数据库长期落盘必须是加密文件信封
 
-- **事实**：数据库驱动为 `sqflite`（移动端）和 `sqflite_common_ffi`（桌面端），**不使用 SQLCipher**。
-- 数据库文件 `secret_roy_vault.db` 为标准明文 SQLite 格式。
-- `EnhancedCryptoService` 当前负责主密码 PBKDF2 校验与遗留主密码迁移；本地 SQLite 账号数据仍未接入 SQLCipher 或逐字段静态加密。
-- 同步服务器上的文件名为 `vault.db.enc`，但内容实际上也是明文 SQLite。
+- **事实**：数据库运行时仍使用 `sqflite`（移动端）和 `sqflite_common_ffi`（桌面端），**不使用 SQLCipher**。
+- 长期落盘文件为 `secret_roy_vault.db.enc`，由 Dart 层 `DatabaseFileCipher` 以 AES-GCM-256 二进制信封加密。
+- 解锁顺序必须是：先由 `EnhancedCryptoService.initMasterKey()` 校验/建立主密码并解开随机 DB 数据密钥，再调用 `SecureStorageService.setDatabaseCipher()` 和 `initialize()` 打开 SQLite。
+- 解锁期间会在临时目录生成 `secret_roy_vault.runtime.db` 作为 SQLite 工作库，`close()` / 锁定时会重新封装并删除运行时文件。
+- 不再兼容旧中间版本的 `secret_roy_vault.db` 明文库；初始化和重置路径可以清理它，不需要导入迁移。
+- 同步层当前走记录级 CRDT payload，不再依赖服务端保存整库明文快照。
 
-### 1.2 同步后的 500ms 延迟不可删除
+### 1.2 同步后的刷新延迟暂时保留
 
-- 在 `ServiceManager.syncNow()` 的 pull 路径中，`replaceDatabase()` 会关闭 DB 连接并写入新文件。
-- 必须 `await Future.delayed(500ms)` 才能重新 `initialize()`。
-- 原因：文件系统存在写入缓冲区刷盘延迟（尤其是 Android）。
+- 当前同步主路径是记录级 `/vaults/<vaultId>/sync`，pull 会将远端 `encrypted_signed_payload` 解封后合并到本地 runtime SQLite，再持久化 `.db.enc`。
+- `ServiceManager.syncNow()` 在 pulled 后仍保留 `await Future.delayed(500ms)`，然后重新 `initialize()` storage/sync，作为刷盘和状态重读保护。
+- 这不再是旧整库 `replaceDatabase()` 的必须补丁，而是保守刷新策略；要删除需要先补同步回归测试。
 
-### 1.3 replaceDatabase 后必须重新 initialize
+### 1.3 replaceDatabase 是备用整库替换入口
 
-- `replaceDatabase()` 内部会将 `_database = null`，此后 `isOpen == false`。
-- 任何 `loadAccounts()` 调用都会返回空列表。
-- **调用方（ServiceManager）必须在替换后显式调用 `initialize()` 重新打开数据库。**
+- 当前 `SyncService` 不再调用 `replaceDatabase()` 做主同步。
+- 如果后续导入/恢复流程使用 `replaceDatabase()`，它会关闭当前连接、把传入 SQLite bytes 封装为 `secret_roy_vault.db.enc`，并删除 runtime/旧明文库。
+- **调用方必须在替换后显式调用 `initialize()` 重新解封并打开数据库。**
 
 ### 1.4 同步配置存储在 SharedPreferences
 
@@ -40,11 +42,10 @@
 SyncService.syncNow() → 决策推/拉 → 执行
 ServiceManager.syncNow() → 如果是 pull:
   1. 等 500ms
-  2. storageService.initialize()      // 重新打开 DB
-  3. syncService.initialize()         // 从新 DB 读版本号
-  4. storageService.loadAccounts()    // 获取真实账号数
-  5. notifyListeners()                // 触发 EnhancedAppProvider.refresh()
-  6. return SyncResult(accountCount:N) // 正确数量
+  2. storageService.initialize()      // 重新解封/刷新 runtime 状态
+  3. syncService.initialize()         // 从 settings 读版本号/dirty 状态
+  4. notifyListeners()                // 触发 EnhancedAppProvider.refresh()
+  5. return SyncResult(version/conflictCount/notice)
 ```
 
 ### 数据刷新
@@ -71,22 +72,11 @@ ServiceManager.syncNow() → 如果是 pull:
 - 同步链路依赖 `ServiceManager → EnhancedAppProvider` 的通知传导。
 - 删除任何一处 `notifyListeners()` 都可能导致 UI 不刷新。
 
-### SyncService.syncNow() 中的 accountCount
+### SyncService.syncNow() 的 pulled 刷新边界
 
-- Pull 路径中，`loadAccounts()` 在 `replaceDatabase()` 之后调用，此时 DB 已关闭，**返回值始终为 0**。
-- 正确的做法是由 `ServiceManager.syncNow()` 在 `initialize()` 之后重新查询。
-- 不要试图在 `SyncService` 层面修复这个问题——这是架构设计的分层边界。
-
-### 未使用的代码
-
-| 代码 | 说明 |
-|------|------|
-| `SyncService._cryptoService` | 构造时接收但未调用任何方法 |
-| `SyncService._getSyncKey()` | 恒返回空字符串 |
-| `SyncResult.hasMetadata` | 恒为 false |
-| `sync_metadata` 表 | Schema 中创建但无 CRUD 代码 |
-| `uuid` 依赖包 | pubspec 中声明但代码中未 import |
-| `json_serializable` / `build_runner` | dev 依赖但未配置 build.yaml |
+- Pull 路径现在走记录级 merge，不再通过下载整库导致 DB 关闭。
+- `ServiceManager.syncNow()` 仍在 pulled 后重新初始化 storage/sync 并通知 UI，这是当前的保守刷新边界。
+- 不要把本机 sync server URL / custom sync key 放入会被 vault 同步覆盖的 settings 表；这些本机配置仍应留在 `SharedPreferences`。
 
 ---
 *整理人：Antigravity (Google DeepMind Agent)*

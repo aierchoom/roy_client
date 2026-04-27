@@ -196,18 +196,8 @@ flutter pub upgrade --major-versions
 
 ### 3.3 代码生成
 
-如果项目使用代码生成：
-
-```bash
-# 生成代码
-flutter pub run build_runner build
-
-# 监听模式
-flutter pub run build_runner watch
-
-# 清理并重建
-flutter pub run build_runner build --delete-conflicting-outputs
-```
+当前 `pubspec.yaml` 没有配置 `build_runner` / `json_serializable`。模型序列化以手写
+`toJson()` / `fromJson()` 为主；除非后续重新加入代码生成依赖，否则不需要运行生成命令。
 
 ### 3.4 国际化配置
 
