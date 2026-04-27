@@ -101,11 +101,12 @@ Navigation:
 
 - `sync_metadata_namespace_test.dart`
 
-### P0-03 把 payload “加密签名”从占位实现改成正式实现
+### P0-03 把 payload “加密签名”从占位实现推进到标准 AEAD/E2EE
 
 目标：
 
-- 让同步消息具备基本真实性，不再只是 base64 包装
+- 当前同步消息已经具备 nonce/ciphertext/HMAC 信封。
+- 下一步是替换为经过审计的标准 AEAD/E2EE 密钥体系。
 
 涉及文件：
 
@@ -115,7 +116,9 @@ Navigation:
 
 实施要点：
 
-- 替换 `_encryptAndSign()` / `_decryptAndVerify()`
+- 将 `SyncPayloadCodec` 的自定义 XOR keystream + HMAC 方案替换为标准 AEAD
+- 明确 vault symmetric key 的生成、同步、撤销与轮换流程
+- 保留 `_encryptAndSign()` / `_decryptAndVerify()` 的高层接口，降低调用层改动
 - 明确加密、签名、验签、解密的责任边界
 - 为 payload 解析失败、验签失败、身份不匹配建立正式错误
 - 不要把“安全完整方案”耦合进 UI 层

@@ -55,6 +55,7 @@
 | [secret_roy_sync_protocol.md](secret_roy_sync_protocol.md) | **同步协议** — 同步机制详解 |
 | [06_Vault_Linking_Design.md](06_Vault_Linking_Design.md) | **Vault 链接设计** — 多设备配对机制 |
 | [07_Key_Sync_Implementation.md](07_Key_Sync_Implementation.md) | **密钥同步实现** — 安全链接码、服务器配对与 LAN 配对 |
+| [08_Local_Database_Encryption.md](08_Local_Database_Encryption.md) | **本地数据库加密** — `secret_roy_vault.db.enc` 二进制 AES-GCM-256 文件信封 |
 
 ### 模板系统
 

@@ -13,7 +13,7 @@ Next: [01_System_Architecture.md](C:\Users\choom\Desktop\CodeRepo\roy\docs\01_Sy
 | Scope | SecretRoy current architecture snapshot |
 | Owner | Repository maintainers (formal owner TBD) |
 | Review Status | Draft - Unapproved |
-| Last Updated | 2026-04-20 |
+| Last Updated | 2026-04-28 |
 
 ## Positioning
 
@@ -26,13 +26,14 @@ SecretRoy 当前最准确的定位是：
 以下几点需要直接按当前代码理解，而不是按产品愿景理解：
 
 - `IdentityService` 当前已经会在首次初始化时自动生成并持久化 `deviceId`、`vaultId`、mock `privateKey` 与 mock `symmetricKey`；它不再返回固定常量，但身份与密钥体系仍然是过渡态。
-- `EnhancedCryptoService` 当前通过 secure storage 读取和直接比对主密码，尚未形成正式的主密钥派生与密钥管理方案。
-- `SyncService` 里的 `_encryptAndSign()` / `_decryptAndVerify()` 目前只是把 JSON 做 base64 编解码包装，不是正式加密和签名实现。
+- `EnhancedCryptoService` 当前使用 PBKDF2-HMAC-SHA256 存储主密码 verifier，并在解锁后用主密码派生包装密钥解开随机 DB 数据密钥。
+- `SecureStorageService` 当前长期落盘 `secret_roy_vault.db.enc`，通过 Dart 层 AES-GCM-256 二进制信封保护 SQLite 快照；解锁期间会在临时目录创建 runtime SQLite 工作库。
+- `SyncService` 里的 `_encryptAndSign()` / `_decryptAndVerify()` 已经进入记录级 nonce/ciphertext/HMAC 信封；它比早期占位实现更真实，但仍不是经过审计的标准 AEAD/E2EE 方案。
 
 它已经具备一套真实系统应有的基础骨架：
 
 - 富客户端运行时
-- SQLite 本地主存储
+- 加密 SQLite 本地主存储
 - 模板驱动表单
 - 解锁/自动锁状态机
 - 客户端主导同步
@@ -76,8 +77,7 @@ Node 服务端只是同步协调器。
 
 主要缺口集中在：
 
-- 主密钥派生与数据加密
-- 服务端持久化与认证
+- 同步 payload 加密/认证与服务端认证
 - 观测性与恢复性
 - 系统级测试覆盖
 
@@ -89,7 +89,7 @@ Node 服务端只是同步协调器。
 | Domain Modeling | 4 | 账号、模板、同步元数据建模较完整。 |
 | Local-first Design | 5 | 本地优先是核心能力，不是附属特性。 |
 | Sync Design | 4 | pull-then-push、HLC、conflict inbox 都较成熟。 |
-| Security Posture | 2 | 方向合理，但当前实现明显是原型级。 |
+| Security Posture | 3 | 已具备主密码 verifier、本地 DB 文件信封加密和安全链接码；同步 payload、服务端认证和运行时硬化仍不足。 |
 | Backend Robustness | 2 | 可跑，但不具备正式后端的治理与承载能力。 |
 | Modifiability | 4 | 分层较好，但 `ServiceManager` 有集中化风险。 |
 | Testability | 3 | 已覆盖高价值点，但还不足以支撑高风险数据系统。 |
@@ -106,8 +106,8 @@ Node 服务端只是同步协调器。
 
 ### Days 31-60
 
-- 设计正式主密钥派生方案。
-- 设计本地数据库加密边界。
+- 继续强化主密钥派生参数、无密码模式边界和运行时明文工作库保护。
+- 完善本地数据库加密的备份、恢复和损坏检测闭环。
 - 设计同步 payload 的正式加密/认证模型。
 - 制定服务端从 JSON 文件迁移到正式数据库的目标结构。
 

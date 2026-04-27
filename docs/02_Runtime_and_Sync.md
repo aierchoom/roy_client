@@ -14,7 +14,7 @@ Next: [03_Risks_and_Roadmap.md](C:\Users\choom\Desktop\CodeRepo\roy\docs\03_Risk
 | Scope | Startup flow, session flow, persistence flow, sync and conflict handling |
 | Owner | Repository maintainers (formal owner TBD) |
 | Review Status | Draft - Unapproved |
-| Last Updated | 2026-04-20 |
+| Last Updated | 2026-04-28 |
 
 ## 1. Runtime Bootstrap
 
@@ -66,14 +66,14 @@ sequenceDiagram
 
     UV->>SM: unlockWithPassword(password)
     SM->>ID: initialize()
-    SM->>DB: initialize(deviceId)
     SM->>CR: initMasterKey(password)
     alt invalid password
-        SM->>DB: close()
         SM->>SY: disconnect()
         SM->>SM: state = locked
         SM-->>UV: invalidPassword
     else valid password
+        SM->>DB: setDatabaseCipher(...)
+        SM->>DB: initialize(deviceId)
         SM->>AL: unlock()
         SM->>SY: initialize()
         SM->>SY: connect() [async]
@@ -85,6 +85,7 @@ sequenceDiagram
 关键观察：
 
 - 解锁不是一个 UI 操作，而是运行时建会话过程
+- 密码错误时不会打开本地数据库文件
 - 锁定也不是遮 UI，而是回收敏感上下文
 
 ## 3. Local Persistence Flow
@@ -102,7 +103,8 @@ sequenceDiagram
     Edit-->>Provider: Navigator.pop(AccountItem)
     Provider->>SM: saveAccount(item)
     SM->>Storage: saveAccount(item)
-    Storage->>Storage: write SQLite + HLC/meta update
+    Storage->>Storage: write runtime SQLite + HLC/meta update
+    Storage->>Storage: persist encrypted .db.enc snapshot
     SM->>Sync: markDirty()
     SM->>Sync: syncNow() [unawaited]
     Storage-->>Provider: onChange event
@@ -197,8 +199,9 @@ sequenceDiagram
 在看这一节之前，需要先把当前实现与目标能力分开：
 
 - `IdentityService` 已经有设备 ID、`vaultId`、mock `privateKey`、mock `symmetricKey` 的自动生成与持久化逻辑；当前问题不再是“没有生成”，而是它仍然停留在 mock identity / mock key 阶段，尚未升级为正式模型。
-- `EnhancedCryptoService` 当前主要是在 secure storage 中保存并比对主密码，更多是会话门禁实现，不是完整密码学底座。
-- `SyncService` 的 `encrypted_signed_payload` 命名代表的是协议壳，而当前实现实际只是 base64 包装后的 JSON 字符串。
+- `EnhancedCryptoService` 当前使用 PBKDF2-HMAC-SHA256 verifier 校验主密码，并用主密码派生包装密钥解开随机 DB 数据密钥。
+- `SecureStorageService` 当前以 `secret_roy_vault.db.enc` 长期落盘，通过 AES-GCM-256 二进制文件信封保护 SQLite 快照；解锁期间存在临时 runtime SQLite 工作库，锁定时会关闭并删除。
+- `SyncService` 的 `encrypted_signed_payload` 当前是记录级 nonce/ciphertext/HMAC 信封，使用 vault/device 派生材料做混淆加密与完整性校验；它仍不是标准 AEAD/E2EE 终局方案。
 
 ### 7.1 What Exists Today
 
@@ -206,11 +209,11 @@ sequenceDiagram
 - 自动锁
 - 生物识别入口
 - secure storage
+- 本地数据库文件级 AES-GCM-256 加密
 
 ### 7.2 What Is Still Prototype-Level
 
-- 正式密钥派生
-- 本地数据库加密
+- 运行时明文工作库防护
 - 正式同步 payload 加密/认证
 - 完整设备身份与密钥体系
 

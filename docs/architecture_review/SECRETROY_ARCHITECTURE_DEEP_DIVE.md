@@ -2,7 +2,9 @@
 
 > 更适合阅读的拆分文档集见：[ARCHITECTURE_DOCS_INDEX.md](ARCHITECTURE_DOCS_INDEX.md)
 >
-> 现实校准：本文优先以当前源码实现为准。像固定 `vaultId` getter、secure storage 直接主密码比对、base64 包装 payload 这类实现，均应视为原型现状而非生产级能力。
+> 现实校准：本文优先以当前源码实现为准。历史版本里的固定 `vaultId`、secure storage 直接主密码比对、早期 payload 协议壳已经被收敛；当前剩余问题是 identity/key 仍偏 mock、sync payload 不是标准 AEAD/E2EE、服务端缺少认证授权。
+>
+> 2026-04-28 delta: 本地数据库长期落盘已切换为 `secret_roy_vault.db.enc` AES-GCM-256 二进制文件信封；主密码校验后才解开随机 DB 数据密钥并打开 runtime SQLite 工作库。早期本地数据库风险段落仅作为历史语境保留。
 
 | Item | Value |
 |---|---|
@@ -13,7 +15,7 @@
 | Perspective | System architecture and engineering assessment |
 | Owner | Repository maintainers (formal owner TBD) |
 | Review Status | Draft - Unapproved |
-| Last Updated | 2026-04-20 |
+| Last Updated | 2026-04-28 |
 | Code Baseline | Current workspace snapshot |
 
 ## 文档定位
@@ -1616,11 +1618,17 @@ sequenceDiagram
 - 主密码管理集中
 - 密码工具归口
 
-但从安全实现上，它明显是原型：
+当前安全实现已越过原型阶段：
 
-- 没有正式 KDF
-- 没有真正数据加密
-- 主密码处理不具备生产级安全姿态
+- 主密码校验使用 PBKDF2-HMAC-SHA256 verifier
+- 解锁后用主密码派生包装密钥解开随机 DB 数据密钥
+- 本地长期落盘数据库使用 AES-GCM-256 二进制文件信封
+
+但仍不是最终安全方案：
+
+- 运行时 SQLite 工作库仍是明文临时文件
+- 生物识别解锁仍依赖 secure storage 中的主密码材料
+- KDF 参数与密钥生命周期还需要继续收敛
 
 #### 13.3 `BiometricAuthService`
 
@@ -1969,13 +1977,13 @@ SecretRoy 在这一点上做得不错：
 - device 与 vault 的绑定关系如何表达
 - 多设备加入与撤销如何进行
 
-### OQ-002. 加密边界最终放在哪里
+### OQ-002. 运行时与远端加密边界最终放在哪里
 
-当前同步 payload 的“加密”仍是占位级实现，因此必须明确：
+当前本地长期落盘数据库已使用 `.db.enc` 文件信封，记录级同步 payload 也已进入 encrypted/signed 形态；后续仍必须明确：
 
-- 本地数据库是否全量加密
-- 远端 payload 是否逐字段或逐记录加密
-- 签名与验证在哪一层执行
+- 运行时 SQLite 工作库是否需要进一步缩短明文窗口
+- 远端 payload 是否需要从记录级封装升级到更强的端到端密钥治理
+- 签名、验证、撤销与密钥轮换在哪一层执行
 
 ### OQ-003. 模板是否进入正式同步域
 
@@ -2340,17 +2348,18 @@ SecretRoy 在这一点上做得不错：
 
 当前表现：
 
-- 架构方向合理，当前实现偏弱
+- 架构方向合理，本地长期落盘边界已加固，但运行时和远端边界仍需继续推进
 
 依据：
 
 - 有解锁入口、自动锁、生物识别、secure storage
-- 但真正的密码学设计尚未落地
+- 有 PBKDF2 主密码 verifier、随机 DB 数据密钥 envelope、AES-GCM-256 `.db.enc` 信封
+- 同步 payload 已有 encrypted/signed 编解码
 
 当前缺口：
 
-- 本地数据库未形成正式加密边界
-- payload 加密与认证未完成
+- 运行时 SQLite 工作库仍是明文临时文件
+- payload 加密与认证还缺少完整密钥治理与服务端强认证
 - 身份与密钥体系仍是过渡态
 
 ### QA-004. Modifiability

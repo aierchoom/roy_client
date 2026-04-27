@@ -12,6 +12,7 @@ import '../models/account_item.dart';
 import '../models/account_template.dart';
 import '../models/hlc.dart';
 import '../sync/crdt_merge_engine.dart';
+import 'database_file_cipher.dart';
 
 bool get _isDesktop =>
     !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
@@ -20,16 +21,41 @@ enum StorageItemType { account, template, setting }
 
 class SecureStorageService {
   static const String _databaseName = 'secret_roy_vault.db';
+  static const String _encryptedDatabaseName = 'secret_roy_vault.db.enc';
+  static const String _workingDatabaseName = 'secret_roy_vault.runtime.db';
   static const int _databaseVersion = 4;
+
+  DatabaseFileCipher? _databaseCipher;
 
   dynamic _database;
   StreamController<StorageChangeEvent> _changeController =
       StreamController<StorageChangeEvent>.broadcast();
 
   String _deviceId = 'local';
+  String? _encryptedDatabasePath;
+  String? _workingDatabasePath;
+  String? _legacyDatabasePath;
+
+  SecureStorageService({DatabaseFileCipher? databaseCipher})
+    : _databaseCipher = databaseCipher;
 
   Stream<StorageChangeEvent> get onChange => _changeController.stream;
   bool get isOpen => _database?.isOpen ?? false;
+
+  void setDatabaseCipher(DatabaseFileCipher cipher) {
+    _databaseCipher = cipher;
+  }
+
+  void clearDatabaseCipher() {
+    _databaseCipher = null;
+  }
+
+  Future<void> rotateDatabaseCipher(DatabaseFileCipher cipher) async {
+    _databaseCipher = cipher;
+    if (isOpen) {
+      await _persistEncryptedDatabase();
+    }
+  }
 
   Future<void> initialize({String deviceId = 'local'}) async {
     _deviceId = deviceId;
@@ -38,12 +64,38 @@ class SecureStorageService {
     }
 
     final documentsDirectory = await getApplicationDocumentsDirectory();
-    final databasePath = join(documentsDirectory.path, _databaseName);
+    final temporaryDirectory = await getTemporaryDirectory();
+    _legacyDatabasePath = join(documentsDirectory.path, _databaseName);
+    _encryptedDatabasePath = join(
+      documentsDirectory.path,
+      _encryptedDatabaseName,
+    );
+    _workingDatabasePath = join(
+      temporaryDirectory.path,
+      'secret_roy',
+      _workingDatabaseName,
+    );
+
+    if (_databaseCipher == null) {
+      throw StateError('Database file cipher is not configured.');
+    }
+
+    if (isOpen) {
+      await _persistEncryptedDatabase();
+      return;
+    }
 
     try {
-      await _openAndInitialize(databasePath);
+      await _prepareWorkingDatabase();
+      await _openAndInitialize(_workingDatabasePath!);
+      await _setRuntimePragmas();
+      await _persistEncryptedDatabase();
+      await _deleteLegacyPlaintextDatabase();
     } catch (e) {
-      final backupPath = await _backupUnreadableDatabase(databasePath);
+      final backupPath = await _backupUnreadableDatabase(
+        _encryptedDatabasePath!,
+      );
+      await _deleteWorkingDatabase();
       if (kDebugMode) {
         debugPrint('Failed to open database safely: $e');
       }
@@ -78,16 +130,27 @@ class SecureStorageService {
   }
 
   Future<void> close({bool dispose = false}) async {
+    final hadOpenDatabase = isOpen;
+    if (hadOpenDatabase) {
+      await _checkpointRuntimeDatabase();
+    }
+
+    await _database?.close();
+    _database = null;
+
+    if (hadOpenDatabase) {
+      await _persistEncryptedDatabase(databaseIsOpen: false);
+      await _deleteWorkingDatabase();
+    }
+
     if (dispose && !_changeController.isClosed) {
       await _changeController.close();
     }
-    await _database?.close();
-    _database = null;
   }
 
   Future<bool> isDatabaseInitialized() async {
     final documentsDirectory = await getApplicationDocumentsDirectory();
-    final databasePath = join(documentsDirectory.path, _databaseName);
+    final databasePath = join(documentsDirectory.path, _encryptedDatabaseName);
     return File(databasePath).existsSync();
   }
 
@@ -95,20 +158,26 @@ class SecureStorageService {
     await close();
 
     final documentsDirectory = await getApplicationDocumentsDirectory();
-    final databasePath = join(documentsDirectory.path, _databaseName);
-    
+    final temporaryDirectory = await getTemporaryDirectory();
+    _legacyDatabasePath = join(documentsDirectory.path, _databaseName);
+    _encryptedDatabasePath = join(
+      documentsDirectory.path,
+      _encryptedDatabaseName,
+    );
+    _workingDatabasePath = join(
+      temporaryDirectory.path,
+      'secret_roy',
+      _workingDatabaseName,
+    );
+
     try {
-      final file = File(databasePath);
-      if (file.existsSync()) {
-        // Close just in case it wasn't closed
-        await _database?.close();
-        _database = null;
-        
-        await file.delete();
-        debugPrint('[Storage] Database file deleted manually: $databasePath');
-      }
-      // Also call sqflite's deleteDatabase to clean up any related files (journal, etc)
-      await deleteDatabase(databasePath);
+      await _deleteDatabaseFamily(_encryptedDatabasePath!);
+      await _deleteDatabaseFamily(_legacyDatabasePath!);
+      await _deleteWorkingDatabase();
+      await _deleteCorruptBackups(_encryptedDatabasePath!);
+      await _deleteCorruptBackups(_legacyDatabasePath!);
+      clearDatabaseCipher();
+      debugPrint('[Storage] Encrypted database files deleted manually.');
     } catch (e) {
       debugPrint('[Storage] Failed to delete database file: $e');
     }
@@ -120,6 +189,7 @@ class SecureStorageService {
       await _database!.execute('DELETE FROM accounts');
       await _database!.execute('DELETE FROM templates WHERE is_custom = 1');
       await _database!.execute('DELETE FROM conflict_logs');
+      await _persistAfterMutation();
       _notifyChange(
         StorageChangeEvent(
           type: StorageItemType.account,
@@ -135,7 +205,7 @@ class SecureStorageService {
 
   Future<String> getDatabaseFilePath() async {
     final documentsDirectory = await getApplicationDocumentsDirectory();
-    return join(documentsDirectory.path, _databaseName);
+    return join(documentsDirectory.path, _encryptedDatabaseName);
   }
 
   Future<String?> _backupUnreadableDatabase(String databasePath) async {
@@ -163,32 +233,178 @@ class SecureStorageService {
     await _database?.close();
     _database = null;
 
-    final dbFile = File(databasePath);
-    final tempFile = File('$databasePath.tmp');
-    final backupFile = File('$databasePath.bak');
+    _encryptedDatabasePath = databasePath;
+    final cipher = _requireDatabaseCipher();
+    final encryptedBytes = await cipher.encrypt(newDbBytes);
+    await _writeFileAtomically(databasePath, encryptedBytes);
+    await _deleteWorkingDatabase();
+    await _deleteLegacyPlaintextDatabase();
+  }
 
-    await tempFile.writeAsBytes(newDbBytes, flush: true);
+  DatabaseFileCipher _requireDatabaseCipher() {
+    final cipher = _databaseCipher;
+    if (cipher == null) {
+      throw StateError('Database file cipher is not configured.');
+    }
+    return cipher;
+  }
+
+  Future<void> _prepareWorkingDatabase() async {
+    final workingPath = _workingDatabasePath!;
+    await _deleteWorkingDatabase();
+    await Directory(dirname(workingPath)).create(recursive: true);
+
+    final encryptedFile = File(_encryptedDatabasePath!);
+    if (!encryptedFile.existsSync()) {
+      return;
+    }
+
+    final encryptedBytes = Uint8List.fromList(
+      await encryptedFile.readAsBytes(),
+    );
+    final plaintextBytes = await _requireDatabaseCipher().decrypt(
+      encryptedBytes,
+    );
+    await _writeFileAtomically(workingPath, plaintextBytes);
+  }
+
+  Future<void> _setRuntimePragmas() async {
+    await _executePragmaSafely('PRAGMA journal_mode = DELETE');
+    await _executePragmaSafely('PRAGMA synchronous = FULL');
+  }
+
+  Future<void> _executePragmaSafely(String sql) async {
+    if (!isOpen) return;
+    try {
+      await _database!.execute(sql);
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Failed to apply SQLite pragma "$sql": $e');
+      }
+    }
+  }
+
+  Future<void> _checkpointRuntimeDatabase() async {
+    if (!isOpen) return;
+    try {
+      await _database!.rawQuery('PRAGMA wal_checkpoint(TRUNCATE)');
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Failed to checkpoint runtime database: $e');
+      }
+    }
+  }
+
+  Future<void> _persistEncryptedDatabase({bool databaseIsOpen = true}) async {
+    final encryptedPath = _encryptedDatabasePath;
+    final workingPath = _workingDatabasePath;
+    if (encryptedPath == null || workingPath == null) {
+      return;
+    }
+
+    if (databaseIsOpen && isOpen) {
+      await _checkpointRuntimeDatabase();
+    }
+
+    final workingFile = File(workingPath);
+    if (!workingFile.existsSync()) {
+      return;
+    }
+
+    final plaintextBytes = Uint8List.fromList(await workingFile.readAsBytes());
+    final encryptedBytes = await _requireDatabaseCipher().encrypt(
+      plaintextBytes,
+    );
+    await _writeFileAtomically(encryptedPath, encryptedBytes);
+  }
+
+  Future<void> _persistAfterMutation() async {
+    await _persistEncryptedDatabase();
+  }
+
+  Future<void> _writeFileAtomically(String targetPath, Uint8List bytes) async {
+    await Directory(dirname(targetPath)).create(recursive: true);
+
+    final targetFile = File(targetPath);
+    final tempFile = File('$targetPath.tmp');
+    final backupFile = File('$targetPath.bak');
+
+    if (tempFile.existsSync()) {
+      await tempFile.delete();
+    }
+    await tempFile.writeAsBytes(bytes, flush: true);
+
     if (backupFile.existsSync()) {
       await backupFile.delete();
     }
-
-    if (dbFile.existsSync()) {
-      await dbFile.rename(backupFile.path);
+    if (targetFile.existsSync()) {
+      await targetFile.rename(backupFile.path);
     }
 
     try {
-      await tempFile.rename(databasePath);
+      await tempFile.rename(targetPath);
       if (backupFile.existsSync()) {
         await backupFile.delete();
       }
-    } catch (e) {
-      if (backupFile.existsSync() && !dbFile.existsSync()) {
-        await backupFile.rename(databasePath);
+    } catch (_) {
+      if (backupFile.existsSync() && !targetFile.existsSync()) {
+        await backupFile.rename(targetPath);
       }
       rethrow;
     } finally {
       if (tempFile.existsSync()) {
         await tempFile.delete();
+      }
+    }
+  }
+
+  Future<void> _deleteWorkingDatabase() async {
+    final workingPath = _workingDatabasePath;
+    if (workingPath == null) {
+      return;
+    }
+    await _deleteDatabaseFamily(workingPath);
+  }
+
+  Future<void> _deleteLegacyPlaintextDatabase() async {
+    final legacyPath = _legacyDatabasePath;
+    if (legacyPath == null) {
+      return;
+    }
+    await _deleteDatabaseFamily(legacyPath);
+  }
+
+  Future<void> _deleteDatabaseFamily(String basePath) async {
+    final paths = [
+      basePath,
+      '$basePath-journal',
+      '$basePath-wal',
+      '$basePath-shm',
+      '$basePath.tmp',
+      '$basePath.bak',
+    ];
+
+    for (final path in paths) {
+      final file = File(path);
+      if (file.existsSync()) {
+        await file.delete();
+      }
+    }
+  }
+
+  Future<void> _deleteCorruptBackups(String basePath) async {
+    final parent = Directory(dirname(basePath));
+    if (!parent.existsSync()) {
+      return;
+    }
+    final baseFileName = basename(basePath);
+    await for (final entity in parent.list()) {
+      if (entity is! File) {
+        continue;
+      }
+      final name = basename(entity.path);
+      if (name.startsWith('$baseFileName.corrupt.')) {
+        await entity.delete();
       }
     }
   }
@@ -262,16 +478,22 @@ class SecureStorageService {
     if (oldVersion < 2) {
       await db.execute('ALTER TABLE templates ADD COLUMN category TEXT');
     }
-    
+
     if (oldVersion < 3) {
       // Data Migration for Phase 2 HLC Structure
       await db.execute('ALTER TABLE accounts ADD COLUMN name_hlc TEXT');
       await db.execute('ALTER TABLE accounts ADD COLUMN email_hlc TEXT');
       await db.execute('ALTER TABLE accounts ADD COLUMN data_hlc TEXT');
-      await db.execute('ALTER TABLE accounts ADD COLUMN server_version INTEGER DEFAULT 0');
+      await db.execute(
+        'ALTER TABLE accounts ADD COLUMN server_version INTEGER DEFAULT 0',
+      );
       // sync_status 1 = pendingPush (since migration changes the data, push it up)
-      await db.execute('ALTER TABLE accounts ADD COLUMN sync_status INTEGER DEFAULT 1');
-      await db.execute('ALTER TABLE accounts ADD COLUMN is_deleted INTEGER DEFAULT 0');
+      await db.execute(
+        'ALTER TABLE accounts ADD COLUMN sync_status INTEGER DEFAULT 1',
+      );
+      await db.execute(
+        'ALTER TABLE accounts ADD COLUMN is_deleted INTEGER DEFAULT 0',
+      );
       await db.execute('ALTER TABLE accounts ADD COLUMN delete_hlc TEXT');
 
       await db.execute('''
@@ -286,8 +508,7 @@ class SecureStorageService {
       ''');
 
       // Populate default HLCs for old accounts so they don't break the new model
-      final stamp =
-          '${DateTime.now().millisecondsSinceEpoch}-0-migration';
+      final stamp = '${DateTime.now().millisecondsSinceEpoch}-0-migration';
       await db.execute(
         'UPDATE accounts SET name_hlc = ?, email_hlc = ?, data_hlc = ?, sync_status = 1',
         [stamp, stamp, '{}'],
@@ -296,9 +517,15 @@ class SecureStorageService {
 
     if (oldVersion < 4) {
       await db.execute('ALTER TABLE templates ADD COLUMN hlc TEXT');
-      await db.execute('ALTER TABLE templates ADD COLUMN server_version INTEGER DEFAULT 0');
-      await db.execute('ALTER TABLE templates ADD COLUMN sync_status INTEGER DEFAULT 1');
-      await db.execute('ALTER TABLE templates ADD COLUMN is_deleted INTEGER DEFAULT 0');
+      await db.execute(
+        'ALTER TABLE templates ADD COLUMN server_version INTEGER DEFAULT 0',
+      );
+      await db.execute(
+        'ALTER TABLE templates ADD COLUMN sync_status INTEGER DEFAULT 1',
+      );
+      await db.execute(
+        'ALTER TABLE templates ADD COLUMN is_deleted INTEGER DEFAULT 0',
+      );
       await db.execute('ALTER TABLE templates ADD COLUMN delete_hlc TEXT');
     }
   }
@@ -381,26 +608,33 @@ class SecureStorageService {
     }
   }
 
-  Future<void> saveAccount(AccountItem account, {bool isSyncMerge = false}) async {
+  Future<void> saveAccount(
+    AccountItem account, {
+    bool isSyncMerge = false,
+  }) async {
     if (!isOpen) return;
 
     AccountItem itemToSave = account;
 
     if (!isSyncMerge) {
       // Local Save logic: Stamp HLCs on explicitly modified fields
-      final existingRows = await _query('accounts', where: 'id = ?', whereArgs: [account.id]);
+      final existingRows = await _query(
+        'accounts',
+        where: 'id = ?',
+        whereArgs: [account.id],
+      );
       Hlc newStamp = Hlc.now(_deviceId);
-      
+
       if (existingRows.isNotEmpty) {
         final old = _mapToAccountItem(existingRows.first);
         if (old != null) {
           final nHlc = account.name != old.name ? newStamp : old.nameHlc;
           final eHlc = account.email != old.email ? newStamp : old.emailHlc;
-          
+
           Map<String, Hlc> dHlc = Map.from(old.dataHlc);
           account.data.forEach((k, v) {
             if (old.data[k] != v) {
-               dHlc[k] = newStamp;
+              dHlc[k] = newStamp;
             }
           });
 
@@ -416,7 +650,9 @@ class SecureStorageService {
       } else {
         // Completely new account being saved
         Map<String, Hlc> dHlc = {};
-        account.data.forEach((k, v) { dHlc[k] = newStamp; });
+        account.data.forEach((k, v) {
+          dHlc[k] = newStamp;
+        });
         itemToSave = account.copyWith(
           nameHlc: newStamp,
           emailHlc: newStamp,
@@ -437,13 +673,16 @@ class SecureStorageService {
       'modified_at': DateTime.now().millisecondsSinceEpoch,
       'name_hlc': itemToSave.nameHlc.toString(),
       'email_hlc': itemToSave.emailHlc.toString(),
-      'data_hlc': jsonEncode(itemToSave.dataHlc.map((k, v) => MapEntry(k, v.toString()))),
+      'data_hlc': jsonEncode(
+        itemToSave.dataHlc.map((k, v) => MapEntry(k, v.toString())),
+      ),
       'server_version': itemToSave.serverVersion,
       'sync_status': itemToSave.syncStatus.index,
       'is_deleted': itemToSave.isDeleted ? 1 : 0,
       'delete_hlc': itemToSave.deleteHlc?.toString(),
     }, conflictAlgorithm: ConflictAlgorithm.replace);
 
+    await _persistAfterMutation();
     _notifyChange(
       StorageChangeEvent(
         type: StorageItemType.account,
@@ -453,19 +692,29 @@ class SecureStorageService {
     );
   }
 
-  Future<void> deleteAccount(String id, {bool isSyncMerge = false, Hlc? syncDeleteHlc}) async {
+  Future<void> deleteAccount(
+    String id, {
+    bool isSyncMerge = false,
+    Hlc? syncDeleteHlc,
+  }) async {
     if (!isOpen) return;
 
     Hlc stamp = syncDeleteHlc ?? Hlc.now(_deviceId);
 
     // Apply Soft Delete (Tombstone)
-    await _database!.update('accounts', {
-      'is_deleted': 1,
-      'delete_hlc': stamp.toString(),
-      'sync_status': SyncStatus.pendingPush.index,
-      'modified_at': DateTime.now().millisecondsSinceEpoch,
-    }, where: 'id = ?', whereArgs: [id]);
-    
+    await _database!.update(
+      'accounts',
+      {
+        'is_deleted': 1,
+        'delete_hlc': stamp.toString(),
+        'sync_status': SyncStatus.pendingPush.index,
+        'modified_at': DateTime.now().millisecondsSinceEpoch,
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+
+    await _persistAfterMutation();
     _notifyChange(
       StorageChangeEvent(
         type: StorageItemType.account,
@@ -494,12 +743,13 @@ class SecureStorageService {
     final batch = _database!.batch();
     for (final log in logs) {
       batch.insert(
-        'conflict_logs', 
-        log.toJson(), 
-        conflictAlgorithm: ConflictAlgorithm.replace
+        'conflict_logs',
+        log.toJson(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
       );
     }
     await batch.commit(noResult: true);
+    await _persistAfterMutation();
     _notifyChange(
       StorageChangeEvent(
         type: StorageItemType.account,
@@ -513,10 +763,10 @@ class SecureStorageService {
     if (!isOpen) return [];
     try {
       final rows = await _query(
-        'conflict_logs', 
-        where: 'account_id = ?', 
-        whereArgs: [accountId], 
-        orderBy: 'saved_at DESC'
+        'conflict_logs',
+        where: 'account_id = ?',
+        whereArgs: [accountId],
+        orderBy: 'saved_at DESC',
       );
       return rows.map((r) => ConflictLog.fromJson(r)).toList();
     } catch (_) {
@@ -526,15 +776,22 @@ class SecureStorageService {
 
   Future<void> deleteConflictLog(String logId) async {
     if (!isOpen) return;
-    await _database!.delete('conflict_logs', where: 'id = ?', whereArgs: [logId]);
+    await _database!.delete(
+      'conflict_logs',
+      where: 'id = ?',
+      whereArgs: [logId],
+    );
+    await _persistAfterMutation();
   }
 
   AccountItem? _mapToAccountItem(Map<String, dynamic> row) {
     try {
       final dataStr = row['data'] as String;
       final parsedData = jsonDecode(dataStr);
-      final mapData = parsedData is Map 
-          ? parsedData.map((k, v) => MapEntry(k.toString(), v?.toString() ?? ''))
+      final mapData = parsedData is Map
+          ? parsedData.map(
+              (k, v) => MapEntry(k.toString(), v?.toString() ?? ''),
+            )
           : <String, String>{};
 
       Map<String, dynamic> dataHlcMap = {};
@@ -554,13 +811,20 @@ class SecureStorageService {
         templateId: row['template_id'] as String,
         data: Map<String, String>.from(mapData),
         createdAt: row['created_at'] as int,
-        nameHlc: row['name_hlc'] != null ? Hlc.parse(row['name_hlc']) : dummyHlc,
-        emailHlc: row['email_hlc'] != null ? Hlc.parse(row['email_hlc']) : dummyHlc,
+        nameHlc: row['name_hlc'] != null
+            ? Hlc.parse(row['name_hlc'])
+            : dummyHlc,
+        emailHlc: row['email_hlc'] != null
+            ? Hlc.parse(row['email_hlc'])
+            : dummyHlc,
         dataHlc: dataHlcMap.map((k, v) => MapEntry(k, Hlc.parse(v.toString()))),
         serverVersion: row['server_version'] as int? ?? 0,
-        syncStatus: SyncStatus.values[(row['sync_status'] as int? ?? 1).clamp(0, 2)],
+        syncStatus:
+            SyncStatus.values[(row['sync_status'] as int? ?? 1).clamp(0, 2)],
         isDeleted: row['is_deleted'] == 1,
-        deleteHlc: row['delete_hlc'] != null ? Hlc.parse(row['delete_hlc']) : null,
+        deleteHlc: row['delete_hlc'] != null
+            ? Hlc.parse(row['delete_hlc'])
+            : null,
       );
     } catch (e) {
       if (kDebugMode) debugPrint('Skipping unreadable account row: $e');
@@ -568,10 +832,14 @@ class SecureStorageService {
     }
   }
 
-  Future<List<AccountTemplate>> loadCustomTemplates({bool includeDeleted = false}) async {
+  Future<List<AccountTemplate>> loadCustomTemplates({
+    bool includeDeleted = false,
+  }) async {
     if (!isOpen) return [];
     try {
-      final where = includeDeleted ? 'is_custom = ?' : 'is_custom = ? AND is_deleted = 0';
+      final where = includeDeleted
+          ? 'is_custom = ?'
+          : 'is_custom = ? AND is_deleted = 0';
       final rows = await _query(
         'templates',
         where: where,
@@ -616,13 +884,19 @@ class SecureStorageService {
         limit: 1,
       );
       if (rows.isEmpty) return null;
-      return _mapToAccountTemplate(rows.first, isCustom: rows.first['is_custom'] == 1);
+      return _mapToAccountTemplate(
+        rows.first,
+        isCustom: rows.first['is_custom'] == 1,
+      );
     } catch (e) {
       return null;
     }
   }
 
-  Future<void> saveTemplate(AccountTemplate template, {bool isSyncMerge = false}) async {
+  Future<void> saveTemplate(
+    AccountTemplate template, {
+    bool isSyncMerge = false,
+  }) async {
     if (!isOpen) return;
 
     AccountTemplate itemToSave;
@@ -666,6 +940,7 @@ class SecureStorageService {
       'delete_hlc': itemToSave.deleteHlc?.toString(),
     }, conflictAlgorithm: ConflictAlgorithm.replace);
 
+    await _persistAfterMutation();
     _notifyChange(
       StorageChangeEvent(
         type: StorageItemType.template,
@@ -675,7 +950,11 @@ class SecureStorageService {
     );
   }
 
-  Future<void> deleteTemplate(String id, {bool isSyncMerge = false, Hlc? syncDeleteHlc}) async {
+  Future<void> deleteTemplate(
+    String id, {
+    bool isSyncMerge = false,
+    Hlc? syncDeleteHlc,
+  }) async {
     if (!isOpen) return;
 
     if (!isSyncMerge) {
@@ -687,13 +966,19 @@ class SecureStorageService {
 
     Hlc stamp = syncDeleteHlc ?? Hlc.now(_deviceId);
 
-    await _database!.update('templates', {
-      'is_deleted': 1,
-      'delete_hlc': stamp.toString(),
-      'sync_status': SyncStatus.pendingPush.index,
-      'created_at': DateTime.now().millisecondsSinceEpoch,
-    }, where: 'id = ?', whereArgs: [id]);
+    await _database!.update(
+      'templates',
+      {
+        'is_deleted': 1,
+        'delete_hlc': stamp.toString(),
+        'sync_status': SyncStatus.pendingPush.index,
+        'created_at': DateTime.now().millisecondsSinceEpoch,
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
 
+    await _persistAfterMutation();
     _notifyChange(
       StorageChangeEvent(
         type: StorageItemType.template,
@@ -723,9 +1008,13 @@ class SecureStorageService {
         isCustom: isCustom,
         hlc: row['hlc'] != null ? Hlc.parse(row['hlc'] as String) : null,
         serverVersion: row['server_version'] as int? ?? 0,
-        syncStatus: SyncStatus.values[row['sync_status'] as int? ?? SyncStatus.synchronized.index],
+        syncStatus:
+            SyncStatus.values[row['sync_status'] as int? ??
+                SyncStatus.synchronized.index],
         isDeleted: row['is_deleted'] == 1,
-        deleteHlc: row['delete_hlc'] != null ? Hlc.parse(row['delete_hlc'] as String) : null,
+        deleteHlc: row['delete_hlc'] != null
+            ? Hlc.parse(row['delete_hlc'] as String)
+            : null,
       );
     } catch (e) {
       if (kDebugMode) debugPrint('Skipping unreadable template row: $e');
@@ -756,6 +1045,7 @@ class SecureStorageService {
       'value': value,
       'updated_at': DateTime.now().millisecondsSinceEpoch,
     }, conflictAlgorithm: ConflictAlgorithm.replace);
+    await _persistAfterMutation();
     _notifyChange(
       StorageChangeEvent(
         type: StorageItemType.setting,
@@ -784,10 +1074,7 @@ class StorageOpenException implements Exception {
   final String originalError;
   final String? backupPath;
 
-  const StorageOpenException({
-    required this.originalError,
-    this.backupPath,
-  });
+  const StorageOpenException({required this.originalError, this.backupPath});
 
   @override
   String toString() {
@@ -808,5 +1095,6 @@ class TemplateInUseException implements Exception {
   });
 
   @override
-  String toString() => 'TemplateInUseException(templateId: $templateId, usageCount: $usageCount)';
+  String toString() =>
+      'TemplateInUseException(templateId: $templateId, usageCount: $usageCount)';
 }

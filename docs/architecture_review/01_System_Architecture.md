@@ -23,7 +23,7 @@ SecretRoy 是一个“富客户端 + 薄同步服务”的系统。
 ```mermaid
 flowchart LR
     U["User"] --> C["SecretRoy Flutter Client"]
-    C --> L["Local SQLite Database"]
+    C --> L["Encrypted Local SQLite Database"]
     C --> S["Secure Storage / Biometrics / OS Lifecycle"]
     C --> H["Node.js Sync Server"]
     H --> D["Vault JSON Data Store"]
@@ -160,7 +160,7 @@ flowchart TB
         SS["SecureStorageService"]
         SY["SyncService"]
         SEC["Crypto / Biometrics / AutoLock / Identity"]
-        DB["SQLite + SharedPreferences + Secure Storage"]
+        DB["Encrypted SQLite + SharedPreferences + Secure Storage"]
     end
 
     subgraph Server["roy_server (Node.js Sync Server)"]
@@ -246,7 +246,7 @@ pull、push、版本推进、冲突恢复都应集中在同步模块，而不是
 
 职责：
 
-- 管理 SQLite、schema 与本地持久化
+- 管理 SQLite、schema、本地持久化与 `.db.enc` 文件信封加密
 
 ### `SyncService`
 

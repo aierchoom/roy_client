@@ -1,6 +1,6 @@
 # SecretRoy 技术文档
 
-> Current delta (2026-04-28): this document remains useful as a broad code map, but key security details changed after the 2026-04-18 scan. `EnhancedCryptoService` now manages PBKDF2-HMAC-SHA256 master password verification rather than plaintext pass-through APIs. Secure vault link codes use `sroy-secure-v2:` with PBKDF2-HMAC-SHA256 plus AES-GCM-256. LAN pairing codes are 8 readable characters. See `07_Key_Sync_Implementation.md` for the latest key-sync implementation.
+> Current delta (2026-04-28): this document remains useful as a broad code map, but key security details changed after the 2026-04-18 scan. `EnhancedCryptoService` now manages PBKDF2-HMAC-SHA256 master password verification and unwraps a random local DB data key with a master-password-derived wrapping key after unlock. Secure vault link codes use `sroy-secure-v2:` with PBKDF2-HMAC-SHA256 plus AES-GCM-256. LAN pairing codes are 8 readable characters. Local SQLite now persists as `secret_roy_vault.db.enc` through a Dart AES-GCM-256 binary file envelope. See `07_Key_Sync_Implementation.md` and `08_Local_Database_Encryption.md` for the latest security implementation.
 
 > **本文档以代码为唯一事实依据**，所有描述均来自对 `lib/`、`sync_server/`、`pubspec.yaml` 的逐文件扫描。  
 > **最后扫描时间**: 2026-04-18
@@ -19,9 +19,9 @@
 | 状态管理 | `provider ^6.1.5` |
 | 国际化 | Flutter gen-l10n（中文 / 英文） |
 | 数据库 | `sqflite ^2.2.0`（移动端）+ `sqflite_common_ffi ^2.3.5`（桌面端） |
-| 同步传输 | `http ^1.2.0`（HTTP PUT/GET） |
+| 同步传输 | `http ^1.2.0`（HTTP GET/POST） |
 | 安全存储 | `flutter_secure_storage ^10.0.0` |
-| 生物识别 | `local_auth ^2.3.0` + `local_auth_windows ^1.0.11` |
+| 生物识别 | `local_auth ^2.3.0` |
 
 ---
 
@@ -103,8 +103,7 @@ sync_server/
 ├── index.js                           # Express 同步服务器
 ├── package.json
 └── data/
-    ├── vault.db.enc                   # 同步的数据库文件
-    └── sync_version.json             # 版本号持久化 {"version": N}
+    └── vault_<vaultId>.json           # 记录级 vault 文档，保存 encrypted_signed_payload
 ```
 
 ---
@@ -195,7 +194,7 @@ class AccountFieldAttributes {
 _cryptoService       = EnhancedCryptoService()
 _biometricService    = BiometricAuthService(secureStorage: secureStorage)
 _autoLockService     = AutoLockService(cryptoService, secureStorage)
-_secureStorageService = SecureStorageService(_cryptoService)
+_secureStorageService = SecureStorageService()
 _syncService         = SyncService(cryptoService, storageService, config)
 ```
 
@@ -214,13 +213,13 @@ uninitialized → locked → unlocking → unlocked
 #### 解锁流程 (`unlockWithPassword`)
 
 ```
-1. secureStorageService.initialize()          // 打开 SQLite
-2. secureStorageService.getDatabaseDiagnostics()  // 调试输出表行数
-3. cryptoService.initMasterKey(password)       // 设置 _isUnlocked=true
-4. _currentDbPassword = password               // 缓存密码
+1. identityService.initialize()                // 准备 vault/device identity
+2. cryptoService.initMasterKey(password)        // 校验/建立主密码并解开 DB 数据密钥
+3. secureStorageService.setDatabaseCipher(...)  // 注入 DatabaseFileCipher
+4. secureStorageService.initialize()            // 解封 .db.enc 并打开 runtime SQLite
 5. autoLockService.unlock()
-6. syncService.initialize()                    // 读 settings 表中的 sync_version/sync_dirty
-7. connectToSyncServer('dummy_token')          // 后台静默连接（.catchError 忽略失败）
+6. syncService.initialize()                     // 读 settings 表中的 sync_version/sync_dirty
+7. syncService.connect()                        // 后台静默连接，失败不阻断解锁
 8. _state = unlocked → notifyListeners()
 ```
 
@@ -230,13 +229,12 @@ uninitialized → locked → unlocking → unlocked
 1. syncService.syncNow()                       // 执行同步决策
 2. if result.pulled:
    a. Future.delayed(500ms)                    // 等待文件系统刷盘
-   b. secureStorageService.initialize()        // 重新打开被替换的数据库
-   c. syncService.initialize()                 // 从新库读取版本号
-   d. secureStorageService.loadAccounts()      // 获取真实账号数
-   e. notifyListeners()                        // 触发 UI 刷新
-   f. return SyncResult(pulled:true, accountCount:N)
+   b. secureStorageService.initialize()        // 重新解封/刷新 runtime 状态
+   c. syncService.initialize()                 // 从本地 settings 读取版本号
+   d. notifyListeners()                        // 触发 UI 刷新
+   e. return SyncResult(pulled:true, version:N, conflictCount:M)
 3. if result.pushed or no-change:
-   return SyncResult(..., accountCount: result.accountCount)
+   return result
 ```
 
 #### 锁定流程 (`lock`)
@@ -291,10 +289,10 @@ bool get _isDesktop => Platform.isWindows || Platform.isLinux || Platform.isMacO
 
 | 属性 | 值 |
 |------|------|
-| 文件名 | `secret_roy_vault.db` |
-| 路径 | `getApplicationDocumentsDirectory()` / `secret_roy_vault.db` |
-| 版本 | 1 |
-| 加密 | ❌ 无（明文 SQLite） |
+| 文件名 | `secret_roy_vault.db.enc` |
+| 路径 | `getApplicationDocumentsDirectory()` / `secret_roy_vault.db.enc` |
+| 版本 | 4 |
+| 加密 | AES-GCM-256 二进制文件信封；解锁期间使用临时 `secret_roy_vault.runtime.db` |
 
 #### 数据库 Schema
 
@@ -307,19 +305,40 @@ CREATE TABLE accounts (
   data TEXT NOT NULL,              -- JSON 字符串
   created_at INTEGER NOT NULL,
   modified_at INTEGER NOT NULL,
-  version INTEGER DEFAULT 1       -- 乐观锁（预留）
+  name_hlc TEXT,
+  email_hlc TEXT,
+  data_hlc TEXT,
+  server_version INTEGER DEFAULT 0,
+  sync_status INTEGER DEFAULT 1,
+  is_deleted INTEGER DEFAULT 0,
+  delete_hlc TEXT
 );
 CREATE INDEX idx_accounts_template ON accounts(template_id);
 CREATE INDEX idx_accounts_modified ON accounts(modified_at);
+
+CREATE TABLE conflict_logs (
+  id TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL,
+  key TEXT NOT NULL,
+  value TEXT,
+  hlc TEXT NOT NULL,
+  saved_at INTEGER NOT NULL
+);
 
 CREATE TABLE templates (
   id TEXT PRIMARY KEY,
   title TEXT NOT NULL,
   subtitle TEXT,
   icon_code_point INTEGER,
+  category TEXT,
   fields TEXT NOT NULL,            -- JSON 字符串
   is_custom INTEGER DEFAULT 1,
-  created_at INTEGER NOT NULL
+  created_at INTEGER NOT NULL,
+  hlc TEXT,
+  server_version INTEGER DEFAULT 0,
+  sync_status INTEGER DEFAULT 1,
+  is_deleted INTEGER DEFAULT 0,
+  delete_hlc TEXT
 );
 
 CREATE TABLE settings (
@@ -327,17 +346,9 @@ CREATE TABLE settings (
   value TEXT,
   updated_at INTEGER NOT NULL
 );
-
-CREATE TABLE sync_metadata (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  device_id TEXT,
-  vector_clock TEXT,
-  last_sync_at INTEGER,
-  sync_enabled INTEGER DEFAULT 0
-);
 ```
 
-> **注意**: `sync_metadata` 表已创建但**未被代码积极使用**，同步版本号通过 `settings` 表中的 `sync_version` / `sync_dirty` 键存储。
+> **注意**: 当前没有独立 `sync_metadata` 表；同步版本号、dirty 标记、恢复标记等通过带 vault 命名空间的 `settings` key 存储。
 
 #### 变更通知机制
 
@@ -399,24 +410,14 @@ Stream<StorageChangeEvent> get onChange                   // 外部订阅
 #### 核心逻辑 (`syncNow`)
 
 ```
-fetchServerVersion → GET /sync/version → {version: N}
-
-if isDirty:
-    if localVersion <= serverVersion:
-        localVersion = serverVersion + 1     // 冲突自动递增
-    pushDatabase → PUT /sync/db?version=N    // 上传原始DB文件
-    isDirty = false
-    loadAccounts() → accountCount            // 此时DB仍打开，能正确读取
-
-else if serverVersion > localVersion:
-    pullDatabase → GET /sync/db              // 下载
-    storageService.replaceDatabase(bytes)     //   ← DB连接关闭！
-    loadAccounts() → []                      //   ← isOpen=false → 返回空
-    // ⚠️ accountCount 在此层始终为 0（pull 时）
-    // ServiceManager.syncNow() 负责重新 initialize 后获取正确数量
-
-else:
-    无需操作
+syncNow:
+    load recovery marker
+    pull → GET /vaults/{vaultId}/sync?since=localVersion
+    apply remote encrypted_signed_payload records
+    merge concurrent account edits through CrdtMergeEngine
+    push dirty accounts/templates → POST /vaults/{vaultId}/sync
+    store accepted server versions
+    update sync_version / sync_dirty / sync_last_time
 ```
 
 #### SyncResult 类
@@ -428,8 +429,8 @@ class SyncResult {
   final bool pulled;            // 是否执行了拉取
   final String? error;          // 失败时的错误信息
   final int version;            // 同步后版本号
-  final int accountCount;       // 账号总数
-  final bool hasMetadata;       // 是否包含元数据（当前未使用，恒 false）
+  final int conflictCount;      // 本轮发现/保留的冲突数
+  final String? notice;         // 给 UI 展示的同步提示
 }
 ```
 
@@ -660,26 +661,26 @@ UnlockView （ServiceManager.state != unlocked 时显示）
 
 | 方法 | 路径 | 请求体 | 响应 |
 |------|------|--------|------|
-| `GET` | `/sync/version` | — | `{ version: int, updatedAt: ISO8601 }` |
-| `GET` | `/sync/db` | — | 二进制文件（`vault.db.enc`） |
-| `PUT` | `/sync/db?version=N` | `application/octet-stream`（最大 50MB） | 成功 `{ success: true, serverVersion: N }`，冲突 `409 { error, serverVersion }` |
+| `GET` | `/health` | — | `{ status, uptimeSeconds, ... }` |
+| `GET` | `/vaults/:vaultId/sync?since=N` | — | `{ max_version, items }`，`items` 为记录级 `encrypted_signed_payload` |
+| `POST` | `/vaults/:vaultId/sync` | `{ pushes: [...] }` | 成功 `{ accepted_versions, max_version }`，冲突 `409 { ... }` |
+| `POST` | `/pairing/sessions` | wrapped vault bundle | 创建 8 位配对码会话 |
+| `GET` | `/pairing/sessions/:code` | — | 读取待配对 bundle |
 
 ### 冲突策略
 
 ```javascript
-if (clientVersion <= serverVersion) {
-  return 409 Conflict     // 拒绝低版本推送
-} else {
-  写入文件，更新版本号
+if (expected_base_version !== storedItem.version) {
+  return 409 Conflict     // 拒绝基于旧版本的推送
 }
+写入记录级 encrypted_signed_payload，并递增 vault currentVersion
 ```
 
 ### 数据存储
 
 ```
 sync_server/data/
-├── vault.db.enc        # 接收的数据库文件（实际为明文 SQLite）
-└── sync_version.json   # { "version": N, "updatedAt": "..." }
+└── vault_<vaultId>.json   # currentVersion + items{id, version, encrypted_signed_payload, is_deleted}
 ```
 
 ### 日志
@@ -712,21 +713,20 @@ UI: SecuritySettingsView → "立即同步" onTap
   → outerNavigator.push(DialogRoute)                   // 显示加载框
   → ServiceManager.syncNow()
     → SyncService.syncNow()
-      → GET /sync/version                             // 获取服务器版本
-      → serverVersion > localVersion
-      → GET /sync/db                                  // 下载数据库
-      → StorageService.replaceDatabase(bytes)          // 写入文件，DB关闭
-      → return SyncResult(pulled:true, accountCount:0) // ← DB已关闭
-    → Future.delayed(500ms)                            // 等待刷盘
-    → StorageService.initialize()                      // 重新打开 DB
-    → SyncService.initialize()                         // 从新库读版本号
-    → StorageService.loadAccounts()                    // 获取真实账号数
+      → GET /vaults/{vaultId}/sync?since=localVersion // 获取远端记录变更
+      → SyncPayloadCodec.decodePayload()              // 校验 HMAC 并解出 payload
+      → CrdtMergeEngine.merge()                       // 并发编辑进入冲突收件箱
+      → SecureStorageService.saveAccount/saveTemplate // 写 runtime DB 并刷新 .db.enc
+      → POST /vaults/{vaultId}/sync                   // 推送本地 dirty 记录
+      → return SyncResult(pulled/pushed/conflicts)
+    → if pulled: delay + StorageService.initialize()   // 保守重读 storage/sync 状态
+    → SyncService.initialize()
     → notifyListeners()
       → EnhancedAppProvider._onServiceManagerStateChanged()
       → EnhancedAppProvider.refresh()                  // 重新加载账号列表
-    → return SyncResult(pulled:true, accountCount:N)
+    → return SyncResult(...)
   → outerNavigator.maybePop()                          // 关闭加载框
-  → outerScaffoldMsg.showSnackBar("拉取成功 账号:N")
+  → outerScaffoldMsg.showSnackBar(result.notice)
 ```
 
 ---
@@ -735,16 +735,14 @@ UI: SecuritySettingsView → "立即同步" onTap
 
 | 优先级 | 问题 | 位置 | 说明 |
 |--------|------|------|------|
-| 🔴 高 | 数据明文存储 | `secure_storage_service.dart` | SQLite 文件无加密，`data` 字段含密码明文 |
-| 🔴 高 | 同步传输明文 | `sync_service.dart` / `index.js` | HTTP 未加密，数据库文件原始传输 |
+| 🟡 中 | 运行时工作库仍是明文 SQLite | `secure_storage_service.dart` | 已加密长期落盘文件；解锁期间临时 runtime DB 仍依赖 OS 权限与锁定清理 |
+| 🔴 高 | 同步传输未强制 TLS | `sync_service.dart` / `index.js` | payload 已封装为 encrypted_signed_payload，但弱服务器部署仍需 HTTPS/局域网边界 |
 | 🔴 高 | 服务器无认证 | `index.js` | 任何能访问 IP 的人可读写数据库 |
 | 🔴 高 | 生物识别密码明文存储 | `biometric_auth_service.dart:117` | 主密码直接写入 FlutterSecureStorage |
-| 🟠 中 | `sync_metadata` 表未使用 | `secure_storage_service.dart:198` | 已创建但无 CRUD 代码调用 |
+| 🟠 中 | sync metadata 分散在 settings key | `secure_storage_service.dart` / `sync_service.dart` | 当前可工作，但命名空间和恢复标记仍需继续收敛 |
 | 🟠 中 | `core/` 目录空 | `lib/core/` | 可清理或填充 |
-| 🟡 低 | `EnhancedCryptoService` 被 `SyncService` 接收但未使用 | `sync_service.dart:39` | 构造参数存在但无调用 |
-| 🟡 低 | 数据库文件后缀名 `.enc` 但实际未加密 | `sync_server/data/vault.db.enc` | 仅约定命名，内容为明文 SQLite |
-| 🟡 低 | `_getSyncKey()` 方法返回空字符串 | `sync_service.dart:161` | 同步密钥功能预留但未实现 |
-| 🟡 低 | `hasMetadata` 字段恒为 `false` | `sync_service.dart:390` | SyncResult 参数从未被设为 true |
+| 🟡 低 | 自定义 payload 加密还不是标准 AEAD | `sync_payload_codec.dart` | 当前有 nonce/ciphertext/HMAC，但应继续替换为标准实现 |
+| 🟡 低 | 旧同步数据残留可清理 | `sync_server/data/` | 当前主路径是 `vault_<vaultId>.json` records |
 
 ---
 
@@ -763,19 +761,19 @@ UI: SecuritySettingsView → "立即同步" onTap
 | `path_provider` | ^2.1.4 | 获取文档目录 |
 | `http` | ^1.2.0 | HTTP 同步传输 |
 | `local_auth` | ^2.3.0 | 生物识别认证 |
-| `local_auth_windows` | ^1.0.11 | Windows 生物识别 |
 | `intl` | any | 国际化 |
 | `flutter_localizations` | SDK | 国际化 |
-| `material_symbols_icons` | ^4.2892.0 | 图标（未在代码中直接引用） |
-| `json_annotation` | ^4.9.0 | JSON 注解（预留） |
-| `cupertino_icons` | ^1.0.8 | iOS 风格图标 |
-| `uuid` | ^4.5.1 | UUID 生成（未在代码中直接引用） |
+| `cryptography` | ^2.7.0 | AES-GCM 与 PBKDF2 |
+| `crypto` | ^3.0.7 | sync payload HMAC/哈希 |
+| `uuid` | ^4.5.3 | UUID 生成 |
+| `archive` | ^4.0.9 | vault bundle 压缩/归档 |
+| `file_picker` | ^11.0.2 | 文件选择 |
+| `share_plus` | ^12.0.2 | 分享/导出 |
+| `google_fonts` | ^8.0.2 | 字体 |
 
 ### 开发依赖
 
 | 包名 | 版本 | 用途 |
 |------|------|------|
 | `flutter_test` | SDK | 测试 |
-| `build_runner` | ^2.4.8 | 代码生成 |
-| `json_serializable` | ^6.8.0 | JSON 序列化（预留） |
 | `flutter_lints` | ^6.0.0 | 代码规范 |
