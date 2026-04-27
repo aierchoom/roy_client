@@ -1,5 +1,7 @@
 # AI Developer Handover Notes (AI 开发交接手册)
 
+> Current delta (2026-04-28): this handover was originally based on the 2026-04-18 code scan. Since then, `EnhancedCryptoService` has been upgraded to store `master_password_v2` PBKDF2-HMAC-SHA256 verifiers and migrate legacy `master_password_v1` after successful verification. Secure vault link export/import now uses `sroy-secure-v2:` with PBKDF2-HMAC-SHA256 plus AES-GCM-256, and LAN pairing uses 8 readable characters. Treat `docs/07_Key_Sync_Implementation.md` as the canonical key-sync reference.
+
 > **致未来的 AI 助手：**
 > 本文档基于 2026-04-18 对所有源代码的全面扫描编写。
 > 如果代码已有更新，请以代码为准。
@@ -10,7 +12,7 @@
 
 - **事实**：数据库驱动为 `sqflite`（移动端）和 `sqflite_common_ffi`（桌面端），**不使用 SQLCipher**。
 - 数据库文件 `secret_roy_vault.db` 为标准明文 SQLite 格式。
-- `EnhancedCryptoService` 的 `encryptData()`/`decryptData()` 当前是**明文透传占位符**，所有数据在 DB 中明文存储。
+- `EnhancedCryptoService` 当前负责主密码 PBKDF2 校验与遗留主密码迁移；本地 SQLite 账号数据仍未接入 SQLCipher 或逐字段静态加密。
 - 同步服务器上的文件名为 `vault.db.enc`，但内容实际上也是明文 SQLite。
 
 ### 1.2 同步后的 500ms 延迟不可删除

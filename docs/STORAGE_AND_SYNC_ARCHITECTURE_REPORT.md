@@ -1,5 +1,7 @@
 # SecretRoy 密码存储与账号同步架构分析报告
 
+> Current delta (2026-04-28): this is a historical risk report from 2026-04-18. Master password verification has since been hardened with `master_password_v2` PBKDF2-HMAC-SHA256 storage, secure vault link codes now use `sroy-secure-v2:` with AES-GCM-256, and LAN pairing uses 8 readable characters. Local SQLite-at-rest encryption remains a separate hardening item unless implemented in a later change.
+
 **生成日期**: 2026-04-18  
 **分析范围**: 密码管理、本地存储、远程同步三层架构
 
@@ -21,7 +23,7 @@
 #### 当前实现 (EnhancedCryptoService)
 
 ```dart
-// 现状：明文透传
+// 2026-04-18 历史状态：未接入本地加密层
 encryptData(plainText) → plainText
 decryptData(data) → data
 ```

@@ -2,31 +2,31 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:secret_roy/services/lan_pairing_service.dart';
 
 void main() {
-  test('normalizePairingCode accepts exactly 6 digits', () {
-    expect(LanPairingService.normalizePairingCode('123456'), '123456');
-    expect(LanPairingService.normalizePairingCode(' 123456 '), '123456');
+  test('normalizePairingCode accepts exactly 8 readable characters', () {
+    expect(LanPairingService.normalizePairingCode('ABC234XY'), 'ABC234XY');
+    expect(LanPairingService.normalizePairingCode(' abc234xy '), 'ABC234XY');
   });
 
   test('normalizePairingCode rejects invalid values', () {
     expect(
-      () => LanPairingService.normalizePairingCode('12345'),
+      () => LanPairingService.normalizePairingCode('ABC234X'),
       throwsA(isA<LanPairingServiceException>()),
     );
     expect(
-      () => LanPairingService.normalizePairingCode('12A456'),
+      () => LanPairingService.normalizePairingCode('ABC23410'),
       throwsA(isA<LanPairingServiceException>()),
     );
   });
 
   test(
-    'startHosting creates a 6-digit LAN session and can stop cleanly',
+    'startHosting creates an 8-character LAN session and can stop cleanly',
     () async {
       final service = LanPairingService();
       final session = await service.startHosting(
         transferCode: 'sroy-link-v1:test',
       );
 
-      expect(session.pairingCode, matches(RegExp(r'^\d{6}$')));
+      expect(session.pairingCode, matches(RegExp(r'^[A-Z2-9]{8}$')));
       expect(service.isHosting, isTrue);
 
       await service.stopHosting();

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 class LanPairingServiceException implements Exception {
@@ -62,7 +63,7 @@ class LanPairingService {
 
     await stopHosting();
 
-    final code = _generateSixDigitCode();
+    final code = _generatePairingCode();
     final expiresAt = DateTime.now().add(ttl);
     final server = await HttpServer.bind(
       InternetAddress.anyIPv4,
@@ -82,17 +83,21 @@ class LanPairingService {
           final s = await RawDatagramSocket.bind(addr, 0, reuseAddress: true);
           s.broadcastEnabled = true;
           sockets.add(s);
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('[LAN] Failed to bind to ${addr.address}: $e');
+        }
       }
     }
-    
+
     // Fallback if no interfaces worked (unlikely)
     if (sockets.isEmpty) {
       try {
         final s = await RawDatagramSocket.bind(InternetAddress.anyIPv4, 0, reuseAddress: true);
         s.broadcastEnabled = true;
         sockets.add(s);
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('[LAN] Failed to bind fallback socket: $e');
+      }
     }
 
     _hostServer = server;
@@ -121,7 +126,9 @@ class LanPairingService {
       for (final s in sockets) {
         try {
           s.send(packet, broadcast, _discoveryPort);
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('[LAN] Failed to send broadcast: $e');
+        }
       }
     }
 
@@ -281,10 +288,10 @@ class LanPairingService {
   }
 
   static String normalizePairingCode(String rawValue) {
-    final normalized = rawValue.replaceAll(RegExp(r'\s+'), '');
-    if (!RegExp(r'^\d{6}$').hasMatch(normalized)) {
+    final normalized = rawValue.replaceAll(RegExp(r'\s+'), '').toUpperCase();
+    if (!RegExp(r'^[A-Z2-9]{8}$').hasMatch(normalized)) {
       throw const LanPairingServiceException(
-        'Pairing code must contain exactly 6 digits.',
+        'Pairing code must contain exactly 8 letters or digits.',
       );
     }
     return normalized;
@@ -397,13 +404,20 @@ class LanPairingService {
       if (decoded is Map<String, dynamic>) {
         return decoded;
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[LAN] Failed to decode JSON: $e');
+    }
     return {};
   }
 
-  String _generateSixDigitCode() {
-    final value = _random.nextInt(1000000);
-    return value.toString().padLeft(6, '0');
+  static const String _codeAlphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+  String _generatePairingCode() {
+    final buffer = StringBuffer();
+    for (var i = 0; i < 8; i++) {
+      buffer.write(_codeAlphabet[_random.nextInt(_codeAlphabet.length)]);
+    }
+    return buffer.toString();
   }
 
   Future<String?> _detectLocalIpv4() async {
@@ -419,7 +433,9 @@ class LanPairingService {
           }
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[LAN] Failed to detect local IPv4: $e');
+    }
     return null;
   }
 }

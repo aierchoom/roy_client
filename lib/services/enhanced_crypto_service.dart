@@ -1,9 +1,15 @@
+import 'dart:convert';
 import 'dart:math';
 
+import 'package:cryptography/cryptography.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class EnhancedCryptoService {
-  static const String _masterPasswordKey = 'master_password_v1';
+  static const String _masterPasswordKeyV1 = 'master_password_v1';
+  static const String _masterPasswordKeyV2 = 'master_password_v2';
+  static const int _pbkdf2Iterations = 100000;
+  static const int _saltLength = 16;
+  static const int _hashBits = 256;
 
   final FlutterSecureStorage _secureStorage;
   bool _isUnlocked = false;
@@ -14,43 +20,120 @@ class EnhancedCryptoService {
   bool get hasMasterKey => _isUnlocked;
 
   Future<bool> initMasterKey(String masterPassword) async {
-    final storedPassword = await _secureStorage.read(key: _masterPasswordKey);
-    if (storedPassword != null && storedPassword != masterPassword) {
-      _isUnlocked = false;
-      return false;
+    final v2Hash = await _secureStorage.read(key: _masterPasswordKeyV2);
+    if (v2Hash != null) {
+      final verified = await _verifyPbkdf2(masterPassword, v2Hash);
+      _isUnlocked = verified;
+      return verified;
     }
 
-    if (storedPassword == null) {
-      await _secureStorage.write(
-        key: _masterPasswordKey,
-        value: masterPassword,
-      );
+    final v1Password = await _secureStorage.read(key: _masterPasswordKeyV1);
+    if (v1Password != null) {
+      if (v1Password != masterPassword) {
+        _isUnlocked = false;
+        return false;
+      }
+      await _storePbkdf2Hash(masterPassword);
+      await _secureStorage.delete(key: _masterPasswordKeyV1);
+      _isUnlocked = true;
+      return true;
     }
 
+    await _storePbkdf2Hash(masterPassword);
     _isUnlocked = true;
     return true;
   }
 
-  Future<bool> updateMasterPassword(String oldPassword, String newPassword) async {
-    final storedPassword = await _secureStorage.read(key: _masterPasswordKey);
-    if (storedPassword != null && storedPassword != oldPassword) {
-      return false;
+  Future<bool> updateMasterPassword(
+    String oldPassword,
+    String newPassword,
+  ) async {
+    final v2Hash = await _secureStorage.read(key: _masterPasswordKeyV2);
+    if (v2Hash != null) {
+      final verified = await _verifyPbkdf2(oldPassword, v2Hash);
+      if (!verified) return false;
+      await _storePbkdf2Hash(newPassword);
+      return true;
     }
 
-    await _secureStorage.write(
-      key: _masterPasswordKey,
-      value: newPassword,
-    );
-    return true;
+    final v1Password = await _secureStorage.read(key: _masterPasswordKeyV1);
+    if (v1Password != null && v1Password == oldPassword) {
+      await _storePbkdf2Hash(newPassword);
+      await _secureStorage.delete(key: _masterPasswordKeyV1);
+      return true;
+    }
+    return false;
   }
 
   Future<bool> verifyMasterPassword(String masterPassword) async {
-    final storedPassword = await _secureStorage.read(key: _masterPasswordKey);
-    return storedPassword == masterPassword;
+    final v2Hash = await _secureStorage.read(key: _masterPasswordKeyV2);
+    if (v2Hash != null) {
+      return _verifyPbkdf2(masterPassword, v2Hash);
+    }
+    final v1Password = await _secureStorage.read(key: _masterPasswordKeyV1);
+    return v1Password == masterPassword;
   }
 
   void logout() {
     _isUnlocked = false;
+  }
+
+  Future<void> _storePbkdf2Hash(String password) async {
+    final salt = List<int>.generate(
+      _saltLength,
+      (_) => Random.secure().nextInt(256),
+    );
+    final pbkdf2 = Pbkdf2(
+      macAlgorithm: Hmac.sha256(),
+      iterations: _pbkdf2Iterations,
+      bits: _hashBits,
+    );
+    final secretKey = await pbkdf2.deriveKey(
+      secretKey: SecretKey(utf8.encode(password)),
+      nonce: salt,
+    );
+    final hashBytes = await secretKey.extractBytes();
+    final encoded =
+        'pbkdf2\$$_pbkdf2Iterations\$${base64Encode(salt)}\$${base64Encode(hashBytes)}';
+    await _secureStorage.write(key: _masterPasswordKeyV2, value: encoded);
+  }
+
+  Future<bool> _verifyPbkdf2(String password, String encoded) async {
+    final parts = encoded.split('\$');
+    if (parts.length != 4 || parts[0] != 'pbkdf2') return false;
+    final iterations = int.tryParse(parts[1]) ?? 0;
+    if (iterations <= 0) return false;
+
+    late final List<int> salt;
+    late final List<int> expectedHash;
+    try {
+      salt = base64Decode(parts[2]);
+      expectedHash = base64Decode(parts[3]);
+    } on FormatException {
+      return false;
+    }
+    if (salt.length < _saltLength || expectedHash.isEmpty) return false;
+
+    final pbkdf2 = Pbkdf2(
+      macAlgorithm: Hmac.sha256(),
+      iterations: iterations,
+      bits: expectedHash.length * 8,
+    );
+    final secretKey = await pbkdf2.deriveKey(
+      secretKey: SecretKey(utf8.encode(password)),
+      nonce: salt,
+    );
+    final hashBytes = await secretKey.extractBytes();
+    return _constantTimeEquals(hashBytes, expectedHash);
+  }
+
+  static bool _constantTimeEquals(List<int> a, List<int> b) {
+    if (a.length != b.length) return false;
+    var result = 0;
+    for (var i = 0; i < a.length; i++) {
+      result |= a[i] ^ b[i];
+    }
+    return result == 0;
   }
 
   static String generatePassword({

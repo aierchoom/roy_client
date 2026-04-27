@@ -221,8 +221,14 @@ class ServiceManager extends ChangeNotifier {
     await secureStorage.delete(key: 'no_password_mode');
   }
 
-  Future<bool> changeMasterPassword(String oldPassword, String newPassword) async {
-    final success = await _cryptoService.updateMasterPassword(oldPassword, newPassword);
+  Future<bool> changeMasterPassword(
+    String oldPassword,
+    String newPassword,
+  ) async {
+    final success = await _cryptoService.updateMasterPassword(
+      oldPassword,
+      newPassword,
+    );
     if (success) {
       if (newPassword.isNotEmpty) {
         await disableNoPasswordMode();
@@ -240,15 +246,15 @@ class ServiceManager extends ChangeNotifier {
   Future<void> resetApplication() async {
     await logout();
     await _secureStorageService.deleteDatabaseFile();
-    
+
     // Clear Secure Storage (Identity, Master Password mode, etc)
     const secureStorage = FlutterSecureStorage();
     await secureStorage.deleteAll();
-    
+
     // Clear SharedPreferences (Server URL, pairing states, etc)
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
-    
+
     _updateState(ServiceManagerState.locked);
   }
 
@@ -369,15 +375,17 @@ class ServiceManager extends ChangeNotifier {
 
   Future<String?> _exportEncryptedVaultDump() async {
     if (!_identityService.hasIdentity) return null;
-    
-    final accountsList = await _secureStorageService.loadAccounts(includeDeleted: true);
+
+    final accountsList = await _secureStorageService.loadAccounts(
+      includeDeleted: true,
+    );
     final templatesList = await _secureStorageService.loadCustomTemplates();
-    
+
     final payloadJson = {
       'accounts': accountsList.map((a) => a.toJson()).toList(),
       'templates': templatesList.map((t) => t.toJson()).toList(),
     };
-    
+
     return SyncPayloadCodec.encodePayload(
       payloadJson: payloadJson,
       vaultId: _identityService.vaultId,
@@ -389,7 +397,7 @@ class ServiceManager extends ChangeNotifier {
 
   Future<void> _importEncryptedVaultDump(String vaultDumpJson) async {
     if (!_identityService.hasIdentity) return;
-    
+
     try {
       final payloadJson = SyncPayloadCodec.decodePayload(
         encodedPayload: vaultDumpJson,
@@ -397,26 +405,28 @@ class ServiceManager extends ChangeNotifier {
         privateKey: _identityService.privateKey,
         symmetricKey: _identityService.symmetricKey,
       );
-      
+
       final accountsList = payloadJson['accounts'] as List?;
       final templatesList = payloadJson['templates'] as List?;
-      
+
       if (templatesList != null || accountsList != null) {
         await _secureStorageService.clearAllData();
       }
-      
+
       if (templatesList != null) {
         for (final t in templatesList) {
-          final template = AccountTemplate.fromJson(Map<String, dynamic>.from(t));
+          final template = AccountTemplate.fromJson(
+            Map<String, dynamic>.from(t),
+          );
           await _secureStorageService.saveTemplate(template, isSyncMerge: true);
         }
       }
-      
+
       if (accountsList != null) {
         for (final a in accountsList) {
           final account = AccountItem.fromJson(Map<String, dynamic>.from(a));
           await _secureStorageService.saveAccount(
-            account.copyWith(syncStatus: SyncStatus.synchronized), 
+            account.copyWith(syncStatus: SyncStatus.synchronized),
             isSyncMerge: true,
           );
         }
@@ -435,7 +445,10 @@ class ServiceManager extends ChangeNotifier {
     );
   }
 
-  Future<String> exportSecureVaultLinkCode(String password, {bool includeData = false}) async {
+  Future<String> exportSecureVaultLinkCode(
+    String password, {
+    bool includeData = false,
+  }) async {
     final serverUrl = await _resolveSyncServerUrl(allowEmpty: true);
     final vaultDump = includeData ? await _exportEncryptedVaultDump() : null;
     return _identityService.exportSecureLinkCode(
@@ -467,13 +480,19 @@ class ServiceManager extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> importSecureVaultLinkCode(String secureCode, String password) async {
+  Future<void> importSecureVaultLinkCode(
+    String secureCode,
+    String password,
+  ) async {
     if (!isUnlocked) {
       throw StateError('Vault is locked.');
     }
 
     await _syncService.disconnect();
-    final importResult = await _identityService.importSecureLinkCode(secureCode, password);
+    final importResult = await _identityService.importSecureLinkCode(
+      secureCode,
+      password,
+    );
     final syncServerUrl = importResult['sync_server_url'];
     final vaultDump = importResult['vault_dump'];
 

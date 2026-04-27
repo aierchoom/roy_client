@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:secret_roy/models/account_template.dart';
 import 'package:secret_roy/services/identity_service.dart';
 import 'package:secret_roy/services/secure_storage_service.dart';
 import 'package:secret_roy/sync/sync_service.dart';
@@ -29,6 +30,9 @@ class _FakeSecureStorageService extends SecureStorageService {
   Future<void> setSetting(String key, String value) async {
     settings[key] = value;
   }
+
+  @override
+  Future<List<AccountTemplate>> loadDirtyTemplates() async => [];
 }
 
 IdentityService _identityWithVault({
@@ -80,6 +84,73 @@ void main() {
 
     expect(
       () => identity.importTransferCode('not-a-real-code'),
+      throwsA(isA<IdentityTransferCodeException>()),
+    );
+  });
+
+  test(
+    'secure identity link imports vault keys with the right password',
+    () async {
+      final sourceIdentity = IdentityService(
+        secureStorage: _MemorySecureKeyValueStore(),
+      );
+      await sourceIdentity.initialize();
+      final linkCode = await sourceIdentity.exportSecureLinkCode(
+        'correct horse battery staple',
+        syncServerUrl: 'http://127.0.0.1:8080',
+        vaultDump: 'encrypted-vault-dump',
+      );
+
+      final targetIdentity = IdentityService(
+        secureStorage: _MemorySecureKeyValueStore(),
+      );
+      await targetIdentity.initialize();
+      final originalTargetDeviceId = targetIdentity.deviceId;
+
+      final result = await targetIdentity.importSecureLinkCode(
+        linkCode,
+        'correct horse battery staple',
+      );
+
+      expect(linkCode, startsWith('sroy-secure-v2:'));
+      expect(linkCode.contains(sourceIdentity.privateKey), isFalse);
+      expect(targetIdentity.deviceId, originalTargetDeviceId);
+      expect(targetIdentity.vaultId, sourceIdentity.vaultId);
+      expect(targetIdentity.privateKey, sourceIdentity.privateKey);
+      expect(targetIdentity.symmetricKey, sourceIdentity.symmetricKey);
+      expect(result['sync_server_url'], 'http://127.0.0.1:8080');
+      expect(result['vault_dump'], 'encrypted-vault-dump');
+    },
+  );
+
+  test('secure identity link rejects a wrong password', () async {
+    final sourceIdentity = IdentityService(
+      secureStorage: _MemorySecureKeyValueStore(),
+    );
+    await sourceIdentity.initialize();
+    final linkCode = await sourceIdentity.exportSecureLinkCode(
+      'right-password',
+    );
+
+    final targetIdentity = IdentityService(
+      secureStorage: _MemorySecureKeyValueStore(),
+    );
+    await targetIdentity.initialize();
+
+    expect(
+      () => targetIdentity.importSecureLinkCode(linkCode, 'wrong-password'),
+      throwsA(isA<IdentityTransferCodeException>()),
+    );
+  });
+
+  test('secure identity link requires a transfer password', () async {
+    final identity = IdentityService(
+      secureStorage: _MemorySecureKeyValueStore(),
+    );
+    await identity.initialize();
+
+    expect(
+      () => identity.exportSecureLinkCode(''),
       throwsA(isA<IdentityTransferCodeException>()),
     );
   });

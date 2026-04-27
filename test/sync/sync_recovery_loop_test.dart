@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:secret_roy/models/account_item.dart';
+import 'package:secret_roy/models/account_template.dart';
 import 'package:secret_roy/models/hlc.dart';
 import 'package:secret_roy/services/identity_service.dart';
 import 'package:secret_roy/services/secure_storage_service.dart';
@@ -68,6 +69,9 @@ class _FakeSecureStorageService extends SecureStorageService {
         .where((item) => item.syncStatus == SyncStatus.pendingPush)
         .toList();
   }
+
+  @override
+  Future<List<AccountTemplate>> loadDirtyTemplates() async => [];
 }
 
 class _StaticVaultServer {
