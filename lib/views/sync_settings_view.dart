@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,6 +12,7 @@ import '../services/service_manager.dart';
 import '../services/vault_pairing_service.dart';
 import '../sync/sync_service.dart';
 import '../widgets/adaptive_page.dart';
+import '../widgets/sync_settings_dialogs.dart';
 
 class SyncSettingsView extends StatefulWidget {
   const SyncSettingsView({super.key});
@@ -276,7 +279,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
     if (!mounted) return;
     final messenger = ScaffoldMessenger.of(context);
     final theme = Theme.of(context);
-    
+
     messenger.showSnackBar(
       SnackBar(
         content: Text(message),
@@ -288,6 +291,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
   Future<void> _runSync(
     NavigatorState navigator,
     ScaffoldMessengerState messenger,
+    EnhancedAppProvider provider,
   ) async {
     final progressRoute = DialogRoute<void>(
       context: navigator.context,
@@ -338,7 +342,6 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
         );
 
         if (result.pulled || hasConflicts) {
-          final provider = context.read<EnhancedAppProvider>();
           await provider.refresh();
         }
       } else {
@@ -374,7 +377,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
   Future<void> _showSyncConfigDialog() async {
     final result = await showDialog<String>(
       context: context,
-      builder: (dialogContext) => _SyncServerDialog(
+      builder: (dialogContext) => SyncServerDialog(
         initialValue: _syncServerUrl,
         title: _text('同步服务器', 'Sync Server'),
         labelText: _text('服务器 URL', 'Server URL'),
@@ -450,18 +453,25 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
       builder: (context) {
         final theme = Theme.of(context);
         return AlertDialog(
-          title: Text(_text('覆盖本地数据？', 'Overwrite Local Data?'), style: const TextStyle(fontWeight: FontWeight.bold)),
-          content: Text(_text(
-            '当前设备已存在本地数据。继续加入将覆盖并清空当前设备上的所有本地数据。你确定要继续吗？',
-            'This device already has local data. Joining will overwrite and clear all local data on this device. Are you sure you want to continue?',
-          )),
+          title: Text(
+            _text('覆盖本地数据？', 'Overwrite Local Data?'),
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          content: Text(
+            _text(
+              '当前设备已存在本地数据。继续加入将覆盖并清空当前设备上的所有本地数据。你确定要继续吗？',
+              'This device already has local data. Joining will overwrite and clear all local data on this device. Are you sure you want to continue?',
+            ),
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
               child: Text(_text('取消', 'Cancel')),
             ),
             FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: theme.colorScheme.error),
+              style: FilledButton.styleFrom(
+                backgroundColor: theme.colorScheme.error,
+              ),
               onPressed: () => Navigator.of(context).pop(true),
               child: Text(_text('强制覆盖', 'Overwrite')),
             ),
@@ -486,7 +496,10 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
       setState(() => _lanHostSession = session);
       _showGeneratedCodeDialog(
         _text('局域网配对码', 'LAN Pairing Code'),
-        _text('请在同一局域网下的另一台设备上输入：', 'Enter this code on the other device on the same LAN:'),
+        _text(
+          '请在同一局域网下的另一台设备上输入：',
+          'Enter this code on the other device on the same LAN:',
+        ),
         session.pairingCode,
       );
     } on LanPairingServiceException catch (e) {
@@ -523,9 +536,9 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
 
     final pairingCode = await showDialog<String>(
       context: context,
-      builder: (dialogContext) => const _SixDigitCodeDialog(
+      builder: (dialogContext) => const LanPairingCodeDialog(
         title: 'Join LAN Pairing',
-        subtitle: 'Enter the 6-digit code from your trusted device.',
+        subtitle: 'Enter the 8-character code from your trusted device.',
         confirmLabel: 'Pair & Import',
         cancelLabel: 'Cancel',
       ),
@@ -541,8 +554,6 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
     setState(() => _isLanPairingBusy = true);
     try {
       await _serviceManager.joinLanVaultPairingWithCode(pairingCode);
-      if (!mounted) return;
-
       await provider.refresh();
       if (!mounted) return;
 
@@ -582,6 +593,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
         _hostPairingSession = session;
         _hostPendingRequest = null;
       });
+
       _showGeneratedCodeDialog(
         _text('受信任服务器配对码', 'Server Pairing Code'),
         _text('请在另一台设备上输入以下配对码：', 'Enter this code on the other device:'),
@@ -687,7 +699,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
 
     final pairingCode = await showDialog<String>(
       context: context,
-      builder: (dialogContext) => _VaultLinkCodeDialog(
+      builder: (dialogContext) => VaultLinkCodeDialog(
         title: _text('Join Existing Vault', 'Join Existing Vault'),
         subtitle: _text(
           'Enter the pairing code shown on your trusted existing device.',
@@ -811,10 +823,12 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
         context: context,
         builder: (context) => AlertDialog(
           title: Text(_text('导出链接码', 'Export Link Code')),
-          content: Text(_text(
-            '是否在链接码中包含所有账号数据？\n\n包含数据会使密文变长（可能无法在 QQ 直接粘贴），但不包含数据则需要新设备有网络才能同步。',
-            'Include all account data in the code?\n\nIncluding data makes the code much longer, but not including it requires a sync server to pull data on the new device.'
-          )),
+          content: Text(
+            _text(
+              '是否在链接码中包含所有账号数据？\n\n包含数据会使密文变长（可能无法在 QQ 直接粘贴），但不包含数据则需要新设备有网络才能同步。',
+              'Include all account data in the code?\n\nIncluding data makes the code much longer, but not including it requires a sync server to pull data on the new device.',
+            ),
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
@@ -833,17 +847,25 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
       // 2. Ask for password
       final password = await _showPasswordInputDialog(
         title: _text('设置传输密码', 'Set Transfer Password'),
-        subtitle: _text('导入时需要输入此密码才能解密。', 'You will need this password to decrypt during import.'),
+        subtitle: _text(
+          '导入时需要输入此密码才能解密。',
+          'You will need this password to decrypt during import.',
+        ),
       );
       if (password == null) return;
 
-      final code = await _serviceManager.exportSecureVaultLinkCode(password, includeData: includeData);
+      final code = await _serviceManager.exportSecureVaultLinkCode(
+        password,
+        includeData: includeData,
+      );
       await Clipboard.setData(ClipboardData(text: code));
       if (!mounted) return;
 
       messenger.showSnackBar(
         SnackBar(
-          content: Text(_text('加密链接码已复制到剪贴板', 'Secure link code copied to clipboard')),
+          content: Text(
+            _text('加密链接码已复制到剪贴板', 'Secure link code copied to clipboard'),
+          ),
         ),
       );
     } catch (e) {
@@ -857,9 +879,12 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
 
     final code = await showDialog<String>(
       context: context,
-      builder: (dialogContext) => _VaultLinkCodeDialog(
+      builder: (dialogContext) => VaultLinkCodeDialog(
         title: _text('导入加密链接码', 'Import Secure Code'),
-        subtitle: _text('粘贴从另一台设备导出的加密链接码。', 'Paste the secure link code from another device.'),
+        subtitle: _text(
+          '粘贴从另一台设备导出的加密链接码。',
+          'Paste the secure link code from another device.',
+        ),
         confirmLabel: _text('下一步', 'Next'),
         cancelLabel: _text('取消', 'Cancel'),
         fieldLabel: 'Secure Link Code',
@@ -872,7 +897,10 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
 
     final password = await _showPasswordInputDialog(
       title: _text('输入传输密码', 'Enter Transfer Password'),
-      subtitle: _text('请输入导出时设置的临时密码。', 'Enter the temporary password set during export.'),
+      subtitle: _text(
+        '请输入导出时设置的临时密码。',
+        'Enter the temporary password set during export.',
+      ),
     );
     if (password == null) return;
 
@@ -888,7 +916,9 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
       if (!mounted) return;
 
       messenger.showSnackBar(
-        SnackBar(content: Text(_text('保险库导入成功', 'Vault imported successfully'))),
+        SnackBar(
+          content: Text(_text('保险库导入成功', 'Vault imported successfully')),
+        ),
       );
     } catch (e) {
       if (!mounted) return;
@@ -900,7 +930,10 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
     }
   }
 
-  Future<String?> _showPasswordInputDialog({required String title, required String subtitle}) async {
+  Future<String?> _showPasswordInputDialog({
+    required String title,
+    required String subtitle,
+  }) async {
     final controller = TextEditingController();
     return showDialog<String>(
       context: context,
@@ -942,14 +975,20 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
       builder: (context) {
         final theme = Theme.of(context);
         return AlertDialog(
-          title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+          title: Text(
+            title,
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(subtitle),
               const SizedBox(height: 24),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 16,
+                ),
                 decoration: BoxDecoration(
                   color: theme.colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(16),
@@ -967,11 +1006,17 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.check_circle, size: 16, color: theme.colorScheme.primary),
+                  Icon(
+                    Icons.check_circle,
+                    size: 16,
+                    color: theme.colorScheme.primary,
+                  ),
                   const SizedBox(width: 6),
                   Text(
                     _text('配对码已自动复制到剪贴板', 'Pairing code copied to clipboard.'),
-                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.primary),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.primary,
+                    ),
                   ),
                 ],
               ),
@@ -992,6 +1037,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
     final theme = Theme.of(context);
     final navigator = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
+    final provider = context.read<EnhancedAppProvider>();
     final hasDirtyData = _serviceManager.hasDirtyData;
     final syncState = _serviceManager.syncState;
     final syncError = _serviceManager.syncErrorMessage;
@@ -1052,18 +1098,18 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  _SyncInfoChip(
+                  SyncInfoChip(
                     label: _text(
                       '版本 V${_serviceManager.syncVersion}',
                       'Version V${_serviceManager.syncVersion}',
                     ),
                   ),
-                  _SyncInfoChip(
+                  SyncInfoChip(
                     label: hasDirtyData
                         ? _text('有未同步更改', 'Unsynced changes')
                         : _text('已与服务器对齐', 'Ready to sync'),
                   ),
-                  _SyncInfoChip(label: _syncStateLabel(syncState)),
+                  SyncInfoChip(label: _syncStateLabel(syncState)),
                 ],
               ),
               if (statusDescription != null) ...[
@@ -1130,7 +1176,8 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                     if (!showsInlineServerEditAction &&
                         !_serviceManager.syncService.isSyncing)
                       FilledButton.icon(
-                        onPressed: () => _runSync(navigator, messenger),
+                        onPressed: () =>
+                            _runSync(navigator, messenger, provider),
                         icon: const Icon(Icons.refresh),
                         label: Text(primaryActionLabel),
                       ),
@@ -1161,7 +1208,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
               child: FilledButton.icon(
                 onPressed: _serviceManager.syncService.isSyncing
                     ? null
-                    : () => _runSync(navigator, messenger),
+                    : () => _runSync(navigator, messenger, provider),
                 icon: const Icon(Icons.sync_outlined),
                 label: Text(primaryActionLabel),
               ),
@@ -1422,7 +1469,10 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
             context,
             Icons.wifi_find_outlined,
             _text('局域网直接配对', 'LAN Direct Pairing'),
-            _text('无需同步服务器，适合面对面快速链接。', 'No server needed, best for face-to-face linking.'),
+            _text(
+              '无需同步服务器，适合面对面快速链接。',
+              'No server needed, best for face-to-face linking.',
+            ),
           ),
           const SizedBox(height: 12),
           Row(
@@ -1447,7 +1497,9 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
               const SizedBox(width: 8),
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: _isLanPairingBusy ? null : _showJoinLanPairingDialog,
+                  onPressed: _isLanPairingBusy
+                      ? null
+                      : _showJoinLanPairingDialog,
                   icon: const Icon(Icons.pin_outlined, size: 18),
                   label: Text(_text('加入', 'Join')),
                 ),
@@ -1456,7 +1508,10 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                 const SizedBox(width: 8),
                 IconButton.outlined(
                   onPressed: _isLanPairingBusy ? null : _stopLanPairingHost,
-                  icon: const Icon(Icons.stop_circle_outlined, color: Colors.red),
+                  icon: const Icon(
+                    Icons.stop_circle_outlined,
+                    color: Colors.red,
+                  ),
                   tooltip: _text('停止局域网配对', 'Stop LAN Pairing'),
                 ),
               ],
@@ -1475,7 +1530,10 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    _text('6 位配对码: ${lanHostSession.pairingCode}', '6-digit code: ${lanHostSession.pairingCode}'),
+                    _text(
+                      '8 位配对码: ${lanHostSession.pairingCode}',
+                      '8-character code: ${lanHostSession.pairingCode}',
+                    ),
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w800,
                       letterSpacing: 1.6,
@@ -1484,13 +1542,19 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                   const SizedBox(height: 4),
                   if (lanHostSession.localAddress != null)
                     Text(
-                      _text('主机局域网 IP: ${lanHostSession.localAddress}', 'Host LAN IP: ${lanHostSession.localAddress}'),
+                      _text(
+                        '主机局域网 IP: ${lanHostSession.localAddress}',
+                        'Host LAN IP: ${lanHostSession.localAddress}',
+                      ),
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                   Text(
-                    _text('过期时间: ${lanHostSession.expiresAt.toLocal()}', 'Expires at: ${lanHostSession.expiresAt.toLocal()}'),
+                    _text(
+                      '过期时间: ${lanHostSession.expiresAt.toLocal()}',
+                      'Expires at: ${lanHostSession.expiresAt.toLocal()}',
+                    ),
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -1506,7 +1570,10 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
             context,
             Icons.admin_panel_settings_outlined,
             _text('受信任设备配对', 'Trusted Device Pairing'),
-            _text('通过服务器中心节点，远程建立安全信任关系。', 'Establish trust remotely via server hub.'),
+            _text(
+              '通过服务器中心节点，远程建立安全信任关系。',
+              'Establish trust remotely via server hub.',
+            ),
           ),
           const SizedBox(height: 12),
           Row(
@@ -1659,8 +1726,13 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                       onPressed: _isPairingBusy
                           ? null
                           : _checkPairingBundleAndImport,
-                      icon: const Icon(Icons.download_for_offline_outlined, size: 18),
-                      label: Text(_text('检查授权结果并导入', 'Check Approval & Import')),
+                      icon: const Icon(
+                        Icons.download_for_offline_outlined,
+                        size: 18,
+                      ),
+                      label: Text(
+                        _text('检查授权结果并导入', 'Check Approval & Import'),
+                      ),
                     ),
                   ),
                 ],
@@ -1674,7 +1746,10 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
             context,
             Icons.vpn_key_outlined,
             _text('离线密文镜像', 'Offline Ciphertext Mirror'),
-            _text('手动复制加密代码。作为最后的备份同步手段。', 'Copy-paste encrypted codes. Use as final fallback.'),
+            _text(
+              '手动复制加密代码。作为最后的备份同步手段。',
+              'Copy-paste encrypted codes. Use as final fallback.',
+            ),
           ),
           const SizedBox(height: 12),
           Row(
@@ -1852,380 +1927,6 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                 ),
               ),
             ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _SyncInfoChip extends StatelessWidget {
-  final String label;
-
-  const _SyncInfoChip({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-      ),
-      child: Text(
-        label,
-        style: theme.textTheme.labelSmall?.copyWith(
-          color: theme.colorScheme.onSurface,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
-}
-
-class _SixDigitCodeDialog extends StatefulWidget {
-  final String title;
-  final String subtitle;
-  final String confirmLabel;
-  final String cancelLabel;
-
-  const _SixDigitCodeDialog({
-    required this.title,
-    required this.subtitle,
-    required this.confirmLabel,
-    required this.cancelLabel,
-  });
-
-  @override
-  State<_SixDigitCodeDialog> createState() => _SixDigitCodeDialogState();
-}
-
-class _SixDigitCodeDialogState extends State<_SixDigitCodeDialog> {
-  late final TextEditingController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = TextEditingController();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      title: Text(
-        widget.title,
-        style: theme.textTheme.titleLarge?.copyWith(
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            widget.subtitle,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 14),
-          TextField(
-            controller: _controller,
-            keyboardType: TextInputType.number,
-            textInputAction: TextInputAction.done,
-            onSubmitted: (_) =>
-                Navigator.of(context).pop(_controller.text.trim()),
-            textAlign: TextAlign.center,
-            style: theme.textTheme.titleLarge?.copyWith(
-              letterSpacing: 4,
-              fontWeight: FontWeight.w700,
-            ),
-            inputFormatters: [
-              FilteringTextInputFormatter.digitsOnly,
-              LengthLimitingTextInputFormatter(6),
-            ],
-            decoration: const InputDecoration(
-              labelText: '6-digit Code',
-              border: OutlineInputBorder(),
-              counterText: '',
-            ),
-            maxLength: 6,
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text(widget.cancelLabel),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.of(context).pop(_controller.text.trim()),
-          child: Text(widget.confirmLabel),
-        ),
-      ],
-    );
-  }
-}
-
-class _VaultLinkCodeDialog extends StatefulWidget {
-  final String title;
-  final String subtitle;
-  final String confirmLabel;
-  final String cancelLabel;
-  final String fieldLabel;
-  final int minLines;
-  final int maxLines;
-
-  const _VaultLinkCodeDialog({
-    required this.title,
-    required this.subtitle,
-    required this.confirmLabel,
-    required this.cancelLabel,
-    this.fieldLabel = 'Code',
-    this.minLines = 1,
-    this.maxLines = 1,
-  });
-
-  @override
-  State<_VaultLinkCodeDialog> createState() => _VaultLinkCodeDialogState();
-}
-
-class _VaultLinkCodeDialogState extends State<_VaultLinkCodeDialog> {
-  late final TextEditingController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = TextEditingController();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-      title: Text(
-        widget.title,
-        style: theme.textTheme.titleLarge?.copyWith(
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            widget.subtitle,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 14),
-          TextField(
-            controller: _controller,
-            minLines: widget.minLines,
-            maxLines: widget.maxLines,
-            autofocus: true,
-            textInputAction: widget.maxLines > 1
-                ? TextInputAction.newline
-                : TextInputAction.done,
-            onSubmitted: widget.maxLines > 1
-                ? null
-                : (_) => Navigator.of(context).pop(_controller.text.trim()),
-            decoration: InputDecoration(
-              labelText: widget.fieldLabel,
-              alignLabelWithHint: true,
-              border: const OutlineInputBorder(),
-            ),
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text(widget.cancelLabel),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.of(context).pop(_controller.text.trim()),
-          child: Text(widget.confirmLabel),
-        ),
-      ],
-    );
-  }
-}
-
-class _SyncServerDialog extends StatefulWidget {
-  final String initialValue;
-  final String title;
-  final String labelText;
-  final String hintText;
-  final String cancelLabel;
-  final String saveLabel;
-
-  const _SyncServerDialog({
-    required this.initialValue,
-    required this.title,
-    required this.labelText,
-    required this.hintText,
-    required this.cancelLabel,
-    required this.saveLabel,
-  });
-
-  @override
-  State<_SyncServerDialog> createState() => _SyncServerDialogState();
-}
-
-class _SyncServerDialogState extends State<_SyncServerDialog> {
-  late final TextEditingController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = TextEditingController(text: widget.initialValue);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  String _text(String zh, String en) {
-    if (!mounted) return en;
-    return Localizations.localeOf(context).languageCode == 'zh' ? zh : en;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-      titlePadding: EdgeInsets.zero,
-      contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
-      title: Column(
-        children: [
-          const SizedBox(height: 24),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.primary.withAlpha(20),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.lan_outlined,
-              size: 32,
-              color: theme.colorScheme.primary,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            widget.title,
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          TextField(
-            controller: _controller,
-            autofocus: true,
-            keyboardType: TextInputType.url,
-            textInputAction: TextInputAction.done,
-            onSubmitted: (value) => Navigator.of(context).pop(value),
-            decoration: InputDecoration(
-              labelText: widget.labelText,
-              hintText: widget.hintText,
-              prefixIcon: const Icon(Icons.link_rounded),
-              filled: true,
-              fillColor: theme.colorScheme.surfaceContainerHighest.withAlpha(
-                50,
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide.none,
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide(
-                  color: theme.colorScheme.primary,
-                  width: 2,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest.withAlpha(100),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.shield_outlined,
-                  size: 16,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    _text(
-                      '服务器仅作为加密数据的同步中转站，无法解密您的内容。',
-                      'The server only acts as a relay for encrypted data and cannot decrypt it.',
-                    ),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                      height: 1.3,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text(widget.cancelLabel),
-        ),
-        const SizedBox(width: 8),
-        Padding(
-          padding: const EdgeInsets.only(right: 8, bottom: 8),
-          child: FilledButton(
-            onPressed: () => Navigator.of(context).pop(_controller.text),
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: Text(widget.saveLabel),
           ),
         ),
       ],

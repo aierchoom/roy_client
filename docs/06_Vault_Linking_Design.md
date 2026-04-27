@@ -11,7 +11,7 @@ Navigation:
 | Audience | Client, protocol, server engineers |
 | Scope | Multi-device vault linking and shared key onboarding |
 | Status | Draft |
-| Last Updated | 2026-04-25 |
+| Last Updated | 2026-04-28 |
 
 ## 1. Problem
 
@@ -349,6 +349,15 @@ As of this design:
 - this solves the immediate functional gap
 - it should be treated as a **Stage A transitional onboarding path**
 - the formal target remains the pairing-session flow described above
+
+Current implementation update, 2026-04-27:
+
+- `sroy-secure-v2:` secure link codes now use PBKDF2-HMAC-SHA256 plus AES-GCM-256 instead of the earlier transitional XOR wrapper.
+- LAN direct pairing now uses an 8-character readable code from `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`.
+- Server-mediated pairing is implemented as a short-lived approval flow, with the server acting only as an opaque relay for the wrapped vault bundle.
+- The receiving device still preserves its own `deviceId` and imports only vault-level identity material.
+
+See [07_Key_Sync_Implementation.md](07_Key_Sync_Implementation.md) for the implementation-level contract and current hardening backlog.
 
 ## 14. Next Step
 

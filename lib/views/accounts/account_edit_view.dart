@@ -12,6 +12,8 @@ import '../../services/service_manager.dart';
 import '../../widgets/adaptive_page.dart';
 import '../../widgets/green_add_button.dart';
 import '../../widgets/password_generator_sheet.dart';
+import '../../widgets/account_edit_widgets.dart';
+import 'account_edit_utils.dart';
 
 class AccountEditView extends StatefulWidget {
   final AccountItem? initial;
@@ -683,39 +685,6 @@ class _AccountEditViewState extends State<AccountEditView> {
     return Color.alphaBlend(tint.withAlpha(tintAlpha), base);
   }
 
-  Widget _buildToneChip(
-    BuildContext context, {
-    required IconData icon,
-    required String label,
-    Color? tint,
-  }) {
-    final theme = Theme.of(context);
-    final accent = tint ?? theme.colorScheme.primary;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        color: _softSurface(theme, tint: accent, tintAlpha: 16),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: accent.withAlpha(48)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: accent),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: theme.textTheme.labelMedium?.copyWith(
-              color: accent,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Color _fieldAccentColor(ThemeData theme, AccountField field) {
     if (field.attributes.isSecret) {
       return theme.colorScheme.tertiary;
@@ -826,8 +795,7 @@ class _AccountEditViewState extends State<AccountEditView> {
             spacing: 10,
             runSpacing: 10,
             children: [
-              _buildToneChip(
-                context,
+              ToneChip(
                 icon: _isEditing
                     ? Icons.edit_note_outlined
                     : Icons.visibility_outlined,
@@ -837,16 +805,14 @@ class _AccountEditViewState extends State<AccountEditView> {
                 tint: theme.colorScheme.onPrimaryContainer,
               ),
               if (selectedTemplate != null)
-                _buildToneChip(
-                  context,
+                ToneChip(
                   icon: Icons.layers_outlined,
                   label:
                       '${selectedTemplate.fields.length} ${_text('个字段', 'fields')}',
                   tint: theme.colorScheme.onPrimaryContainer,
                 ),
               if (_emailCtrl.text.trim().isNotEmpty)
-                _buildToneChip(
-                  context,
+                ToneChip(
                   icon: Icons.alternate_email_rounded,
                   label: _emailCtrl.text.trim(),
                   tint: theme.colorScheme.onPrimaryContainer,
@@ -1175,20 +1141,17 @@ class _AccountEditViewState extends State<AccountEditView> {
                             spacing: 8,
                             runSpacing: 8,
                             children: [
-                              _buildToneChip(
-                                context,
+                              ToneChip(
                                 icon: Icons.view_stream_outlined,
                                 label:
                                     '${selectedTemplate.fields.length} ${_text('个字段', 'fields')}',
                               ),
-                              _buildToneChip(
-                                context,
+                              ToneChip(
                                 icon: Icons.star_border_rounded,
                                 label:
                                     '${selectedTemplate.fields.where((field) => field.attributes.isRequired).length} ${_text('个必填', 'required')}',
                               ),
-                              _buildToneChip(
-                                context,
+                              ToneChip(
                                 icon: Icons.visibility_off_outlined,
                                 label:
                                     '${selectedTemplate.fields.where((field) => field.attributes.isSecret).length} ${_text('个保密', 'secret')}',
@@ -1283,29 +1246,25 @@ class _AccountEditViewState extends State<AccountEditView> {
               spacing: 8,
               runSpacing: 8,
               children: [
-                _buildToneChip(
-                  context,
+                ToneChip(
                   icon: Icons.label_outline_rounded,
                   label: field.attributes.type.name,
                   tint: accent,
                 ),
                 if (field.attributes.isRequired)
-                  _buildToneChip(
-                    context,
+                  ToneChip(
                     icon: Icons.star_outline_rounded,
                     label: _text('必填', 'Required'),
                     tint: accent,
                   ),
                 if (field.attributes.isSecret)
-                  _buildToneChip(
-                    context,
+                  ToneChip(
                     icon: Icons.visibility_off_outlined,
                     label: _text('保密', 'Secret'),
                     tint: accent,
                   ),
                 if (!field.attributes.isEditable)
-                  _buildToneChip(
-                    context,
+                  ToneChip(
                     icon: Icons.lock_outline_rounded,
                     label: _text('只读', 'Read only'),
                     tint: accent,
@@ -1471,13 +1430,11 @@ class _AccountEditViewState extends State<AccountEditView> {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  _buildToneChip(
-                    context,
+                  ToneChip(
                     icon: Icons.layers_outlined,
                     label: '${template.title} · $fieldCount',
                   ),
-                  _buildToneChip(
-                    context,
+                  ToneChip(
                     icon: Icons.visibility_off_outlined,
                     label: '$secretCount ${_text('个保密字段', 'secret')}',
                     tint: theme.colorScheme.tertiary,
@@ -1991,30 +1948,6 @@ class _AccountEditViewState extends State<AccountEditView> {
           ),
         );
       },
-    );
-  }
-}
-
-class MonthYearInputFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    if (newValue.text.length < oldValue.text.length) return newValue;
-
-    var text = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
-    if (text.length > 4) text = text.substring(0, 4);
-
-    var formatted = '';
-    for (var i = 0; i < text.length; i++) {
-      if (i == 2) formatted += '/';
-      formatted += text[i];
-    }
-
-    return TextEditingValue(
-      text: formatted,
-      selection: TextSelection.collapsed(offset: formatted.length),
     );
   }
 }

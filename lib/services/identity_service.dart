@@ -1,9 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
+import 'package:cryptography/cryptography.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:uuid/uuid.dart';
-import 'package:crypto/crypto.dart';
+import 'package:crypto/crypto.dart' show sha256;
 
 abstract class SecureKeyValueStore {
   Future<String?> read({required String key});
@@ -60,10 +62,15 @@ class IdentityTransferCodeException implements Exception {
 
 class IdentityService {
   static const String _transferCodePrefix = 'sroy-link-v1:';
+  static const String _secureCodePrefixV1 = 'sroy-secure-v1:';
+  static const String _secureCodePrefixV2 = 'sroy-secure-v2:';
   static const String _deviceIdKey = 'device_id';
   static const String _vaultIdKey = 'vault_id';
   static const String _privateKeyKey = 'private_key';
   static const String _symmetricKeyKey = 'symmetric_key';
+  static const int _secureLinkIterations = 150000;
+  static const int _secureLinkSaltLength = 16;
+  static const int _secureLinkNonceLength = 12;
 
   static final RegExp _currentDeviceIdPattern = RegExp(
     r'^device_[a-f0-9]{12}$',
@@ -131,58 +138,181 @@ class IdentityService {
     return '$_transferCodePrefix$encoded';
   }
 
-  String exportSecureLinkCode(String password, {String? syncServerUrl, String? vaultDump}) {
+  Future<String> exportSecureLinkCode(
+    String password, {
+    String? syncServerUrl,
+    String? vaultDump,
+  }) async {
+    _validateSecureLinkPassword(password);
+
     final payload = {
-      'v': 2, // New version for secure code
+      'v': 2,
       'vid': vaultId,
       'pk': privateKey,
       'sk': symmetricKey,
       if (syncServerUrl != null) 'url': syncServerUrl,
       if (vaultDump != null) 'dump': vaultDump,
     };
-    
-    final jsonBytes = utf8.encode(jsonEncode(payload));
-    // Compression
-    final compressedBytes = zlib.encode(jsonBytes);
-    
-    // Simple encryption derived from password
-    final key = sha256.convert(utf8.encode(password)).bytes;
-    final encryptedBytes = _xorBytes(compressedBytes, key);
-    
-    final encoded = base64UrlEncode(encryptedBytes);
-    return 'sroy-secure-v1:$encoded';
+
+    final salt = _randomBytes(_secureLinkSaltLength);
+    final nonce = _randomBytes(_secureLinkNonceLength);
+    final secretKey = await _deriveSecureLinkKey(
+      password: password,
+      salt: salt,
+      iterations: _secureLinkIterations,
+    );
+    final secretBox = await AesGcm.with256bits().encrypt(
+      zlib.encode(utf8.encode(jsonEncode(payload))),
+      secretKey: secretKey,
+      nonce: nonce,
+    );
+
+    final envelope = {
+      'v': 2,
+      'kdf': 'pbkdf2-hmac-sha256',
+      'iterations': _secureLinkIterations,
+      'salt': base64UrlEncode(salt),
+      'nonce': base64UrlEncode(secretBox.nonce),
+      'ciphertext': base64UrlEncode(secretBox.cipherText),
+      'mac': base64UrlEncode(secretBox.mac.bytes),
+    };
+
+    return '$_secureCodePrefixV2${base64UrlEncode(utf8.encode(jsonEncode(envelope)))}';
   }
 
-  Future<Map<String, String?>> importSecureLinkCode(String secureCode, String password) async {
-    const prefix = 'sroy-secure-v1:';
-    if (!secureCode.startsWith(prefix)) {
-      throw const IdentityTransferCodeException('Invalid secure link code format.');
+  Future<Map<String, String?>> importSecureLinkCode(
+    String secureCode,
+    String password,
+  ) async {
+    _validateSecureLinkPassword(password);
+
+    final normalized = secureCode.trim();
+    if (normalized.startsWith(_secureCodePrefixV2)) {
+      return _importSecureLinkCodeV2(
+        normalized.substring(_secureCodePrefixV2.length),
+        password,
+      );
     }
-    
+    if (normalized.startsWith(_secureCodePrefixV1)) {
+      return _importSecureLinkCodeV1(
+        normalized.substring(_secureCodePrefixV1.length),
+        password,
+      );
+    }
+    throw const IdentityTransferCodeException(
+      'Invalid secure link code format.',
+    );
+  }
+
+  Future<Map<String, String?>> _importSecureLinkCodeV2(
+    String encodedEnvelope,
+    String password,
+  ) async {
     try {
-      final encryptedBytes = base64Url.decode(secureCode.substring(prefix.length));
+      final envelope = Map<String, dynamic>.from(
+        jsonDecode(
+              utf8.decode(
+                base64Url.decode(base64Url.normalize(encodedEnvelope)),
+              ),
+            )
+            as Map,
+      );
+
+      if (envelope['v'] != 2 ||
+          envelope['kdf'] != 'pbkdf2-hmac-sha256' ||
+          envelope['iterations'] is! int) {
+        throw const IdentityTransferCodeException(
+          'Unsupported secure code version.',
+        );
+      }
+
+      final iterations = envelope['iterations'] as int;
+      if (iterations <= 0) {
+        throw const IdentityTransferCodeException(
+          'Secure code KDF parameters are invalid.',
+        );
+      }
+
+      final salt = base64Url.decode(
+        base64Url.normalize(envelope['salt'] as String? ?? ''),
+      );
+      final nonce = base64Url.decode(
+        base64Url.normalize(envelope['nonce'] as String? ?? ''),
+      );
+      final cipherText = base64Url.decode(
+        base64Url.normalize(envelope['ciphertext'] as String? ?? ''),
+      );
+      final macBytes = base64Url.decode(
+        base64Url.normalize(envelope['mac'] as String? ?? ''),
+      );
+
+      final secretKey = await _deriveSecureLinkKey(
+        password: password,
+        salt: salt,
+        iterations: iterations,
+      );
+      final clearBytes = await AesGcm.with256bits().decrypt(
+        SecretBox(cipherText, nonce: nonce, mac: Mac(macBytes)),
+        secretKey: secretKey,
+      );
+      final payload = Map<String, dynamic>.from(
+        jsonDecode(utf8.decode(zlib.decode(clearBytes))) as Map,
+      );
+
+      return _importVaultIdentityPayload(
+        version: payload['v'],
+        expectedVersion: 2,
+        vaultId: payload['vid'] as String?,
+        privateKey: payload['pk'] as String?,
+        symmetricKey: payload['sk'] as String?,
+        syncServerUrl: payload['url'] as String?,
+        vaultDump: payload['dump'] as String?,
+        sourceLabel: 'secure code',
+      );
+    } on IdentityTransferCodeException {
+      rethrow;
+    } catch (e) {
+      throw IdentityTransferCodeException(
+        'Failed to decrypt link code. Wrong password? ($e)',
+      );
+    }
+  }
+
+  Future<Map<String, String?>> _importSecureLinkCodeV1(
+    String encodedPayload,
+    String password,
+  ) async {
+    if (encodedPayload.isEmpty) {
+      throw const IdentityTransferCodeException(
+        'Invalid secure link code format.',
+      );
+    }
+
+    try {
+      final encryptedBytes = base64Url.decode(
+        base64Url.normalize(encodedPayload),
+      );
       final key = sha256.convert(utf8.encode(password)).bytes;
       final compressedBytes = _xorBytes(encryptedBytes, key);
-      
+
       final jsonBytes = zlib.decode(compressedBytes);
-      final payload = jsonDecode(utf8.decode(jsonBytes)) as Map<String, dynamic>;
-      
-      if (payload['v'] != 2) throw const IdentityTransferCodeException('Unsupported secure code version.');
-      
-      _vaultId = payload['vid'] as String;
-      _privateKeyMock = payload['pk'] as String;
-      _symmetricKeyMock = payload['sk'] as String;
+      final payload =
+          jsonDecode(utf8.decode(jsonBytes)) as Map<String, dynamic>;
 
-      await secureStorage.write(key: _vaultIdKey, value: _vaultId!);
-      await secureStorage.write(key: _privateKeyKey, value: _privateKeyMock!);
-      await secureStorage.write(key: _symmetricKeyKey, value: _symmetricKeyMock!);
-
-      return {
-        'sync_server_url': payload['url'] as String?,
-        'vault_dump': payload['dump'] as String?,
-      };
+      return _importVaultIdentityPayload(
+        version: payload['v'],
+        expectedVersion: 2,
+        vaultId: payload['vid'] as String?,
+        privateKey: payload['pk'] as String?,
+        symmetricKey: payload['sk'] as String?,
+        syncServerUrl: payload['url'] as String?,
+        vaultDump: payload['dump'] as String?,
+        sourceLabel: 'secure code',
+      );
     } catch (e) {
-      throw IdentityTransferCodeException('Failed to decrypt link code. Wrong password? ($e)');
+      throw IdentityTransferCodeException(
+        'Failed to decrypt link code. Wrong password? ($e)',
+      );
     }
   }
 
@@ -222,46 +352,84 @@ class IdentityService {
       );
     }
 
-    final version = payload['version'];
-    final importedVaultId = payload['vault_id'] as String?;
-    final importedPrivateKey = payload['private_key'] as String?;
-    final importedSymmetricKey = payload['symmetric_key'] as String?;
+    return _importVaultIdentityPayload(
+      version: payload['version'],
+      expectedVersion: 1,
+      vaultId: payload['vault_id'] as String?,
+      privateKey: payload['private_key'] as String?,
+      symmetricKey: payload['symmetric_key'] as String?,
+      syncServerUrl: payload['sync_server_url'] as String?,
+      vaultDump: payload['vault_dump'] as String?,
+      sourceLabel: 'transfer code',
+    );
+  }
 
-    if (version != 1) {
-      throw const IdentityTransferCodeException(
-        'Unsupported transfer code version.',
+  Future<Map<String, String?>> _importVaultIdentityPayload({
+    required Object? version,
+    required int expectedVersion,
+    required String? vaultId,
+    required String? privateKey,
+    required String? symmetricKey,
+    required String? syncServerUrl,
+    required String? vaultDump,
+    required String sourceLabel,
+  }) async {
+    await _ensureDeviceId();
+    if (version != expectedVersion) {
+      throw IdentityTransferCodeException('Unsupported $sourceLabel version.');
+    }
+    if (vaultId == null || !_vaultIdPattern.hasMatch(vaultId)) {
+      throw IdentityTransferCodeException('$sourceLabel vault id is invalid.');
+    }
+    if (privateKey == null || !_privateKeyPattern.hasMatch(privateKey)) {
+      throw IdentityTransferCodeException(
+        '$sourceLabel private key is invalid.',
       );
     }
-    if (importedVaultId == null || !_vaultIdPattern.hasMatch(importedVaultId)) {
-      throw const IdentityTransferCodeException(
-        'Transfer code vault id is invalid.',
-      );
-    }
-    if (importedPrivateKey == null ||
-        !_privateKeyPattern.hasMatch(importedPrivateKey)) {
-      throw const IdentityTransferCodeException(
-        'Transfer code private key is invalid.',
-      );
-    }
-    if (importedSymmetricKey == null ||
-        !_symmetricKeyPattern.hasMatch(importedSymmetricKey)) {
-      throw const IdentityTransferCodeException(
-        'Transfer code symmetric key is invalid.',
+    if (symmetricKey == null || !_symmetricKeyPattern.hasMatch(symmetricKey)) {
+      throw IdentityTransferCodeException(
+        '$sourceLabel symmetric key is invalid.',
       );
     }
 
-    _vaultId = importedVaultId;
-    _privateKeyMock = importedPrivateKey;
-    _symmetricKeyMock = importedSymmetricKey;
+    _vaultId = vaultId;
+    _privateKeyMock = privateKey;
+    _symmetricKeyMock = symmetricKey;
 
     await secureStorage.write(key: _vaultIdKey, value: _vaultId!);
     await secureStorage.write(key: _privateKeyKey, value: _privateKeyMock!);
     await secureStorage.write(key: _symmetricKeyKey, value: _symmetricKeyMock!);
-    
-    return {
-      'sync_server_url': payload['sync_server_url'] as String?,
-      'vault_dump': payload['vault_dump'] as String?,
-    };
+
+    return {'sync_server_url': syncServerUrl, 'vault_dump': vaultDump};
+  }
+
+  Future<SecretKey> _deriveSecureLinkKey({
+    required String password,
+    required List<int> salt,
+    required int iterations,
+  }) {
+    final pbkdf2 = Pbkdf2(
+      macAlgorithm: Hmac.sha256(),
+      iterations: iterations,
+      bits: 256,
+    );
+    return pbkdf2.deriveKey(
+      secretKey: SecretKey(utf8.encode(password)),
+      nonce: salt,
+    );
+  }
+
+  List<int> _randomBytes(int length) {
+    final random = Random.secure();
+    return List<int>.generate(length, (_) => random.nextInt(256));
+  }
+
+  void _validateSecureLinkPassword(String password) {
+    if (password.isEmpty) {
+      throw const IdentityTransferCodeException(
+        'Secure link password is required.',
+      );
+    }
   }
 
   Future<void> initialize() async {

@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:secret_roy/models/account_item.dart';
+import 'package:secret_roy/models/account_template.dart';
 import 'package:secret_roy/models/hlc.dart';
 import 'package:secret_roy/services/identity_service.dart';
 import 'package:secret_roy/services/secure_storage_service.dart';
@@ -82,6 +83,9 @@ class _FakeSecureStorageService extends SecureStorageService {
   Future<List<ConflictLog>> getConflictLogs(String accountId) async {
     return List<ConflictLog>.from(conflictLogs[accountId] ?? const []);
   }
+
+  @override
+  Future<List<AccountTemplate>> loadDirtyTemplates() async => [];
 }
 
 IdentityService _identityService({

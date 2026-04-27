@@ -1,5 +1,7 @@
 # SecretRoy 密码存储与多设备同步方案 - 执行总结
 
+> Current delta (2026-04-28): this is a 2026-04-18 architecture proposal snapshot. Current code now has PBKDF2-HMAC-SHA256 master password verification, `sroy-secure-v2:` secure link codes with AES-GCM-256, and 8-character LAN pairing. SQLite at-rest encryption and the broader storage roadmap remain follow-up items.
+
 **日期**: 2026-04-18  
 **文档版本**: 1.0
 
@@ -11,7 +13,7 @@
 
 | 层级         | 现状         | 问题等级 |
 | ------------ | ------------ | -------- |
-| **加密**     | 明文透传     | 🔴 严重   |
+| **加密**     | 历史快照：加固前状态 | 🔴 严重   |
 | **存储**     | SQLite 明文  | 🔴 严重   |
 | **同步**     | 全库覆盖     | 🟠 重要   |
 | **冲突处理** | 版本冲突丢失 | 🟠 重要   |

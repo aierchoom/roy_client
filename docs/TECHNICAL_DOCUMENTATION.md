@@ -1,5 +1,7 @@
 # SecretRoy 技术文档
 
+> Current delta (2026-04-28): this document remains useful as a broad code map, but key security details changed after the 2026-04-18 scan. `EnhancedCryptoService` now manages PBKDF2-HMAC-SHA256 master password verification rather than plaintext pass-through APIs. Secure vault link codes use `sroy-secure-v2:` with PBKDF2-HMAC-SHA256 plus AES-GCM-256. LAN pairing codes are 8 readable characters. See `07_Key_Sync_Implementation.md` for the latest key-sync implementation.
+
 > **本文档以代码为唯一事实依据**，所有描述均来自对 `lib/`、`sync_server/`、`pubspec.yaml` 的逐文件扫描。  
 > **最后扫描时间**: 2026-04-18
 
@@ -41,7 +43,7 @@
 ┌──────────────────────────────────────────────────────────┐
 │              ServiceManager (单例, ChangeNotifier)        │
 │  ┌────────────────────────────────────────────────────┐  │
-│  │ EnhancedCryptoService    ← 加密（当前明文透传）      │  │
+│  │ EnhancedCryptoService    ← 主密码 PBKDF2 校验        │  │
 │  │ SecureStorageService     ← SQLite CRUD              │  │
 │  │ SyncService              ← 版本号同步               │  │
 │  │ AutoLockService          ← 自动锁定                 │  │
@@ -79,7 +81,7 @@ lib/
 │   ├── services.dart                  # 统一 barrel 导出
 │   ├── service_manager.dart           # ServiceManager 单例 (ChangeNotifier)
 │   ├── secure_storage_service.dart    # SecureStorageService (SQLite)
-│   ├── enhanced_crypto_service.dart   # EnhancedCryptoService (明文占位)
+│   ├── enhanced_crypto_service.dart   # EnhancedCryptoService (PBKDF2 master verifier)
 │   ├── auto_lock_service.dart         # AutoLockService (ChangeNotifier)
 │   └── biometric_auth_service.dart    # BiometricAuthService
 ├── sync/
@@ -456,15 +458,13 @@ Timer.periodic(_config.syncInterval, (_) => syncNow())
 ### 5.4 EnhancedCryptoService
 
 **文件**: `lib/services/enhanced_crypto_service.dart`  
-**当前状态**: ⚠️ 所有加密/解密方法是**明文透传占位符**
+**当前状态**: 主密码 PBKDF2-HMAC-SHA256 校验与遗留 `master_password_v1` 迁移
 
 | 方法 | 实际行为 |
 |------|---------|
-| `initMasterKey(password)` | 设置 `_isUnlocked=true`，返回 `true` |
-| `verifyPassword(password)` | 返回 `true` |
-| `encryptData(plainText)` | 原样返回 `plainText` |
-| `decryptData(data)` | 原样返回 `data` |
-| `deriveSubKey(purpose)` | 返回全零字节列表 |
+| `initMasterKey(password)` | 验证或创建 `master_password_v2` PBKDF2 记录 |
+| `verifyMasterPassword(password)` | 校验 PBKDF2 记录，兼容 legacy `master_password_v1` |
+| `updateMasterPassword(oldPassword, newPassword)` | 通过旧密码校验后写入新 PBKDF2 记录 |
 | `logout()` | 设置 `_isUnlocked=false` |
 
 保留了 `KdfVersion` 枚举和 `DerivedKeyMetadata` 类（含 JSON 序列化），为未来加密层重设计做接口预留。
