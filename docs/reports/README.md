@@ -8,6 +8,7 @@
 | [docs-audit-2026-04-28.md](docs-audit-2026-04-28.md) | Prior documentation audit |
 | [ai-handover-notes.md](ai-handover-notes.md) | AI handoff notes |
 | [beta-technical-delivery.md](beta-technical-delivery.md) | Beta technical delivery notes |
+| [execution/README.md](execution/README.md) | Per-feature execution reports |
 | [quality-convergence/README.md](quality-convergence/README.md) | Quality convergence reports |
 | [dev-log/sync-account-count-fix.md](dev-log/sync-account-count-fix.md) | Sync account count fix log |
 | [dev-log/sync-fix-and-platform-adaptation.md](dev-log/sync-fix-and-platform-adaptation.md) | Sync fix and platform adaptation log |

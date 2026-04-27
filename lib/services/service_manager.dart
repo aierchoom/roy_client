@@ -7,8 +7,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/account_item.dart';
 import '../models/account_template.dart';
-import '../sync/sync_payload_codec.dart';
 import '../sync/sync_service.dart';
+import '../system/service_manager/default_sync_server_url.dart';
+import '../system/service_manager/password_tools.dart';
+import '../system/service_manager/sync_server_url_store.dart';
+import '../system/service_manager/vault_dump_coordinator.dart';
 import 'auto_lock_service.dart';
 import 'biometric_auth_service.dart';
 import 'enhanced_crypto_service.dart';
@@ -28,18 +31,7 @@ class ServiceManager extends ChangeNotifier {
   }
 
   static String get defaultSyncServerUrl {
-    if (kIsWeb) return '';
-    switch (defaultTargetPlatform) {
-      case TargetPlatform.android:
-      case TargetPlatform.iOS:
-        return '';
-      case TargetPlatform.macOS:
-      case TargetPlatform.windows:
-      case TargetPlatform.linux:
-        return 'http://127.0.0.1:8080';
-      case TargetPlatform.fuchsia:
-        return '';
-    }
+    return defaultSyncServerUrlForCurrentPlatform();
   }
 
   late final EnhancedCryptoService _cryptoService;
@@ -50,6 +42,8 @@ class ServiceManager extends ChangeNotifier {
   late final SyncService _syncService;
   late final VaultPairingService _vaultPairingService;
   late final LanPairingService _lanPairingService;
+  late final SyncServerUrlStore _syncServerUrlStore;
+  late final VaultDumpCoordinator _vaultDumpCoordinator;
 
   ServiceManagerState _state = ServiceManagerState.uninitialized;
   String? _errorMessage;
@@ -75,6 +69,11 @@ class ServiceManager extends ChangeNotifier {
     );
     _vaultPairingService = VaultPairingService();
     _lanPairingService = LanPairingService();
+    _syncServerUrlStore = const SyncServerUrlStore();
+    _vaultDumpCoordinator = VaultDumpCoordinator(
+      identityService: _identityService,
+      storageService: _secureStorageService,
+    );
   }
 
   ServiceManagerState get state => _state;
@@ -387,80 +386,23 @@ class ServiceManager extends ChangeNotifier {
   bool get hasDirtyData => _syncService.isDirty;
 
   Future<String?> getSyncServerUrl() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('sync_server_url');
+    return _syncServerUrlStore.read();
   }
 
   Future<void> setSyncServerUrl(String url) async {
     if (!isUnlocked) return;
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('sync_server_url', url);
+    await _syncServerUrlStore.write(url);
     await disconnectFromSyncServer();
     notifyListeners();
   }
 
   Future<String?> _exportEncryptedVaultDump() async {
-    if (!_identityService.hasIdentity) return null;
-
-    final accountsList = await _secureStorageService.loadAccounts(
-      includeDeleted: true,
-    );
-    final templatesList = await _secureStorageService.loadCustomTemplates();
-
-    final payloadJson = {
-      'accounts': accountsList.map((a) => a.toJson()).toList(),
-      'templates': templatesList.map((t) => t.toJson()).toList(),
-    };
-
-    return SyncPayloadCodec.encodePayload(
-      payloadJson: payloadJson,
-      vaultId: _identityService.vaultId,
-      nodeId: _identityService.deviceId,
-      privateKey: _identityService.privateKey,
-      symmetricKey: _identityService.symmetricKey,
-    );
+    return _vaultDumpCoordinator.exportEncryptedVaultDump();
   }
 
   Future<void> _importEncryptedVaultDump(String vaultDumpJson) async {
-    if (!_identityService.hasIdentity) return;
-
-    try {
-      final payloadJson = SyncPayloadCodec.decodePayload(
-        encodedPayload: vaultDumpJson,
-        expectedVaultId: _identityService.vaultId,
-        privateKey: _identityService.privateKey,
-        symmetricKey: _identityService.symmetricKey,
-      );
-
-      final accountsList = payloadJson['accounts'] as List?;
-      final templatesList = payloadJson['templates'] as List?;
-
-      if (templatesList != null || accountsList != null) {
-        await _secureStorageService.clearAllData();
-      }
-
-      if (templatesList != null) {
-        for (final t in templatesList) {
-          final template = AccountTemplate.fromJson(
-            Map<String, dynamic>.from(t),
-          );
-          await _secureStorageService.saveTemplate(template, isSyncMerge: true);
-        }
-      }
-
-      if (accountsList != null) {
-        for (final a in accountsList) {
-          final account = AccountItem.fromJson(Map<String, dynamic>.from(a));
-          await _secureStorageService.saveAccount(
-            account.copyWith(syncStatus: SyncStatus.synchronized),
-            isSyncMerge: true,
-          );
-        }
-      }
-    } catch (e) {
-      debugPrint('Failed to import vault dump: $e');
-    }
+    await _vaultDumpCoordinator.importEncryptedVaultDump(vaultDumpJson);
   }
 
   Future<String> exportVaultLinkCode() async {
@@ -684,29 +626,7 @@ class ServiceManager extends ChangeNotifier {
   AutoLockDuration get autoLockDuration => _autoLockService.duration;
 
   Future<String> _resolveSyncServerUrl({bool allowEmpty = false}) async {
-    final normalized = _normalizeServerUrl(
-      (await getSyncServerUrl()) ?? defaultSyncServerUrl,
-    );
-    if (normalized.isEmpty && !allowEmpty) {
-      throw const VaultPairingServiceException(
-        'Sync server URL is not configured.',
-      );
-    }
-    return normalized;
-  }
-
-  String _normalizeServerUrl(String rawUrl) {
-    var url = rawUrl.trim();
-    if (url.isEmpty) {
-      return '';
-    }
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      url = 'http://$url';
-    }
-    if (url.endsWith('/')) {
-      url = url.substring(0, url.length - 1);
-    }
-    return url;
+    return _syncServerUrlStore.resolve(allowEmpty: allowEmpty);
   }
 
   static String generatePassword({
@@ -716,7 +636,7 @@ class ServiceManager extends ChangeNotifier {
     bool includeNumbers = true,
     bool includeSpecial = true,
   }) {
-    return EnhancedCryptoService.generatePassword(
+    return ServiceManagerPasswordTools.generatePassword(
       length: length,
       includeUppercase: includeUppercase,
       includeLowercase: includeLowercase,
@@ -726,11 +646,11 @@ class ServiceManager extends ChangeNotifier {
   }
 
   static int calculatePasswordStrength(String password) {
-    return EnhancedCryptoService.calculatePasswordStrength(password);
+    return ServiceManagerPasswordTools.calculatePasswordStrength(password);
   }
 
   static String getPasswordStrengthLevel(int score) {
-    return EnhancedCryptoService.getPasswordStrengthLevel(score);
+    return ServiceManagerPasswordTools.getPasswordStrengthLevel(score);
   }
 
   void _updateState(ServiceManagerState newState) {
