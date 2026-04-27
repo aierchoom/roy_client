@@ -8,7 +8,7 @@ and a lightweight sync server.
 
 - `lib/`: Flutter application code.
 - `sync_server/`: local Node.js sync server used for development.
-- `docs/`: project notes and architecture documents.
+- `docs/`: normalized project documentation index and archives.
 - `test/`: lightweight regression tests.
 
 ## Current state
@@ -24,6 +24,17 @@ and a lightweight sync server.
   working file while the vault is unlocked.
 - The sync server stores runtime data locally and should not commit generated
   files such as `node_modules/` or `sync_server/data/`.
+
+## Documentation
+
+Start from [docs/README.md](docs/README.md). The documentation set is organized
+by area:
+
+- [Architecture](docs/architecture/README.md)
+- [Security](docs/security/README.md)
+- [Sync](docs/sync/README.md)
+- [Guides](docs/guides/README.md)
+- [Reports](docs/reports/README.md)
 
 ## Local development
 
