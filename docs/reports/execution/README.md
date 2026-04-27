@@ -18,3 +18,10 @@ Each report should include:
 - `Validation`
 - `Risk Notes`
 - `Follow-ups`
+
+## Reports
+
+| Date | Report | Scope |
+|---|---|---|
+| 2026-04-28 | [2026-04-28-client-service-manager-system-refactor.md](2026-04-28-client-service-manager-system-refactor.md) | ServiceManager system-module refactor |
+| 2026-04-28 | [2026-04-28-project-todo-linkage.md](2026-04-28-project-todo-linkage.md) | Project TODO linkage |

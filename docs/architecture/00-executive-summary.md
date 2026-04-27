@@ -125,6 +125,10 @@ Node 服务端只是同步协调器。
 - 它是一个值得继续投入的架构原型
 - 但还不是一个可直接产品化的安全系统
 
+Execution follow-up:
+
+- [Project TODO](../todo.md) tracks the work derived from this conclusion.
+
 ---
 
 Navigation:

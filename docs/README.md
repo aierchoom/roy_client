@@ -16,6 +16,7 @@ kebab-case names, and avoid duplicated mirror copies.
 | Sync | [sync/sync-protocol.md](sync/sync-protocol.md) | Sync protocol and vault-linking references |
 | Account templates | [features/account-templates/business-analysis.md](features/account-templates/business-analysis.md) | Template feature design and test reports |
 | Guides | [guides/technical-documentation.md](guides/technical-documentation.md) | Code map and implementation guides |
+| TODO | [todo.md](todo.md) | Project-level TODO derived from the current architecture conclusion |
 | Reports | [reports/docs-reorganization-execution-report-2026-04-28.md](reports/docs-reorganization-execution-report-2026-04-28.md) | Latest documentation execution report |
 | Archive | [archive/historical-proposals/executive-summary-2026-04-18.md](archive/historical-proposals/executive-summary-2026-04-18.md) | Historical proposals and legacy reports |
 
