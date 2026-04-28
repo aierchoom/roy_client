@@ -1868,15 +1868,15 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
             subtitle: Text(
               _text(
                 '用于旧链路和内部密钥包承载，不作为普通恢复入口展示。',
-                'Used by legacy links and internal bundle transport; not exposed as a normal recovery entry.',
+                'Used by internal bundle transport; not exposed as a normal recovery entry.',
               ),
               style: theme.textTheme.bodySmall,
             ),
             children: [
               Text(
                 _text(
-                  '内部兼容码是 sroy-link-v1 格式，当前仍被面对面链接和远程配对的密钥包流程承载使用。普通用户请使用上面的三个入口，不要手动保存或粘贴内部兼容码。',
-                  'The internal compatibility code uses the sroy-link-v1 format and is still carried inside face-to-face and remote pairing bundles. Use the three entries above instead of manually saving or pasting this internal code.',
+                  '内部兼容码是 sroy-link 格式，当前仍被面对面链接和远程配对的密钥包流程承载使用。普通用户请使用上面的三个入口，不要手动保存或粘贴内部兼容码。',
+                  'The internal compatibility code uses the sroy-link format and is still carried inside face-to-face and remote pairing bundles. Use the three entries above instead of manually saving or pasting this internal code.',
                 ),
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
@@ -1962,8 +1962,8 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
           Icons.integration_instructions_outlined,
           _text('内部兼容码', 'Internal compatibility code'),
           _text(
-            'sroy-link-v1 仅作为内部承载格式，不作为普通用户入口。',
-            'sroy-link-v1 is an internal transport format, not a normal user entry.',
+            'sroy-link 仅作为内部承载格式，不作为普通用户入口。',
+            'sroy-link is an internal transport format, not a normal user entry.',
           ),
         ),
       ],

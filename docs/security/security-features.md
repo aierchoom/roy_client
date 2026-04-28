@@ -1,4 +1,4 @@
-﻿# SecretRoy Security Features
+# SecretRoy Security Features
 
 **Last updated**: 2026-04-29
 
@@ -34,14 +34,14 @@ the client.
 
 ### Offline Recovery Codes
 
-- `IdentityService.exportSecureLinkCode(...)` emits `sroy-secure-v2:` codes.
-- `sroy-secure-v2:` uses PBKDF2-HMAC-SHA256 with a random salt and AES-GCM-256
+- `IdentityService.exportSecureLinkCode(...)` emits `sroy-recovery:` codes.
+- `sroy-recovery:` uses PBKDF2-HMAC-SHA256 with a random salt and AES-GCM-256
   with a random nonce.
 - Offline recovery imports preserve the receiving device's `deviceId` and
   replace only shared vault identity material.
 - Imports validate the recovery code and optional dump before writing; non-clean
   devices must explicitly confirm overwrite.
-- `sroy-secure-v1:` import remains available for legacy compatibility.
+- Only the current `sroy-recovery:` protocol is imported.
 
 ### Face-to-Face Linking
 
@@ -64,17 +64,17 @@ the client.
 - The joining device submits a temporary X25519 public key when it enters the
   pairing code.
 - The trusted device encrypts the vault bundle to that public key and uploads a
-  `sroy-pairing-v2:` AES-GCM bundle.
-- The server rejects legacy plaintext `sroy-link-v1:` bundles on approval.
+  `sroy-pairing:` AES-GCM bundle.
+- The server rejects plaintext `sroy-link:` bundles on approval.
 - The server stores and relays only the encrypted wrapped vault bundle.
 - The trusted device approves the join request before the new device can fetch
   the bundle.
 
 ### Internal Compatibility Code Boundary
 
-- `sroy-link-v1:` still exists as an internal compatibility code.
+- `sroy-link:` still exists as an internal compatibility code.
 - Normal UI does not expose internal compatibility code export or import.
-- Remote pairing server routes reject plaintext `sroy-link-v1:` approve bundles.
+- Remote pairing server routes reject plaintext `sroy-link:` approve bundles.
 - Face-to-face linking prefers requester-public-key encryption and returns
   `wrapped_transfer_code`.
 

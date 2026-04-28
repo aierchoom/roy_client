@@ -21,7 +21,7 @@ class VaultPairingKeyPair {
 }
 
 class VaultPairingCrypto {
-  static const String prefix = 'sroy-pairing-v2:';
+  static const String prefix = 'sroy-pairing:';
   static const String _algorithmName = 'x25519-aesgcm-sha256';
   static const int _nonceLength = 12;
   static const int _saltLength = 16;
@@ -68,7 +68,7 @@ class VaultPairingCrypto {
       );
 
       final envelope = {
-        'v': 2,
+        'v': 1,
         'alg': _algorithmName,
         'epk': _encodeBase64Url(senderPublicKey.bytes),
         'salt': _encodeBase64Url(salt),
@@ -109,7 +109,7 @@ class VaultPairingCrypto {
             as Map,
       );
 
-      if (envelope['v'] != 2 || envelope['alg'] != _algorithmName) {
+      if (envelope['v'] != 1 || envelope['alg'] != _algorithmName) {
         throw const VaultPairingCryptoException(
           'Unsupported pairing bundle version.',
         );
@@ -152,7 +152,7 @@ class VaultPairingCrypto {
     required List<int> salt,
   }) {
     return Hmac(sha256, sharedBytes).convert([
-      ...utf8.encode('sroy-pairing-v2'),
+      ...utf8.encode('sroy-pairing'),
       ...salt,
       ...utf8.encode(_algorithmName),
     ]).bytes;

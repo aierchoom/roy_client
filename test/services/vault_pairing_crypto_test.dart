@@ -6,7 +6,7 @@ void main() {
     'pairing bundle encrypts to requester public key and decrypts locally',
     () async {
       const transferCode =
-          'sroy-link-v1:eyJ2YXVsdF9pZCI6InZhdWx0XzEyMyIsInBrIjoicHJpdiJ9';
+          'sroy-link:eyJ2YXVsdF9pZCI6InZhdWx0XzEyMyIsInBrIjoicHJpdiJ9';
       final requester = await VaultPairingCrypto.createKeyPair();
 
       final wrappedBundle = await VaultPairingCrypto.encryptBundle(
@@ -28,7 +28,7 @@ void main() {
     final requester = await VaultPairingCrypto.createKeyPair();
     final otherRequester = await VaultPairingCrypto.createKeyPair();
     final wrappedBundle = await VaultPairingCrypto.encryptBundle(
-      plainBundle: 'sroy-link-v1:test',
+      plainBundle: 'sroy-link:test',
       requesterPublicKey: requester.publicKey,
     );
 

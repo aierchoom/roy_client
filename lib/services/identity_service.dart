@@ -5,7 +5,6 @@ import 'dart:math';
 import 'package:cryptography/cryptography.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:uuid/uuid.dart';
-import 'package:crypto/crypto.dart' show sha256;
 
 abstract class SecureKeyValueStore {
   Future<String?> read({required String key});
@@ -89,9 +88,8 @@ class VaultIdentityImportPreview {
 }
 
 class IdentityService {
-  static const String _transferCodePrefix = 'sroy-link-v1:';
-  static const String _secureCodePrefixV1 = 'sroy-secure-v1:';
-  static const String _secureCodePrefixV2 = 'sroy-secure-v2:';
+  static const String _transferCodePrefix = 'sroy-link:';
+  static const String _secureCodePrefix = 'sroy-recovery:';
   static const String _deviceIdKey = 'device_id';
   static const String _vaultIdKey = 'vault_id';
   static const String _privateKeyKey = 'private_key';
@@ -174,7 +172,7 @@ class IdentityService {
     _validateSecureLinkPassword(password);
 
     final payload = {
-      'v': 2,
+      'v': 1,
       'vid': vaultId,
       'pk': privateKey,
       'sk': symmetricKey,
@@ -196,7 +194,7 @@ class IdentityService {
     );
 
     final envelope = {
-      'v': 2,
+      'v': 1,
       'kdf': 'pbkdf2-hmac-sha256',
       'iterations': _secureLinkIterations,
       'salt': base64UrlEncode(salt),
@@ -205,7 +203,7 @@ class IdentityService {
       'mac': base64UrlEncode(secretBox.mac.bytes),
     };
 
-    return '$_secureCodePrefixV2${base64UrlEncode(utf8.encode(jsonEncode(envelope)))}';
+    return '$_secureCodePrefix${base64UrlEncode(utf8.encode(jsonEncode(envelope)))}';
   }
 
   Future<Map<String, String?>> importSecureLinkCode(
@@ -224,24 +222,16 @@ class IdentityService {
     _validateSecureLinkPassword(password);
 
     final normalized = secureCode.trim();
-    if (normalized.startsWith(_secureCodePrefixV2)) {
-      return _importSecureLinkCodeV2(
-        normalized.substring(_secureCodePrefixV2.length),
+    if (normalized.startsWith(_secureCodePrefix)) {
+      return _importSecureLinkCode(
+        normalized.substring(_secureCodePrefix.length),
         password,
       );
     }
-    if (normalized.startsWith(_secureCodePrefixV1)) {
-      return _importSecureLinkCodeV1(
-        normalized.substring(_secureCodePrefixV1.length),
-        password,
-      );
-    }
-    throw const IdentityTransferCodeException(
-      'Invalid secure link code format.',
-    );
+    throw const IdentityTransferCodeException('Invalid recovery code format.');
   }
 
-  Future<VaultIdentityImportPreview> _importSecureLinkCodeV2(
+  Future<VaultIdentityImportPreview> _importSecureLinkCode(
     String encodedEnvelope,
     String password,
   ) async {
@@ -255,18 +245,18 @@ class IdentityService {
             as Map,
       );
 
-      if (envelope['v'] != 2 ||
+      if (envelope['v'] != 1 ||
           envelope['kdf'] != 'pbkdf2-hmac-sha256' ||
           envelope['iterations'] is! int) {
         throw const IdentityTransferCodeException(
-          'Unsupported secure code version.',
+          'Unsupported recovery code version.',
         );
       }
 
       final iterations = envelope['iterations'] as int;
       if (iterations <= 0) {
         throw const IdentityTransferCodeException(
-          'Secure code KDF parameters are invalid.',
+          'Recovery code KDF parameters are invalid.',
         );
       }
 
@@ -298,67 +288,21 @@ class IdentityService {
 
       return _importVaultIdentityPayload(
         version: payload['v'],
-        expectedVersion: 2,
+        expectedVersion: 1,
         vaultId: payload['vid'] as String?,
         privateKey: payload['pk'] as String?,
         symmetricKey: payload['sk'] as String?,
         syncServerUrl: payload['url'] as String?,
         vaultDump: payload['dump'] as String?,
-        sourceLabel: 'secure code',
+        sourceLabel: 'recovery code',
       );
     } on IdentityTransferCodeException {
       rethrow;
     } catch (e) {
       throw IdentityTransferCodeException(
-        'Failed to decrypt link code. Wrong password? ($e)',
+        'Failed to decrypt recovery code. Wrong password? ($e)',
       );
     }
-  }
-
-  Future<VaultIdentityImportPreview> _importSecureLinkCodeV1(
-    String encodedPayload,
-    String password,
-  ) async {
-    if (encodedPayload.isEmpty) {
-      throw const IdentityTransferCodeException(
-        'Invalid secure link code format.',
-      );
-    }
-
-    try {
-      final encryptedBytes = base64Url.decode(
-        base64Url.normalize(encodedPayload),
-      );
-      final key = sha256.convert(utf8.encode(password)).bytes;
-      final compressedBytes = _xorBytes(encryptedBytes, key);
-
-      final jsonBytes = zlib.decode(compressedBytes);
-      final payload =
-          jsonDecode(utf8.decode(jsonBytes)) as Map<String, dynamic>;
-
-      return _importVaultIdentityPayload(
-        version: payload['v'],
-        expectedVersion: 2,
-        vaultId: payload['vid'] as String?,
-        privateKey: payload['pk'] as String?,
-        symmetricKey: payload['sk'] as String?,
-        syncServerUrl: payload['url'] as String?,
-        vaultDump: payload['dump'] as String?,
-        sourceLabel: 'secure code',
-      );
-    } catch (e) {
-      throw IdentityTransferCodeException(
-        'Failed to decrypt link code. Wrong password? ($e)',
-      );
-    }
-  }
-
-  List<int> _xorBytes(List<int> input, List<int> key) {
-    final output = List<int>.filled(input.length, 0);
-    for (var i = 0; i < input.length; i++) {
-      output[i] = input[i] ^ key[i % key.length];
-    }
-    return output;
   }
 
   Future<Map<String, String?>> importTransferCode(String rawCode) async {
@@ -375,9 +319,12 @@ class IdentityService {
       throw const IdentityTransferCodeException('Transfer code is empty.');
     }
 
-    final encodedPayload = normalized.startsWith(_transferCodePrefix)
-        ? normalized.substring(_transferCodePrefix.length)
-        : normalized;
+    if (!normalized.startsWith(_transferCodePrefix)) {
+      throw const IdentityTransferCodeException(
+        'Invalid transfer code format.',
+      );
+    }
+    final encodedPayload = normalized.substring(_transferCodePrefix.length);
 
     Map<String, dynamic> payload;
     try {
@@ -492,7 +439,7 @@ class IdentityService {
   void _validateSecureLinkPassword(String password) {
     if (password.isEmpty) {
       throw const IdentityTransferCodeException(
-        'Secure link password is required.',
+        'Recovery password is required.',
       );
     }
   }

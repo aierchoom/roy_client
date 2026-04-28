@@ -40,7 +40,7 @@
 
 当前协议格式：
 
-- 前缀：`sroy-secure-v2:`
+- 前缀：`sroy-recovery:`
 - 信封：Base64URL JSON
 - KDF：PBKDF2-HMAC-SHA256
 - 迭代次数：`150000`
@@ -69,8 +69,8 @@
 
 兼容性：
 
-- `sroy-secure-v1:` 仍可导入，用于迁移。
-- 新导出始终使用 `sroy-secure-v2:`。
+- 当前不保留旧恢复码协议兼容导入。
+- 导出和导入都使用 `sroy-recovery:` 当前格式。
 
 ### 2.2 远程配对
 
@@ -94,17 +94,17 @@
 3. 新设备生成临时 X25519 keypair 并输入配对码。
 4. 新设备携带 `requester_public_key` join；private key 留在本地。
 5. 已有设备看到 pending request 并手动批准。
-6. 已有设备在本地导出 vault transfer payload，加密给 `requester_public_key`，只上传 `sroy-pairing-v2:` 密文。
+6. 已有设备在本地导出 vault transfer payload，加密给 `requester_public_key`，只上传 `sroy-pairing:` 密文。
 7. 新设备拉取密文 bundle，用本地临时 private key 解密，再导入 vault identity。
 
 当前协议格式：
 
-- 前缀：`sroy-pairing-v2:`
+- 前缀：`sroy-pairing:`
 - 密钥协商：请求方临时 X25519 key + 主机临时 key
 - KDF：HMAC-SHA256 over shared secret、salt、protocol label
 - 加密：AES-GCM-256
 - 服务器可见字段：配对元数据、请求方 public key、加密 bundle
-- 服务器禁止 payload：明文 `sroy-link-v1:` transfer code
+- 服务器禁止 payload：明文 `sroy-link:` transfer code
 
 ### 2.3 面对面链接
 
@@ -164,7 +164,7 @@
 
 当前协议格式：
 
-- 前缀：`sroy-link-v1:`
+- 前缀：`sroy-link:`
 - 用途：内部承载 vault identity payload，仍被面对面链接和远程配对的内部密钥包流程使用。
 - 边界：普通用户不应手动保存、粘贴或分享该格式。
 
@@ -180,7 +180,7 @@
 - 离线恢复码使用恢复密码和认证加密保护。
 - 远程配对在上传前把 vault transfer payload 加密给 joining device 的临时 public key。
 - 面对面链接 claim 是短期信任仪式，只能在可信局域网内使用。
-- `sroy-link-v1:` 内部兼容码是 bearer secret，不应作为普通用户恢复入口。
+- `sroy-link:` 内部兼容码是 bearer secret，不应作为普通用户恢复入口。
 
 ## 4. 回归覆盖
 
