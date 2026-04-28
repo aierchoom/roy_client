@@ -128,11 +128,13 @@ node --test
 
 - `test/sync/sync_service_identity_test.dart`
   - vault identity 导入导出。
-  - 安全链接码密码校验。
+  - 离线恢复码密码校验。
+  - 导入 preview 不提前写入密钥。
+  - 坏 dump 不写 storage。
   - dirty 状态按 vault 隔离。
 
 - `test/sync/lan_pairing_service_test.dart`
-  - 8 位可读 LAN 配对码。
+  - 8 位面对面临时码。
   - 非法字符拒绝。
   - 主机创建、领取、停止流程。
 
