@@ -29,8 +29,8 @@
 
 | 软件 | 版本要求 | 用途 |
 |------|----------|------|
-| Flutter SDK | 3.16+ | 跨平台框架 |
-| Dart SDK | 3.2+ | 编程语言 |
+| Flutter SDK | 与 Dart `^3.10.1` 兼容的版本 | 跨平台框架 |
+| Dart SDK | `^3.10.1` | 编程语言 |
 | Git | 2.0+ | 版本控制 |
 | VS Code / Android Studio | 最新版 | IDE |
 
@@ -175,7 +175,6 @@ roy_client/
 ├── lib/                    # 源代码
 ├── test/                   # 测试代码
 ├── docs/                   # 文档
-├── assets/                 # 资源文件
 ├── pubspec.yaml           # 依赖配置
 ├── analysis_options.yaml  # 代码分析规则
 └── README.md              # 项目说明
@@ -262,7 +261,7 @@ flutter run --release
 flutter test
 
 # 运行指定测试文件
-flutter test test/services/sync_service_test.dart
+flutter test test/sync/sync_state_machine_test.dart
 
 # 运行测试并生成覆盖率
 flutter test --coverage

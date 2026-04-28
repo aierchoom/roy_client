@@ -68,4 +68,3 @@ the client.
 - `docs/security/local-database-encryption.md`
 - `docs/sync/vault-linking-design.md`
 - `docs/wiki/api-reference.md`
-- `docs/reports/docs-audit-2026-04-28.md`

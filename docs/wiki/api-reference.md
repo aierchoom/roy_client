@@ -1,462 +1,250 @@
 # API 参考
 
-**版本**: v1.1.0
 **最后更新**: 2026-04-28
 
----
+本文只记录当前 `roy_client` 中真实存在、被页面或测试直接使用的主要 API。同步服务端作为同级
+`../roy_server/` 项目存在，客户端通过 `SyncService` 使用 HTTP 协议与其通信。
 
-## 目录
+## 1. ServiceManager
 
-1. [服务 API](#1-服务-api)
-2. [Provider API](#2-provider-api)
-3. [同步 API](#3-同步-api)
-4. [加密 API](#4-加密-api)
-5. [存储 API](#5-存储-api)
-
----
-
-## 1. 服务 API
-
-### 1.1 ServiceManager
-
-服务管理器，全局单例，管理所有服务实例。
+文件：`lib/services/service_manager.dart`
 
 ```dart
-class ServiceManager {
-  /// 单例实例
+class ServiceManager extends ChangeNotifier {
   static ServiceManager get instance;
+  static String get defaultSyncServerUrl;
 
-  /// 默认同步服务器地址
-  static const String defaultSyncServerUrl = 'https://sync.secretroy.com';
+  ServiceManagerState get state;
+  bool get isLocked;
+  bool get isUnlocked;
+  bool get hasIdentity;
+  String? get errorMessage;
 
-  /// 安全存储服务
-  SecureStorageService get storage;
+  EnhancedCryptoService get cryptoService;
+  BiometricAuthService get biometricService;
+  AutoLockService get autoLockService;
+  IdentityService get identityService;
+  SecureStorageService get storageService;
+  SyncService get syncService;
 
-  /// 同步服务
-  SyncService get sync;
-
-  /// 身份服务
-  IdentityService get identity;
-
-  /// LAN 配对服务
-  LanPairingService get lanPairing;
-
-  /// Vault 配对服务
-  VaultPairingService get vaultPairing;
-
-  /// 初始化所有服务
   Future<void> initialize();
+  void setupLifecycleObserver();
+  void disposeLifecycleObserver();
 
-  /// 释放所有服务
-  Future<void> dispose();
-}
-```
+  Future<UnlockResult> unlockWithPassword(String password);
+  Future<UnlockResult> unlockWithBiometric();
+  void lock();
+  Future<void> logout();
+  Future<void> resetApplication();
 
-**使用示例**:
-```dart
-// 获取服务实例
-final storage = ServiceManager.instance.storage;
-
-// 初始化
-await ServiceManager.instance.initialize();
-```
-
-### 1.2 SecureStorageService
-
-安全存储服务，负责数据持久化。
-
-```dart
-class SecureStorageService {
-  // === Vault 操作 ===
-
-  /// 加载 Vault
-  Future<Vault?> loadVault();
-
-  /// 保存 Vault
-  Future<void> saveVault(Vault vault);
-
-  // === 账户操作 ===
-
-  /// 加载所有账户
-  Future<List<AccountItem>> loadAccounts();
-
-  /// 保存账户列表
-  Future<void> saveAccounts(List<AccountItem> accounts);
-
-  /// 加载单个账户
-  Future<AccountItem?> loadAccount(String id);
-
-  /// 保存单个账户
   Future<void> saveAccount(AccountItem account);
-
-  /// 删除账户
   Future<void> deleteAccount(String id);
+  Future<int> countAccountsByTemplate(String templateId);
+  Future<void> saveTemplate(AccountTemplate template);
+  Future<void> deleteTemplate(String id);
 
-  // === 模板操作 ===
+  Future<bool> connectToSyncServer();
+  Future<void> disconnectFromSyncServer();
+  Future<SyncResult> syncNow();
 
-  /// 加载所有模板
-  Future<List<AccountTemplate>> loadTemplates();
+  SyncState get syncState;
+  String? get syncErrorMessage;
+  String? get syncStatusNote;
+  bool get isSyncConnected;
+  int get syncVersion;
+  bool get hasDirtyData;
 
-  /// 保存模板列表
-  Future<void> saveTemplates(List<AccountTemplate> templates);
-
-  /// 加载未同步的模板
-  Future<List<AccountTemplate>> loadDirtyTemplates();
-
-  // === 同步状态 ===
-
-  /// 加载同步状态
-  Future<SyncState?> loadSyncState();
-
-  /// 保存同步状态
-  Future<void> saveSyncState(SyncState state);
+  Future<String?> getSyncServerUrl();
+  Future<void> setSyncServerUrl(String url);
 }
 ```
 
----
+`defaultSyncServerUrl` 由 `lib/system/service_manager/default_sync_server_url.dart` 决定：
 
-## 2. Provider API
+- 桌面平台：`http://127.0.0.1:8080`
+- Android / iOS / Web：空字符串
 
-### 2.1 EnhancedAppProvider
+## 2. EnhancedAppProvider
 
-全局状态管理 Provider。
+文件：`lib/providers/enhanced_app_provider.dart`
 
 ```dart
 class EnhancedAppProvider extends ChangeNotifier {
-  // === 数据状态 ===
+  List<AccountTemplate> get allTemplates;
+  List<AccountItem> get allAccounts;
+  List<AccountTemplate> get customTemplates;
+  String get searchQuery;
+  Set<String> get selectedTags;
+  bool get isLoading;
+  int get conflictCount;
 
-  /// 所有账户
   List<AccountItem> get accounts;
+  AccountTemplate? getTemplate(String templateId);
+  AccountItem? getAccount(String id);
 
-  /// 所有模板
-  List<AccountTemplate> get templates;
-
-  /// 当前同步状态
   SyncState get syncState;
+  bool get isSyncConnected;
 
-  /// 同步状态流
-  Stream<SyncState> get syncStateStream;
+  Future<void> refresh();
+  void setSearchQuery(String query);
+  void clearSearch();
+  void toggleTag(String templateId);
+  void setTags(Set<String> tags);
+  void clearFilters();
 
-  // === 账户操作 ===
+  Future<void> addAccount(AccountItem item);
+  Future<void> updateAccount(AccountItem item);
+  Future<void> deleteAccount(String id);
 
-  /// 加载账户数据
-  Future<void> loadAccounts();
-
-  /// 保存账户
-  Future<void> saveAccount(AccountItem account);
-
-  /// 删除账户
-  Future<void> deleteAccount(String accountId);
-
-  /// 按模板统计账户数
+  Future<void> addCustomTemplate(AccountTemplate template);
+  Future<void> updateCustomTemplate(AccountTemplate template);
   int countAccountsByTemplate(String templateId);
+  Future<void> deleteCustomTemplate(String templateId);
 
-  // === 模板操作 ===
-
-  /// 加载模板数据
-  Future<void> loadTemplates();
-
-  /// 保存模板
-  Future<void> saveTemplate(AccountTemplate template);
-
-  /// 删除模板
-  Future<void> deleteTemplate(String templateId);
-
-  // === 同步操作 ===
-
-  /// 连接同步服务器
-  Future<bool> connectToSyncServer(String serverUrl);
-
-  /// 断开同步
-  Future<void> disconnectSync();
-
-  /// 执行同步
+  String generatePassword({...});
+  int calculatePasswordStrength(String password);
+  String getPasswordStrengthLevel(int score);
   Future<SyncResult> syncNow();
-
-  /// 获取同步错误
-  String? get syncError;
-
-  /// 清除同步错误
-  void clearSyncError();
-
-  // === 冲突管理 ===
-
-  /// 获取冲突列表
-  List<ConflictItem> get conflicts;
-
-  /// 解决冲突
-  Future<void> resolveConflict(String conflictId, Resolution resolution);
 }
 ```
 
-**使用示例**:
-```dart
-// 在 Widget 中使用
-class MyWidget extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final provider = context.watch<EnhancedAppProvider>();
-
-    return ListView.builder(
-      itemCount: provider.accounts.length,
-      itemBuilder: (context, index) {
-        final account = provider.accounts[index];
-        return ListTile(title: Text(account.name));
-      },
-    );
-  }
-}
-
-// 修改数据
-Future<void> addAccount(BuildContext context, AccountItem account) async {
-  final provider = context.read<EnhancedAppProvider>();
-  await provider.saveAccount(account);
-}
-```
-
----
-
-## 3. 同步 API
-
-### 3.1 SyncService
-
-同步服务，处理与服务器的通信。
+UI 中的典型用法：
 
 ```dart
-class SyncService {
-  /// 当前状态
-  SyncState get state;
+final provider = context.watch<EnhancedAppProvider>();
+final accounts = provider.allAccounts;
+```
 
-  /// 状态变化流
-  Stream<SyncState> get stateStream;
+修改数据时使用 `read`：
 
-  /// 当前服务器地址
-  String? get serverUrl;
+```dart
+await context.read<EnhancedAppProvider>().addAccount(item);
+```
 
-  /// 是否已连接
-  bool get isConnected;
+## 3. SecureStorageService
 
-  /// 连接服务器
-  /// 返回 true 表示连接成功
-  Future<bool> connect(String serverUrl);
+文件：`lib/services/secure_storage_service.dart`
 
-  /// 断开连接
-  Future<void> disconnect();
+```dart
+class SecureStorageService {
+  Stream<StorageChangeEvent> get onChange;
+  bool get isOpen;
 
-  /// 执行同步
-  Future<SyncResult> syncNow();
+  void setDatabaseCipher(DatabaseFileCipher cipher);
+  void clearDatabaseCipher();
+  Future<void> rotateDatabaseCipher(DatabaseFileCipher cipher);
 
-  /// 调度同步（延迟执行）
-  void scheduleSync({Duration delay = const Duration(seconds: 5)});
+  Future<void> initialize({String deviceId = 'local'});
+  Future<void> close({bool dispose = false});
+  Future<bool> isDatabaseInitialized();
+  Future<void> deleteDatabaseFile();
+  Future<void> clearAllData();
+  Future<String> getDatabaseFilePath();
+  Future<void> replaceDatabase(Uint8List newDbBytes);
 
-  /// 取消待执行的同步
-  void cancelScheduledSync();
+  Future<List<AccountItem>> loadAccounts({bool includeDeleted = false});
+  Future<List<AccountItem>> loadPendingSyncAccounts();
+  Future<AccountItem?> getAccountById(String id, {bool includeDeleted = false});
+  Future<void> saveAccount(AccountItem account, {bool isSyncMerge = false});
+  Future<void> deleteAccount(String id, {bool isSyncMerge = false, Hlc? syncDeleteHlc});
+  Future<int> countAccountsByTemplate(String templateId);
 
-  /// 设置同步间隔
-  void setSyncInterval(Duration interval);
+  Future<void> saveConflictLogs(List<ConflictLog> logs);
+  Future<List<ConflictLog>> getConflictLogs(String accountId);
+  Future<void> deleteConflictLog(String logId);
 
-  /// 手动触发推送
-  Future<void> pushChanges();
+  Future<List<AccountTemplate>> loadCustomTemplates({bool includeDeleted = false});
+  Future<List<AccountTemplate>> loadDirtyTemplates();
+  Future<AccountTemplate?> loadTemplateById(String id);
+  Future<void> saveTemplate(AccountTemplate template, {bool isSyncMerge = false});
+  Future<void> deleteTemplate(String id, {bool isSyncMerge = false, Hlc? syncDeleteHlc});
 
-  /// 手动触发拉取
-  Future<PullResult> pullChanges();
+  Future<String?> getSetting(String key);
+  Future<void> setSetting(String key, String value);
 }
 ```
 
-**SyncState 枚举**:
+变更事件：
+
+```dart
+class StorageChangeEvent {
+  final StorageItemType type;   // account / template / setting
+  final StorageAction action;   // save / delete
+  final String? id;
+}
+```
+
+## 4. SyncService
+
+文件：`lib/sync/sync_service.dart`
+
 ```dart
 enum SyncState {
-  /// 离线
   offline,
-
-  /// 同步中
   syncing,
-
-  /// 冲突恢复中
-  conflictRecovery,
-
-  /// 已同步
   synced,
-
-  /// 错误状态
   error,
+  conflictRecovery,
+}
+
+class SyncService extends ChangeNotifier {
+  SyncState get state;
+  String? get errorMessage;
+  String? get statusNote;
+  DateTime? get lastSyncTime;
+  bool get isConnected;
+  bool get isSyncing;
+  int get localVersion;
+  bool get isDirty;
+
+  Future<void> initialize();
+  Future<void> markDirty();
+  Future<void> reset();
+  Future<void> disconnect();
+  Future<bool> connect();
+  Future<SyncResult> syncNow();
 }
 ```
 
-**SyncResult 结构**:
+`SyncResult`：
+
 ```dart
 class SyncResult {
-  /// 是否成功
   final bool success;
-
-  /// 错误信息（如果失败）
+  final bool pushed;
+  final bool pulled;
   final String? error;
-
-  /// 推送的账户数
-  final int pushedCount;
-
-  /// 拉取的账户数
-  final int pulledCount;
-
-  /// 检测到的冲突数
+  final int version;
   final int conflictCount;
-
-  /// 新服务器版本
-  final int newVersion;
+  final String? notice;
 }
 ```
 
-### 3.2 CRDTMergeEngine
+同步请求：
 
-CRDT 合并引擎，处理数据合并。
-
-```dart
-class CRDTMergeEngine {
-  /// 设备 ID
-  final String deviceId;
-
-  /// 合并两个 Vault
-  MergeResult merge(Vault local, Vault remote);
-
-  /// 检测冲突
-  List<Conflict> detectConflicts(Vault local, Vault remote);
-
-  /// 应用冲突解决
-  Vault applyResolutions(Vault vault, List<ConflictResolution> resolutions);
-
-  /// 合并单个账户
-  AccountItem mergeAccount(AccountItem local, AccountItem remote);
-
-  /// 合并字段值
-  MapEntry<String, String> mergeField(
-    String key,
-    String localValue,
-    String remoteValue,
-    Hlc localHlc,
-    Hlc remoteHlc,
-  );
-}
+```text
+GET  /vaults/{vaultId}/sync?since={version}
+POST /vaults/{vaultId}/sync
 ```
 
-**MergeResult 结构**:
-```dart
-class MergeResult {
-  /// 合并后的 Vault
-  final Vault merged;
+配对请求由 `ServiceManager` 通过 `VaultPairingService` / `LanPairingService` 发起。
 
-  /// 是否有冲突
-  final bool hasConflicts;
+## 5. IdentityService
 
-  /// 冲突列表
-  final List<Conflict> conflicts;
-
-  /// 合并统计
-  final MergeStats stats;
-}
-
-class MergeStats {
-  final int localWins;
-  final int remoteWins;
-  final int autoMerged;
-  final int conflicts;
-}
-```
-
-### 3.3 LanPairingService
-
-局域网配对服务。
-
-```dart
-class LanPairingService {
-  /// 创建主机会话
-  /// 返回 8 位可读配对码
-  Future<LanPairingHostSession> startHosting();
-
-  /// 停止主机会话
-  Future<void> stopHosting();
-
-  /// 加入主机会话
-  Future<LanPairingJoinResult> join(String pairingCode);
-
-  /// 取消加入
-  Future<void> cancelJoin();
-
-  /// 当前主机会话
-  LanPairingHostSession? get hostSession;
-
-  /// 当前加入结果
-  LanPairingJoinResult? get joinResult;
-
-  /// 是否正在配对
-  bool get isPairing;
-}
-```
-
----
-
-## 4. 加密 API
-
-### 4.1 EnhancedCryptoService
-
-主密码服务。
-
-```dart
-class EnhancedCryptoService {
-  bool get hasMasterKey;
-
-  /// 初始化主密码；首次使用会创建 PBKDF2 记录
-  Future<bool> initMasterKey(String masterPassword);
-
-  /// 校验主密码
-  Future<bool> verifyMasterPassword(String masterPassword);
-
-  /// 修改主密码
-  Future<bool> updateMasterPassword(
-    String oldPassword,
-    String newPassword,
-  );
-
-  /// 锁定当前会话
-  void logout();
-}
-```
-
-Current implementation note:
-
-- `EnhancedCryptoService` handles master password verification with `master_password_v2` PBKDF2-HMAC-SHA256 hashes and migrates legacy `master_password_v1` after successful verification.
-- Secure vault link codes use `sroy-secure-v2:` with PBKDF2-HMAC-SHA256 and AES-GCM-256.
-- `sroy-secure-v1:` import remains supported only for legacy compatibility.
-
----
-
-## 5. 存储 API
-
-### 5.1 IdentityService
-
-身份服务，管理设备身份。
+文件：`lib/services/identity_service.dart`
 
 ```dart
 class IdentityService {
-  /// 获取或创建设备 ID
-  Future<String> getDeviceId();
+  String get deviceId;
+  String get vaultId;
+  bool get hasIdentity;
+  String get privateKey;
+  String get symmetricKey;
 
-  /// 获取设备信息
-  Future<DeviceInfo> getDeviceInfo();
+  Future<bool> checkIdentityExists();
+  Future<void> initialize();
 
-  /// 检查是否已初始化
-  Future<bool> isInitialized();
-
-  /// 重置身份（清除所有数据）
-  Future<void> reset();
-}
-```
-
-Current key sync API:
-
-```dart
-class IdentityService {
   String exportTransferCode({String? syncServerUrl, String? vaultDump});
-
   Future<Map<String, String?>> importTransferCode(String rawCode);
 
   Future<String> exportSecureLinkCode(
@@ -472,93 +260,182 @@ class IdentityService {
 }
 ```
 
-Notes:
+编码约定：
 
-- `exportSecureLinkCode` emits `sroy-secure-v2:` codes.
-- `sroy-secure-v2:` uses PBKDF2-HMAC-SHA256 and AES-GCM-256.
-- Imports preserve the local `deviceId` and replace only vault-level identity fields.
-- `sroy-secure-v1:` import remains available for legacy compatibility.
+- 普通转移码：`sroy-link-v1:`
+- 当前安全转移码：`sroy-secure-v2:`
+- 兼容导入：`sroy-secure-v1:`
 
-LAN pairing code contract:
+## 6. EnhancedCryptoService
 
-- `LanPairingService.normalizePairingCode(...)` accepts exactly 8 readable characters.
-- Allowed alphabet: `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`.
-- Whitespace is removed and letters are uppercased before validation.
-
-### 5.2 本地存储键名
-
-| 键名 | 用途 | 类型 |
-|------|------|------|
-| `vault_data` | Vault 主数据 | JSON |
-| `device_id` | 设备 ID | String |
-| `sync_server_url` | 同步服务器地址 | String |
-| `sync_state` | 同步状态 | JSON |
-| `last_sync_time` | 最后同步时间 | int |
-| `biometric_enabled` | 生物识别开关 | bool |
-| `auto_lock_minutes` | 自动锁定时间 | int |
-
----
-
-## 附录
-
-### A. 错误处理
-
-所有异步 API 都可能抛出异常：
+文件：`lib/services/enhanced_crypto_service.dart`
 
 ```dart
-try {
-  await syncService.syncNow();
-} on SyncException catch (e) {
-  // 同步特定错误
-  print('Sync failed: ${e.message}');
-} on NetworkException catch (e) {
-  // 网络错误
-  print('Network error: ${e.message}');
-} catch (e) {
-  // 其他错误
-  print('Unknown error: $e');
+class EnhancedCryptoService {
+  bool get hasMasterKey;
+
+  Future<bool> initMasterKey(String masterPassword);
+  Future<bool> updateMasterPassword(String oldPassword, String newPassword);
+  Future<bool> verifyMasterPassword(String masterPassword);
+  void logout();
+  DatabaseFileCipher createDatabaseFileCipher();
+
+  static String generatePassword({...});
+  static int calculatePasswordStrength(String password);
+  static String getPasswordStrengthLevel(int score);
 }
 ```
 
-### B. 事件流
+主密码记录：
 
-订阅状态变化：
+- 当前：`master_password_v2`，PBKDF2-HMAC-SHA256。
+- 兼容迁移：`master_password_v1`。
 
-```dart
-// 同步状态
-syncService.stateStream.listen((state) {
-  print('Sync state: $state');
-});
+## 7. BiometricAuthService
 
-// 账户变化
-provider.accountsStream.listen((accounts) {
-  print('Accounts updated: ${accounts.length}');
-});
-```
-
-### C. 批量操作
+文件：`lib/services/biometric_auth_service.dart`
 
 ```dart
-// 批量保存账户
-Future<void> saveAccountsBatch(List<AccountItem> accounts) async {
-  final storage = ServiceManager.instance.storage;
-  final existing = await storage.loadAccounts();
+enum BiometricAuthStatus {
+  notSupported,
+  notEnrolled,
+  available,
+  enabled,
+}
 
-  final updated = [...existing];
-  for (final account in accounts) {
-    final index = updated.indexWhere((a) => a.id == account.id);
-    if (index >= 0) {
-      updated[index] = account;
-    } else {
-      updated.add(account);
-    }
-  }
-
-  await storage.saveAccounts(updated);
+class BiometricAuthService {
+  Future<BiometricAuthStatus> getStatus();
+  Future<BiometricSetupResult> enableBiometric(String currentPassword);
+  Future<void> disableBiometric();
+  Future<String?> unlockWithBiometric();
+  Future<String> getBiometricName();
 }
 ```
 
----
+## 8. AutoLockService
 
-**文档版本**: 1.0
-**最后更新**: 2026-04-28
+文件：`lib/services/auto_lock_service.dart`
+
+```dart
+class AutoLockService extends ChangeNotifier {
+  AutoLockDuration get duration;
+  bool get isLocked;
+
+  Future<void> initialize();
+  Future<void> setDuration(AutoLockDuration duration);
+  void unlock();
+  void lock();
+  void updateActivity();
+}
+```
+
+`ServiceManager.setupLifecycleObserver()` 会把它接到 Flutter 应用生命周期上。
+
+## 9. AccountItem
+
+文件：`lib/models/account_item.dart`
+
+```dart
+class AccountItem {
+  final String id;
+  final String name;
+  final String email;
+  final String templateId;
+  final Map<String, String> data;
+  final int createdAt;
+
+  final Hlc nameHlc;
+  final Hlc emailHlc;
+  final Map<String, Hlc> dataHlc;
+  final int serverVersion;
+  final SyncStatus syncStatus;
+  final bool isDeleted;
+  final Hlc? deleteHlc;
+
+  factory AccountItem.fromJson(Map<String, dynamic> json);
+  Map<String, dynamic> toJson();
+  AccountItem copyWith({...});
+}
+```
+
+```dart
+enum SyncStatus {
+  synchronized,
+  pendingPush,
+  conflict,
+}
+```
+
+## 10. AccountTemplate
+
+文件：`lib/models/account_template.dart`
+
+```dart
+class AccountTemplate {
+  final String templateId;
+  final String title;
+  final String subTitle;
+  final IconData? icon;
+  final TemplateCategory category;
+  final List<AccountField> fields;
+  final bool isCustom;
+
+  final SyncStatus syncStatus;
+  final Hlc? hlc;
+  final int serverVersion;
+  final bool isDeleted;
+  final Hlc? deleteHlc;
+
+  factory AccountTemplate.fromJson(Map<String, dynamic> json, {bool isCustom = true});
+  Map<String, dynamic> toJson();
+  AccountTemplate copyWith({...});
+}
+```
+
+当前内置模板：
+
+```dart
+final List<AccountTemplate> basicAccountTemplates = [genericInfoTemplate];
+```
+
+## 11. 常用调用链
+
+新增账号：
+
+```text
+AccountEditView._save()
+↓
+Navigator.pop(AccountItem)
+↓
+EnhancedAppProvider.addAccount()
+↓
+ServiceManager.saveAccount()
+↓
+SecureStorageService.saveAccount()
+↓
+SyncService.markDirty()
+```
+
+解锁：
+
+```text
+UnlockView._unlockWithPassword()
+↓
+ServiceManager.unlockWithPassword()
+↓
+IdentityService + EnhancedCryptoService + SecureStorageService + SyncService
+↓
+ServiceManagerState.unlocked
+```
+
+同步：
+
+```text
+EnhancedAppProvider.syncNow()
+↓
+ServiceManager.syncNow()
+↓
+SyncService.syncNow()
+↓
+SecureStorageService 保存 pull/merge/push 后的数据
+```
