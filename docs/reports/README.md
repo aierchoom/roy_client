@@ -2,13 +2,11 @@
 
 **Last updated**: 2026-04-28
 
+This directory keeps current project reports that are still useful for ongoing
+development. Legacy audits, one-off handoff notes, old quality passes, and
+garbled historical mirrors have been removed to keep the documentation set
+focused.
+
 | Document | Purpose |
 |---|---|
-| [docs-reorganization-execution-report-2026-04-28.md](docs-reorganization-execution-report-2026-04-28.md) | Latest documentation reorganization report |
-| [docs-audit-2026-04-28.md](docs-audit-2026-04-28.md) | Prior documentation audit |
-| [ai-handover-notes.md](ai-handover-notes.md) | AI handoff notes |
-| [beta-technical-delivery.md](beta-technical-delivery.md) | Beta technical delivery notes |
 | [execution/README.md](execution/README.md) | Per-feature execution reports |
-| [quality-convergence/README.md](quality-convergence/README.md) | Quality convergence reports |
-| [dev-log/sync-account-count-fix.md](dev-log/sync-account-count-fix.md) | Sync account count fix log |
-| [dev-log/sync-fix-and-platform-adaptation.md](dev-log/sync-fix-and-platform-adaptation.md) | Sync fix and platform adaptation log |

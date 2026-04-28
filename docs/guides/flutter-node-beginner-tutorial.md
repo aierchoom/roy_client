@@ -139,13 +139,14 @@ roy/
 
 根级 `docs/` 不是 Flutter 客户端源码的一部分，而更像仓库的“说明区”。
 
-你会看到类似文件：
+你会看到类似目录：
 
-- `beta-risk-register.md`
-- `beta-technical-delivery.md`
-- `sync-protocol.md`
-- `whitepaper.md`
-- `flutter-node-beginner-tutorial.md`
+- `architecture/`
+- `guides/`
+- `reports/execution/`
+- `security/`
+- `sync/`
+- `wiki/`
 
 可以把它理解为：
 
