@@ -483,6 +483,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
 
   Future<void> _startLanPairingHost() async {
     if (_isLanPairingBusy) return;
+    if (!await _confirmTrustedLanPairing()) return;
 
     setState(() => _isLanPairingBusy = true);
     try {
@@ -515,6 +516,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
   }
 
   Future<void> _showJoinLanPairingDialog() async {
+    if (!await _confirmTrustedLanPairing()) return;
     if (!await _confirmOverwriteLocalData()) return;
 
     final pairingCode = await showDialog<String>(
@@ -561,6 +563,41 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
         setState(() => _isLanPairingBusy = false);
       }
     }
+  }
+
+  Future<bool> _confirmTrustedLanPairing() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        final theme = Theme.of(context);
+        return AlertDialog(
+          title: Text(
+            _text('仅在可信局域网使用', 'Use only on a trusted LAN'),
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          content: Text(
+            _text(
+              '面对面链接会临时在本机局域网监听。请只在家庭、办公室或手机热点等可信网络中使用；公共 Wi-Fi 不建议使用。',
+              'Face-to-face linking temporarily listens on your local network. Use it only on trusted home, office, or hotspot networks; avoid public Wi-Fi.',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text(_text('取消', 'Cancel')),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: theme.colorScheme.primary,
+              ),
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text(_text('继续', 'Continue')),
+            ),
+          ],
+        );
+      },
+    );
+    return confirmed == true;
   }
 
   Future<void> _createVaultPairingSession() async {

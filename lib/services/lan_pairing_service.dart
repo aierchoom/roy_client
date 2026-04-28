@@ -6,6 +6,8 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+import 'vault_pairing_crypto.dart';
+
 class LanPairingServiceException implements Exception {
   final String message;
 
@@ -183,6 +185,7 @@ class LanPairingService {
     required String requesterDeviceId,
     Duration discoveryTimeout = const Duration(seconds: 12),
     Duration claimTimeout = const Duration(seconds: 8),
+    bool useRequesterEncryption = true,
   }) async {
     final normalizedCode = normalizePairingCode(pairingCode);
     if (requesterDeviceId.trim().isEmpty) {
@@ -190,6 +193,9 @@ class LanPairingService {
         'Requester device id is required.',
       );
     }
+    final requesterKeyPair = useRequesterEncryption
+        ? await VaultPairingCrypto.createKeyPair()
+        : null;
 
     final socket = await RawDatagramSocket.bind(
       InternetAddress.anyIPv4,
@@ -224,6 +230,7 @@ class LanPairingService {
               port: port,
               pairingCode: normalizedCode,
               requesterDeviceId: requesterDeviceId,
+              requesterKeyPair: requesterKeyPair,
               timeout: claimTimeout,
             )
             .then((transferCode) {
@@ -335,6 +342,8 @@ class LanPairingService {
     final requestBody = await utf8.decoder.bind(request).join();
     final body = _decodeJson(requestBody);
     final incomingCode = _normalizeIncomingClaimCode(body['code']);
+    final requesterPublicKey = (body['requester_public_key'] as String?)
+        ?.trim();
 
     if (incomingCode != hostCode) {
       _hostFailedClaims += 1;
@@ -359,9 +368,31 @@ class LanPairingService {
 
     _hostClaimed = true;
     _clearHostedBundleState(claimed: true);
+
+    String? wrappedTransferCode;
+    if (requesterPublicKey != null && requesterPublicKey.isNotEmpty) {
+      try {
+        wrappedTransferCode = await VaultPairingCrypto.encryptBundle(
+          plainBundle: transferCode,
+          requesterPublicKey: requesterPublicKey,
+        );
+      } on VaultPairingCryptoException catch (e) {
+        response.statusCode = HttpStatus.badRequest;
+        response.write(jsonEncode({'error': e.message}));
+        await response.close();
+        unawaited(stopHosting());
+        return;
+      }
+    }
+
     response.statusCode = HttpStatus.ok;
     response.write(
-      jsonEncode({'status': 'approved', 'transfer_code': transferCode}),
+      jsonEncode({
+        'status': 'approved',
+        if (wrappedTransferCode == null) 'transfer_code': transferCode,
+        if (wrappedTransferCode != null)
+          'wrapped_transfer_code': wrappedTransferCode,
+      }),
     );
     await response.close();
 
@@ -377,6 +408,7 @@ class LanPairingService {
     required int port,
     required String pairingCode,
     required String requesterDeviceId,
+    required VaultPairingKeyPair? requesterKeyPair,
     required Duration timeout,
   }) async {
     final response = await http
@@ -386,6 +418,8 @@ class LanPairingService {
           body: jsonEncode({
             'code': pairingCode,
             'requester_device_id': requesterDeviceId,
+            if (requesterKeyPair != null)
+              'requester_public_key': requesterKeyPair.publicKey,
           }),
         )
         .timeout(timeout);
@@ -401,6 +435,23 @@ class LanPairingService {
         );
       }
       return null;
+    }
+
+    final wrappedTransferCode = body['wrapped_transfer_code'] as String?;
+    if (wrappedTransferCode != null && wrappedTransferCode.isNotEmpty) {
+      if (requesterKeyPair == null) {
+        throw const LanPairingServiceException(
+          'Host returned an encrypted transfer code without a local key.',
+        );
+      }
+      try {
+        return VaultPairingCrypto.decryptBundle(
+          wrappedBundle: wrappedTransferCode,
+          keyPair: requesterKeyPair,
+        );
+      } on VaultPairingCryptoException catch (e) {
+        throw LanPairingServiceException(e.message);
+      }
     }
 
     final transferCode = body['transfer_code'] as String?;
