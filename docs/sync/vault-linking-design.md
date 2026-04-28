@@ -355,6 +355,9 @@ Current implementation update, 2026-04-27:
 - `sroy-secure-v2:` secure link codes now use PBKDF2-HMAC-SHA256 plus AES-GCM-256 instead of the earlier transitional XOR wrapper.
 - LAN direct pairing now uses an 8-character readable code from `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`; it is not a 6-digit numeric code.
 - LAN discovery broadcasts only endpoint metadata. The pairing code is supplied and verified during the HTTP claim step.
+- LAN direct pairing is scoped to the visible 8-character code window: closing
+  the window, successful claim, timeout, stop, or too many wrong-code attempts
+  destroys the hosted key bundle.
 - Server-mediated pairing is implemented as a short-lived approval flow. The
   joining device submits a temporary X25519 public key, and the approving device
   uploads only a `sroy-pairing-v2:` AES-GCM encrypted vault bundle for that key.
@@ -370,4 +373,4 @@ Implementation should now follow this order:
 
 1. Keep Stage A secure link codes working and tested.
 2. Add clean-device import checks for bundle imports that include `vault_dump`.
-3. Harden LAN direct pairing TTL, one-time-use, and failed-attempt behavior.
+3. Add QR scan support for LAN and secure-code entry.

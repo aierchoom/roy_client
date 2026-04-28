@@ -32,7 +32,6 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
   PairingPendingRequest? _hostPendingRequest;
   PairingJoinResult? _joinPairingResult;
   bool _isLanPairingBusy = false;
-  LanPairingHostSession? _lanHostSession;
 
   bool get _isMobileClient =>
       !kIsWeb &&
@@ -490,17 +489,14 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
       final session = await _serviceManager.startLanVaultPairingHost();
       if (!mounted) return;
 
-      await Clipboard.setData(ClipboardData(text: session.pairingCode));
-      if (!mounted) return;
-
-      setState(() => _lanHostSession = session);
-      _showGeneratedCodeDialog(
+      await _showGeneratedCodeDialog(
         _text('局域网配对码', 'LAN Pairing Code'),
         _text(
-          '请在同一局域网下的另一台设备上输入：',
-          'Enter this code on the other device on the same LAN:',
+          '窗口关闭后配对码立即失效，请让另一台设备现在输入：',
+          'This code expires when this window closes. Enter it on the other device now:',
         ),
         session.pairingCode,
+        showCopyNotice: false,
       );
     } on LanPairingServiceException catch (e) {
       if (!mounted) return;
@@ -509,24 +505,11 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
       if (!mounted) return;
       _showError('Failed to start LAN pairing: $e');
     } finally {
-      if (mounted) {
-        setState(() => _isLanPairingBusy = false);
-      }
-    }
-  }
-
-  Future<void> _stopLanPairingHost() async {
-    setState(() => _isLanPairingBusy = true);
-    try {
       await _serviceManager.stopLanVaultPairingHost();
-      if (!mounted) return;
-      setState(() => _lanHostSession = null);
-    } catch (e) {
-      if (!mounted) return;
-      _showError('Failed to stop LAN pairing: $e');
-    } finally {
       if (mounted) {
-        setState(() => _isLanPairingBusy = false);
+        setState(() {
+          _isLanPairingBusy = false;
+        });
       }
     }
   }
@@ -594,7 +577,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
         _hostPendingRequest = null;
       });
 
-      _showGeneratedCodeDialog(
+      await _showGeneratedCodeDialog(
         _text('受信任服务器配对码', 'Server Pairing Code'),
         _text('请在另一台设备上输入以下配对码：', 'Enter this code on the other device:'),
         session.pairingCode,
@@ -969,8 +952,13 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
     );
   }
 
-  void _showGeneratedCodeDialog(String title, String subtitle, String code) {
-    showDialog(
+  Future<void> _showGeneratedCodeDialog(
+    String title,
+    String subtitle,
+    String code, {
+    bool showCopyNotice = true,
+  }) {
+    return showDialog<void>(
       context: context,
       builder: (context) {
         final theme = Theme.of(context);
@@ -1002,24 +990,40 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.check_circle,
-                    size: 16,
-                    color: theme.colorScheme.primary,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    _text('配对码已自动复制到剪贴板', 'Pairing code copied to clipboard.'),
-                    style: theme.textTheme.bodySmall?.copyWith(
+              if (showCopyNotice) ...[
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.check_circle,
+                      size: 16,
                       color: theme.colorScheme.primary,
                     ),
+                    const SizedBox(width: 6),
+                    Text(
+                      _text(
+                        '配对码已自动复制到剪贴板',
+                        'Pairing code copied to clipboard.',
+                      ),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                  ],
+                ),
+              ] else ...[
+                const SizedBox(height: 12),
+                Text(
+                  _text(
+                    '保持此窗口打开，完成后密钥包会自动销毁。',
+                    'Keep this window open. The key bundle is destroyed after use.',
                   ),
-                ],
-              ),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
             ],
           ),
           actions: [
@@ -1433,14 +1437,12 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
     final hostSession = _hostPairingSession;
     final hostPendingRequest = _hostPendingRequest;
     final joinResult = _joinPairingResult;
-    final lanHostSession = _lanHostSession;
-
     return _buildSectionCard(
       context: context,
       title: _text('数据保险库链接', 'Vault Linking'),
       subtitle: _text(
-        '通过同步服务器配对信任设备，或者使用离线链接码作为备用方案。',
-        'Pair trusted devices through the sync server, then keep a manual link-code fallback.',
+        '优先使用面对面 8 位临时码或受信任设备配对。',
+        'Use face-to-face temporary codes or trusted-device pairing first.',
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1470,8 +1472,8 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
             Icons.wifi_find_outlined,
             _text('局域网直接配对', 'LAN Direct Pairing'),
             _text(
-              '无需同步服务器，适合面对面快速链接。',
-              'No server needed, best for face-to-face linking.',
+              '仅在 8 位配对码窗口打开期间可领取密钥包。',
+              'The key bundle can be claimed only while the 8-character code window is open.',
             ),
           ),
           const SizedBox(height: 12),
@@ -1487,11 +1489,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.wifi_tethering_outlined, size: 18),
-                  label: Text(
-                    lanHostSession == null
-                        ? _text('开启配对', 'Start')
-                        : _text('重置', 'Reset'),
-                  ),
+                  label: Text(_text('显示 8 位码', 'Show Code')),
                 ),
               ),
               const SizedBox(width: 8),
@@ -1501,68 +1499,22 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                       ? null
                       : _showJoinLanPairingDialog,
                   icon: const Icon(Icons.pin_outlined, size: 18),
-                  label: Text(_text('加入', 'Join')),
+                  label: Text(_text('输入 8 位码', 'Enter Code')),
                 ),
               ),
-              if (lanHostSession != null) ...[
-                const SizedBox(width: 8),
-                IconButton.outlined(
-                  onPressed: _isLanPairingBusy ? null : _stopLanPairingHost,
-                  icon: const Icon(
-                    Icons.stop_circle_outlined,
-                    color: Colors.red,
-                  ),
-                  tooltip: _text('停止局域网配对', 'Stop LAN Pairing'),
-                ),
-              ],
             ],
           ),
-          if (lanHostSession != null) ...[
-            const SizedBox(height: 10),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest.withAlpha(95),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _text(
-                      '8 位配对码: ${lanHostSession.pairingCode}',
-                      '8-character code: ${lanHostSession.pairingCode}',
-                    ),
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1.6,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  if (lanHostSession.localAddress != null)
-                    Text(
-                      _text(
-                        '主机局域网 IP: ${lanHostSession.localAddress}',
-                        'Host LAN IP: ${lanHostSession.localAddress}',
-                      ),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  Text(
-                    _text(
-                      '过期时间: ${lanHostSession.expiresAt.toLocal()}',
-                      'Expires at: ${lanHostSession.expiresAt.toLocal()}',
-                    ),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
+          const SizedBox(height: 8),
+          Text(
+            _text(
+              '关闭配对码窗口、领取成功或超时后，本机都会立即销毁本次密钥包。',
+              'Closing the code window, a successful claim, or timeout destroys this key bundle.',
             ),
-          ],
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              height: 1.25,
+            ),
+          ),
           const SizedBox(height: 14),
           Divider(color: theme.colorScheme.outlineVariant.withAlpha(140)),
           const SizedBox(height: 8),
@@ -1742,32 +1694,45 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
           const SizedBox(height: 14),
           Divider(color: theme.colorScheme.outlineVariant.withAlpha(140)),
           const SizedBox(height: 8),
-          _buildActionHeader(
-            context,
-            Icons.vpn_key_outlined,
-            _text('离线密文镜像', 'Offline Ciphertext Mirror'),
-            _text(
-              '手动复制加密代码。作为最后的备份同步手段。',
-              'Copy-paste encrypted codes. Use as final fallback.',
+          ExpansionTile(
+            tilePadding: EdgeInsets.zero,
+            childrenPadding: EdgeInsets.zero,
+            leading: Icon(
+              Icons.vpn_key_outlined,
+              color: theme.colorScheme.onSurfaceVariant,
             ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: FilledButton.tonalIcon(
-                  onPressed: _exportSecureVaultLinkCode,
-                  icon: const Icon(Icons.copy_all_outlined, size: 18),
-                  label: Text(_text('导出', 'Export')),
-                ),
+            title: Text(
+              _text('高级备用：加密链接码', 'Advanced fallback: secure link code'),
+              style: theme.textTheme.labelLarge?.copyWith(
+                fontWeight: FontWeight.w700,
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _importSecureVaultLinkCode,
-                  icon: const Icon(Icons.paste_outlined, size: 18),
-                  label: Text(_text('导入', 'Import')),
-                ),
+            ),
+            subtitle: Text(
+              _text(
+                '仅在无法使用面对面或受信任设备配对时手动复制。',
+                'Copy manually only when pairing is unavailable.',
+              ),
+              style: theme.textTheme.bodySmall,
+            ),
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton.icon(
+                      onPressed: _exportSecureVaultLinkCode,
+                      icon: const Icon(Icons.copy_all_outlined, size: 18),
+                      label: Text(_text('导出加密码', 'Export secure code')),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextButton.icon(
+                      onPressed: _importSecureVaultLinkCode,
+                      icon: const Icon(Icons.paste_outlined, size: 18),
+                      label: Text(_text('导入加密码', 'Import secure code')),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
