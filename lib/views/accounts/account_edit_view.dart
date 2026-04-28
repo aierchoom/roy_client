@@ -1176,6 +1176,12 @@ class _AccountEditViewState extends State<AccountEditView> {
     final controller = _fieldCtrls[field.fieldKey];
     final accent = _fieldAccentColor(theme, field);
     final previewSurface = _softSurface(theme, tint: accent, tintAlpha: 10);
+    final canPickInlineTime =
+        controller != null &&
+        _isTimeField(field) &&
+        field.attributes.timeFormat != TimeFieldFormat.monthYear &&
+        _isEditing &&
+        field.attributes.isEditable;
 
     return Container(
       decoration: BoxDecoration(
@@ -1333,13 +1339,8 @@ class _AccountEditViewState extends State<AccountEditView> {
                         field.attributes.timeFormat == TimeFieldFormat.monthYear
                         ? [MonthYearInputFormatter()]
                         : null,
-                    onTap:
-                        _isTimeField(field) &&
-                            field.attributes.timeFormat !=
-                                TimeFieldFormat.monthYear &&
-                            _isEditing &&
-                            field.attributes.isEditable
-                        ? () => _pickDateTimeField(field, controller!)
+                    onTap: canPickInlineTime
+                        ? () => _pickDateTimeField(field, controller)
                         : null,
                     decoration: InputDecoration(
                       labelText: field.label,

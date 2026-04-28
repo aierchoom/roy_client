@@ -27,6 +27,41 @@ class _HomeSearchViewState extends State<HomeSearchView> {
     return Localizations.localeOf(context).languageCode == 'zh' ? zh : en;
   }
 
+  Set<String> _templateIdSet(List<AccountTemplate> templates) {
+    return templates.map((template) => template.templateId).toSet();
+  }
+
+  Set<String> _activeSelectedTemplateIds(List<AccountTemplate> templates) {
+    final availableTemplateIds = _templateIdSet(templates);
+    return _selectedTemplateIds.where(availableTemplateIds.contains).toSet();
+  }
+
+  String? _templateTitleById(List<AccountTemplate> templates, String id) {
+    for (final template in templates) {
+      if (template.templateId == id) return template.title;
+    }
+    return null;
+  }
+
+  void _pruneUnavailableTemplateFilters(List<AccountTemplate> templates) {
+    if (_selectedTemplateIds.isEmpty) return;
+
+    final availableTemplateIds = _templateIdSet(templates);
+    final hasUnavailableFilter = _selectedTemplateIds.any(
+      (id) => !availableTemplateIds.contains(id),
+    );
+    if (!hasUnavailableFilter) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      setState(() {
+        _selectedTemplateIds.removeWhere(
+          (id) => !availableTemplateIds.contains(id),
+        );
+      });
+    });
+  }
+
   Future<void> _openAccount(BuildContext context, AccountItem account) async {
     final provider = context.read<EnhancedAppProvider>();
     final result = await Navigator.push<AccountItem>(
@@ -73,11 +108,12 @@ class _HomeSearchViewState extends State<HomeSearchView> {
     List<AccountItem> accounts,
     EnhancedAppProvider provider,
   ) {
+    final activeTemplateIds = _activeSelectedTemplateIds(provider.allTemplates);
     final filtered = accounts.where((account) {
       final template = provider.getTemplate(account.templateId);
       final matchesTemplate =
-          _selectedTemplateIds.isEmpty ||
-          _selectedTemplateIds.contains(account.templateId);
+          activeTemplateIds.isEmpty ||
+          activeTemplateIds.contains(account.templateId);
 
       final matchesQuery =
           _query.isEmpty ||
@@ -146,17 +182,20 @@ class _HomeSearchViewState extends State<HomeSearchView> {
     List<AccountTemplate> templates,
   ) {
     final theme = Theme.of(context);
+    final activeTemplateIds = _activeSelectedTemplateIds(templates);
 
     String label;
-    if (_selectedTemplateIds.isEmpty) {
+    if (activeTemplateIds.isEmpty) {
       label = _text('\u5168\u90e8\u6a21\u677f', 'All Templates');
-    } else if (_selectedTemplateIds.length == 1) {
-      final id = _selectedTemplateIds.first;
-      label = templates.firstWhere((t) => t.templateId == id).title;
+    } else if (activeTemplateIds.length == 1) {
+      final id = activeTemplateIds.first;
+      label =
+          _templateTitleById(templates, id) ??
+          _text('\u5168\u90e8\u6a21\u677f', 'All Templates');
     } else {
       label = _text(
-        '\u5df2\u9009 ${_selectedTemplateIds.length} \u4e2a\u6a21\u677f',
-        '${_selectedTemplateIds.length} templates selected',
+        '\u5df2\u9009 ${activeTemplateIds.length} \u4e2a\u6a21\u677f',
+        '${activeTemplateIds.length} templates selected',
       );
     }
 
@@ -200,7 +239,7 @@ class _HomeSearchViewState extends State<HomeSearchView> {
                   maxLines: 1,
                 ),
               ),
-              if (_selectedTemplateIds.isNotEmpty)
+              if (activeTemplateIds.isNotEmpty)
                 GestureDetector(
                   onTap: () => setState(() => _selectedTemplateIds.clear()),
                   child: MouseRegion(
@@ -238,12 +277,16 @@ class _HomeSearchViewState extends State<HomeSearchView> {
         ),
         const PopupMenuDivider(),
         ...templates.map((t) {
-          final isSelected = _selectedTemplateIds.contains(t.templateId);
+          final isSelected = activeTemplateIds.contains(t.templateId);
           return CheckboxMenuButton(
             closeOnActivate: false,
             value: isSelected,
             onChanged: (val) {
               setState(() {
+                final availableTemplateIds = _templateIdSet(templates);
+                _selectedTemplateIds.removeWhere(
+                  (id) => !availableTemplateIds.contains(id),
+                );
                 if (val == true) {
                   _selectedTemplateIds.add(t.templateId);
                 } else {
@@ -353,15 +396,14 @@ class _HomeSearchViewState extends State<HomeSearchView> {
           ),
           const SizedBox(height: 18),
           // ── Conflict Alert Banner (only shown when conflicts exist) ──
-          if (provider.conflictCount > 0) ...
-             [
-              const SizedBox(height: 10),
-              _ConflictAlertBanner(
-                count: provider.conflictCount,
-                onTap: onOpenConflicts,
-                textBuilder: _text,
-              ),
-            ],
+          if (provider.conflictCount > 0) ...[
+            const SizedBox(height: 10),
+            _ConflictAlertBanner(
+              count: provider.conflictCount,
+              onTap: onOpenConflicts,
+              textBuilder: _text,
+            ),
+          ],
           const SizedBox(height: 18),
           Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -412,6 +454,7 @@ class _HomeSearchViewState extends State<HomeSearchView> {
     EnhancedAppProvider provider,
   ) {
     final theme = Theme.of(context);
+    final activeTemplateIds = _activeSelectedTemplateIds(provider.allTemplates);
 
     return Card(
       child: Padding(
@@ -427,7 +470,7 @@ class _HomeSearchViewState extends State<HomeSearchView> {
             ),
             const SizedBox(height: 6),
             Text(
-              _query.isEmpty && _selectedTemplateIds.isEmpty
+              _query.isEmpty && activeTemplateIds.isEmpty
                   ? _text(
                       '\u672a\u8f93\u5165\u5173\u952e\u5b57\u65f6\uff0c\u9ed8\u8ba4\u663e\u793a\u6700\u8fd1 6 \u6761\u8d26\u6237\u3002',
                       'When no keyword is entered, the latest 6 accounts are shown.',
@@ -487,6 +530,7 @@ class _HomeSearchViewState extends State<HomeSearchView> {
   Widget build(BuildContext context) {
     final provider = context.watch<EnhancedAppProvider>();
     final accounts = provider.allAccounts;
+    _pruneUnavailableTemplateFilters(provider.allTemplates);
     final results = _buildResults(accounts, provider);
 
     return AdaptivePage(
@@ -617,7 +661,10 @@ class _ConflictAlertBanner extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        textBuilder('发现 $count 个同步冲突', '$count sync conflict(s) detected'),
+                        textBuilder(
+                          '发现 $count 个同步冲突',
+                          '$count sync conflict(s) detected',
+                        ),
                         style: theme.textTheme.titleSmall?.copyWith(
                           color: Colors.white,
                           fontWeight: FontWeight.w700,
@@ -625,7 +672,10 @@ class _ConflictAlertBanner extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        textBuilder('点击查看并手动解决冲突字段', 'Tap to review and resolve field conflicts'),
+                        textBuilder(
+                          '点击查看并手动解决冲突字段',
+                          'Tap to review and resolve field conflicts',
+                        ),
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: Colors.white.withAlpha(200),
                         ),

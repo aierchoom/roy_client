@@ -20,7 +20,10 @@ class SyncConfig {
   final String serverUrl;
   final Duration syncInterval;
 
-  const SyncConfig({required this.serverUrl, this.syncInterval = const Duration(minutes: 5)});
+  const SyncConfig({
+    required this.serverUrl,
+    this.syncInterval = const Duration(minutes: 5),
+  });
 }
 
 enum _SyncRecoveryPhase { pull, push, conflictRecovery }
@@ -60,11 +63,22 @@ class _SyncRecoveryMarker {
     return _SyncRecoveryMarker(
       phase: phase,
       localVersion: json['local_version'] as int? ?? 0,
-      startedAt: DateTime.tryParse(json['started_at'] as String? ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0),
+      startedAt:
+          DateTime.tryParse(json['started_at'] as String? ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0),
       itemId: json['item_id'] as String?,
       conflictType: json['conflict_type'] as String?,
     );
   }
+}
+
+class _SyncProtocolException implements Exception {
+  final String message;
+
+  const _SyncProtocolException(this.message);
+
+  @override
+  String toString() => 'SyncProtocolException($message)';
 }
 
 class SyncService extends ChangeNotifier {
@@ -98,8 +112,11 @@ class SyncService extends ChangeNotifier {
   String? get statusNote => _statusNote;
   DateTime? get lastSyncTime => _lastSyncTime;
   bool get isConnected =>
-      _state == SyncState.synced || _state == SyncState.syncing || _state == SyncState.conflictRecovery;
-  bool get isSyncing => _state == SyncState.syncing || _state == SyncState.conflictRecovery;
+      _state == SyncState.synced ||
+      _state == SyncState.syncing ||
+      _state == SyncState.conflictRecovery;
+  bool get isSyncing =>
+      _state == SyncState.syncing || _state == SyncState.conflictRecovery;
   int get localVersion => _localVersion;
   bool get isDirty => _isDirty;
 
@@ -124,10 +141,14 @@ class SyncService extends ChangeNotifier {
     }
 
     final vaultId = _identityService.vaultId;
-    final versionStr = await _storageService.getSetting(_syncVersionKey(vaultId));
+    final versionStr = await _storageService.getSetting(
+      _syncVersionKey(vaultId),
+    );
     _localVersion = int.tryParse(versionStr ?? '') ?? 0;
 
-    final lastSyncStr = await _storageService.getSetting(_syncLastTimeKey(vaultId));
+    final lastSyncStr = await _storageService.getSetting(
+      _syncLastTimeKey(vaultId),
+    );
     _lastSyncTime = lastSyncStr == null ? null : DateTime.tryParse(lastSyncStr);
 
     final dirtyKey = _syncDirtyKey(vaultId);
@@ -151,7 +172,10 @@ class SyncService extends ChangeNotifier {
     if (!_identityService.hasIdentity) return;
     _isDirty = true;
     _statusNote = 'Local changes are queued for the next sync.';
-    await _storageService.setSetting(_syncDirtyKey(_identityService.vaultId), '1');
+    await _storageService.setSetting(
+      _syncDirtyKey(_identityService.vaultId),
+      '1',
+    );
     notifyListeners();
   }
 
@@ -179,20 +203,25 @@ class SyncService extends ChangeNotifier {
   Future<SyncResult> syncNow() async {
     final serverUrl = await _getSyncServerUrl();
     if (serverUrl.isEmpty) {
-      _setError('Sync server URL not configured.', statusNote: 'Set a sync server address before trying again.');
+      _setError(
+        'Sync server URL not configured.',
+        statusNote: 'Set a sync server address before trying again.',
+      );
       return SyncResult.failure('Sync server URL not configured.');
     }
     if (!_identityService.hasIdentity) {
       _setError(
         'Identity not established.',
-        statusNote: 'Unlock the vault and recreate local identity before syncing.',
+        statusNote:
+            'Unlock the vault and recreate local identity before syncing.',
       );
       return SyncResult.failure('Identity not established.');
     }
     if (_isMobileLoopbackUrl(serverUrl)) {
       _setError(
         'Mobile clients cannot use loopback sync URLs.',
-        statusNote: 'Replace localhost or 127.0.0.1 with the desktop machine LAN IP.',
+        statusNote:
+            'Replace localhost or 127.0.0.1 with the desktop machine LAN IP.',
       );
       return SyncResult.failure(
         'On mobile devices, 127.0.0.1/localhost points to the phone itself. Use your computer\'s LAN IP instead.',
@@ -238,7 +267,10 @@ class SyncService extends ChangeNotifier {
 
           await _recordSyncTime();
           _isDirty = false;
-          await _storageService.setSetting(_syncDirtyKey(_identityService.vaultId), '0');
+          await _storageService.setSetting(
+            _syncDirtyKey(_identityService.vaultId),
+            '0',
+          );
           await _clearRecoveryMarker();
           _statusNote = _buildSuccessStatusNote(
             recovered: recoveredCount > 0,
@@ -271,7 +303,8 @@ class SyncService extends ChangeNotifier {
 
       _setError(
         'Max retries exceeded! Last Server Reject: $_lastConflictMsg',
-        statusNote: 'Conflict recovery did not converge automatically. Review the conflict inbox before retrying.',
+        statusNote:
+            'Conflict recovery did not converge automatically. Review the conflict inbox before retrying.',
       );
       return SyncResult.failure('Max retries exceeded: $_lastConflictMsg');
     } catch (e, stack) {
@@ -281,7 +314,8 @@ class SyncService extends ChangeNotifier {
 
   SyncResult _handleGlobalSyncError(dynamic e, StackTrace stack) {
     if (e is SocketException || e is TimeoutException) {
-      _statusNote = 'Cannot reach the sync server. Verify the address and network path.';
+      _statusNote =
+          'Cannot reach the sync server. Verify the address and network path.';
       _updateState(SyncState.offline);
       return SyncResult.failure('offline');
     }
@@ -292,7 +326,8 @@ class SyncService extends ChangeNotifier {
       if (message.contains('SocketException') ||
           message.contains('Connection failed') ||
           message.contains('OS Error')) {
-        _statusNote = 'Network unreachable. Sync will retry when connection is restored.';
+        _statusNote =
+            'Network unreachable. Sync will retry when connection is restored.';
         _updateState(SyncState.offline);
         return SyncResult.failure('offline');
       }
@@ -300,7 +335,8 @@ class SyncService extends ChangeNotifier {
       if (_looksLikeCleartextBlock(message)) {
         _setError(
           'Cleartext HTTP blocked: $message',
-          statusNote: 'Use HTTPS or allow local HTTP traffic for this device build.',
+          statusNote:
+              'Use HTTPS or allow local HTTP traffic for this device build.',
         );
         return SyncResult.failure('cleartext_blocked');
       }
@@ -313,10 +349,20 @@ class SyncService extends ChangeNotifier {
       return SyncResult.failure(e.userMessage);
     }
 
+    if (e is _SyncProtocolException) {
+      _setError(
+        'Sync protocol invalid: ${e.message}',
+        statusNote:
+            'The sync server returned data this client could not safely process. Check server version and logs.',
+      );
+      return SyncResult.failure(e.message);
+    }
+
     if (e is SyncPayloadException) {
       _setError(
         'Sync payload invalid: ${e.message}',
-        statusNote: 'The remote payload could not be verified. Check key consistency across devices.',
+        statusNote:
+            'The remote payload could not be verified. Check key consistency across devices.',
       );
       return SyncResult.failure(e.message);
     }
@@ -327,7 +373,8 @@ class SyncService extends ChangeNotifier {
     }
     _setError(
       'Sync failed: $e',
-      statusNote: 'An unexpected sync error occurred. Retry and inspect client/server logs if it repeats.',
+      statusNote:
+          'An unexpected sync error occurred. Retry and inspect client/server logs if it repeats.',
     );
     return SyncResult.failure(e.toString());
   }
@@ -359,47 +406,150 @@ class SyncService extends ChangeNotifier {
     return 'Already up to date.';
   }
 
-  Future<Map<String, dynamic>> _fetchRemoteChanges(String serverUrl, {required int since}) async {
+  Future<Map<String, dynamic>> _fetchRemoteChanges(
+    String serverUrl, {
+    required int since,
+  }) async {
     final vaultId = _identityService.vaultId;
     final url = '$serverUrl/vaults/$vaultId/sync?since=$since';
 
-    final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
+    final response = await http
+        .get(Uri.parse(url))
+        .timeout(const Duration(seconds: 10));
     if (response.statusCode == 304) {
       return {'max_version': since, 'items': const <dynamic>[]};
     }
     _throwIfSyncHttpError(response, phase: 'pull');
 
-    return jsonDecode(response.body) as Map<String, dynamic>;
+    return _decodeSyncResponse(response, phase: 'pull');
   }
 
   Future<int> _runPullPhase(String serverUrl) async {
     final vaultId = _identityService.vaultId;
-    debugPrint('[Sync] >>> Pull Phase Start (Vault: $vaultId, Since: $_localVersion)');
+    debugPrint(
+      '[Sync] >>> Pull Phase Start (Vault: $vaultId, Since: $_localVersion)',
+    );
 
     final data = await _fetchRemoteChanges(serverUrl, since: _localVersion);
     final mergedCount = await _applyRemoteChanges(data);
-    debugPrint('[Sync] <<< Pull Phase Completed. Processed: $mergedCount, Version: $_localVersion');
+    debugPrint(
+      '[Sync] <<< Pull Phase Completed. Processed: $mergedCount, Version: $_localVersion',
+    );
     return mergedCount;
   }
 
+  Map<String, dynamic> _decodeSyncResponse(
+    http.Response response, {
+    required String phase,
+  }) {
+    try {
+      final decoded = jsonDecode(response.body);
+      return _asStringKeyedMap(decoded, '$phase response');
+    } on _SyncProtocolException {
+      rethrow;
+    } catch (_) {
+      throw _SyncProtocolException('$phase response is not valid JSON.');
+    }
+  }
+
+  Map<String, dynamic> _asStringKeyedMap(Object? value, String label) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) {
+      try {
+        return Map<String, dynamic>.from(value);
+      } catch (_) {
+        // Fall through to the typed protocol error below.
+      }
+    }
+    throw _SyncProtocolException('$label must be a JSON object.');
+  }
+
+  int _readOptionalVersion(
+    Map<String, dynamic> data,
+    String key, {
+    required int fallback,
+    required String label,
+  }) {
+    final value = data[key];
+    if (value == null) return fallback;
+    if (value is int && value >= 0) return value;
+    throw _SyncProtocolException('$label must be a non-negative integer.');
+  }
+
+  List<dynamic> _readRemoteItems(Map<String, dynamic> data) {
+    final value = data['items'];
+    if (value == null) return const <dynamic>[];
+    if (value is List<dynamic>) return value;
+    if (value is List) return List<dynamic>.from(value);
+    throw const _SyncProtocolException('pull response items must be a list.');
+  }
+
+  Map<String, dynamic> _readRemoteRecord(Object? value) {
+    return _asStringKeyedMap(value, 'remote sync item');
+  }
+
+  int _readRemoteVersion(Map<String, dynamic> remoteRecord) {
+    final value = remoteRecord['version'];
+    if (value is int && value >= 0) return value;
+    throw const _SyncProtocolException(
+      'remote sync item version must be a non-negative integer.',
+    );
+  }
+
+  String _readEncryptedPayload(Map<String, dynamic> remoteRecord) {
+    final value = remoteRecord['encrypted_signed_payload'];
+    if (value is String && value.isNotEmpty) return value;
+    throw const _SyncProtocolException(
+      'remote sync item encrypted payload is missing.',
+    );
+  }
+
+  Map<String, dynamic> _readAcceptedVersions(Map<String, dynamic> response) {
+    final value = response['accepted_versions'];
+    if (value == null) return const <String, dynamic>{};
+    return _asStringKeyedMap(value, 'push response accepted_versions');
+  }
+
+  int? _acceptedVersionFor(
+    Map<String, dynamic> acceptedVersions,
+    String itemId,
+  ) {
+    final value = acceptedVersions[itemId];
+    if (value == null) return null;
+    if (value is int && value >= 0) return value;
+    throw _SyncProtocolException(
+      'accepted version for $itemId must be a non-negative integer.',
+    );
+  }
+
   Future<int> _applyRemoteChanges(Map<String, dynamic> data) async {
-    final maxVersion = data['max_version'] as int? ?? _localVersion;
-    final itemsList = data['items'] as List<dynamic>? ?? [];
+    final maxVersion = _readOptionalVersion(
+      data,
+      'max_version',
+      fallback: _localVersion,
+      label: 'pull response max_version',
+    );
+    final itemsList = _readRemoteItems(data);
     final vaultId = _identityService.vaultId;
 
-    debugPrint('[Sync] Received ${itemsList.length} items. Server Max Version: $maxVersion');
+    debugPrint(
+      '[Sync] Received ${itemsList.length} items. Server Max Version: $maxVersion',
+    );
 
     if (itemsList.isEmpty) {
       // 没有任何更新项，直接对齐版本号并退出
       _localVersion = maxVersion;
-      await _storageService.setSetting(_syncVersionKey(vaultId), '$_localVersion');
+      await _storageService.setSetting(
+        _syncVersionKey(vaultId),
+        '$_localVersion',
+      );
       return 0;
     }
 
     var mergedCount = 0;
     for (final item in itemsList) {
-      final remoteEncoded = item as Map<String, dynamic>;
-      final remoteVersion = remoteEncoded['version'] as int;
+      final remoteEncoded = _readRemoteRecord(item);
+      final remoteVersion = _readRemoteVersion(remoteEncoded);
       final isRemoteDeleted = remoteEncoded['is_deleted'] == true;
 
       final payload = _decryptAndVerifyPayload(remoteEncoded);
@@ -412,7 +562,9 @@ class SyncService extends ChangeNotifier {
           isDeleted: isRemoteDeleted,
         );
 
-        final maybeLocal = await _storageService.loadTemplateById(remoteTemplate.templateId);
+        final maybeLocal = await _storageService.loadTemplateById(
+          remoteTemplate.templateId,
+        );
         if (maybeLocal == null) {
           await _storageService.saveTemplate(remoteTemplate, isSyncMerge: true);
         } else if (maybeLocal.syncStatus == SyncStatus.pendingPush) {
@@ -428,13 +580,20 @@ class SyncService extends ChangeNotifier {
           isDeleted: isRemoteDeleted,
         );
 
-        final maybeLocal = await _storageService.getAccountById(remoteAccount.id, includeDeleted: true);
+        final maybeLocal = await _storageService.getAccountById(
+          remoteAccount.id,
+          includeDeleted: true,
+        );
 
         if (maybeLocal == null) {
           await _storageService.saveAccount(remoteAccount, isSyncMerge: true);
-        } else if (maybeLocal.syncStatus == SyncStatus.pendingPush || maybeLocal.syncStatus == SyncStatus.conflict) {
+        } else if (maybeLocal.syncStatus == SyncStatus.pendingPush ||
+            maybeLocal.syncStatus == SyncStatus.conflict) {
           final mergeResult = CrdtMergeEngine.merge(maybeLocal, remoteAccount);
-          await _storageService.saveAccount(mergeResult.mergedItem, isSyncMerge: true);
+          await _storageService.saveAccount(
+            mergeResult.mergedItem,
+            isSyncMerge: true,
+          );
           if (mergeResult.conflictLogs.isNotEmpty) {
             await _storageService.saveConflictLogs(mergeResult.conflictLogs);
           }
@@ -448,7 +607,10 @@ class SyncService extends ChangeNotifier {
     // 只有在所有项目都成功处理后，才推进全局版本号
     _localVersion = maxVersion;
     final currentVaultId = _identityService.vaultId;
-    await _storageService.setSetting(_syncVersionKey(currentVaultId), '$_localVersion');
+    await _storageService.setSetting(
+      _syncVersionKey(currentVaultId),
+      '$_localVersion',
+    );
     await _recordSyncTime();
 
     return mergedCount;
@@ -456,12 +618,17 @@ class SyncService extends ChangeNotifier {
 
   Future<void> _pullLatestSnapshot(String serverUrl) async {
     final data = await _fetchRemoteChanges(serverUrl, since: 0);
-    final maxVersion = data['max_version'] as int? ?? 0;
-    final itemsList = data['items'] as List<dynamic>? ?? [];
+    final maxVersion = _readOptionalVersion(
+      data,
+      'max_version',
+      fallback: 0,
+      label: 'snapshot response max_version',
+    );
+    final itemsList = _readRemoteItems(data);
 
     for (final item in itemsList) {
-      final remoteEncoded = item as Map<String, dynamic>;
-      final remoteVersion = remoteEncoded['version'] as int;
+      final remoteEncoded = _readRemoteRecord(item);
+      final remoteVersion = _readRemoteVersion(remoteEncoded);
       final isRemoteDeleted = remoteEncoded['is_deleted'] == true;
       final payload = _decryptAndVerifyPayload(remoteEncoded);
       final type = payload['_type'] as String?;
@@ -484,7 +651,10 @@ class SyncService extends ChangeNotifier {
     }
 
     _localVersion = maxVersion;
-    await _storageService.setSetting(_syncVersionKey(_identityService.vaultId), '$_localVersion');
+    await _storageService.setSetting(
+      _syncVersionKey(_identityService.vaultId),
+      '$_localVersion',
+    );
   }
 
   Future<int> _pullAndMergeLatestSnapshot(String serverUrl) async {
@@ -500,14 +670,20 @@ class SyncService extends ChangeNotifier {
     }
 
     try {
-      _pendingRecovery = _SyncRecoveryMarker.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+      _pendingRecovery = _SyncRecoveryMarker.fromJson(
+        jsonDecode(raw) as Map<String, dynamic>,
+      );
     } catch (_) {
       _pendingRecovery = null;
       await _storageService.setSetting(_syncRecoveryKey(vaultId), '');
     }
   }
 
-  Future<void> _writeRecoveryMarker(_SyncRecoveryPhase phase, {String? itemId, String? conflictType}) async {
+  Future<void> _writeRecoveryMarker(
+    _SyncRecoveryPhase phase, {
+    String? itemId,
+    String? conflictType,
+  }) async {
     final marker = _SyncRecoveryMarker(
       phase: phase,
       localVersion: _localVersion,
@@ -516,12 +692,18 @@ class SyncService extends ChangeNotifier {
       conflictType: conflictType,
     );
     _pendingRecovery = marker;
-    await _storageService.setSetting(_syncRecoveryKey(_identityService.vaultId), jsonEncode(marker.toJson()));
+    await _storageService.setSetting(
+      _syncRecoveryKey(_identityService.vaultId),
+      jsonEncode(marker.toJson()),
+    );
   }
 
   Future<void> _clearRecoveryMarker() async {
     _pendingRecovery = null;
-    await _storageService.setSetting(_syncRecoveryKey(_identityService.vaultId), '');
+    await _storageService.setSetting(
+      _syncRecoveryKey(_identityService.vaultId),
+      '',
+    );
   }
 
   Future<int> _resumeInterruptedSync(String serverUrl) async {
@@ -530,14 +712,20 @@ class SyncService extends ChangeNotifier {
       return 0;
     }
 
-    debugPrint('[Sync] Recovering interrupted ${marker.phase.name} phase from version ${marker.localVersion}.');
+    debugPrint(
+      '[Sync] Recovering interrupted ${marker.phase.name} phase from version ${marker.localVersion}.',
+    );
     final recoveredCount = await _pullAndMergeLatestSnapshot(serverUrl);
-    _queuedConflictNotice ??= 'Recovered from an interrupted ${marker.phase.name} cycle before continuing sync.';
+    _queuedConflictNotice ??=
+        'Recovered from an interrupted ${marker.phase.name} cycle before continuing sync.';
     await _clearRecoveryMarker();
     return recoveredCount;
   }
 
-  Future<void> _handleConflict(String serverUrl, _ConflictException conflict) async {
+  Future<void> _handleConflict(
+    String serverUrl,
+    _ConflictException conflict,
+  ) async {
     final itemId = conflict.itemId;
     if (itemId == null) {
       return;
@@ -560,23 +748,34 @@ class SyncService extends ChangeNotifier {
         await _handleVersionConflict(
           serverUrl,
           itemId,
-          conflict.serverIsDeleted == true ? 'concurrent_delete' : 'stale_base_version',
+          conflict.serverIsDeleted == true
+              ? 'concurrent_delete'
+              : 'stale_base_version',
         );
         return;
     }
   }
 
-  Future<void> _handleRemoteMissingConflict(String serverUrl, String itemId) async {
+  Future<void> _handleRemoteMissingConflict(
+    String serverUrl,
+    String itemId,
+  ) async {
     await _pullLatestSnapshot(serverUrl);
 
-    final localItem = await _storageService.getAccountById(itemId, includeDeleted: true);
+    final localItem = await _storageService.getAccountById(
+      itemId,
+      includeDeleted: true,
+    );
     if (localItem == null) {
       return;
     }
 
     if (localItem.isDeleted) {
       await _storageService.saveAccount(
-        localItem.copyWith(syncStatus: SyncStatus.synchronized, serverVersion: 0),
+        localItem.copyWith(
+          syncStatus: SyncStatus.synchronized,
+          serverVersion: 0,
+        ),
         isSyncMerge: true,
       );
       return;
@@ -597,15 +796,23 @@ class SyncService extends ChangeNotifier {
     await _storageService.saveConflictLogs([conflictLog]);
 
     _queuedConflictCount += 1;
-    _queuedConflictNotice = 'Remote record missing. Review the conflict inbox before overwriting.';
+    _queuedConflictNotice =
+        'Remote record missing. Review the conflict inbox before overwriting.';
   }
 
-  Future<void> _handleVersionConflict(String serverUrl, String itemId, String conflictType) async {
+  Future<void> _handleVersionConflict(
+    String serverUrl,
+    String itemId,
+    String conflictType,
+  ) async {
     final beforeCount = (await _storageService.getConflictLogs(itemId)).length;
     await _pullAndMergeLatestSnapshot(serverUrl);
 
     final afterCount = (await _storageService.getConflictLogs(itemId)).length;
-    final localItem = await _storageService.getAccountById(itemId, includeDeleted: true);
+    final localItem = await _storageService.getAccountById(
+      itemId,
+      includeDeleted: true,
+    );
     if (localItem == null) {
       return;
     }
@@ -617,41 +824,57 @@ class SyncService extends ChangeNotifier {
           'Remote delete conflicted with local changes. Review the conflict inbox before restoring.',
         'concurrent_edit' =>
           'Concurrent remote edits were merged locally. Review the conflict inbox before overwriting.',
-        _ => 'Remote changes were merged locally. Review the conflict inbox before overwriting.',
+        _ =>
+          'Remote changes were merged locally. Review the conflict inbox before overwriting.',
       };
       return;
     }
 
     if (localItem.syncStatus == SyncStatus.pendingPush) {
       _queuedConflictNotice = switch (conflictType) {
-        'concurrent_delete' => 'Remote delete was merged with local data. Sync will retry with the reconciled record.',
-        'concurrent_edit' => 'Concurrent remote edits were merged locally. Sync will retry with the reconciled record.',
-        _ => 'Remote changes were merged locally. Sync will retry with the reconciled record.',
+        'concurrent_delete' =>
+          'Remote delete was merged with local data. Sync will retry with the reconciled record.',
+        'concurrent_edit' =>
+          'Concurrent remote edits were merged locally. Sync will retry with the reconciled record.',
+        _ =>
+          'Remote changes were merged locally. Sync will retry with the reconciled record.',
       };
     }
   }
 
   Future<int> _runPushPhase(String serverUrl) async {
     final allPendingAccounts = await _storageService.loadPendingSyncAccounts();
-    final dirtyAccounts = allPendingAccounts.where((a) => a.syncStatus == SyncStatus.pendingPush).toList();
+    final dirtyAccounts = allPendingAccounts
+        .where((a) => a.syncStatus == SyncStatus.pendingPush)
+        .toList();
     final dirtyTemplates = await _storageService.loadDirtyTemplates();
 
     final List<dynamic> dirtyItems = [...dirtyAccounts, ...dirtyTemplates];
 
     if (dirtyItems.isEmpty) {
       if (allPendingAccounts.isNotEmpty) {
-        debugPrint('[Sync] Push Phase: ${allPendingAccounts.length} items pending, but all are in Conflict state.');
+        debugPrint(
+          '[Sync] Push Phase: ${allPendingAccounts.length} items pending, but all are in Conflict state.',
+        );
       }
       return 0;
     }
 
     final vaultId = _identityService.vaultId;
-    debugPrint('[Sync] >>> Push Phase Start. Items to push: ${dirtyItems.length}');
+    debugPrint(
+      '[Sync] >>> Push Phase Start. Items to push: ${dirtyItems.length}',
+    );
     final pushPayloads = dirtyItems.map((item) {
       final ciphertext = _encryptAndSign(item);
-      final String itemId = (item is AccountItem) ? item.id : (item as AccountTemplate).templateId;
-      final int serverVersion = (item is AccountItem) ? item.serverVersion : (item as AccountTemplate).serverVersion;
-      final bool isDeleted = (item is AccountItem) ? item.isDeleted : (item as AccountTemplate).isDeleted;
+      final String itemId = (item is AccountItem)
+          ? item.id
+          : (item as AccountTemplate).templateId;
+      final int serverVersion = (item is AccountItem)
+          ? item.serverVersion
+          : (item as AccountTemplate).serverVersion;
+      final bool isDeleted = (item is AccountItem)
+          ? item.isDeleted
+          : (item as AccountTemplate).isDeleted;
 
       return {
         'id': itemId,
@@ -674,21 +897,29 @@ class SyncService extends ChangeNotifier {
     }
     _throwIfSyncHttpError(response, phase: 'push');
 
-    final respData = jsonDecode(response.body) as Map<String, dynamic>;
-    final acceptedVersions = respData['accepted_versions'] as Map<String, dynamic>? ?? {};
+    final respData = _decodeSyncResponse(response, phase: 'push');
+    final acceptedVersions = _readAcceptedVersions(respData);
 
     for (final item in dirtyItems) {
-      final String itemId = (item is AccountItem) ? item.id : (item as AccountTemplate).templateId;
-      final newVersion = acceptedVersions[itemId] as int?;
+      final String itemId = (item is AccountItem)
+          ? item.id
+          : (item as AccountTemplate).templateId;
+      final newVersion = _acceptedVersionFor(acceptedVersions, itemId);
       if (newVersion == null) {
         continue;
       }
 
       if (item is AccountItem) {
-        final cleanItem = item.copyWith(syncStatus: SyncStatus.synchronized, serverVersion: newVersion);
+        final cleanItem = item.copyWith(
+          syncStatus: SyncStatus.synchronized,
+          serverVersion: newVersion,
+        );
         await _storageService.saveAccount(cleanItem, isSyncMerge: true);
       } else if (item is AccountTemplate) {
-        final cleanTemplate = item.copyWith(syncStatus: SyncStatus.synchronized, serverVersion: newVersion);
+        final cleanTemplate = item.copyWith(
+          syncStatus: SyncStatus.synchronized,
+          serverVersion: newVersion,
+        );
         await _storageService.saveTemplate(cleanTemplate, isSyncMerge: true);
       }
 
@@ -697,8 +928,13 @@ class SyncService extends ChangeNotifier {
       }
     }
 
-    await _storageService.setSetting(_syncVersionKey(_identityService.vaultId), '$_localVersion');
-    debugPrint('[Sync] <<< Push Phase Completed. Success items: ${acceptedVersions.length}');
+    await _storageService.setSetting(
+      _syncVersionKey(_identityService.vaultId),
+      '$_localVersion',
+    );
+    debugPrint(
+      '[Sync] <<< Push Phase Completed. Success items: ${acceptedVersions.length}',
+    );
     return dirtyItems.length;
   }
 
@@ -723,8 +959,10 @@ class SyncService extends ChangeNotifier {
     throw ArgumentError('Unsupported sync item type: ${item.runtimeType}');
   }
 
-  Map<String, dynamic> _decryptAndVerifyPayload(Map<String, dynamic> remoteRecord) {
-    final cipher = remoteRecord['encrypted_signed_payload'] as String;
+  Map<String, dynamic> _decryptAndVerifyPayload(
+    Map<String, dynamic> remoteRecord,
+  ) {
+    final cipher = _readEncryptedPayload(remoteRecord);
     return SyncPayloadCodec.decodePayload(
       encodedPayload: cipher,
       expectedVaultId: _identityService.vaultId,
@@ -735,7 +973,9 @@ class SyncService extends ChangeNotifier {
 
   Future<String> _getSyncServerUrl() async {
     final prefs = await SharedPreferences.getInstance();
-    var url = prefs.getString('sync_server_url') ?? await _storageService.getSetting('sync_server_url');
+    var url =
+        prefs.getString('sync_server_url') ??
+        await _storageService.getSetting('sync_server_url');
     if (url != null) {
       await prefs.setString('sync_server_url', url);
     }
@@ -754,7 +994,10 @@ class SyncService extends ChangeNotifier {
 
   Future<void> _recordSyncTime() async {
     _lastSyncTime = DateTime.now();
-    await _storageService.setSetting(_syncLastTimeKey(_identityService.vaultId), _lastSyncTime!.toIso8601String());
+    await _storageService.setSetting(
+      _syncLastTimeKey(_identityService.vaultId),
+      _lastSyncTime!.toIso8601String(),
+    );
   }
 
   bool _isMobileLoopbackUrl(String serverUrl) {
@@ -766,7 +1009,9 @@ class SyncService extends ChangeNotifier {
 
   bool _looksLikeCleartextBlock(String message) {
     final lower = message.toLowerCase();
-    return lower.contains('cleartext') || lower.contains('insecure http') || lower.contains('not permitted');
+    return lower.contains('cleartext') ||
+        lower.contains('insecure http') ||
+        lower.contains('not permitted');
   }
 
   void _throwIfSyncHttpError(http.Response response, {required String phase}) {
@@ -872,11 +1117,16 @@ class _SyncHttpException implements Exception {
   final int statusCode;
   final String? serverMessage;
 
-  const _SyncHttpException({required this.phase, required this.statusCode, this.serverMessage});
+  const _SyncHttpException({
+    required this.phase,
+    required this.statusCode,
+    this.serverMessage,
+  });
 
   String get userMessage {
     if (statusCode == 503) {
-      return serverMessage ?? 'Sync server storage is temporarily unavailable. Retry later.';
+      return serverMessage ??
+          'Sync server storage is temporarily unavailable. Retry later.';
     }
     if (serverMessage != null && serverMessage!.isNotEmpty) {
       return serverMessage!;
@@ -885,7 +1135,8 @@ class _SyncHttpException implements Exception {
   }
 
   String get logMessage {
-    final prefix = '${phase[0].toUpperCase()}${phase.substring(1)} HTTP $statusCode';
+    final prefix =
+        '${phase[0].toUpperCase()}${phase.substring(1)} HTTP $statusCode';
     if (serverMessage == null || serverMessage!.isEmpty) {
       return prefix;
     }
