@@ -207,8 +207,8 @@ secret_roy_vault.runtime.db
 
 - 维护 `deviceId`、`vaultId`、`privateKey`、`symmetricKey`。
 - 首次运行时生成本地身份。
-- 解析 `sroy-link-v1:` 内部兼容码；该格式不作为普通用户恢复入口。
-- 导出/导入 `sroy-secure-v2:` 离线恢复码。
+- 解析 `sroy-link:` 内部兼容码；该格式不作为普通用户恢复入口。
+- 导出/导入 `sroy-recovery:` 离线恢复码。
 - 提供 preview/apply 两阶段导入能力，避免 dump 失败后出现半成功恢复。
 
 ### SyncService

@@ -262,10 +262,10 @@ PBKDF2-HMAC-SHA256 校验
 
 保险库链接码：
 
-- 内部兼容码：`sroy-link-v1:`，不作为普通用户恢复入口
-- 离线恢复码：`sroy-secure-v2:`
-- 远程配对密文包：`sroy-pairing-v2:`
-- 兼容导入：`sroy-secure-v1:`
+- 内部兼容码：`sroy-link:`，不作为普通用户恢复入口
+- 离线恢复码：`sroy-recovery:`
+- 远程配对密文包：`sroy-pairing:`
+- 当前恢复导入：`sroy-recovery:`
 
 仍需注意：
 

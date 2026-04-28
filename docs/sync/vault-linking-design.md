@@ -1,4 +1,4 @@
-﻿# SecretRoy Vault Linking Design
+# SecretRoy Vault Linking Design
 
 Navigation:
 [Docs Home](../README.md) |
@@ -353,12 +353,12 @@ As of this design:
 - face-to-face linking and remote pairing are the preferred device-onboarding
   paths
 - offline recovery code is the manual fallback path
-- `sroy-link-v1:` remains only an internal compatibility/transport format and
+- `sroy-link:` remains only an internal compatibility/transport format and
   should not be presented as a normal recovery entry
 
 Current implementation update, 2026-04-29:
 
-- `sroy-secure-v2:` is now documented and presented as an offline recovery
+- `sroy-recovery:` is now documented and presented as an offline recovery
   code, not as a generic user-facing link code.
 - LAN/face-to-face linking now uses an 8-character readable code from `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`; it is not a 6-digit numeric code.
 - LAN discovery broadcasts only endpoint metadata. The pairing code is supplied and verified during the HTTP claim step.
@@ -372,8 +372,8 @@ Current implementation update, 2026-04-29:
   joining a face-to-face linking session.
 - Remote pairing is implemented as a short-lived approval flow. The
   joining device submits a temporary X25519 public key, and the approving device
-  uploads only a `sroy-pairing-v2:` AES-GCM encrypted vault bundle for that key.
-- The server rejects legacy plaintext `sroy-link-v1:` bundles on the approve
+  uploads only a `sroy-pairing:` AES-GCM encrypted vault bundle for that key.
+- The server rejects plaintext `sroy-link:` bundles on the approve
   route, so the relay no longer receives readable vault key material.
 - Import consistency protection is implemented at `ServiceManager`: imports
   preview and validate incoming identity/dump before writing, require

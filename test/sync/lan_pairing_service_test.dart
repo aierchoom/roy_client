@@ -29,7 +29,7 @@ void main() {
       final service = LanPairingService();
       final startedAt = DateTime.now();
       final session = await service.startHosting(
-        transferCode: 'sroy-link-v1:test',
+        transferCode: 'sroy-link:test',
       );
       final ttl = session.expiresAt.difference(startedAt);
 
@@ -48,7 +48,7 @@ void main() {
     () async {
       final host = LanPairingService();
       final requester = LanPairingService();
-      const transferCode = 'sroy-link-v1:test';
+      const transferCode = 'sroy-link:test';
 
       final session = await host.startHosting(transferCode: transferCode);
 
@@ -73,7 +73,7 @@ void main() {
 
   test('successful direct claim destroys the hosted key bundle', () async {
     final host = LanPairingService();
-    const transferCode = 'sroy-link-v1:test';
+    const transferCode = 'sroy-link:test';
     final session = await host.startHosting(transferCode: transferCode);
 
     final response = await _postClaim(
@@ -93,7 +93,7 @@ void main() {
     'direct claim can return a requester-encrypted transfer bundle',
     () async {
       final host = LanPairingService();
-      const transferCode = 'sroy-link-v1:test';
+      const transferCode = 'sroy-link:test';
       final requesterKeyPair = await VaultPairingCrypto.createKeyPair();
       final session = await host.startHosting(transferCode: transferCode);
 
@@ -124,7 +124,7 @@ void main() {
   test('expired LAN code destroys the hosted key bundle', () async {
     final host = LanPairingService();
     await host.startHosting(
-      transferCode: 'sroy-link-v1:test',
+      transferCode: 'sroy-link:test',
       ttl: const Duration(milliseconds: 80),
     );
 
@@ -137,9 +137,7 @@ void main() {
     'too many wrong LAN code attempts destroy the hosted key bundle',
     () async {
       final host = LanPairingService();
-      final session = await host.startHosting(
-        transferCode: 'sroy-link-v1:test',
-      );
+      final session = await host.startHosting(transferCode: 'sroy-link:test');
       final wrongCode = session.pairingCode == 'ABCDEFGH'
           ? 'HGFEDCBA'
           : 'ABCDEFGH';

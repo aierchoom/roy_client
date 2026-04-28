@@ -128,7 +128,7 @@ void main() {
   });
 
   test(
-    'secure identity link imports vault keys with the right password',
+    'offline recovery code imports vault keys with the right password',
     () async {
       final sourceIdentity = IdentityService(
         secureStorage: _MemorySecureKeyValueStore(),
@@ -151,7 +151,7 @@ void main() {
         'correct horse battery staple',
       );
 
-      expect(linkCode, startsWith('sroy-secure-v2:'));
+      expect(linkCode, startsWith('sroy-recovery:'));
       expect(linkCode.contains(sourceIdentity.privateKey), isFalse);
       expect(targetIdentity.deviceId, originalTargetDeviceId);
       expect(targetIdentity.vaultId, sourceIdentity.vaultId);
@@ -162,7 +162,7 @@ void main() {
     },
   );
 
-  test('secure identity link rejects a wrong password', () async {
+  test('offline recovery code rejects a wrong password', () async {
     final sourceIdentity = IdentityService(
       secureStorage: _MemorySecureKeyValueStore(),
     );
@@ -182,7 +182,7 @@ void main() {
     );
   });
 
-  test('secure identity link requires a transfer password', () async {
+  test('offline recovery code requires a recovery password', () async {
     final identity = IdentityService(
       secureStorage: _MemorySecureKeyValueStore(),
     );
