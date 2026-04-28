@@ -25,3 +25,5 @@ Each report should include:
 |---|---|---|
 | 2026-04-28 | [2026-04-28-client-service-manager-system-refactor.md](2026-04-28-client-service-manager-system-refactor.md) | ServiceManager system-module refactor |
 | 2026-04-28 | [2026-04-28-project-todo-linkage.md](2026-04-28-project-todo-linkage.md) | Project TODO linkage |
+| 2026-04-28 | [2026-04-28-builtin-template-simplification.md](2026-04-28-builtin-template-simplification.md) | Built-in template simplification |
+| 2026-04-28 | [2026-04-28-app-usability-quality-convergence.md](2026-04-28-app-usability-quality-convergence.md) | App usability quality convergence |

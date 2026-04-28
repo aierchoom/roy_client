@@ -108,8 +108,10 @@ class _SyncProbeServer {
   final Completer<void>? _gate;
   final int getStatusCode;
   final String? getError;
+  final String? getBody;
   final int postStatusCode;
   final String? postError;
+  final String? postBody;
   int getCount = 0;
   int postCount = 0;
 
@@ -118,8 +120,10 @@ class _SyncProbeServer {
     this._gate, {
     required this.getStatusCode,
     required this.getError,
+    required this.getBody,
     required this.postStatusCode,
     required this.postError,
+    required this.postBody,
   }) {
     _server.listen(_handleRequest);
   }
@@ -128,8 +132,10 @@ class _SyncProbeServer {
     Completer<void>? gate,
     int getStatusCode = 200,
     String? getError,
+    String? getBody,
     int postStatusCode = 200,
     String? postError,
+    String? postBody,
   }) async {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     return _SyncProbeServer._(
@@ -137,8 +143,10 @@ class _SyncProbeServer {
       gate,
       getStatusCode: getStatusCode,
       getError: getError,
+      getBody: getBody,
       postStatusCode: postStatusCode,
       postError: postError,
+      postBody: postBody,
     );
   }
 
@@ -158,9 +166,10 @@ class _SyncProbeServer {
       request.response.statusCode = getStatusCode;
       request.response.headers.contentType = ContentType.json;
       request.response.write(
-        getStatusCode == 200
-            ? jsonEncode({'max_version': 0, 'items': const <dynamic>[]})
-            : jsonEncode({'error': getError ?? 'Pull failed'}),
+        getBody ??
+            (getStatusCode == 200
+                ? jsonEncode({'max_version': 0, 'items': const <dynamic>[]})
+                : jsonEncode({'error': getError ?? 'Pull failed'})),
       );
       await request.response.close();
       return;
@@ -171,13 +180,14 @@ class _SyncProbeServer {
       request.response.statusCode = postStatusCode;
       request.response.headers.contentType = ContentType.json;
       request.response.write(
-        postStatusCode == 200
-            ? jsonEncode({
-                'success': true,
-                'max_version': 0,
-                'accepted_versions': const <String, int>{},
-              })
-            : jsonEncode({'error': postError ?? 'Push failed'}),
+        postBody ??
+            (postStatusCode == 200
+                ? jsonEncode({
+                    'success': true,
+                    'max_version': 0,
+                    'accepted_versions': const <String, int>{},
+                  })
+                : jsonEncode({'error': postError ?? 'Push failed'})),
       );
       await request.response.close();
       return;
@@ -363,6 +373,65 @@ void main() {
       expect(syncService.state, SyncState.error);
       expect(syncService.errorMessage, contains('Push HTTP 503'));
       expect(result.error, syncService.statusNote);
+      expect(server.postCount, 1);
+    },
+  );
+
+  test('syncNow rejects malformed pull responses before pushing', () async {
+    final identity = _identityService();
+    await identity.initialize();
+
+    final server = await _SyncProbeServer.start(
+      getBody: jsonEncode({'max_version': 'bad', 'items': const <dynamic>[]}),
+    );
+    addTearDown(server.close);
+
+    final syncService = SyncService(
+      storageService: _FakeSecureStorageService(),
+      identityService: identity,
+      config: SyncConfig(serverUrl: server.baseUrl),
+    );
+    addTearDown(syncService.dispose);
+    await syncService.initialize();
+
+    final result = await syncService.syncNow();
+
+    expect(result.success, isFalse);
+    expect(result.error, contains('pull response max_version'));
+    expect(syncService.state, SyncState.error);
+    expect(syncService.errorMessage, contains('Sync protocol invalid'));
+    expect(server.postCount, 0);
+  });
+
+  test(
+    'syncNow rejects malformed push acknowledgements without marking clean',
+    () async {
+      final identity = _identityService();
+      await identity.initialize();
+
+      final storage = _FakeSecureStorageService()
+        ..accounts['account_1'] = _pendingItem();
+      final server = await _SyncProbeServer.start(
+        postBody: jsonEncode({
+          'success': true,
+          'accepted_versions': {'account_1': 'bad'},
+        }),
+      );
+      addTearDown(server.close);
+
+      final syncService = SyncService(
+        storageService: storage,
+        identityService: identity,
+        config: SyncConfig(serverUrl: server.baseUrl),
+      );
+      addTearDown(syncService.dispose);
+      await syncService.initialize();
+
+      final result = await syncService.syncNow();
+
+      expect(result.success, isFalse);
+      expect(result.error, contains('accepted version for account_1'));
+      expect(storage.accounts['account_1']!.syncStatus, SyncStatus.pendingPush);
       expect(server.postCount, 1);
     },
   );

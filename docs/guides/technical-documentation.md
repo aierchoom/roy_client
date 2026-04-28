@@ -166,18 +166,15 @@ class AccountFieldAttributes {
 
 ### 4.3 内置模板
 
-代码中硬编码了 4 个内置模板：
+代码中硬编码了 1 个内置模板：
 
 | ID | 标题 | 图标 | 核心字段 |
 |------|------|------|------|
-| `bank_card` | 银行卡 | `credit_card` | 持卡人、卡号★、银行、有效期、CVV |
-| `email_account` | 邮箱账号 | `email` | 邮箱地址★、邮箱密码、备注 |
-| `web_account` | 网站/App 账号 | `web` | 网站名称、账号★、密码、登录地址 |
-| `phone_account` | 手机号 | `phone` | 手机号★、运营商、SIM PIN |
+| `generic_info` | 通用信息 | `description` | 内容★ |
 
 （★=isPrimary+isRequired）
 
-全局列表 `basicAccountTemplates` 包含以上 4 个。`EnhancedAppProvider.allTemplates` 合并了内置和用户自定义模板。
+全局列表 `basicAccountTemplates` 包含以上 1 个。`EnhancedAppProvider.allTemplates` 合并了内置和用户自定义模板。
 
 ---
 

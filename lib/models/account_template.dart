@@ -13,12 +13,7 @@ enum AccountFieldType {
   custom,
 }
 
-enum TimeFieldFormat {
-  full,
-  date,
-  monthYear,
-  time,
-}
+enum TimeFieldFormat { full, date, monthYear, time }
 
 enum TemplateCategory {
   login,
@@ -230,13 +225,16 @@ class AccountTemplate {
           .map((field) => AccountField.fromJson(field as Map<String, dynamic>))
           .toList(),
       isCustom: isCustom,
-      syncStatus: json['syncStatus'] != null 
-          ? SyncStatus.values.firstWhere((e) => e.name == json['syncStatus'])
-          : SyncStatus.synchronized,
+      syncStatus: syncStatusFromJson(
+        json['syncStatus'],
+        fallback: SyncStatus.synchronized,
+      ),
       hlc: json['hlc'] != null ? Hlc.parse(json['hlc'] as String) : null,
       serverVersion: json['serverVersion'] as int? ?? 0,
       isDeleted: json['isDeleted'] == true,
-      deleteHlc: json['deleteHlc'] != null ? Hlc.parse(json['deleteHlc'] as String) : null,
+      deleteHlc: json['deleteHlc'] != null
+          ? Hlc.parse(json['deleteHlc'] as String)
+          : null,
     );
   }
 
@@ -352,13 +350,8 @@ TemplateCategory inferTemplateCategory({
   }
 
   switch (templateId) {
-    case 'bank_card':
-      return TemplateCategory.payment;
-    case 'email_account':
-    case 'web_account':
-      return TemplateCategory.login;
-    case 'phone_account':
-      return TemplateCategory.contact;
+    case 'generic_info':
+      return TemplateCategory.custom;
   }
 
   if (icon == Icons.credit_card_outlined) return TemplateCategory.payment;
@@ -451,188 +444,36 @@ TemplateCategory inferTemplateCategory({
 
 IconData iconForBuiltinTemplate(String id) {
   switch (id) {
-    case 'bank_card':
-      return Icons.credit_card_outlined;
-    case 'email_account':
-      return Icons.email_outlined;
-    case 'web_account':
-      return Icons.language_outlined;
-    case 'phone_account':
-      return Icons.phone_outlined;
+    case 'generic_info':
+      return Icons.description_outlined;
     default:
       return Icons.description_outlined;
   }
 }
 
-final AccountTemplate bankCardTemplate = AccountTemplate(
-  templateId: 'bank_card',
-  title: '\u94f6\u884c\u5361',
-  subTitle: '\u94f6\u884c\u5361\u4e0e\u652f\u4ed8\u4fe1\u606f',
-  icon: Icons.credit_card_outlined,
-  category: TemplateCategory.payment,
+final AccountTemplate genericInfoTemplate = AccountTemplate(
+  templateId: 'generic_info',
+  title: '\u901a\u7528\u4fe1\u606f',
+  subTitle:
+      '\u4e00\u4e2a\u5c3d\u53ef\u80fd\u7b80\u6d01\u7684\u654f\u611f\u4fe1\u606f\u5bb9\u5668',
+  icon: Icons.description_outlined,
+  category: TemplateCategory.custom,
   fields: const [
     AccountField(
-      fieldKey: 'card_holder',
-      label: '\u6301\u5361\u4eba',
-      attributes: AccountFieldAttributes(
-        type: AccountFieldType.text,
-        isRequired: true,
-        isSearchable: true,
-      ),
-    ),
-    AccountField(
-      fieldKey: 'card_number',
-      label: '\u5361\u53f7',
-      attributes: AccountFieldAttributes(
-        type: AccountFieldType.number,
-        isPrimary: true,
-        isRequired: true,
-        isSecret: false,
-        minLength: 16,
-        maxLength: 19,
-      ),
-    ),
-    AccountField(
-      fieldKey: 'bank_name',
-      label: '\u5f00\u6237\u884c',
-      attributes: AccountFieldAttributes(type: AccountFieldType.text),
-    ),
-    AccountField(
-      fieldKey: 'expiry_date',
-      label: '\u5230\u671f\u65f6\u95f4',
-      attributes: AccountFieldAttributes(
-        type: AccountFieldType.time,
-        timeFormat: TimeFieldFormat.monthYear,
-        hint: 'MM/YY',
-      ),
-    ),
-    AccountField(
-      fieldKey: 'cvv',
-      label: 'CVV',
-      attributes: AccountFieldAttributes(
-        type: AccountFieldType.password,
-        isSecret: true,
-        minLength: 3,
-        maxLength: 4,
-      ),
-    ),
-  ],
-);
-
-final AccountTemplate emailAccountTemplate = AccountTemplate(
-  templateId: 'email_account',
-  title: '\u90ae\u7bb1\u8d26\u53f7',
-  subTitle: '\u90ae\u7bb1\u767b\u5f55\u4e0e\u5907\u6ce8\u4fe1\u606f',
-  icon: Icons.email_outlined,
-  category: TemplateCategory.login,
-  fields: const [
-    AccountField(
-      fieldKey: 'email',
-      label: '\u90ae\u7bb1\u5730\u5740',
-      attributes: AccountFieldAttributes(
-        type: AccountFieldType.email,
-        isPrimary: true,
-        isRequired: true,
-        isSearchable: true,
-      ),
-    ),
-    AccountField(
-      fieldKey: 'password',
-      label: '\u5bc6\u7801',
-      attributes: AccountFieldAttributes(
-        type: AccountFieldType.password,
-        isRequired: true,
-        isSecret: true,
-        minLength: 8,
-      ),
-    ),
-    AccountField(
-      fieldKey: 'remark',
-      label: '\u5907\u6ce8',
-      attributes: AccountFieldAttributes(type: AccountFieldType.text),
-    ),
-  ],
-);
-
-final AccountTemplate webAccountTemplate = AccountTemplate(
-  templateId: 'web_account',
-  title: '\u7f51\u7ad9/\u5e94\u7528',
-  subTitle: '\u5e38\u89c1\u7f51\u7ad9\u6216 App \u8d26\u53f7\u4fe1\u606f',
-  icon: Icons.language_outlined,
-  category: TemplateCategory.login,
-  fields: const [
-    AccountField(
-      fieldKey: 'site_name',
-      label: '\u7f51\u7ad9\u6216 App \u540d\u79f0',
-      attributes: AccountFieldAttributes(
-        type: AccountFieldType.text,
-        isRequired: true,
-        isSearchable: true,
-      ),
-    ),
-    AccountField(
-      fieldKey: 'username',
-      label: '\u8d26\u53f7',
+      fieldKey: 'content',
+      label: '\u5185\u5bb9',
+      description:
+          '\u8d26\u53f7\u3001\u5bc6\u7801\u3001\u6062\u590d\u7801\u3001API Key \u6216\u4efb\u610f\u9700\u8981\u4fdd\u7ba1\u7684\u4fe1\u606f\u3002',
       attributes: AccountFieldAttributes(
         type: AccountFieldType.text,
         isPrimary: true,
         isRequired: true,
-        isSearchable: true,
-      ),
-    ),
-    AccountField(
-      fieldKey: 'password',
-      label: '\u5bc6\u7801',
-      attributes: AccountFieldAttributes(
-        type: AccountFieldType.password,
-        isRequired: true,
         isSecret: true,
-      ),
-    ),
-    AccountField(
-      fieldKey: 'login_url',
-      label: '\u767b\u5f55\u94fe\u63a5',
-      attributes: AccountFieldAttributes(type: AccountFieldType.url),
-    ),
-  ],
-);
-
-final AccountTemplate phoneAccountTemplate = AccountTemplate(
-  templateId: 'phone_account',
-  title: '\u624b\u673a\u53f7',
-  subTitle: '\u624b\u673a\u53f7\u4e0e\u8fd0\u8425\u5546\u4fe1\u606f',
-  icon: Icons.phone_outlined,
-  category: TemplateCategory.contact,
-  fields: const [
-    AccountField(
-      fieldKey: 'phone_number',
-      label: '\u624b\u673a\u53f7',
-      attributes: AccountFieldAttributes(
-        type: AccountFieldType.phone,
-        isPrimary: true,
-        isRequired: true,
-        isSearchable: true,
-      ),
-    ),
-    AccountField(
-      fieldKey: 'carrier',
-      label: '\u8fd0\u8425\u5546',
-      attributes: AccountFieldAttributes(type: AccountFieldType.text),
-    ),
-    AccountField(
-      fieldKey: 'pin',
-      label: 'SIM PIN',
-      attributes: AccountFieldAttributes(
-        type: AccountFieldType.password,
-        isSecret: true,
+        hint:
+            '\u7c98\u8d34\u6216\u8f93\u5165\u9700\u8981\u4fdd\u7ba1\u7684\u5185\u5bb9',
       ),
     ),
   ],
 );
 
-final List<AccountTemplate> basicAccountTemplates = [
-  bankCardTemplate,
-  emailAccountTemplate,
-  webAccountTemplate,
-  phoneAccountTemplate,
-];
+final List<AccountTemplate> basicAccountTemplates = [genericInfoTemplate];

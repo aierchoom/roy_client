@@ -2,6 +2,32 @@ import 'hlc.dart';
 
 enum SyncStatus { synchronized, pendingPush, conflict }
 
+SyncStatus syncStatusFromJson(
+  Object? value, {
+  SyncStatus fallback = SyncStatus.pendingPush,
+}) {
+  if (value is SyncStatus) return value;
+
+  if (value is int) {
+    return value >= 0 && value < SyncStatus.values.length
+        ? SyncStatus.values[value]
+        : fallback;
+  }
+
+  if (value is String) {
+    final numericValue = int.tryParse(value);
+    if (numericValue != null) {
+      return syncStatusFromJson(numericValue, fallback: fallback);
+    }
+
+    for (final status in SyncStatus.values) {
+      if (status.name == value) return status;
+    }
+  }
+
+  return fallback;
+}
+
 class AccountItem {
   final String id;
   final String name;
@@ -54,14 +80,20 @@ class AccountItem {
       createdAt:
           json['createdAt'] as int? ?? DateTime.now().millisecondsSinceEpoch,
       nameHlc: json['nameHlc'] != null ? Hlc.parse(json['nameHlc']) : dummyHlc,
-      emailHlc: json['emailHlc'] != null ? Hlc.parse(json['emailHlc']) : dummyHlc,
-      dataHlc: (json['dataHlc'] as Map<String, dynamic>?)?.map(
+      emailHlc: json['emailHlc'] != null
+          ? Hlc.parse(json['emailHlc'])
+          : dummyHlc,
+      dataHlc:
+          (json['dataHlc'] as Map<String, dynamic>?)?.map(
             (k, v) => MapEntry(k, Hlc.parse(v.toString())),
-          ) ?? {},
+          ) ??
+          {},
       serverVersion: json['serverVersion'] as int? ?? 0,
-      syncStatus: SyncStatus.values[json['syncStatus'] as int? ?? SyncStatus.pendingPush.index],
+      syncStatus: syncStatusFromJson(json['syncStatus']),
       isDeleted: json['isDeleted'] == 1 || json['isDeleted'] == true,
-      deleteHlc: json['deleteHlc'] != null ? Hlc.parse(json['deleteHlc']) : null,
+      deleteHlc: json['deleteHlc'] != null
+          ? Hlc.parse(json['deleteHlc'])
+          : null,
     );
   }
 

@@ -819,8 +819,7 @@ class SecureStorageService {
             : dummyHlc,
         dataHlc: dataHlcMap.map((k, v) => MapEntry(k, Hlc.parse(v.toString()))),
         serverVersion: row['server_version'] as int? ?? 0,
-        syncStatus:
-            SyncStatus.values[(row['sync_status'] as int? ?? 1).clamp(0, 2)],
+        syncStatus: syncStatusFromJson(row['sync_status']),
         isDeleted: row['is_deleted'] == 1,
         deleteHlc: row['delete_hlc'] != null
             ? Hlc.parse(row['delete_hlc'])
@@ -1008,9 +1007,10 @@ class SecureStorageService {
         isCustom: isCustom,
         hlc: row['hlc'] != null ? Hlc.parse(row['hlc'] as String) : null,
         serverVersion: row['server_version'] as int? ?? 0,
-        syncStatus:
-            SyncStatus.values[row['sync_status'] as int? ??
-                SyncStatus.synchronized.index],
+        syncStatus: syncStatusFromJson(
+          row['sync_status'],
+          fallback: SyncStatus.synchronized,
+        ),
         isDeleted: row['is_deleted'] == 1,
         deleteHlc: row['delete_hlc'] != null
             ? Hlc.parse(row['delete_hlc'] as String)
