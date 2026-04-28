@@ -353,8 +353,13 @@ As of this design:
 Current implementation update, 2026-04-27:
 
 - `sroy-secure-v2:` secure link codes now use PBKDF2-HMAC-SHA256 plus AES-GCM-256 instead of the earlier transitional XOR wrapper.
-- LAN direct pairing now uses an 8-character readable code from `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`.
-- Server-mediated pairing is implemented as a short-lived approval flow, with the server acting only as an opaque relay for the wrapped vault bundle.
+- LAN direct pairing now uses an 8-character readable code from `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`; it is not a 6-digit numeric code.
+- LAN discovery broadcasts only endpoint metadata. The pairing code is supplied and verified during the HTTP claim step.
+- Server-mediated pairing is implemented as a short-lived approval flow. The
+  joining device submits a temporary X25519 public key, and the approving device
+  uploads only a `sroy-pairing-v2:` AES-GCM encrypted vault bundle for that key.
+- The server rejects legacy plaintext `sroy-link-v1:` bundles on the approve
+  route, so the relay no longer receives readable vault key material.
 - The receiving device still preserves its own `deviceId` and imports only vault-level identity material.
 
 See [key-sync-implementation.md](../security/key-sync-implementation.md) for the implementation-level contract and current hardening backlog.
@@ -363,6 +368,6 @@ See [key-sync-implementation.md](../security/key-sync-implementation.md) for the
 
 Implementation should now follow this order:
 
-1. Keep Stage A working and tested.
-2. Add protocol and storage scaffolding for Stage B.
-3. Migrate UI from raw transfer semantics toward explicit trusted-device pairing semantics.
+1. Keep Stage A secure link codes working and tested.
+2. Add clean-device import checks for bundle imports that include `vault_dump`.
+3. Harden LAN direct pairing TTL, one-time-use, and failed-attempt behavior.

@@ -17,6 +17,7 @@ import 'biometric_auth_service.dart';
 import 'enhanced_crypto_service.dart';
 import 'identity_service.dart';
 import 'lan_pairing_service.dart';
+import 'vault_pairing_crypto.dart';
 import 'secure_storage_service.dart';
 import 'vault_pairing_service.dart';
 
@@ -49,6 +50,7 @@ class ServiceManager extends ChangeNotifier {
   String? _errorMessage;
   AutoLockObserver? _autoLockObserver;
   VoidCallback? _autoLockListener;
+  final Map<String, VaultPairingKeyPair> _vaultPairingJoinKeysByRequestId = {};
 
   ServiceManager._internal() {
     const secureStorage = FlutterSecureStorage();
@@ -111,6 +113,7 @@ class ServiceManager extends ChangeNotifier {
         unawaited(_closeStorageForLock());
         unawaited(_syncService.disconnect());
         unawaited(_lanPairingService.stopHosting());
+        _vaultPairingJoinKeysByRequestId.clear();
         _syncService.reset();
         _updateState(ServiceManagerState.locked);
       }
@@ -203,6 +206,7 @@ class ServiceManager extends ChangeNotifier {
     unawaited(_closeStorageForLock());
     unawaited(_syncService.disconnect());
     unawaited(_lanPairingService.stopHosting());
+    _vaultPairingJoinKeysByRequestId.clear();
     _updateState(ServiceManagerState.locked);
   }
 
@@ -272,6 +276,7 @@ class ServiceManager extends ChangeNotifier {
     _secureStorageService.clearDatabaseCipher();
     _cryptoService.logout();
     await _secureStorageService.deleteDatabaseFile();
+    _vaultPairingJoinKeysByRequestId.clear();
 
     // Clear Secure Storage (Identity, Master Password mode, etc)
     const secureStorage = FlutterSecureStorage();
@@ -517,10 +522,31 @@ class ServiceManager extends ChangeNotifier {
     }
 
     final serverUrl = await _resolveSyncServerUrl();
+    final status = await _vaultPairingService.getHostSessionStatus(
+      serverUrl: serverUrl,
+      sessionId: sessionId,
+      hostDeviceId: _identityService.deviceId,
+    );
+    final pendingRequest = status.pendingRequest;
+    if (pendingRequest == null || pendingRequest.requestId != requestId) {
+      throw const VaultPairingServiceException(
+        'Pairing request is no longer pending. Refresh and try again.',
+      );
+    }
+    if (pendingRequest.requesterPublicKey.isEmpty) {
+      throw const VaultPairingServiceException(
+        'Pairing request is missing the requester public key.',
+      );
+    }
+
     final vaultDump = await _exportEncryptedVaultDump();
-    final wrappedVaultBundle = _identityService.exportTransferCode(
+    final transferCode = _identityService.exportTransferCode(
       syncServerUrl: serverUrl.isEmpty ? null : serverUrl,
       vaultDump: vaultDump,
+    );
+    final wrappedVaultBundle = await VaultPairingCrypto.encryptBundle(
+      plainBundle: transferCode,
+      requesterPublicKey: pendingRequest.requesterPublicKey,
     );
     await _vaultPairingService.approveSession(
       serverUrl: serverUrl,
@@ -537,11 +563,15 @@ class ServiceManager extends ChangeNotifier {
     }
 
     final serverUrl = await _resolveSyncServerUrl();
-    return _vaultPairingService.joinSession(
+    final keyPair = await VaultPairingCrypto.createKeyPair();
+    final joinResult = await _vaultPairingService.joinSession(
       serverUrl: serverUrl,
       pairingCode: pairingCode.trim(),
       requesterDeviceId: _identityService.deviceId,
+      requesterPublicKey: keyPair.publicKey,
     );
+    _vaultPairingJoinKeysByRequestId[joinResult.requestId] = keyPair;
+    return joinResult;
   }
 
   Future<PairingBundleResult> fetchAndImportVaultPairingBundle({
@@ -567,7 +597,18 @@ class ServiceManager extends ChangeNotifier {
           'Pairing bundle is empty. Retry the approval flow.',
         );
       }
-      await importVaultLinkCode(wrappedBundle);
+      final keyPair = _vaultPairingJoinKeysByRequestId[requestId];
+      if (keyPair == null) {
+        throw const VaultPairingServiceException(
+          'Pairing key expired locally. Rejoin the pairing session.',
+        );
+      }
+      final transferCode = await VaultPairingCrypto.decryptBundle(
+        wrappedBundle: wrappedBundle,
+        keyPair: keyPair,
+      );
+      await importVaultLinkCode(transferCode);
+      _vaultPairingJoinKeysByRequestId.remove(requestId);
     }
 
     return bundleResult;

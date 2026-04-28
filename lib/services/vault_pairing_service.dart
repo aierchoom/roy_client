@@ -64,11 +64,13 @@ class PairingJoinResult {
 class PairingPendingRequest {
   final String requestId;
   final String requesterDeviceId;
+  final String requesterPublicKey;
   final DateTime requestedAt;
 
   const PairingPendingRequest({
     required this.requestId,
     required this.requesterDeviceId,
+    required this.requesterPublicKey,
     required this.requestedAt,
   });
 
@@ -76,6 +78,7 @@ class PairingPendingRequest {
     return PairingPendingRequest(
       requestId: json['request_id'] as String? ?? '',
       requesterDeviceId: json['requester_device_id'] as String? ?? '',
+      requesterPublicKey: json['requester_public_key'] as String? ?? '',
       requestedAt:
           DateTime.tryParse(json['requested_at'] as String? ?? '') ??
           DateTime.fromMillisecondsSinceEpoch(0),
@@ -149,6 +152,7 @@ class VaultPairingService {
     required String serverUrl,
     required String pairingCode,
     required String requesterDeviceId,
+    required String requesterPublicKey,
   }) async {
     final response = await http.post(
       Uri.parse('$serverUrl/pairing/sessions/join'),
@@ -156,6 +160,7 @@ class VaultPairingService {
       body: jsonEncode({
         'pairing_code': pairingCode,
         'requester_device_id': requesterDeviceId,
+        'requester_public_key': requesterPublicKey,
       }),
     );
 

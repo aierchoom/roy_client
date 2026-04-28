@@ -19,7 +19,8 @@ and optional sync through the sibling `roy_server` project.
   plaintext verifier records after successful verification.
 - Secure vault link codes use `sroy-secure-v2:` with PBKDF2-HMAC-SHA256 and
   AES-GCM-256; legacy `sroy-secure-v1:` imports remain supported.
-- LAN pairing uses 8 readable characters.
+- LAN pairing uses 8 readable characters from
+  `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`, not a 6-digit numeric code.
 - Local SQLite is encrypted at rest through a binary AES-GCM-256 envelope
   (`secret_roy_vault.db.enc`); SQLite is decrypted only into a temporary runtime
   working file while the vault is unlocked.

@@ -46,11 +46,19 @@ the client.
 - LAN pairing codes are 8 readable characters.
 - Allowed alphabet: `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`.
 - Ambiguous characters and invalid lengths are rejected during normalization.
+- The LAN pairing code is not a 6-digit numeric code.
+- LAN discovery broadcasts endpoint metadata only; the pairing code is checked
+  during the HTTP claim step.
 
 ### Server-Mediated Pairing
 
 - The sync server supports short-lived pairing sessions.
-- The server stores and relays the wrapped vault bundle as opaque data.
+- The joining device submits a temporary X25519 public key when it enters the
+  pairing code.
+- The trusted device encrypts the vault bundle to that public key and uploads a
+  `sroy-pairing-v2:` AES-GCM bundle.
+- The server rejects legacy plaintext `sroy-link-v1:` bundles on approval.
+- The server stores and relays only the encrypted wrapped vault bundle.
 - The trusted device approves the join request before the new device can fetch
   the bundle.
 
