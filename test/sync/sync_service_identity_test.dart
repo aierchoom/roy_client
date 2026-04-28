@@ -1,7 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:secret_roy/models/account_item.dart';
 import 'package:secret_roy/models/account_template.dart';
 import 'package:secret_roy/services/identity_service.dart';
 import 'package:secret_roy/services/secure_storage_service.dart';
+import 'package:secret_roy/system/service_manager/vault_dump_coordinator.dart';
 import 'package:secret_roy/sync/sync_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -19,6 +21,7 @@ class _MemorySecureKeyValueStore implements SecureKeyValueStore {
 
 class _FakeSecureStorageService extends SecureStorageService {
   final Map<String, String> settings = {};
+  bool replaceAllDataForImportCalled = false;
 
   @override
   bool get isOpen => true;
@@ -33,6 +36,23 @@ class _FakeSecureStorageService extends SecureStorageService {
 
   @override
   Future<List<AccountTemplate>> loadDirtyTemplates() async => [];
+
+  @override
+  Future<List<AccountItem>> loadAccounts({bool includeDeleted = false}) async =>
+      [];
+
+  @override
+  Future<List<AccountTemplate>> loadCustomTemplates({
+    bool includeDeleted = false,
+  }) async => [];
+
+  @override
+  Future<void> replaceAllDataForImport({
+    required List<AccountTemplate> templates,
+    required List<AccountItem> accounts,
+  }) async {
+    replaceAllDataForImportCalled = true;
+  }
 }
 
 IdentityService _identityWithVault({
@@ -86,6 +106,25 @@ void main() {
       () => identity.importTransferCode('not-a-real-code'),
       throwsA(isA<IdentityTransferCodeException>()),
     );
+  });
+
+  test('identity preview does not apply imported vault keys', () async {
+    final sourceIdentity = IdentityService(
+      secureStorage: _MemorySecureKeyValueStore(),
+    );
+    await sourceIdentity.initialize();
+    final linkCode = sourceIdentity.exportTransferCode();
+
+    final targetIdentity = IdentityService(
+      secureStorage: _MemorySecureKeyValueStore(),
+    );
+    await targetIdentity.initialize();
+    final originalVaultId = targetIdentity.vaultId;
+
+    final preview = await targetIdentity.previewTransferCode(linkCode);
+
+    expect(preview.vaultId, sourceIdentity.vaultId);
+    expect(targetIdentity.vaultId, originalVaultId);
   });
 
   test(
@@ -252,5 +291,23 @@ void main() {
       ),
       isFalse,
     );
+  });
+
+  test('vault dump import throws and does not write on invalid dump', () async {
+    final identity = IdentityService(
+      secureStorage: _MemorySecureKeyValueStore(),
+    );
+    await identity.initialize();
+    final storage = _FakeSecureStorageService();
+    final coordinator = VaultDumpCoordinator(
+      identityService: identity,
+      storageService: storage,
+    );
+
+    await expectLater(
+      coordinator.importEncryptedVaultDump('not-a-vault-dump'),
+      throwsA(isA<VaultDumpImportException>()),
+    );
+    expect(storage.replaceAllDataForImportCalled, isFalse);
   });
 }
