@@ -49,6 +49,9 @@ the client.
 - The LAN pairing code is not a 6-digit numeric code.
 - LAN discovery broadcasts endpoint metadata only; the pairing code is checked
   during the HTTP claim step.
+- The LAN transfer bundle exists only while the 8-character code window is open.
+- Successful claim, timeout, manual stop, or too many failed code attempts
+  destroys the hosted transfer bundle.
 
 ### Server-Mediated Pairing
 

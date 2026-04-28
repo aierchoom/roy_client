@@ -105,11 +105,15 @@ Primary code path:
 
 Flow:
 
-1. Existing device starts a local HTTP claim endpoint.
-2. Existing device advertises the endpoint over UDP broadcast.
-3. Existing device displays an 8-character pairing code.
-4. New device enters the code on the same LAN.
-5. New device claims the transfer code from the host and imports it locally.
+1. Existing device opens the LAN pairing code window.
+2. Existing device starts a local HTTP claim endpoint only for that window.
+3. Existing device advertises the endpoint over UDP broadcast.
+4. Existing device displays an 8-character pairing code.
+5. New device enters the code on the same LAN while the window is open.
+6. New device claims the transfer code from the host and imports it locally.
+7. Host destroys the transfer bundle when the claim succeeds, the code window
+   closes, the TTL expires, pairing is stopped, or too many wrong codes are
+   submitted.
 
 Pairing code rules:
 
@@ -125,6 +129,8 @@ Discovery privacy:
 - UDP broadcast advertises only the LAN claim endpoint metadata.
 - The pairing code itself is not included in the broadcast payload.
 - The code is checked only when the joining device sends the HTTP claim request.
+- When LAN pairing is not actively showing the 8-character code window, there is
+  no hosted transfer bundle to claim.
 
 ## 3. Security Model
 
@@ -154,6 +160,8 @@ Current tests cover:
   - invalid LAN code rejection
   - LAN host lifecycle
   - LAN claim/import path
+  - transfer bundle destruction after successful claim, expiry, and repeated
+    wrong-code attempts
 - `roy_server/test/index.test.js`
   - server pairing session lifecycle
   - requester public key propagation

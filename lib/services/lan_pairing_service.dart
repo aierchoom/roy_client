@@ -33,6 +33,7 @@ class LanPairingService {
   static const int _discoveryPort = 48653;
   static const String _advertisementKind = 'sroy_lan_pairing';
   static const String _claimPath = '/lan-pairing/claim';
+  static const int _maxFailedClaims = 5;
 
   final Random _random;
 
@@ -44,6 +45,7 @@ class LanPairingService {
   String? _hostTransferCode;
   DateTime? _hostExpiresAt;
   bool _hostClaimed = false;
+  int _hostFailedClaims = 0;
 
   LanPairingService({Random? random}) : _random = random ?? Random.secure();
 
@@ -92,7 +94,11 @@ class LanPairingService {
     // Fallback if no interfaces worked (unlikely)
     if (sockets.isEmpty) {
       try {
-        final s = await RawDatagramSocket.bind(InternetAddress.anyIPv4, 0, reuseAddress: true);
+        final s = await RawDatagramSocket.bind(
+          InternetAddress.anyIPv4,
+          0,
+          reuseAddress: true,
+        );
         s.broadcastEnabled = true;
         sockets.add(s);
       } catch (e) {
@@ -106,6 +112,7 @@ class LanPairingService {
     _hostTransferCode = normalizedTransferCode;
     _hostExpiresAt = expiresAt;
     _hostClaimed = false;
+    _hostFailedClaims = 0;
 
     server.listen(_handleHostRequest);
 
@@ -168,10 +175,7 @@ class LanPairingService {
       await server.close(force: true);
     }
 
-    _hostPairingCode = null;
-    _hostTransferCode = null;
-    _hostExpiresAt = null;
-    _hostClaimed = false;
+    _clearHostedBundleState();
   }
 
   Future<String> claimTransferCodeByCode({
@@ -216,20 +220,22 @@ class LanPairingService {
     void tryClaimEndpoint(InternetAddress address, int port) {
       unawaited(
         _claimEndpoint(
-          address: address,
-          port: port,
-          pairingCode: normalizedCode,
-          requesterDeviceId: requesterDeviceId,
-          timeout: claimTimeout,
-        ).then((transferCode) {
-          if (transferCode != null && !completer.isCompleted) {
-            completer.complete(transferCode);
-          }
-        }).catchError((Object e) {
-          // Ignore individual endpoint failures (e.g. 403 Wrong Code) 
-          // because there might be other hosts on the network.
-          // If no host accepts the code, the discoveryTimeout will eventually trigger.
-        }),
+              address: address,
+              port: port,
+              pairingCode: normalizedCode,
+              requesterDeviceId: requesterDeviceId,
+              timeout: claimTimeout,
+            )
+            .then((transferCode) {
+              if (transferCode != null && !completer.isCompleted) {
+                completer.complete(transferCode);
+              }
+            })
+            .catchError((Object e) {
+              // Ignore individual endpoint failures (e.g. 403 Wrong Code)
+              // because there might be other hosts on the network.
+              // If no host accepts the code, the discoveryTimeout will eventually trigger.
+            }),
       );
     }
 
@@ -311,9 +317,11 @@ class LanPairingService {
     final hostCode = _hostPairingCode;
     final transferCode = _hostTransferCode;
     if (hostCode == null || transferCode == null || _isHostExpired()) {
+      _clearHostedBundleState();
       response.statusCode = HttpStatus.gone;
       response.write(jsonEncode({'error': 'LAN pairing session expired.'}));
       await response.close();
+      unawaited(stopHosting());
       return;
     }
 
@@ -326,16 +334,31 @@ class LanPairingService {
 
     final requestBody = await utf8.decoder.bind(request).join();
     final body = _decodeJson(requestBody);
-    final incomingCode = body['code'] as String?;
+    final incomingCode = _normalizeIncomingClaimCode(body['code']);
 
     if (incomingCode != hostCode) {
+      _hostFailedClaims += 1;
+      final locked = _hostFailedClaims >= _maxFailedClaims;
+      if (locked) {
+        _clearHostedBundleState();
+      }
       response.statusCode = HttpStatus.forbidden;
-      response.write(jsonEncode({'error': 'Pairing code mismatch.'}));
+      response.write(
+        jsonEncode({
+          'error': locked
+              ? 'LAN pairing stopped after too many failed attempts.'
+              : 'Pairing code mismatch.',
+        }),
+      );
       await response.close();
+      if (locked) {
+        unawaited(stopHosting());
+      }
       return;
     }
 
     _hostClaimed = true;
+    _clearHostedBundleState(claimed: true);
     response.statusCode = HttpStatus.ok;
     response.write(
       jsonEncode({'status': 'approved', 'transfer_code': transferCode}),
@@ -373,7 +396,9 @@ class LanPairingService {
       if (response.statusCode == HttpStatus.forbidden ||
           response.statusCode == HttpStatus.conflict ||
           response.statusCode == HttpStatus.gone) {
-        throw LanPairingServiceException(errorMsg ?? 'Pairing rejected by host.');
+        throw LanPairingServiceException(
+          errorMsg ?? 'Pairing rejected by host.',
+        );
       }
       return null;
     }
@@ -393,6 +418,25 @@ class LanPairingService {
       return true;
     }
     return DateTime.now().isAfter(expiresAt);
+  }
+
+  void _clearHostedBundleState({bool claimed = false}) {
+    _hostPairingCode = null;
+    _hostTransferCode = null;
+    _hostExpiresAt = null;
+    _hostClaimed = claimed;
+    _hostFailedClaims = 0;
+  }
+
+  String? _normalizeIncomingClaimCode(Object? rawCode) {
+    if (rawCode is! String) {
+      return null;
+    }
+    try {
+      return normalizePairingCode(rawCode);
+    } on LanPairingServiceException {
+      return null;
+    }
   }
 
   Map<String, dynamic> _decodeJson(String rawValue) {
