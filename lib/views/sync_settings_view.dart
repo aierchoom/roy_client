@@ -492,9 +492,9 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
       if (!mounted) return;
 
       await _showGeneratedCodeDialog(
-        _text('局域网配对码', 'LAN Pairing Code'),
+        _text('面对面链接码', 'Face-to-Face Link Code'),
         _text(
-          '窗口关闭后配对码立即失效，请让另一台设备现在输入：',
+          '仅在这个窗口打开期间有效。请让另一台设备现在输入这 8 位临时码：',
           'This code expires when this window closes. Enter it on the other device now:',
         ),
         session.pairingCode,
@@ -505,7 +505,9 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
       _showError(e.message);
     } catch (e) {
       if (!mounted) return;
-      _showError('Failed to start LAN pairing: $e');
+      _showError(
+        _text('启动面对面链接失败: $e', 'Failed to start face-to-face linking: $e'),
+      );
     } finally {
       await _serviceManager.stopLanVaultPairingHost();
       if (mounted) {
@@ -523,11 +525,15 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
 
     final pairingCode = await showDialog<String>(
       context: context,
-      builder: (dialogContext) => const LanPairingCodeDialog(
-        title: 'Join LAN Pairing',
-        subtitle: 'Enter the 8-character code from your trusted device.',
-        confirmLabel: 'Pair & Import',
-        cancelLabel: 'Cancel',
+      builder: (dialogContext) => LanPairingCodeDialog(
+        title: _text('输入面对面链接码', 'Enter Face-to-Face Code'),
+        subtitle: _text(
+          '输入可信设备当前弹窗中显示的 8 位临时码。窗口关闭后不能再领取密钥包。',
+          'Enter the 8-character temporary code shown on your trusted device. The key bundle is unavailable after that window closes.',
+        ),
+        confirmLabel: _text('链接并导入', 'Link & Import'),
+        cancelLabel: _text('取消', 'Cancel'),
+        codeLabel: _text('8 位临时码', '8-Character Temporary Code'),
       ),
     );
 
@@ -548,9 +554,12 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
       if (!mounted) return;
 
       messenger.showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
-            'LAN pairing complete. Run Sync Now to pull existing data.',
+            _text(
+              '面对面链接完成。若本次未携带全量数据，可执行一次同步拉取远程数据。',
+              'Face-to-face link complete. Run Sync Now if this import did not include all data.',
+            ),
           ),
         ),
       );
@@ -559,7 +568,12 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
       _showError(e.message);
     } on IdentityTransferCodeException catch (e) {
       if (!mounted) return;
-      _showError('Imported transfer code is invalid: ${e.message}');
+      _showError(
+        _text(
+          '导入的链接包无效: ${e.message}',
+          'Imported bundle is invalid: ${e.message}',
+        ),
+      );
     } on VaultImportPreconditionException catch (e) {
       if (!mounted) return;
       _showError(e.message);
@@ -568,7 +582,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
       _showError(e.message);
     } catch (e) {
       if (!mounted) return;
-      _showError('Failed to pair over LAN: $e');
+      _showError(_text('面对面链接失败: $e', 'Failed to link face-to-face: $e'));
     } finally {
       if (mounted) {
         setState(() => _isLanPairingBusy = false);
@@ -626,8 +640,11 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
       });
 
       await _showGeneratedCodeDialog(
-        _text('受信任服务器配对码', 'Server Pairing Code'),
-        _text('请在另一台设备上输入以下配对码：', 'Enter this code on the other device:'),
+        _text('远程配对码', 'Remote Pairing Code'),
+        _text(
+          '请在另一台设备上输入此配对码。新设备提交请求后，还需要本机手动批准。',
+          'Enter this code on the other device. The request still needs manual approval on this device.',
+        ),
         session.pairingCode,
       );
     } on VaultPairingServiceException catch (e) {
@@ -665,7 +682,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
           SnackBar(
             content: Text(
               _text(
-                'Pairing approved. The new device can now import vault keys.',
+                '已批准远程配对。新设备现在可以领取加密密钥包。',
                 'Pairing approved. The new device can now import vault keys.',
               ),
             ),
@@ -706,7 +723,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
         SnackBar(
           content: Text(
             _text(
-              'Device approved. New device can finish import now.',
+              '已允许设备加入。新设备现在可以完成导入。',
               'Device approved. New device can finish import now.',
             ),
           ),
@@ -732,14 +749,14 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
     final pairingCode = await showDialog<String>(
       context: context,
       builder: (dialogContext) => VaultLinkCodeDialog(
-        title: _text('Join Existing Vault', 'Join Existing Vault'),
+        title: _text('加入远程配对', 'Join Remote Pairing'),
         subtitle: _text(
-          'Enter the pairing code shown on your trusted existing device.',
+          '输入已有可信设备显示的远程配对码。提交后需要对方设备批准，服务器只负责中转。',
           'Enter the pairing code shown on your trusted existing device.',
         ),
-        confirmLabel: _text('Request Pairing', 'Request Pairing'),
-        cancelLabel: _text('Cancel', 'Cancel'),
-        fieldLabel: 'Pairing Code',
+        confirmLabel: _text('请求配对', 'Request Pairing'),
+        cancelLabel: _text('取消', 'Cancel'),
+        fieldLabel: _text('远程配对码', 'Remote Pairing Code'),
       ),
     );
 
@@ -761,7 +778,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
         SnackBar(
           content: Text(
             _text(
-              'Pairing request sent. Ask the trusted device to approve it.',
+              '配对请求已发送。请在可信设备上检查并批准。',
               'Pairing request sent. Ask the trusted device to approve it.',
             ),
           ),
@@ -808,7 +825,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
           SnackBar(
             content: Text(
               _text(
-                'Vault pairing completed. Run Sync Now to pull existing data.',
+                '远程配对完成。若本次未携带全量数据，可执行一次同步拉取远程数据。',
                 'Vault pairing completed. Run Sync Now to pull existing data.',
               ),
             ),
@@ -823,7 +840,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
           SnackBar(
             content: Text(
               _text(
-                'Still waiting for approval on the trusted device.',
+                '仍在等待可信设备批准。',
                 'Still waiting for approval on the trusted device.',
               ),
             ),
@@ -845,7 +862,12 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
       _showError(e.message);
     } on IdentityTransferCodeException catch (e) {
       if (!mounted) return;
-      _showError('Imported bundle is invalid: ${e.message}');
+      _showError(
+        _text(
+          '导入的远程配对包无效: ${e.message}',
+          'Imported bundle is invalid: ${e.message}',
+        ),
+      );
     } on VaultImportPreconditionException catch (e) {
       if (!mounted) return;
       _showError(e.message);
@@ -854,7 +876,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
       _showError(e.message);
     } catch (e) {
       if (!mounted) return;
-      _showError('Failed to fetch pairing bundle: $e');
+      _showError(_text('获取远程配对结果失败: $e', 'Failed to fetch pairing bundle: $e'));
     } finally {
       if (mounted) {
         setState(() => _isPairingBusy = false);
@@ -866,25 +888,24 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
     final messenger = ScaffoldMessenger.of(context);
 
     try {
-      // 1. Ask for data inclusion
       final bool? includeData = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: Text(_text('导出链接码', 'Export Link Code')),
+          title: Text(_text('导出离线恢复码', 'Export Offline Recovery Code')),
           content: Text(
             _text(
-              '是否在链接码中包含所有账号数据？\n\n包含数据会使密文变长（可能无法在 QQ 直接粘贴），但不包含数据则需要新设备有网络才能同步。',
-              'Include all account data in the code?\n\nIncluding data makes the code much longer, but not including it requires a sync server to pull data on the new device.',
+              '离线恢复码用于没有面对面链接或远程配对条件时手动恢复密钥。\n\n包含全量数据后可在纯离线场景恢复快照，但密文会更长；仅包含身份密钥时，新设备后续仍需要同步服务器拉取数据。',
+              'Offline recovery codes are for manual key recovery when face-to-face or remote pairing is unavailable.\n\nIncluding all data enables offline snapshot recovery but makes the ciphertext much longer; identity-only recovery still needs a sync server later.',
             ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: Text(_text('仅身份密钥 (极短)', 'Identity Only (Short)')),
+              child: Text(_text('仅恢复密钥', 'Keys Only')),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(context, true),
-              child: Text(_text('包含全量数据 (长)', 'Include All Data (Long)')),
+              child: Text(_text('密钥 + 数据快照', 'Keys + Data Snapshot')),
             ),
           ],
         ),
@@ -892,12 +913,11 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
 
       if (includeData == null) return;
 
-      // 2. Ask for password
       final password = await _showPasswordInputDialog(
-        title: _text('设置传输密码', 'Set Transfer Password'),
+        title: _text('设置恢复密码', 'Set Recovery Password'),
         subtitle: _text(
-          '导入时需要输入此密码才能解密。',
-          'You will need this password to decrypt during import.',
+          '恢复码会使用此密码加密。请单独保存密码，不要和恢复码放在同一处。',
+          'This password encrypts the recovery code. Store it separately from the code.',
         ),
       );
       if (password == null) return;
@@ -912,7 +932,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
       messenger.showSnackBar(
         SnackBar(
           content: Text(
-            _text('加密链接码已复制到剪贴板', 'Secure link code copied to clipboard'),
+            _text('离线恢复码已复制到剪贴板', 'Offline recovery code copied to clipboard'),
           ),
         ),
       );
@@ -929,14 +949,14 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
     final code = await showDialog<String>(
       context: context,
       builder: (dialogContext) => VaultLinkCodeDialog(
-        title: _text('导入加密链接码', 'Import Secure Code'),
+        title: _text('导入离线恢复码', 'Import Offline Recovery Code'),
         subtitle: _text(
-          '粘贴从另一台设备导出的加密链接码。',
-          'Paste the secure link code from another device.',
+          '粘贴此前导出的离线恢复码。恢复会切换本设备的保险库密钥，可能覆盖本地数据。',
+          'Paste a previously exported offline recovery code. Importing switches this device to that vault key and may overwrite local data.',
         ),
         confirmLabel: _text('下一步', 'Next'),
         cancelLabel: _text('取消', 'Cancel'),
-        fieldLabel: 'Secure Link Code',
+        fieldLabel: _text('离线恢复码', 'Offline Recovery Code'),
         minLines: 4,
         maxLines: 12,
       ),
@@ -945,10 +965,10 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
     if (!mounted || code == null || code.isEmpty) return;
 
     final password = await _showPasswordInputDialog(
-      title: _text('输入传输密码', 'Enter Transfer Password'),
+      title: _text('输入恢复密码', 'Enter Recovery Password'),
       subtitle: _text(
-        '请输入导出时设置的临时密码。',
-        'Enter the temporary password set during export.',
+        '请输入导出恢复码时设置的密码。',
+        'Enter the password set when the recovery code was exported.',
       ),
     );
     if (password == null) return;
@@ -970,7 +990,9 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
 
       messenger.showSnackBar(
         SnackBar(
-          content: Text(_text('保险库导入成功', 'Vault imported successfully')),
+          content: Text(
+            _text('离线恢复码导入成功', 'Recovery code imported successfully'),
+          ),
         ),
       );
     } on IdentityTransferCodeException catch (e) {
@@ -1011,7 +1033,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
               obscureText: true,
               autofocus: true,
               decoration: InputDecoration(
-                labelText: _text('传输密码', 'Transfer Password'),
+                labelText: _text('密码', 'Password'),
                 border: const OutlineInputBorder(),
               ),
             ),
@@ -1518,14 +1540,16 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
     final joinResult = _joinPairingResult;
     return _buildSectionCard(
       context: context,
-      title: _text('数据保险库链接', 'Vault Linking'),
+      title: _text('密钥恢复与设备链接', 'Key Recovery & Device Linking'),
       subtitle: _text(
-        '优先使用面对面 8 位临时码或受信任设备配对。',
-        'Use face-to-face temporary codes or trusted-device pairing first.',
+        '按场景选择入口，避免误用恢复能力覆盖本机保险库。',
+        'Choose the route by scenario to avoid accidentally overwriting this device vault.',
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          _buildRecoveryRouteGuide(context),
+          const SizedBox(height: 14),
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(12),
@@ -1535,8 +1559,8 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
             ),
             child: Text(
               _text(
-                '推荐使用受信任配对。在导入数据保险库密钥之前，新设备需要获得已有信任设备的批准。',
-                'Trusted pairing is recommended. It requires approval from an existing device before a new device can import vault keys.',
+                '日常加新设备优先使用面对面链接或远程配对；离线恢复码只用于无法配对时的应急恢复；内部兼容码不作为普通用户入口。',
+                'Use face-to-face linking or remote pairing for normal device setup. Offline recovery codes are for emergency recovery, and internal compatibility codes are not a normal user entry.',
               ),
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onPrimaryContainer,
@@ -1549,9 +1573,9 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
           _buildActionHeader(
             context,
             Icons.wifi_find_outlined,
-            _text('局域网直接配对', 'LAN Direct Pairing'),
+            _text('面对面链接：8 位临时码', 'Face-to-Face Link: 8-Character Code'),
             _text(
-              '仅在 8 位配对码窗口打开期间可领取密钥包。',
+              '两台设备在同一可信局域网内，且仅在配对码窗口打开期间可领取密钥包。',
               'The key bundle can be claimed only while the 8-character code window is open.',
             ),
           ),
@@ -1568,7 +1592,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.wifi_tethering_outlined, size: 18),
-                  label: Text(_text('显示 8 位码', 'Show Code')),
+                  label: Text(_text('显示临时码', 'Show Code')),
                 ),
               ),
               const SizedBox(width: 8),
@@ -1578,7 +1602,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                       ? null
                       : _showJoinLanPairingDialog,
                   icon: const Icon(Icons.pin_outlined, size: 18),
-                  label: Text(_text('输入 8 位码', 'Enter Code')),
+                  label: Text(_text('输入临时码', 'Enter Code')),
                 ),
               ),
             ],
@@ -1600,10 +1624,10 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
           _buildActionHeader(
             context,
             Icons.admin_panel_settings_outlined,
-            _text('受信任设备配对', 'Trusted Device Pairing'),
+            _text('远程配对：可信设备批准', 'Remote Pairing: Trusted Approval'),
             _text(
-              '通过服务器中心节点，远程建立安全信任关系。',
-              'Establish trust remotely via server hub.',
+              '两台设备不在同一局域网时使用。服务器只中转请求和密文，已有设备必须手动批准。',
+              'Use when devices are not on the same LAN. The server relays requests and ciphertext, and an existing device must approve.',
             ),
           ),
           const SizedBox(height: 12),
@@ -1781,26 +1805,39 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
               color: theme.colorScheme.onSurfaceVariant,
             ),
             title: Text(
-              _text('高级备用：加密链接码', 'Advanced fallback: secure link code'),
+              _text('离线恢复码', 'Offline Recovery Code'),
               style: theme.textTheme.labelLarge?.copyWith(
                 fontWeight: FontWeight.w700,
               ),
             ),
             subtitle: Text(
               _text(
-                '仅在无法使用面对面或受信任设备配对时手动复制。',
-                'Copy manually only when pairing is unavailable.',
+                '手动导出和导入加密恢复码。仅在无法使用面对面链接或远程配对时使用。',
+                'Manually export and import encrypted recovery codes. Use only when pairing is unavailable.',
               ),
               style: theme.textTheme.bodySmall,
             ),
             children: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Text(
+                  _text(
+                    '恢复码会携带保险库密钥材料。请设置恢复密码，并将恢复码和密码分开保存。',
+                    'Recovery codes carry vault key material. Set a recovery password and store the code separately from the password.',
+                  ),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    height: 1.3,
+                  ),
+                ),
+              ),
               Row(
                 children: [
                   Expanded(
                     child: TextButton.icon(
                       onPressed: _exportSecureVaultLinkCode,
                       icon: const Icon(Icons.copy_all_outlined, size: 18),
-                      label: Text(_text('导出加密码', 'Export secure code')),
+                      label: Text(_text('导出恢复码', 'Export recovery code')),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -1808,10 +1845,43 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                     child: TextButton.icon(
                       onPressed: _importSecureVaultLinkCode,
                       icon: const Icon(Icons.paste_outlined, size: 18),
-                      label: Text(_text('导入加密码', 'Import secure code')),
+                      label: Text(_text('导入恢复码', 'Import recovery code')),
                     ),
                   ),
                 ],
+              ),
+            ],
+          ),
+          ExpansionTile(
+            tilePadding: EdgeInsets.zero,
+            childrenPadding: EdgeInsets.zero,
+            leading: Icon(
+              Icons.integration_instructions_outlined,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+            title: Text(
+              _text('内部兼容码说明', 'Internal Compatibility Code'),
+              style: theme.textTheme.labelLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            subtitle: Text(
+              _text(
+                '用于旧链路和内部密钥包承载，不作为普通恢复入口展示。',
+                'Used by legacy links and internal bundle transport; not exposed as a normal recovery entry.',
+              ),
+              style: theme.textTheme.bodySmall,
+            ),
+            children: [
+              Text(
+                _text(
+                  '内部兼容码是 sroy-link-v1 格式，当前仍被面对面链接和远程配对的密钥包流程承载使用。普通用户请使用上面的三个入口，不要手动保存或粘贴内部兼容码。',
+                  'The internal compatibility code uses the sroy-link-v1 format and is still carried inside face-to-face and remote pairing bundles. Use the three entries above instead of manually saving or pasting this internal code.',
+                ),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  height: 1.3,
+                ),
               ),
             ],
           ),
@@ -1851,6 +1921,89 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildRecoveryRouteGuide(BuildContext context) {
+    return Column(
+      children: [
+        _buildRouteGuideItem(
+          context,
+          Icons.wifi_tethering_outlined,
+          _text('面对面链接', 'Face-to-face linking'),
+          _text(
+            '同一可信局域网内使用 8 位临时码，窗口关闭即停止领取。',
+            'Use an 8-character temporary code on a trusted LAN; closing the window stops claims.',
+          ),
+        ),
+        const SizedBox(height: 8),
+        _buildRouteGuideItem(
+          context,
+          Icons.admin_panel_settings_outlined,
+          _text('远程配对', 'Remote pairing'),
+          _text(
+            '通过服务器中转配对请求，必须由已有设备批准。',
+            'Relay pairing requests through the server; an existing device must approve.',
+          ),
+        ),
+        const SizedBox(height: 8),
+        _buildRouteGuideItem(
+          context,
+          Icons.vpn_key_outlined,
+          _text('离线恢复码', 'Offline recovery code'),
+          _text(
+            '手动保存的加密恢复码，用于无法配对时恢复密钥或数据快照。',
+            'A manually saved encrypted recovery code for key or snapshot recovery when pairing is unavailable.',
+          ),
+        ),
+        const SizedBox(height: 8),
+        _buildRouteGuideItem(
+          context,
+          Icons.integration_instructions_outlined,
+          _text('内部兼容码', 'Internal compatibility code'),
+          _text(
+            'sroy-link-v1 仅作为内部承载格式，不作为普通用户入口。',
+            'sroy-link-v1 is an internal transport format, not a normal user entry.',
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRouteGuideItem(
+    BuildContext context,
+    IconData icon,
+    String title,
+    String desc,
+  ) {
+    final theme = Theme.of(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 18, color: theme.colorScheme.primary),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                desc,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  height: 1.25,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 

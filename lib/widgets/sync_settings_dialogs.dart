@@ -29,12 +29,13 @@ class SyncInfoChip extends StatelessWidget {
   }
 }
 
-/// A dialog for entering a LAN pairing code.
+/// A dialog for entering a face-to-face pairing code.
 class LanPairingCodeDialog extends StatefulWidget {
   final String title;
   final String subtitle;
   final String confirmLabel;
   final String cancelLabel;
+  final String codeLabel;
 
   const LanPairingCodeDialog({
     super.key,
@@ -42,6 +43,7 @@ class LanPairingCodeDialog extends StatefulWidget {
     required this.subtitle,
     required this.confirmLabel,
     required this.cancelLabel,
+    this.codeLabel = '8-character Code',
   });
 
   @override
@@ -102,9 +104,9 @@ class _LanPairingCodeDialogState extends State<LanPairingCodeDialog> {
               FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z2-9]')),
               LengthLimitingTextInputFormatter(8),
             ],
-            decoration: const InputDecoration(
-              labelText: '8-character Code',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: widget.codeLabel,
+              border: const OutlineInputBorder(),
               counterText: '',
             ),
             maxLength: 8,
@@ -125,7 +127,7 @@ class _LanPairingCodeDialogState extends State<LanPairingCodeDialog> {
   }
 }
 
-/// A dialog for entering vault link codes.
+/// A dialog for entering vault recovery or pairing codes.
 class VaultLinkCodeDialog extends StatefulWidget {
   final String title;
   final String subtitle;
