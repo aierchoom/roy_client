@@ -110,8 +110,11 @@ Flow:
 3. Existing device advertises the endpoint over UDP broadcast.
 4. Existing device displays an 8-character pairing code.
 5. New device enters the code on the same LAN while the window is open.
-6. New device claims the transfer code from the host and imports it locally.
-7. Host destroys the transfer bundle when the claim succeeds, the code window
+6. New device sends a temporary requester public key with the claim request.
+7. Existing device encrypts the transfer code to that temporary public key when
+   present, then returns only the encrypted LAN bundle.
+8. New device decrypts the returned bundle locally and imports it.
+9. Host destroys the transfer bundle when the claim succeeds, the code window
    closes, the TTL expires, pairing is stopped, or too many wrong codes are
    submitted.
 
@@ -123,6 +126,9 @@ Pairing code rules:
 - Input is normalized by removing whitespace and uppercasing.
 - This is intentionally not a 6-digit numeric code. Older notes or UI drafts
   that mention 6 digits are stale.
+- Default TTL is 3 minutes.
+- The host stops after one successful claim.
+- The host stops after repeated wrong-code attempts.
 
 Discovery privacy:
 
@@ -131,6 +137,10 @@ Discovery privacy:
 - The code is checked only when the joining device sends the HTTP claim request.
 - When LAN pairing is not actively showing the 8-character code window, there is
   no hosted transfer bundle to claim.
+- The UI warns the user to use LAN direct pairing only on trusted private
+  networks, not public Wi-Fi.
+- Current clients include a temporary public key in the claim request so the
+  host can return `wrapped_transfer_code` instead of plaintext `transfer_code`.
 
 ## 3. Security Model
 
@@ -162,6 +172,7 @@ Current tests cover:
   - LAN claim/import path
   - transfer bundle destruction after successful claim, expiry, and repeated
     wrong-code attempts
+  - requester-encrypted LAN claim response
 - `roy_server/test/index.test.js`
   - server pairing session lifecycle
   - requester public key propagation

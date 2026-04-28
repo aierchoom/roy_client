@@ -358,6 +358,11 @@ Current implementation update, 2026-04-27:
 - LAN direct pairing is scoped to the visible 8-character code window: closing
   the window, successful claim, timeout, stop, or too many wrong-code attempts
   destroys the hosted key bundle.
+- LAN direct pairing now supports requester-bound encryption: the joining device
+  sends a temporary public key and the host returns an encrypted
+  `wrapped_transfer_code` when that key is present.
+- The UI asks the user to confirm they are on a trusted LAN before opening or
+  joining a LAN direct pairing session.
 - Server-mediated pairing is implemented as a short-lived approval flow. The
   joining device submits a temporary X25519 public key, and the approving device
   uploads only a `sroy-pairing-v2:` AES-GCM encrypted vault bundle for that key.

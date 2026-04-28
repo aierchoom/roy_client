@@ -52,6 +52,9 @@ the client.
 - The LAN transfer bundle exists only while the 8-character code window is open.
 - Successful claim, timeout, manual stop, or too many failed code attempts
   destroys the hosted transfer bundle.
+- Current clients send a temporary requester public key during LAN claim, so the
+  host can return an encrypted `wrapped_transfer_code`.
+- The UI warns users to avoid LAN direct pairing on public Wi-Fi.
 
 ### Server-Mediated Pairing
 

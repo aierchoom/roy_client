@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:secret_roy/services/lan_pairing_service.dart';
+import 'package:secret_roy/services/vault_pairing_crypto.dart';
 
 void main() {
   test('normalizePairingCode accepts exactly 8 readable characters', () {
@@ -26,11 +27,15 @@ void main() {
     'startHosting creates an 8-character LAN session and can stop cleanly',
     () async {
       final service = LanPairingService();
+      final startedAt = DateTime.now();
       final session = await service.startHosting(
         transferCode: 'sroy-link-v1:test',
       );
+      final ttl = session.expiresAt.difference(startedAt);
 
       expect(session.pairingCode, matches(RegExp(r'^[A-Z2-9]{8}$')));
+      expect(ttl, greaterThan(const Duration(minutes: 2, seconds: 50)));
+      expect(ttl, lessThan(const Duration(minutes: 3, seconds: 10)));
       expect(service.isHosting, isTrue);
 
       await service.stopHosting();
@@ -84,6 +89,38 @@ void main() {
     await host.stopHosting();
   });
 
+  test(
+    'direct claim can return a requester-encrypted transfer bundle',
+    () async {
+      final host = LanPairingService();
+      const transferCode = 'sroy-link-v1:test';
+      final requesterKeyPair = await VaultPairingCrypto.createKeyPair();
+      final session = await host.startHosting(transferCode: transferCode);
+
+      final response = await _postClaim(
+        port: session.serverPort,
+        code: session.pairingCode,
+        requesterPublicKey: requesterKeyPair.publicKey,
+      );
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      final wrappedTransferCode = body['wrapped_transfer_code'] as String;
+      final decryptedTransferCode = await VaultPairingCrypto.decryptBundle(
+        wrappedBundle: wrappedTransferCode,
+        keyPair: requesterKeyPair,
+      );
+
+      expect(response.statusCode, HttpStatus.ok);
+      expect(body.containsKey('transfer_code'), isFalse);
+      expect(wrappedTransferCode, startsWith(VaultPairingCrypto.prefix));
+      expect(wrappedTransferCode.contains(transferCode), isFalse);
+      expect(decryptedTransferCode, transferCode);
+
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+      expect(host.isHosting, isFalse);
+      await host.stopHosting();
+    },
+  );
+
   test('expired LAN code destroys the hosted key bundle', () async {
     final host = LanPairingService();
     await host.startHosting(
@@ -122,13 +159,19 @@ void main() {
   );
 }
 
-Future<http.Response> _postClaim({required int port, required String code}) {
+Future<http.Response> _postClaim({
+  required int port,
+  required String code,
+  String? requesterPublicKey,
+}) {
   return http.post(
     Uri.parse('http://127.0.0.1:$port/lan-pairing/claim'),
     headers: const {'Content-Type': 'application/json'},
     body: jsonEncode({
       'code': code,
       'requester_device_id': 'device_abcdef123456',
+      if (requesterPublicKey != null)
+        'requester_public_key': requesterPublicKey,
     }),
   );
 }
