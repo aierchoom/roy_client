@@ -60,6 +60,34 @@ class IdentityTransferCodeException implements Exception {
   String toString() => 'IdentityTransferCodeException($message)';
 }
 
+class VaultIdentityImportPreview {
+  final String vaultId;
+  final String privateKey;
+  final String symmetricKey;
+  final String? syncServerUrl;
+  final String? vaultDump;
+
+  const VaultIdentityImportPreview({
+    required this.vaultId,
+    required this.privateKey,
+    required this.symmetricKey,
+    this.syncServerUrl,
+    this.vaultDump,
+  });
+
+  String? operator [](String key) {
+    return switch (key) {
+      'sync_server_url' => syncServerUrl,
+      'vault_dump' => vaultDump,
+      _ => null,
+    };
+  }
+
+  Map<String, String?> toLegacyMap() {
+    return {'sync_server_url': syncServerUrl, 'vault_dump': vaultDump};
+  }
+}
+
 class IdentityService {
   static const String _transferCodePrefix = 'sroy-link-v1:';
   static const String _secureCodePrefixV1 = 'sroy-secure-v1:';
@@ -184,6 +212,15 @@ class IdentityService {
     String secureCode,
     String password,
   ) async {
+    final preview = await previewSecureLinkCode(secureCode, password);
+    await _applyVaultIdentityImport(preview);
+    return preview.toLegacyMap();
+  }
+
+  Future<VaultIdentityImportPreview> previewSecureLinkCode(
+    String secureCode,
+    String password,
+  ) async {
     _validateSecureLinkPassword(password);
 
     final normalized = secureCode.trim();
@@ -204,7 +241,7 @@ class IdentityService {
     );
   }
 
-  Future<Map<String, String?>> _importSecureLinkCodeV2(
+  Future<VaultIdentityImportPreview> _importSecureLinkCodeV2(
     String encodedEnvelope,
     String password,
   ) async {
@@ -278,7 +315,7 @@ class IdentityService {
     }
   }
 
-  Future<Map<String, String?>> _importSecureLinkCodeV1(
+  Future<VaultIdentityImportPreview> _importSecureLinkCodeV1(
     String encodedPayload,
     String password,
   ) async {
@@ -325,6 +362,12 @@ class IdentityService {
   }
 
   Future<Map<String, String?>> importTransferCode(String rawCode) async {
+    final preview = await previewTransferCode(rawCode);
+    await _applyVaultIdentityImport(preview);
+    return preview.toLegacyMap();
+  }
+
+  Future<VaultIdentityImportPreview> previewTransferCode(String rawCode) async {
     await _ensureDeviceId();
 
     final normalized = rawCode.trim();
@@ -364,7 +407,7 @@ class IdentityService {
     );
   }
 
-  Future<Map<String, String?>> _importVaultIdentityPayload({
+  Future<VaultIdentityImportPreview> _importVaultIdentityPayload({
     required Object? version,
     required int expectedVersion,
     required String? vaultId,
@@ -392,15 +435,37 @@ class IdentityService {
       );
     }
 
-    _vaultId = vaultId;
-    _privateKeyMock = privateKey;
-    _symmetricKeyMock = symmetricKey;
+    return VaultIdentityImportPreview(
+      vaultId: vaultId,
+      privateKey: privateKey,
+      symmetricKey: symmetricKey,
+      syncServerUrl: syncServerUrl,
+      vaultDump: vaultDump,
+    );
+  }
+
+  Future<void> _applyVaultIdentityImport(
+    VaultIdentityImportPreview preview,
+  ) async {
+    _vaultId = preview.vaultId;
+    _privateKeyMock = preview.privateKey;
+    _symmetricKeyMock = preview.symmetricKey;
 
     await secureStorage.write(key: _vaultIdKey, value: _vaultId!);
     await secureStorage.write(key: _privateKeyKey, value: _privateKeyMock!);
     await secureStorage.write(key: _symmetricKeyKey, value: _symmetricKeyMock!);
+  }
 
-    return {'sync_server_url': syncServerUrl, 'vault_dump': vaultDump};
+  VaultIdentityImportPreview currentImportPreview() {
+    return VaultIdentityImportPreview(
+      vaultId: vaultId,
+      privateKey: privateKey,
+      symmetricKey: symmetricKey,
+    );
+  }
+
+  Future<void> applyImportPreview(VaultIdentityImportPreview preview) {
+    return _applyVaultIdentityImport(preview);
   }
 
   Future<SecretKey> _deriveSecureLinkKey({

@@ -200,7 +200,71 @@ class SecureStorageService {
       if (kDebugMode) {
         debugPrint('Failed to clear all data: $e');
       }
+      rethrow;
     }
+  }
+
+  Future<void> replaceAllDataForImport({
+    required List<AccountTemplate> templates,
+    required List<AccountItem> accounts,
+  }) async {
+    if (!isOpen) {
+      throw StateError('Encrypted storage is not open.');
+    }
+
+    final batch = _database!.batch();
+    batch.delete('accounts');
+    batch.delete('templates', where: 'is_custom = 1');
+    batch.delete('conflict_logs');
+
+    for (final template in templates) {
+      batch.insert('templates', {
+        'id': template.templateId,
+        'title': template.title,
+        'subtitle': template.subTitle,
+        'icon_code_point': templateIconStorageValue(template.icon),
+        'category': template.category.name,
+        'fields': jsonEncode(template.fields.map((f) => f.toJson()).toList()),
+        'is_custom': template.isCustom ? 1 : 0,
+        'created_at': DateTime.now().millisecondsSinceEpoch,
+        'hlc': template.hlc?.toString(),
+        'server_version': template.serverVersion,
+        'sync_status': template.syncStatus.index,
+        'is_deleted': template.isDeleted ? 1 : 0,
+        'delete_hlc': template.deleteHlc?.toString(),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+
+    for (final account in accounts) {
+      final itemToSave = account.copyWith(syncStatus: SyncStatus.synchronized);
+      batch.insert('accounts', {
+        'id': itemToSave.id,
+        'name': itemToSave.name,
+        'email': itemToSave.email,
+        'template_id': itemToSave.templateId,
+        'data': jsonEncode(itemToSave.data),
+        'created_at': itemToSave.createdAt,
+        'modified_at': DateTime.now().millisecondsSinceEpoch,
+        'name_hlc': itemToSave.nameHlc.toString(),
+        'email_hlc': itemToSave.emailHlc.toString(),
+        'data_hlc': jsonEncode(
+          itemToSave.dataHlc.map((k, v) => MapEntry(k, v.toString())),
+        ),
+        'server_version': itemToSave.serverVersion,
+        'sync_status': itemToSave.syncStatus.index,
+        'is_deleted': itemToSave.isDeleted ? 1 : 0,
+        'delete_hlc': itemToSave.deleteHlc?.toString(),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+
+    await batch.commit(noResult: true);
+    await _persistAfterMutation();
+    _notifyChange(
+      StorageChangeEvent(
+        type: StorageItemType.account,
+        action: StorageAction.save,
+      ),
+    );
   }
 
   Future<String> getDatabaseFilePath() async {

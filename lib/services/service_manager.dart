@@ -406,10 +406,6 @@ class ServiceManager extends ChangeNotifier {
     return _vaultDumpCoordinator.exportEncryptedVaultDump();
   }
 
-  Future<void> _importEncryptedVaultDump(String vaultDumpJson) async {
-    await _vaultDumpCoordinator.importEncryptedVaultDump(vaultDumpJson);
-  }
-
   Future<String> exportVaultLinkCode() async {
     final serverUrl = await _resolveSyncServerUrl(allowEmpty: true);
     final vaultDump = await _exportEncryptedVaultDump();
@@ -432,54 +428,120 @@ class ServiceManager extends ChangeNotifier {
     );
   }
 
-  Future<void> importVaultLinkCode(String code) async {
+  Future<void> importVaultLinkCode(
+    String code, {
+    bool forceOverwrite = false,
+  }) async {
     if (!isUnlocked) {
       throw StateError('Vault is locked.');
     }
 
-    await _syncService.disconnect();
-    final importResult = await _identityService.importTransferCode(code);
-    final syncServerUrl = importResult['sync_server_url'];
-    final vaultDump = importResult['vault_dump'];
-
-    if (syncServerUrl != null && syncServerUrl.isNotEmpty) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('sync_server_url', syncServerUrl);
-    }
-
-    if (vaultDump != null && vaultDump.isNotEmpty) {
-      await _importEncryptedVaultDump(vaultDump);
-    }
-    await _syncService.initialize();
-    notifyListeners();
+    final preview = await _identityService.previewTransferCode(code);
+    await _importVaultIdentityPreview(preview, forceOverwrite: forceOverwrite);
   }
 
   Future<void> importSecureVaultLinkCode(
     String secureCode,
-    String password,
-  ) async {
+    String password, {
+    bool forceOverwrite = false,
+  }) async {
     if (!isUnlocked) {
       throw StateError('Vault is locked.');
     }
 
-    await _syncService.disconnect();
-    final importResult = await _identityService.importSecureLinkCode(
+    final preview = await _identityService.previewSecureLinkCode(
       secureCode,
       password,
     );
-    final syncServerUrl = importResult['sync_server_url'];
-    final vaultDump = importResult['vault_dump'];
+    await _importVaultIdentityPreview(preview, forceOverwrite: forceOverwrite);
+  }
 
-    if (syncServerUrl != null && syncServerUrl.isNotEmpty) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('sync_server_url', syncServerUrl);
+  Future<void> _importVaultIdentityPreview(
+    VaultIdentityImportPreview preview, {
+    required bool forceOverwrite,
+  }) async {
+    final VaultDumpImportPlan? dumpPlan;
+    try {
+      dumpPlan = _validateIncomingVaultDump(preview);
+    } on VaultDumpImportException catch (error) {
+      throw VaultImportException(error.message);
+    }
+    final hadLocalData = await _hasLocalVaultDataForImport();
+    if (hadLocalData && !forceOverwrite) {
+      throw const VaultImportPreconditionException(
+        'This device already has local vault data. Confirm overwrite before importing.',
+      );
     }
 
-    if (vaultDump != null && vaultDump.isNotEmpty) {
-      await _importEncryptedVaultDump(vaultDump);
+    final previousIdentity = _identityService.hasIdentity
+        ? _identityService.currentImportPreview()
+        : null;
+    var identityApplied = false;
+
+    try {
+      await _syncService.disconnect();
+      await _identityService.applyImportPreview(preview);
+      identityApplied = true;
+
+      if (dumpPlan != null) {
+        if (dumpPlan.hasData) {
+          await _vaultDumpCoordinator.importValidatedVaultDump(dumpPlan);
+        } else if (hadLocalData) {
+          await _secureStorageService.clearAllData();
+        }
+      } else if (hadLocalData) {
+        await _secureStorageService.clearAllData();
+      }
+
+      final syncServerUrl = preview.syncServerUrl;
+      if (syncServerUrl != null && syncServerUrl.isNotEmpty) {
+        await _syncServerUrlStore.write(syncServerUrl);
+      }
+
+      await _syncService.initialize();
+      notifyListeners();
+    } on VaultDumpImportException catch (error) {
+      if (identityApplied && previousIdentity != null) {
+        await _identityService.applyImportPreview(previousIdentity);
+        await _syncService.initialize();
+      }
+      throw VaultImportException(error.message);
+    } catch (error) {
+      if (identityApplied && previousIdentity != null) {
+        await _identityService.applyImportPreview(previousIdentity);
+        await _syncService.initialize();
+      }
+      throw VaultImportException('Vault import failed: $error');
     }
-    await _syncService.initialize();
-    notifyListeners();
+  }
+
+  VaultDumpImportPlan? _validateIncomingVaultDump(
+    VaultIdentityImportPreview preview,
+  ) {
+    final vaultDump = preview.vaultDump;
+    if (vaultDump == null || vaultDump.isEmpty) {
+      return null;
+    }
+
+    return _vaultDumpCoordinator.validateEncryptedVaultDump(
+      vaultDumpJson: vaultDump,
+      vaultId: preview.vaultId,
+      privateKey: preview.privateKey,
+      symmetricKey: preview.symmetricKey,
+    );
+  }
+
+  Future<bool> _hasLocalVaultDataForImport() async {
+    final accounts = await _secureStorageService.loadAccounts(
+      includeDeleted: true,
+    );
+    final templates = await _secureStorageService.loadCustomTemplates(
+      includeDeleted: true,
+    );
+    return accounts.isNotEmpty ||
+        templates.isNotEmpty ||
+        _syncService.localVersion > 0 ||
+        _syncService.isDirty;
   }
 
   Future<PairingSessionInfo> createVaultPairingSession({
@@ -577,6 +639,7 @@ class ServiceManager extends ChangeNotifier {
   Future<PairingBundleResult> fetchAndImportVaultPairingBundle({
     required String sessionId,
     required String requestId,
+    bool forceOverwrite = false,
   }) async {
     if (!isUnlocked) {
       throw StateError('Vault is locked.');
@@ -607,7 +670,7 @@ class ServiceManager extends ChangeNotifier {
         wrappedBundle: wrappedBundle,
         keyPair: keyPair,
       );
-      await importVaultLinkCode(transferCode);
+      await importVaultLinkCode(transferCode, forceOverwrite: forceOverwrite);
       _vaultPairingJoinKeysByRequestId.remove(requestId);
     }
 
@@ -642,7 +705,10 @@ class ServiceManager extends ChangeNotifier {
     await _lanPairingService.stopHosting();
   }
 
-  Future<void> joinLanVaultPairingWithCode(String pairingCode) async {
+  Future<void> joinLanVaultPairingWithCode(
+    String pairingCode, {
+    bool forceOverwrite = false,
+  }) async {
     if (!isUnlocked) {
       throw StateError('Vault is locked.');
     }
@@ -656,7 +722,7 @@ class ServiceManager extends ChangeNotifier {
       pairingCode: pairingCode,
       requesterDeviceId: _identityService.deviceId,
     );
-    await importVaultLinkCode(transferCode);
+    await importVaultLinkCode(transferCode, forceOverwrite: forceOverwrite);
   }
 
   Future<void> setAutoLockDuration(AutoLockDuration duration) async {
@@ -740,4 +806,22 @@ class TemplateInUseException implements Exception {
   String toString() {
     return 'TemplateInUseException(templateId: $templateId, usageCount: $usageCount)';
   }
+}
+
+class VaultImportPreconditionException implements Exception {
+  final String message;
+
+  const VaultImportPreconditionException(this.message);
+
+  @override
+  String toString() => 'VaultImportPreconditionException($message)';
+}
+
+class VaultImportException implements Exception {
+  final String message;
+
+  const VaultImportException(this.message);
+
+  @override
+  String toString() => 'VaultImportException($message)';
 }

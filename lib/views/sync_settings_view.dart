@@ -31,6 +31,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
   PairingSessionInfo? _hostPairingSession;
   PairingPendingRequest? _hostPendingRequest;
   PairingJoinResult? _joinPairingResult;
+  bool _joinPairingForceOverwrite = false;
   bool _isLanPairingBusy = false;
 
   bool get _isMobileClient =>
@@ -517,7 +518,8 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
 
   Future<void> _showJoinLanPairingDialog() async {
     if (!await _confirmTrustedLanPairing()) return;
-    if (!await _confirmOverwriteLocalData()) return;
+    final forceOverwrite = _hasLocalVaultData();
+    if (forceOverwrite && !await _confirmOverwriteLocalData()) return;
 
     final pairingCode = await showDialog<String>(
       context: context,
@@ -538,7 +540,10 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
 
     setState(() => _isLanPairingBusy = true);
     try {
-      await _serviceManager.joinLanVaultPairingWithCode(pairingCode);
+      await _serviceManager.joinLanVaultPairingWithCode(
+        pairingCode,
+        forceOverwrite: forceOverwrite,
+      );
       await provider.refresh();
       if (!mounted) return;
 
@@ -555,6 +560,12 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
     } on IdentityTransferCodeException catch (e) {
       if (!mounted) return;
       _showError('Imported transfer code is invalid: ${e.message}');
+    } on VaultImportPreconditionException catch (e) {
+      if (!mounted) return;
+      _showError(e.message);
+    } on VaultImportException catch (e) {
+      if (!mounted) return;
+      _showError(e.message);
     } catch (e) {
       if (!mounted) return;
       _showError('Failed to pair over LAN: $e');
@@ -715,7 +726,8 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
   }
 
   Future<void> _showJoinPairingCodeDialog() async {
-    if (!await _confirmOverwriteLocalData()) return;
+    final forceOverwrite = _hasLocalVaultData();
+    if (forceOverwrite && !await _confirmOverwriteLocalData()) return;
 
     final pairingCode = await showDialog<String>(
       context: context,
@@ -740,7 +752,10 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
       );
       if (!mounted) return;
 
-      setState(() => _joinPairingResult = joinResult);
+      setState(() {
+        _joinPairingResult = joinResult;
+        _joinPairingForceOverwrite = forceOverwrite;
+      });
       final messenger = ScaffoldMessenger.of(context);
       messenger.showSnackBar(
         SnackBar(
@@ -775,11 +790,15 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
           .fetchAndImportVaultPairingBundle(
             sessionId: joinResult.sessionId,
             requestId: joinResult.requestId,
+            forceOverwrite: _joinPairingForceOverwrite,
           );
       if (!mounted) return;
 
       if (bundleResult.status == 'approved') {
-        setState(() => _joinPairingResult = null);
+        setState(() {
+          _joinPairingResult = null;
+          _joinPairingForceOverwrite = false;
+        });
         final provider = context.read<EnhancedAppProvider>();
         final messenger = ScaffoldMessenger.of(context);
         await provider.refresh();
@@ -815,7 +834,10 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
 
       if (bundleResult.status == 'rejected' ||
           bundleResult.status == 'expired') {
-        setState(() => _joinPairingResult = null);
+        setState(() {
+          _joinPairingResult = null;
+          _joinPairingForceOverwrite = false;
+        });
       }
       _showError('Pairing status: ${bundleResult.status}');
     } on VaultPairingServiceException catch (e) {
@@ -824,6 +846,12 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
     } on IdentityTransferCodeException catch (e) {
       if (!mounted) return;
       _showError('Imported bundle is invalid: ${e.message}');
+    } on VaultImportPreconditionException catch (e) {
+      if (!mounted) return;
+      _showError(e.message);
+    } on VaultImportException catch (e) {
+      if (!mounted) return;
+      _showError(e.message);
     } catch (e) {
       if (!mounted) return;
       _showError('Failed to fetch pairing bundle: $e');
@@ -895,7 +923,8 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
   }
 
   Future<void> _importSecureVaultLinkCode() async {
-    if (!await _confirmOverwriteLocalData()) return;
+    final forceOverwrite = _hasLocalVaultData();
+    if (forceOverwrite && !await _confirmOverwriteLocalData()) return;
 
     final code = await showDialog<String>(
       context: context,
@@ -926,7 +955,11 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
 
     try {
       setState(() => _isPairingBusy = true);
-      await _serviceManager.importSecureVaultLinkCode(code, password);
+      await _serviceManager.importSecureVaultLinkCode(
+        code,
+        password,
+        forceOverwrite: forceOverwrite,
+      );
       if (!mounted) return;
 
       final provider = context.read<EnhancedAppProvider>();
@@ -940,6 +973,15 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
           content: Text(_text('保险库导入成功', 'Vault imported successfully')),
         ),
       );
+    } on IdentityTransferCodeException catch (e) {
+      if (!mounted) return;
+      _showError(_text('导入失败: ${e.message}', 'Import failed: ${e.message}'));
+    } on VaultImportPreconditionException catch (e) {
+      if (!mounted) return;
+      _showError(e.message);
+    } on VaultImportException catch (e) {
+      if (!mounted) return;
+      _showError(e.message);
     } catch (e) {
       if (!mounted) return;
       _showError(_text('导入失败: $e', 'Import failed: $e'));

@@ -1,10 +1,26 @@
-import 'package:flutter/foundation.dart';
-
 import '../../models/account_item.dart';
 import '../../models/account_template.dart';
 import '../../services/identity_service.dart';
 import '../../services/secure_storage_service.dart';
 import '../../sync/sync_payload_codec.dart';
+
+class VaultDumpImportException implements Exception {
+  final String message;
+
+  const VaultDumpImportException(this.message);
+
+  @override
+  String toString() => 'VaultDumpImportException($message)';
+}
+
+class VaultDumpImportPlan {
+  final List<AccountTemplate> templates;
+  final List<AccountItem> accounts;
+
+  const VaultDumpImportPlan({required this.templates, required this.accounts});
+
+  bool get hasData => templates.isNotEmpty || accounts.isNotEmpty;
+}
 
 class VaultDumpCoordinator {
   final IdentityService identityService;
@@ -38,45 +54,94 @@ class VaultDumpCoordinator {
   }
 
   Future<void> importEncryptedVaultDump(String vaultDumpJson) async {
-    if (!identityService.hasIdentity) return;
+    if (!identityService.hasIdentity) {
+      throw const VaultDumpImportException(
+        'Vault identity is not initialized.',
+      );
+    }
+
+    final plan = validateEncryptedVaultDump(
+      vaultDumpJson: vaultDumpJson,
+      vaultId: identityService.vaultId,
+      privateKey: identityService.privateKey,
+      symmetricKey: identityService.symmetricKey,
+    );
+    await importValidatedVaultDump(plan);
+  }
+
+  VaultDumpImportPlan validateEncryptedVaultDump({
+    required String vaultDumpJson,
+    required String vaultId,
+    required String privateKey,
+    required String symmetricKey,
+  }) {
+    if (vaultDumpJson.trim().isEmpty) {
+      throw const VaultDumpImportException('Vault dump is empty.');
+    }
 
     try {
       final payloadJson = SyncPayloadCodec.decodePayload(
         encodedPayload: vaultDumpJson,
-        expectedVaultId: identityService.vaultId,
-        privateKey: identityService.privateKey,
-        symmetricKey: identityService.symmetricKey,
+        expectedVaultId: vaultId,
+        privateKey: privateKey,
+        symmetricKey: symmetricKey,
       );
 
-      final accountsList = payloadJson['accounts'] as List?;
-      final templatesList = payloadJson['templates'] as List?;
+      final accountsList = _readOptionalList(payloadJson, 'accounts');
+      final templatesList = _readOptionalList(payloadJson, 'templates');
 
-      if (templatesList != null || accountsList != null) {
-        await storageService.clearAllData();
-      }
-
-      if (templatesList != null) {
-        for (final templateJson in templatesList) {
-          final template = AccountTemplate.fromJson(
-            Map<String, dynamic>.from(templateJson),
-          );
-          await storageService.saveTemplate(template, isSyncMerge: true);
-        }
-      }
-
-      if (accountsList != null) {
-        for (final accountJson in accountsList) {
-          final account = AccountItem.fromJson(
-            Map<String, dynamic>.from(accountJson),
-          );
-          await storageService.saveAccount(
-            account.copyWith(syncStatus: SyncStatus.synchronized),
-            isSyncMerge: true,
-          );
-        }
-      }
+      return VaultDumpImportPlan(
+        templates: templatesList
+            .map((templateJson) => AccountTemplate.fromJson(templateJson))
+            .toList(growable: false),
+        accounts: accountsList
+            .map(
+              (accountJson) => AccountItem.fromJson(
+                accountJson,
+              ).copyWith(syncStatus: SyncStatus.synchronized),
+            )
+            .toList(growable: false),
+      );
+    } on VaultDumpImportException {
+      rethrow;
+    } on SyncPayloadException catch (error) {
+      throw VaultDumpImportException(error.message);
     } catch (error) {
-      debugPrint('Failed to import vault dump: $error');
+      throw VaultDumpImportException('Vault dump is invalid: $error');
     }
+  }
+
+  Future<void> importValidatedVaultDump(VaultDumpImportPlan plan) async {
+    if (!plan.hasData) return;
+
+    try {
+      await storageService.replaceAllDataForImport(
+        templates: plan.templates,
+        accounts: plan.accounts,
+      );
+    } catch (error) {
+      throw VaultDumpImportException('Failed to write vault dump: $error');
+    }
+  }
+
+  List<Map<String, dynamic>> _readOptionalList(
+    Map<String, dynamic> payloadJson,
+    String key,
+  ) {
+    final rawList = payloadJson[key];
+    if (rawList == null) return const [];
+    if (rawList is! List) {
+      throw VaultDumpImportException('Vault dump $key must be a list.');
+    }
+    return rawList
+        .map((item) {
+          if (item is! Map) {
+            throw VaultDumpImportException(
+              'Vault dump $key contains invalid item.',
+            );
+          }
+          return Map<String, dynamic>.from(item);
+        })
+        .toList(growable: false);
   }
 }
