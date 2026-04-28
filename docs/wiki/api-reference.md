@@ -262,8 +262,9 @@ class IdentityService {
 
 编码约定：
 
-- 普通转移码：`sroy-link-v1:`
-- 当前安全转移码：`sroy-secure-v2:`
+- 内部兼容码：`sroy-link-v1:`，仅作为内部承载格式，不作为普通用户恢复入口
+- 离线恢复码：`sroy-secure-v2:`
+- 远程配对密文包：`sroy-pairing-v2:`
 - 兼容导入：`sroy-secure-v1:`
 
 ## 6. EnhancedCryptoService

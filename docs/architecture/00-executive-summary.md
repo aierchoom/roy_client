@@ -89,7 +89,7 @@ Node 服务端只是同步协调器。
 | Domain Modeling | 4 | 账号、模板、同步元数据建模较完整。 |
 | Local-first Design | 5 | 本地优先是核心能力，不是附属特性。 |
 | Sync Design | 4 | pull-then-push、HLC、conflict inbox 都较成熟。 |
-| Security Posture | 3 | 已具备主密码 verifier、本地 DB 文件信封加密和安全链接码；同步 payload、服务端认证和运行时硬化仍不足。 |
+| Security Posture | 3 | 已具备主密码 verifier、本地 DB 文件信封加密、离线恢复码、面对面链接和远程配对；同步 payload、服务端认证和运行时硬化仍不足。 |
 | Backend Robustness | 2 | 可跑，但不具备正式后端的治理与承载能力。 |
 | Modifiability | 4 | 分层较好，但 `ServiceManager` 有集中化风险。 |
 | Testability | 3 | 已覆盖高价值点，但还不足以支撑高风险数据系统。 |

@@ -2,7 +2,7 @@
 
 > 2026-04-28 delta: Local SQLite at-rest encryption is now implemented with `secret_roy_vault.db.enc`, a Dart AES-GCM-256 binary file envelope, and a random DB data key wrapped by a master-password-derived key-encryption key. The external security Beta blockers are now sync payload encryption/authentication, server authentication/authorization, transport hardening, and runtime protection while the vault is unlocked.
 
-更新日期：2026-04-28
+更新日期：2026-04-29
 
 ## 结论
 
@@ -42,6 +42,7 @@
 | P2 | 已缓解 | 服务端 JSON 落盘不是原子写 | 宕机或异常中断时可能损坏 vault 文件 | 已改为 temp + backup + rename |
 | P2 | 已缓解 | 服务端缺乏 push 输入校验 | 异常 payload 会导致脏写或崩溃 | 已加校验 |
 | P2 | 未关闭 | 服务端仍允许 HTTP 明文接入 | 局域网或公网部署时易被窃听 | 正式 Beta 需改 HTTPS |
+| P2 | 已缓解 | 密钥恢复入口和文案混用“链接码 / 转移码 / 配对码” | 用户可能误把内部兼容码当作恢复能力，或在错误场景覆盖本地数据 | 已新增恢复路线矩阵，UI 区分面对面链接、远程配对、离线恢复码、内部兼容码 |
 | P2 | 未关闭 | 缺少端到端集成测试 | 回归主要依赖局部单测与静态检查 | 下一轮建议补齐 |
 | P3 | 未关闭 | 服务端仍保留未使用依赖 `sqlite3` / `ws` | 增加维护噪音 | 可后续清理 |
 

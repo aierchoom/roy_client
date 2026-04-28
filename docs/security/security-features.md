@@ -1,6 +1,6 @@
 ﻿# SecretRoy Security Features
 
-**Last updated**: 2026-04-28
+**Last updated**: 2026-04-29
 
 This file records the security capabilities that are currently implemented in
 the client.
@@ -32,31 +32,33 @@ the client.
 - Legacy intermediate plaintext `secret_roy_vault.db` is not imported as a
   valid vault and is cleaned after encrypted initialization.
 
-### Secure Vault Link Codes
+### Offline Recovery Codes
 
 - `IdentityService.exportSecureLinkCode(...)` emits `sroy-secure-v2:` codes.
 - `sroy-secure-v2:` uses PBKDF2-HMAC-SHA256 with a random salt and AES-GCM-256
   with a random nonce.
-- Secure link imports preserve the receiving device's `deviceId` and replace
-  only shared vault identity material.
+- Offline recovery imports preserve the receiving device's `deviceId` and
+  replace only shared vault identity material.
+- Imports validate the recovery code and optional dump before writing; non-clean
+  devices must explicitly confirm overwrite.
 - `sroy-secure-v1:` import remains available for legacy compatibility.
 
-### LAN Pairing
+### Face-to-Face Linking
 
-- LAN pairing codes are 8 readable characters.
+- Face-to-face link codes are 8 readable characters.
 - Allowed alphabet: `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`.
 - Ambiguous characters and invalid lengths are rejected during normalization.
-- The LAN pairing code is not a 6-digit numeric code.
-- LAN discovery broadcasts endpoint metadata only; the pairing code is checked
+- The face-to-face link code is not a 6-digit numeric code.
+- LAN discovery broadcasts endpoint metadata only; the temporary code is checked
   during the HTTP claim step.
-- The LAN transfer bundle exists only while the 8-character code window is open.
+- The transfer bundle exists only while the 8-character code window is open.
 - Successful claim, timeout, manual stop, or too many failed code attempts
   destroys the hosted transfer bundle.
 - Current clients send a temporary requester public key during LAN claim, so the
   host can return an encrypted `wrapped_transfer_code`.
-- The UI warns users to avoid LAN direct pairing on public Wi-Fi.
+- The UI warns users to avoid face-to-face linking on public Wi-Fi.
 
-### Server-Mediated Pairing
+### Remote Pairing
 
 - The sync server supports short-lived pairing sessions.
 - The joining device submits a temporary X25519 public key when it enters the
@@ -67,6 +69,14 @@ the client.
 - The server stores and relays only the encrypted wrapped vault bundle.
 - The trusted device approves the join request before the new device can fetch
   the bundle.
+
+### Internal Compatibility Code Boundary
+
+- `sroy-link-v1:` still exists as an internal compatibility code.
+- Normal UI does not expose internal compatibility code export or import.
+- Remote pairing server routes reject plaintext `sroy-link-v1:` approve bundles.
+- Face-to-face linking prefers requester-public-key encryption and returns
+  `wrapped_transfer_code`.
 
 ## Not Yet Implemented
 
@@ -80,5 +90,6 @@ the client.
 
 - `docs/security/key-sync-implementation.md`
 - `docs/security/local-database-encryption.md`
+- `docs/sync/vault-recovery-routes.md`
 - `docs/sync/vault-linking-design.md`
 - `docs/wiki/api-reference.md`

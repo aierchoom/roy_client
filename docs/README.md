@@ -1,6 +1,6 @@
 # SecretRoy Documentation
 
-**Last updated**: 2026-04-28
+**Last updated**: 2026-04-29
 
 This directory is the canonical documentation home for the SecretRoy client.
 Project-owned Markdown files are organized by purpose, use lowercase
@@ -15,6 +15,7 @@ kebab-case names, and avoid duplicated mirror copies.
 | Beginner | [beginner/app_flow.md](beginner/app_flow.md) | Newcomer path for running and understanding the Flutter client |
 | Security | [security/security-features.md](security/security-features.md) | Implemented security capabilities |
 | Sync | [sync/sync-protocol.md](sync/sync-protocol.md) | Sync protocol and vault-linking references |
+| Key recovery | [sync/vault-recovery-routes.md](sync/vault-recovery-routes.md) | Recovery routes, risk levels, scenarios, and acceptance checks |
 | Account templates | [features/account-templates/business-analysis.md](features/account-templates/business-analysis.md) | Template feature design and test reports |
 | Guides | [guides/technical-documentation.md](guides/technical-documentation.md) | Code map and implementation guides |
 | TODO | [todo.md](todo.md) | Project-level TODO derived from the current architecture conclusion |
@@ -28,8 +29,8 @@ kebab-case names, and avoid duplicated mirror copies.
 | New Flutter developer | [beginner/flutter_basics.md](beginner/flutter_basics.md) -> [beginner/app_flow.md](beginner/app_flow.md) |
 | Developer | [wiki/development-setup.md](wiki/development-setup.md) -> [guides/technical-documentation.md](guides/technical-documentation.md) |
 | Architecture reviewer | [architecture/00-executive-summary.md](architecture/00-executive-summary.md) -> [architecture/03-risks-and-roadmap.md](architecture/03-risks-and-roadmap.md) |
-| Security reviewer | [security/security-features.md](security/security-features.md) -> [security/local-database-encryption.md](security/local-database-encryption.md) |
-| Sync implementer | [sync/sync-protocol.md](sync/sync-protocol.md) -> [security/key-sync-implementation.md](security/key-sync-implementation.md) |
+| Security reviewer | [security/security-features.md](security/security-features.md) -> [sync/vault-recovery-routes.md](sync/vault-recovery-routes.md) |
+| Sync implementer | [sync/sync-protocol.md](sync/sync-protocol.md) -> [security/key-sync-implementation.md](security/key-sync-implementation.md) -> [sync/vault-recovery-routes.md](sync/vault-recovery-routes.md) |
 
 ## Directory Layout
 

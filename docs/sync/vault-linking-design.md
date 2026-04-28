@@ -2,7 +2,8 @@
 
 Navigation:
 [Docs Home](../README.md) |
-[Architecture Index](../architecture/README.md)
+[Architecture Index](../architecture/README.md) |
+[Recovery Routes](vault-recovery-routes.md)
 
 | Item | Value |
 |---|---|
@@ -11,7 +12,7 @@ Navigation:
 | Audience | Client, protocol, server engineers |
 | Scope | Multi-device vault linking and shared key onboarding |
 | Status | Draft |
-| Last Updated | 2026-04-28 |
+| Last Updated | 2026-04-29 |
 
 ## 1. Problem
 
@@ -80,7 +81,7 @@ The onboarding flow must copy or derive the **vault identity**, while preserving
 
 We should implement this in two stages.
 
-### Stage A: Transitional Link Code
+### Stage A: Transitional Internal Transfer Payload
 
 Purpose:
 
@@ -90,8 +91,10 @@ Purpose:
 
 Mechanism:
 
-- existing device exports a Vault Link Code
-- new clean device imports that code
+- existing device prepares an internal vault identity payload
+- user-facing routes wrap that payload as face-to-face linking, remote pairing,
+  or offline recovery code
+- new clean device imports through one of those routes
 - import overwrites only vault-level identity material
 - import does not overwrite the new device's own `deviceId`
 
@@ -345,37 +348,48 @@ The feature is acceptable when:
 
 As of this design:
 
-- the repository now has a transitional Vault Link Code mechanism in code
-- this solves the immediate functional gap
-- it should be treated as a **Stage A transitional onboarding path**
-- the formal target remains the pairing-session flow described above
+- the repository now separates user-facing recovery routes from internal code
+  formats
+- face-to-face linking and remote pairing are the preferred device-onboarding
+  paths
+- offline recovery code is the manual fallback path
+- `sroy-link-v1:` remains only an internal compatibility/transport format and
+  should not be presented as a normal recovery entry
 
-Current implementation update, 2026-04-27:
+Current implementation update, 2026-04-29:
 
-- `sroy-secure-v2:` secure link codes now use PBKDF2-HMAC-SHA256 plus AES-GCM-256 instead of the earlier transitional XOR wrapper.
-- LAN direct pairing now uses an 8-character readable code from `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`; it is not a 6-digit numeric code.
+- `sroy-secure-v2:` is now documented and presented as an offline recovery
+  code, not as a generic user-facing link code.
+- LAN/face-to-face linking now uses an 8-character readable code from `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`; it is not a 6-digit numeric code.
 - LAN discovery broadcasts only endpoint metadata. The pairing code is supplied and verified during the HTTP claim step.
-- LAN direct pairing is scoped to the visible 8-character code window: closing
+- Face-to-face linking is scoped to the visible 8-character code window: closing
   the window, successful claim, timeout, stop, or too many wrong-code attempts
   destroys the hosted key bundle.
-- LAN direct pairing now supports requester-bound encryption: the joining device
+- Face-to-face linking now supports requester-bound encryption: the joining device
   sends a temporary public key and the host returns an encrypted
   `wrapped_transfer_code` when that key is present.
 - The UI asks the user to confirm they are on a trusted LAN before opening or
-  joining a LAN direct pairing session.
-- Server-mediated pairing is implemented as a short-lived approval flow. The
+  joining a face-to-face linking session.
+- Remote pairing is implemented as a short-lived approval flow. The
   joining device submits a temporary X25519 public key, and the approving device
   uploads only a `sroy-pairing-v2:` AES-GCM encrypted vault bundle for that key.
 - The server rejects legacy plaintext `sroy-link-v1:` bundles on the approve
   route, so the relay no longer receives readable vault key material.
+- Import consistency protection is implemented at `ServiceManager`: imports
+  preview and validate incoming identity/dump before writing, require
+  `forceOverwrite` for non-clean devices, and throw on dump failures.
 - The receiving device still preserves its own `deviceId` and imports only vault-level identity material.
 
-See [key-sync-implementation.md](../security/key-sync-implementation.md) for the implementation-level contract and current hardening backlog.
+See [vault-recovery-routes.md](vault-recovery-routes.md) for the product,
+risk, and acceptance matrix. See
+[key-sync-implementation.md](../security/key-sync-implementation.md) for the
+implementation-level contract and current hardening backlog.
 
 ## 14. Next Step
 
 Implementation should now follow this order:
 
-1. Keep Stage A secure link codes working and tested.
-2. Add clean-device import checks for bundle imports that include `vault_dump`.
-3. Add QR scan support for LAN and secure-code entry.
+1. Keep face-to-face linking, remote pairing, and offline recovery code naming
+   consistent across UI and docs.
+2. Add QR scan support for face-to-face and offline recovery code entry.
+3. Add device trust metadata and revocation UI.

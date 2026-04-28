@@ -115,11 +115,11 @@ MultiProvider(
 | `ServiceManager` | 统一业务门面和服务生命周期 |
 | `SecureStorageService` | 加密数据库打开、CRUD、变更事件 |
 | `EnhancedCryptoService` | 主密码验证、数据库文件密钥解封 |
-| `IdentityService` | 设备/保险库身份、转移码和安全链接码 |
+| `IdentityService` | 设备/保险库身份、内部兼容码和离线恢复码 |
 | `SyncService` | pull/push、同步状态、冲突恢复 |
 | `CrdtMergeEngine` | 多设备并发修改合并 |
 | `VaultPairingService` | 经同步服务端的保险库配对 |
-| `LanPairingService` | 局域网直接配对 |
+| `LanPairingService` | 面对面链接和 8 位临时码领取 |
 | `AutoLockService` | 自动锁定和应用生命周期联动 |
 
 ### 3.4 数据层
@@ -262,8 +262,9 @@ PBKDF2-HMAC-SHA256 校验
 
 保险库链接码：
 
-- 普通转移码：`sroy-link-v1:`
-- 当前安全链接码：`sroy-secure-v2:`
+- 内部兼容码：`sroy-link-v1:`，不作为普通用户恢复入口
+- 离线恢复码：`sroy-secure-v2:`
+- 远程配对密文包：`sroy-pairing-v2:`
 - 兼容导入：`sroy-secure-v1:`
 
 仍需注意：
