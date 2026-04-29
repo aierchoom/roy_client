@@ -3,26 +3,9 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../theme/app_design_tokens.dart';
 import '../models/account_item.dart';
 import '../models/account_template.dart';
-
-Color _softSurface(ThemeData theme, {Color? tint, int tintAlpha = 18}) {
-  final base = theme.colorScheme.surface;
-  if (tint == null) {
-    return base;
-  }
-  if (theme.brightness != Brightness.light) {
-    return theme.colorScheme.surfaceContainerHigh;
-  }
-  var tintColor = tint;
-  final hsv = HSVColor.fromColor(tint);
-  // Boost saturation for 'muddy' colors (common in blue themes)
-  if (hsv.saturation < 0.35) {
-    tintColor = hsv.withSaturation(0.45).withValue(math.max(hsv.value, 0.8)).toColor();
-  }
-
-  return Color.alphaBlend(tintColor.withAlpha(tintAlpha), base);
-}
 
 class AccountFieldDisplayData {
   final String label;
@@ -38,11 +21,14 @@ class AccountFieldDisplayData {
   });
 }
 
+enum AccountListTileDensity { library, search }
+
 class AccountListTile extends StatefulWidget {
   final AccountItem account;
   final AccountTemplate? template;
   final bool hasMissingTemplate;
   final int legacyFieldCount;
+  final AccountListTileDensity density;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final String Function(BuildContext, String, String) localeText;
@@ -53,6 +39,7 @@ class AccountListTile extends StatefulWidget {
     required this.template,
     required this.hasMissingTemplate,
     required this.legacyFieldCount,
+    this.density = AccountListTileDensity.library,
     required this.onEdit,
     required this.onDelete,
     required this.localeText,
@@ -292,7 +279,7 @@ class _AccountListTileState extends State<AccountListTile> {
     return '**** $suffix';
   }
 
-  Widget _buildSummaryContent(BuildContext context) {
+  Widget _buildSummaryContent(BuildContext context, {int maxLines = 1}) {
     final theme = Theme.of(context);
     final segments = <String>[];
 
@@ -359,7 +346,7 @@ class _AccountListTileState extends State<AccountListTile> {
 
     return Text(
       segments.join('  /  '),
-      maxLines: 2,
+      maxLines: maxLines,
       overflow: TextOverflow.ellipsis,
       style: theme.textTheme.bodySmall?.copyWith(
         color: theme.colorScheme.onSurfaceVariant.withAlpha(180),
@@ -461,17 +448,15 @@ class _AccountListTileState extends State<AccountListTile> {
       tooltip: tooltip,
       onPressed: onPressed,
       style: IconButton.styleFrom(
-        minimumSize: const Size(36, 36),
+        minimumSize: const Size(32, 32),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        backgroundColor: _softSurface(
-          Theme.of(context),
-          tint: accent,
-          tintAlpha: 10,
+        backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+        side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.control),
         ),
-        side: BorderSide(color: accent.withAlpha(32)),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
-      icon: Icon(icon, color: accent, size: 20),
+      icon: Icon(icon, color: accent, size: 18),
     );
   }
 
@@ -479,6 +464,8 @@ class _AccountListTileState extends State<AccountListTile> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final accent = _tileAccent(theme);
+    final isSearchResult = widget.density == AccountListTileDensity.search;
+    final tileRadius = isSearchResult ? AppRadii.card : 0.0;
     final fieldEntries = _buildFieldEntries(context);
     final templateName =
         widget.template?.title ??
@@ -489,23 +476,31 @@ class _AccountListTileState extends State<AccountListTile> {
         );
 
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 260),
-      curve: Curves.easeOutQuart,
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOutCubic,
       decoration: const BoxDecoration(color: Colors.transparent),
       child: Material(
-        color: _softSurface(theme, tint: accent, tintAlpha: theme.brightness == Brightness.light ? 22 : 38),
+        color: isSearchResult
+            ? theme.colorScheme.surfaceContainerHighest.withAlpha(110)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(tileRadius),
         child: InkWell(
           onTap: widget.onEdit,
           onLongPress: widget.onDelete,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(tileRadius),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(tileRadius),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 6),
+                  padding: EdgeInsets.fromLTRB(
+                    12,
+                    isSearchResult ? 12 : 10,
+                    10,
+                    4,
+                  ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -513,35 +508,20 @@ class _AccountListTileState extends State<AccountListTile> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text.rich(
-                              TextSpan(
-                                children: [
-                                  TextSpan(
-                                    text: widget.localeText(
-                                      context,
-                                      '名称：',
-                                      'Name: ',
-                                    ),
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w900,
-                                    ),
-                                  ),
-                                  TextSpan(
-                                    text: widget.account.name,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              maxLines: 2,
+                            Text(
+                              widget.account.name,
+                              maxLines: isSearchResult ? 2 : 1,
                               overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                color: theme.colorScheme.onPrimaryContainer,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                color: theme.colorScheme.onSurface,
+                                fontWeight: FontWeight.w800,
                               ),
                             ),
-                            const SizedBox(height: 4),
-                            _buildSummaryContent(context),
+                            const SizedBox(height: 3),
+                            _buildSummaryContent(
+                              context,
+                              maxLines: isSearchResult ? 2 : 1,
+                            ),
                           ],
                         ),
                       ),
@@ -549,7 +529,12 @@ class _AccountListTileState extends State<AccountListTile> {
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+                  padding: EdgeInsets.fromLTRB(
+                    12,
+                    0,
+                    10,
+                    isSearchResult ? 12 : 10,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -576,7 +561,7 @@ class _AccountListTileState extends State<AccountListTile> {
                                       return const SizedBox.shrink();
                                     }
                                     return Padding(
-                                      padding: const EdgeInsets.only(top: 8),
+                                      padding: const EdgeInsets.only(top: 6),
                                       child: status,
                                     );
                                   },
@@ -584,7 +569,7 @@ class _AccountListTileState extends State<AccountListTile> {
                               ],
                             ),
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 6),
                           _buildIconAction(
                             context: context,
                             accent: accent,
@@ -598,7 +583,7 @@ class _AccountListTileState extends State<AccountListTile> {
                             ),
                             onPressed: _toggleExpanded,
                           ),
-                          const SizedBox(width: 6),
+                          const SizedBox(width: 2),
                           PopupMenuButton<String>(
                             tooltip: widget.localeText(
                               context,
@@ -682,39 +667,41 @@ class _AccountListTileState extends State<AccountListTile> {
                             ],
                             padding: EdgeInsets.zero,
                             icon: Container(
-                              width: 36,
-                              height: 36,
+                              width: 32,
+                              height: 32,
                               decoration: BoxDecoration(
-                                color: _softSurface(
-                                  theme,
-                                  tint: accent,
-                                  tintAlpha: 10,
+                                color:
+                                    theme.colorScheme.surfaceContainerHighest,
+                                borderRadius: BorderRadius.circular(
+                                  AppRadii.control,
                                 ),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: accent.withAlpha(32)),
+                                border: Border.all(
+                                  color: theme.colorScheme.outlineVariant,
+                                ),
                               ),
                               alignment: Alignment.center,
                               child: Icon(
                                 Icons.more_horiz_rounded,
-                                color: accent,
-                                size: 20,
+                                color: theme.colorScheme.onSurfaceVariant,
+                                size: 18,
                               ),
                             ),
                           ),
                         ],
                       ),
                       if (_isExpanded && fieldEntries.isNotEmpty) ...[
-                        const SizedBox(height: 14),
+                        const SizedBox(height: 10),
                         Container(
-                          padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
+                          padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
                           decoration: BoxDecoration(
-                            color: _softSurface(
-                              theme,
-                              tint: accent,
-                              tintAlpha: 6,
+                            color: theme.colorScheme.surfaceContainerHighest
+                                .withAlpha(80),
+                            borderRadius: BorderRadius.circular(
+                              AppRadii.control,
                             ),
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(color: accent.withAlpha(24)),
+                            border: Border.all(
+                              color: theme.colorScheme.outlineVariant,
+                            ),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -725,18 +712,18 @@ class _AccountListTileState extends State<AccountListTile> {
                                   '\u8be6\u7ec6\u5b57\u6bb5',
                                   'Field Details',
                                 ),
-                                style: theme.textTheme.labelLarge?.copyWith(
-                                  color: accent,
+                                style: theme.textTheme.labelMedium?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
                                   fontWeight: FontWeight.w800,
                                 ),
                               ),
-                              const SizedBox(height: 12),
+                              const SizedBox(height: 8),
                               for (var i = 0; i < fieldEntries.length; i++)
                                 Padding(
                                   padding: EdgeInsets.only(
                                     bottom: i == fieldEntries.length - 1
                                         ? 0
-                                        : 10,
+                                        : 8,
                                   ),
                                   child: AccountFieldRow(
                                     label: fieldEntries[i].label,
@@ -847,26 +834,28 @@ class _AccountFieldRowBodyState extends State<AccountFieldRowBody> {
         : widget.value;
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
+      padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
       decoration: BoxDecoration(
-        color: _softSurface(theme, tint: widget.accent, tintAlpha: 8),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: widget.accent.withAlpha(22)),
+        color: theme.colorScheme.surface.withAlpha(
+          theme.brightness == Brightness.light ? 180 : 80,
+        ),
+        borderRadius: BorderRadius.circular(AppRadii.control),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 36,
-            height: 36,
+            width: 28,
+            height: 28,
             decoration: BoxDecoration(
-              color: widget.accent.withAlpha(18),
-              borderRadius: BorderRadius.circular(12),
+              color: widget.accent.withAlpha(14),
+              borderRadius: BorderRadius.circular(8),
             ),
             alignment: Alignment.center,
-            child: Icon(widget.icon, size: 18, color: widget.accent),
+            child: Icon(widget.icon, size: 15, color: widget.accent),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -876,10 +865,10 @@ class _AccountFieldRowBodyState extends State<AccountFieldRowBody> {
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant.withAlpha(168),
                     fontWeight: FontWeight.w700,
-                    letterSpacing: 0.2,
+                    letterSpacing: 0,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 3),
                 Text(
                   displayValue,
                   style: theme.textTheme.bodyMedium?.copyWith(

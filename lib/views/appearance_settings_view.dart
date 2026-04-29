@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/theme_provider.dart';
+import '../theme/app_design_tokens.dart';
 import '../widgets/adaptive_page.dart';
 
 class AppearanceSettingsView extends StatelessWidget {
@@ -16,17 +17,7 @@ class AppearanceSettingsView extends StatelessWidget {
     final theme = Theme.of(context);
     final themeProvider = context.watch<AppThemeProvider>();
 
-    final colorPresets = [
-      Colors.deepPurple,
-      Colors.blue,
-      Colors.teal,
-      Colors.green,
-      Colors.amber,
-      Colors.orange,
-      Colors.red,
-      Colors.pink,
-      const Color(0xFF176B87),
-    ];
+    final colorPresets = AppBrandColors.presets;
 
     return Scaffold(
       appBar: AppBar(
