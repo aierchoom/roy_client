@@ -1,4 +1,4 @@
-# Built-In Template Simplification Execution Report
+# Built-In Website Template Execution Report
 
 | Item | Value |
 |---|---|
@@ -8,13 +8,13 @@
 
 ## Goal
 
-Reduce the default built-in template set so SecretRoy feels lighter and more aligned with the trusted local-first sensitive information manager direction.
+Reduce the default built-in template set and keep the single built-in entry focused on website credentials.
 
 ## Scope
 
 Included:
 
-- Keep one broad generic information template.
+- Keep one website credential template.
 - Remove narrow built-ins from the default template list.
 - Update documentation that describes built-in templates.
 
@@ -33,7 +33,7 @@ Out of scope:
   - bank cards
   - email accounts
   - phone numbers
-- Added `genericInfoTemplate` as a compact sensitive information container with one hidden `content` field.
+- Added `websiteTemplate` with `website`, `username`, `password`, and `notes` fields.
 - Updated quick-start, user-manual, and technical documentation to reflect the reduced built-in set.
 - Updated release-note copy so it describes the lighter built-in template surface.
 
@@ -48,7 +48,7 @@ Out of scope:
 
 ## Risk Notes
 
-- Existing records that still reference removed built-in template ids can appear as missing-template records until the user retargets them to the generic information template or recreates those structures as custom templates.
+- Existing records that still reference removed built-in template ids can appear as missing-template records until the user retargets them to the website template or recreates those structures as custom templates.
 - This is intentional for the current iteration because the roadmap favors a smaller default surface over broad preset coverage.
 
 ## Follow-Ups

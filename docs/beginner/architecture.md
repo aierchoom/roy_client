@@ -311,7 +311,7 @@ class AccountItem {
 编辑页根据模板自动生成输入项
 ```
 
-当前内置模板是 `genericInfoTemplate`，也就是“通用信息”模板。
+当前内置模板是 `websiteTemplate`，也就是“网站模板”。
 
 ### 本地存储：SecureStorageService
 

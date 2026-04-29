@@ -156,8 +156,8 @@ class ReleaseNoteView extends StatelessWidget {
                   _text(context, '动态模板引擎', 'Dynamic Templates'),
                   _text(
                     context,
-                    '基础模板收敛为通用信息容器，并保留自定义字段扩展，让默认入口尽可能轻巧。',
-                    'Professional templates with custom field extensions to adapt to diverse credential types.',
+                    '基础模板调整为网站模板，默认覆盖网站、账号、密码和备注，并保留自定义字段扩展。',
+                    'The built-in template now focuses on website credentials while custom fields remain available.',
                   ),
                 ),
                 _FeatureNode(

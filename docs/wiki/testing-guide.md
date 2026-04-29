@@ -78,7 +78,7 @@ node --test
 
 - `test/models/account_template_test.dart`
   - 校验内置模板保持精简。
-  - 校验通用信息模板默认隐藏敏感内容。
+  - 校验网站模板默认隐藏密码字段。
   - 校验模板同步状态解析 fallback。
 
 ### 3.2 加密和存储测试
