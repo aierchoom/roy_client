@@ -54,8 +54,8 @@ the client.
 - The transfer bundle exists only while the 8-character code window is open.
 - Successful claim, timeout, manual stop, or too many failed code attempts
   destroys the hosted transfer bundle.
-- Current clients send a temporary requester public key during LAN claim, so the
-  host can return an encrypted `wrapped_transfer_code`.
+- LAN claims require a temporary requester public key, and the host returns only
+  an encrypted `wrapped_transfer_code`.
 - The UI warns users to avoid face-to-face linking on public Wi-Fi.
 
 ### Remote Pairing
@@ -75,7 +75,7 @@ the client.
 - `sroy-link:` still exists as an internal compatibility code.
 - Normal UI does not expose internal compatibility code export or import.
 - Remote pairing server routes reject plaintext `sroy-link:` approve bundles.
-- Face-to-face linking prefers requester-public-key encryption and returns
+- Face-to-face linking requires requester-public-key encryption and returns
   `wrapped_transfer_code`.
 
 ## Not Yet Implemented

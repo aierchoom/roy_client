@@ -71,7 +71,7 @@ void main() {
         : false,
   );
 
-  test('successful direct claim destroys the hosted key bundle', () async {
+  test('direct claim requires a requester public key', () async {
     final host = LanPairingService();
     const transferCode = 'sroy-link:test';
     final session = await host.startHosting(transferCode: transferCode);
@@ -81,16 +81,18 @@ void main() {
       code: session.pairingCode,
     );
 
-    expect(response.statusCode, HttpStatus.ok);
-    expect(jsonDecode(response.body)['transfer_code'], transferCode);
+    expect(response.statusCode, HttpStatus.badRequest);
+    expect(
+      jsonDecode(response.body)['error'],
+      contains('requester_public_key'),
+    );
+    expect(host.isHosting, isTrue);
 
-    await Future<void>.delayed(const Duration(milliseconds: 500));
-    expect(host.isHosting, isFalse);
     await host.stopHosting();
   });
 
   test(
-    'direct claim can return a requester-encrypted transfer bundle',
+    'successful direct claim returns a requester-encrypted transfer bundle and destroys the hosted key bundle',
     () async {
       final host = LanPairingService();
       const transferCode = 'sroy-link:test';

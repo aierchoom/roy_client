@@ -366,32 +366,39 @@ class LanPairingService {
       return;
     }
 
+    if (requesterPublicKey == null || requesterPublicKey.isEmpty) {
+      response.statusCode = HttpStatus.badRequest;
+      response.write(
+        jsonEncode({
+          'error': 'LAN pairing claim requires requester_public_key.',
+        }),
+      );
+      await response.close();
+      return;
+    }
+
     _hostClaimed = true;
     _clearHostedBundleState(claimed: true);
 
-    String? wrappedTransferCode;
-    if (requesterPublicKey != null && requesterPublicKey.isNotEmpty) {
-      try {
-        wrappedTransferCode = await VaultPairingCrypto.encryptBundle(
-          plainBundle: transferCode,
-          requesterPublicKey: requesterPublicKey,
-        );
-      } on VaultPairingCryptoException catch (e) {
-        response.statusCode = HttpStatus.badRequest;
-        response.write(jsonEncode({'error': e.message}));
-        await response.close();
-        unawaited(stopHosting());
-        return;
-      }
+    late final String wrappedTransferCode;
+    try {
+      wrappedTransferCode = await VaultPairingCrypto.encryptBundle(
+        plainBundle: transferCode,
+        requesterPublicKey: requesterPublicKey,
+      );
+    } on VaultPairingCryptoException catch (e) {
+      response.statusCode = HttpStatus.badRequest;
+      response.write(jsonEncode({'error': e.message}));
+      await response.close();
+      unawaited(stopHosting());
+      return;
     }
 
     response.statusCode = HttpStatus.ok;
     response.write(
       jsonEncode({
         'status': 'approved',
-        if (wrappedTransferCode == null) 'transfer_code': transferCode,
-        if (wrappedTransferCode != null)
-          'wrapped_transfer_code': wrappedTransferCode,
+        'wrapped_transfer_code': wrappedTransferCode,
       }),
     );
     await response.close();
@@ -454,13 +461,9 @@ class LanPairingService {
       }
     }
 
-    final transferCode = body['transfer_code'] as String?;
-    if (transferCode == null || transferCode.isEmpty) {
-      throw const LanPairingServiceException(
-        'Host returned an empty transfer code.',
-      );
-    }
-    return transferCode;
+    throw const LanPairingServiceException(
+      'Host did not return an encrypted transfer code.',
+    );
   }
 
   bool _isHostExpired() {
