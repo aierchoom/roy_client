@@ -23,6 +23,7 @@ Each report should include:
 
 | Date | Report | Scope |
 |---|---|---|
+| 2026-04-29 | [2026-04-29-key-linking-quality-convergence.md](2026-04-29-key-linking-quality-convergence.md) | Local key linking quality convergence |
 | 2026-04-28 | [2026-04-28-client-service-manager-system-refactor.md](2026-04-28-client-service-manager-system-refactor.md) | ServiceManager system-module refactor |
 | 2026-04-28 | [2026-04-28-project-todo-linkage.md](2026-04-28-project-todo-linkage.md) | Project TODO linkage |
 | 2026-04-28 | [2026-04-28-builtin-template-simplification.md](2026-04-28-builtin-template-simplification.md) | Built-in template simplification |
