@@ -95,7 +95,8 @@
 4. 新设备携带 `requester_public_key` join；private key 留在本地。
 5. 已有设备看到 pending request 并手动批准。
 6. 已有设备在本地导出 vault transfer payload，加密给 `requester_public_key`，只上传 `sroy-pairing:` 密文。
-7. 新设备拉取密文 bundle，用本地临时 private key 解密，再导入 vault identity。
+7. 新设备一次性拉取密文 bundle，服务端删除 pairing session 和密文 bundle。
+8. 新设备用本地临时 private key 解密，再导入 vault identity。
 
 当前协议格式：
 
@@ -105,6 +106,7 @@
 - 加密：AES-GCM-256
 - 服务器可见字段：配对元数据、请求方 public key、加密 bundle
 - 服务器禁止 payload：明文 `sroy-link:` transfer code
+- 密文 bundle 成功领取后即从服务端内存中删除。
 
 ### 2.3 面对面链接
 
@@ -126,7 +128,7 @@
 4. 已有设备显示 8 位临时码。
 5. 新设备在同一可信局域网内输入该临时码。
 6. 新设备在 claim 请求中发送临时 requester public key。
-7. 已有设备在存在临时公钥时把 transfer code 加密给该公钥，只返回加密 LAN bundle。
+7. 已有设备必须使用该临时公钥加密 transfer code，只返回加密 LAN bundle。
 8. 新设备本地解密返回 bundle 并导入。
 9. claim 成功、窗口关闭、TTL 到期、手动停止或错误码次数过多时，host 销毁 transfer bundle。
 
@@ -148,7 +150,7 @@
 - 只有 joining device 发送 HTTP claim 请求时才校验临时码。
 - 未显示 8 位临时码窗口时，没有可领取的 hosted transfer bundle。
 - UI 会提示仅在可信私有网络使用，不建议公共 Wi-Fi。
-- 当前客户端在 claim 请求中携带临时 public key，因此 host 可返回 `wrapped_transfer_code`，而不是 plaintext `transfer_code`。
+- claim 请求必须携带临时 public key，host 只返回 `wrapped_transfer_code`，不返回 plaintext `transfer_code`。
 
 ### 2.4 内部兼容码
 

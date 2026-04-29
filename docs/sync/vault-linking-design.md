@@ -365,9 +365,9 @@ Current implementation update, 2026-04-29:
 - Face-to-face linking is scoped to the visible 8-character code window: closing
   the window, successful claim, timeout, stop, or too many wrong-code attempts
   destroys the hosted key bundle.
-- Face-to-face linking now supports requester-bound encryption: the joining device
-  sends a temporary public key and the host returns an encrypted
-  `wrapped_transfer_code` when that key is present.
+- Face-to-face linking now requires requester-bound encryption: the joining
+  device sends a temporary public key and the host returns only an encrypted
+  `wrapped_transfer_code`.
 - The UI asks the user to confirm they are on a trusted LAN before opening or
   joining a face-to-face linking session.
 - Remote pairing is implemented as a short-lived approval flow. The
