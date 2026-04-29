@@ -4,22 +4,28 @@ import 'package:secret_roy/models/account_template.dart';
 
 void main() {
   group('built-in account templates', () {
-    test('keeps the default template surface intentionally small', () {
+    test('keeps website as the only built-in template', () {
       expect(basicAccountTemplates.map((template) => template.templateId), [
         'generic_info',
       ]);
     });
 
-    test('generic info keeps content hidden by default', () {
-      final contentField = genericInfoTemplate.fields.firstWhere(
-        (field) => field.fieldKey == 'content',
+    test('website template keeps password hidden by default', () {
+      final passwordField = websiteTemplate.fields.firstWhere(
+        (field) => field.fieldKey == 'password',
       );
 
-      expect(genericInfoTemplate.isCustom, isFalse);
-      expect(genericInfoTemplate.fields, hasLength(1));
-      expect(contentField.attributes.isSecret, isTrue);
-      expect(contentField.attributes.isRequired, isTrue);
-      expect(contentField.attributes.type, AccountFieldType.text);
+      expect(websiteTemplate.isCustom, isFalse);
+      expect(websiteTemplate.title, '网站模板');
+      expect(websiteTemplate.fields.map((field) => field.fieldKey), [
+        'website',
+        'username',
+        'password',
+        'notes',
+      ]);
+      expect(passwordField.attributes.isSecret, isTrue);
+      expect(passwordField.attributes.isRequired, isTrue);
+      expect(passwordField.attributes.type, AccountFieldType.password);
     });
 
     test('uses a safe sync status fallback for unreadable template data', () {

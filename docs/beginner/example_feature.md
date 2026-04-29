@@ -166,10 +166,13 @@ final Map<String, TextEditingController> _fieldCtrls = {};
 build 时画出对应输入框
 ```
 
-项目中的默认模板是“通用信息”，字段大致是：
+项目中的默认模板是“网站模板”，字段大致是：
 
 ```text
-content：需要保管的敏感信息
+website：网站名称或登录地址
+username：登录账号
+password：登录密码
+notes：备注
 ```
 
 ## 5. 第四步：保存时创建 AccountItem
@@ -228,8 +231,10 @@ syncStatus：同步状态
 ```text
 名称：GitHub
 邮箱：me@example.com
-内容：github_pat_xxx
-模板：通用信息
+网站：https://github.com
+账号：me@example.com
+密码：github_pat_xxx
+模板：网站模板
 ```
 
 就会变成类似这样的对象：
@@ -241,7 +246,9 @@ AccountItem(
   email: 'me@example.com',
   templateId: 'generic_info',
   data: {
-    'content': 'github_pat_xxx',
+    'website': 'https://github.com',
+    'username': 'me@example.com',
+    'password': 'github_pat_xxx',
   },
   createdAt: 1777370000000,
   syncStatus: SyncStatus.pendingPush,

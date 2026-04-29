@@ -396,7 +396,7 @@ class AccountTemplate {
 当前内置模板：
 
 ```dart
-final List<AccountTemplate> basicAccountTemplates = [genericInfoTemplate];
+final List<AccountTemplate> basicAccountTemplates = [websiteTemplate];
 ```
 
 ## 11. 常用调用链

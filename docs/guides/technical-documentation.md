@@ -292,7 +292,7 @@ deleteHlc
 
 | ID | 标题 | 字段 |
 |---|---|---|
-| `generic_info` | 通用信息 | `content` |
+| `generic_info` | 网站模板 | `website`, `username`, `password`, `notes` |
 
 自定义模板存入 `templates` 表，内置模板来自代码常量 `basicAccountTemplates`。
 

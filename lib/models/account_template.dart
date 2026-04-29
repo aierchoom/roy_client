@@ -445,35 +445,68 @@ TemplateCategory inferTemplateCategory({
 IconData iconForBuiltinTemplate(String id) {
   switch (id) {
     case 'generic_info':
-      return Icons.description_outlined;
+      return Icons.language_outlined;
     default:
       return Icons.description_outlined;
   }
 }
 
-final AccountTemplate genericInfoTemplate = AccountTemplate(
+final AccountTemplate websiteTemplate = AccountTemplate(
   templateId: 'generic_info',
-  title: '\u901a\u7528\u4fe1\u606f',
+  title: '\u7f51\u7ad9\u6a21\u677f',
   subTitle:
-      '\u4e00\u4e2a\u5c3d\u53ef\u80fd\u7b80\u6d01\u7684\u654f\u611f\u4fe1\u606f\u5bb9\u5668',
-  icon: Icons.description_outlined,
-  category: TemplateCategory.custom,
+      '\u4fdd\u5b58\u7f51\u7ad9\u3001\u767b\u5f55\u8d26\u53f7\u3001\u5bc6\u7801\u548c\u5907\u6ce8',
+  icon: Icons.language_outlined,
+  category: TemplateCategory.login,
   fields: const [
     AccountField(
-      fieldKey: 'content',
-      label: '\u5185\u5bb9',
+      fieldKey: 'website',
+      label: '\u7f51\u7ad9',
       description:
-          '\u8d26\u53f7\u3001\u5bc6\u7801\u3001\u6062\u590d\u7801\u3001API Key \u6216\u4efb\u610f\u9700\u8981\u4fdd\u7ba1\u7684\u4fe1\u606f\u3002',
+          '\u7f51\u7ad9\u540d\u79f0\u6216\u767b\u5f55\u5730\u5740\u3002',
+      attributes: AccountFieldAttributes(
+        type: AccountFieldType.url,
+        isPrimary: true,
+        isRequired: true,
+        isSearchable: true,
+        hint: 'https://example.com',
+      ),
+    ),
+    AccountField(
+      fieldKey: 'username',
+      label: '\u8d26\u53f7',
+      description:
+          '\u767b\u5f55\u7528\u6237\u540d\u3001\u90ae\u7bb1\u6216\u624b\u673a\u53f7\u3002',
       attributes: AccountFieldAttributes(
         type: AccountFieldType.text,
         isPrimary: true,
         isRequired: true,
+        isSearchable: true,
+        hint: '\u7528\u6237\u540d / \u90ae\u7bb1 / \u624b\u673a\u53f7',
+      ),
+    ),
+    AccountField(
+      fieldKey: 'password',
+      label: '\u5bc6\u7801',
+      description: '\u8be5\u7f51\u7ad9\u7684\u767b\u5f55\u5bc6\u7801\u3002',
+      attributes: AccountFieldAttributes(
+        type: AccountFieldType.password,
+        isRequired: true,
         isSecret: true,
-        hint:
-            '\u7c98\u8d34\u6216\u8f93\u5165\u9700\u8981\u4fdd\u7ba1\u7684\u5185\u5bb9',
+        hint: '\u8f93\u5165\u6216\u751f\u6210\u5bc6\u7801',
+      ),
+    ),
+    AccountField(
+      fieldKey: 'notes',
+      label: '\u5907\u6ce8',
+      description:
+          '\u989d\u5916\u8bf4\u660e\u3001\u6062\u590d\u63d0\u793a\u6216\u5b89\u5168\u95ee\u9898\u7b49\u4fe1\u606f\u3002',
+      attributes: AccountFieldAttributes(
+        type: AccountFieldType.text,
+        hint: '\u53ef\u9009',
       ),
     ),
   ],
 );
 
-final List<AccountTemplate> basicAccountTemplates = [genericInfoTemplate];
+final List<AccountTemplate> basicAccountTemplates = [websiteTemplate];
