@@ -1,6 +1,6 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
+
+import '../../../theme/app_design_tokens.dart';
 
 class HomeViewMobile extends StatelessWidget {
   final int selectedIndex;
@@ -34,62 +34,50 @@ class HomeViewMobile extends StatelessWidget {
         child: IndexedStack(index: selectedIndex, children: pages),
       ),
       bottomNavigationBar: Padding(
-        padding: EdgeInsets.fromLTRB(16, 10, 16, navBottomPadding),
+        padding: EdgeInsets.fromLTRB(
+          AppSpacing.lg,
+          AppSpacing.sm,
+          AppSpacing.lg,
+          navBottomPadding,
+        ),
         child: Visibility(
           visible: bottomInset == 0,
           child: Container(
-            height: 80,
+            height: 72,
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(28),
-              boxShadow: [
-                BoxShadow(
-                  color: theme.colorScheme.shadow.withAlpha(26),
-                  blurRadius: 18,
-                  offset: const Offset(0, 8),
+              color: theme.colorScheme.surface,
+              borderRadius: BorderRadius.circular(AppRadii.panel),
+              border: Border.all(
+                color: theme.colorScheme.outlineVariant.withAlpha(120),
+              ),
+              boxShadow: AppShadows.low(theme),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _NavItem(
+                  icon: Icons.inventory_2_outlined,
+                  selectedIcon: Icons.inventory_2,
+                  label: _text(context, '账户', 'Accounts'),
+                  isSelected: selectedIndex == 0,
+                  onTap: () => onDestinationSelected(0),
+                ),
+                _NavItem(
+                  icon: Icons.search_outlined,
+                  selectedIcon: Icons.search,
+                  label: _text(context, '搜索', 'Search'),
+                  isSelected: selectedIndex == 1,
+                  onTap: () => onDestinationSelected(1),
+                ),
+                _NavItem(
+                  icon: Icons.settings_outlined,
+                  selectedIcon: Icons.settings,
+                  label: _text(context, '设置', 'Settings'),
+                  isSelected: selectedIndex == 2,
+                  onTap: () => onDestinationSelected(2),
                 ),
               ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(28),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surface.withAlpha(210),
-                    borderRadius: BorderRadius.circular(28),
-                    border: Border.all(
-                      color: theme.colorScheme.outlineVariant.withAlpha(110),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _NavItem(
-                        icon: Icons.inventory_2_outlined,
-                        selectedIcon: Icons.inventory_2,
-                        label: _text(context, '账户', 'Accounts'),
-                        isSelected: selectedIndex == 0,
-                        onTap: () => onDestinationSelected(0),
-                      ),
-                      _NavItem(
-                        icon: Icons.home_outlined,
-                        selectedIcon: Icons.home,
-                        label: _text(context, '主页', 'Home'),
-                        isSelected: selectedIndex == 1,
-                        onTap: () => onDestinationSelected(1),
-                      ),
-                      _NavItem(
-                        icon: Icons.settings_outlined,
-                        selectedIcon: Icons.settings,
-                        label: _text(context, '设置', 'Settings'),
-                        isSelected: selectedIndex == 2,
-                        onTap: () => onDestinationSelected(2),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
             ),
           ),
         ),
@@ -125,7 +113,7 @@ class _NavItem extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(AppRadii.button),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -137,9 +125,9 @@ class _NavItem extends StatelessWidget {
                 ),
                 decoration: BoxDecoration(
                   color: isSelected
-                      ? theme.colorScheme.primaryContainer.withAlpha(130)
+                      ? theme.colorScheme.primary.withAlpha(18)
                       : Colors.transparent,
-                  borderRadius: BorderRadius.circular(18),
+                  borderRadius: BorderRadius.circular(AppRadii.button),
                 ),
                 child: Icon(
                   isSelected ? selectedIcon : icon,
@@ -152,8 +140,7 @@ class _NavItem extends StatelessWidget {
                 label,
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: color,
-                  fontWeight:
-                      isSelected ? FontWeight.w700 : FontWeight.w500,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                   fontSize: 11,
                 ),
               ),

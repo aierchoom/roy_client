@@ -4,7 +4,9 @@ import 'package:provider/provider.dart';
 import '../../models/account_item.dart';
 import '../../models/account_template.dart';
 import '../../providers/enhanced_app_provider.dart';
+import '../../theme/app_design_tokens.dart';
 import '../../widgets/adaptive_page.dart';
+import '../../widgets/app_page_header.dart';
 import '../../widgets/green_add_button.dart';
 import '../../widgets/account_list_tile.dart';
 import 'account_edit_view.dart';
@@ -126,88 +128,31 @@ class _AccountListViewState extends State<AccountListView> {
         )
         .length;
 
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            theme.colorScheme.primaryContainer,
-            theme.colorScheme.tertiaryContainer,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+    return AppPageHeader(
+      icon: Icons.shield_outlined,
+      title: _text(context, '\u8d26\u6237\u4e2d\u5fc3', 'Account Hub'),
+      subtitle: _text(
+        context,
+        '\u4f60\u7684\u52a0\u5bc6\u4fe1\u606f\u5e93',
+        'Your encrypted vault',
+      ),
+      metrics: [
+        _StatChip(
+          value: '$totalAccounts',
+          label: _text(context, '\u4e2a\u8d26\u6237', 'Accounts'),
+          onColor: theme.colorScheme.primary,
         ),
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surface.withAlpha(210),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Icon(
-                  Icons.shield_outlined,
-                  size: 28,
-                  color: theme.colorScheme.primary,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _text(context, '\u8d26\u6237\u4e2d\u5fc3', 'Account Hub'),
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: theme.colorScheme.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      _text(
-                        context,
-                        '\u4f60\u7684\u52a0\u5bc6\u4fe1\u606f\u5e93',
-                        'Your encrypted vault',
-                      ),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              _StatChip(
-                value: '$totalAccounts',
-                label: _text(context, '\u4e2a\u8d26\u6237', 'Accounts'),
-                onColor: theme.colorScheme.primary,
-              ),
-              _StatChip(
-                value: '$usedTemplates',
-                label: _text(context, '\u4e2a\u6a21\u677f', 'Templates'),
-                onColor: theme.colorScheme.primary,
-              ),
-              _StatChip(
-                value: '$customAccounts',
-                label: _text(context, '\u4e2a\u81ea\u5b9a\u4e49', 'Custom'),
-                onColor: theme.colorScheme.primary,
-              ),
-            ],
-          ),
-        ],
-      ),
+        _StatChip(
+          value: '$usedTemplates',
+          label: _text(context, '\u4e2a\u6a21\u677f', 'Templates'),
+          onColor: theme.colorScheme.primary,
+        ),
+        _StatChip(
+          value: '$customAccounts',
+          label: _text(context, '\u4e2a\u81ea\u5b9a\u4e49', 'Custom'),
+          onColor: theme.colorScheme.primary,
+        ),
+      ],
     );
   }
 
@@ -400,19 +345,13 @@ class _AccountListViewState extends State<AccountListView> {
       children: groups.map((group) {
         final template = group.template;
         final title = template?.title ?? _text(context, '其它', 'Other');
-        final subtitle = template?.subTitle.isNotEmpty == true
-            ? template!.subTitle
-            : _text(
-                context,
-                '共 ${group.accounts.length} 条账号',
-                '${group.accounts.length} accounts total',
-              );
+        final subtitle = template?.subTitle.trim() ?? '';
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 2),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -428,32 +367,32 @@ class _AccountListViewState extends State<AccountListView> {
                       _GroupCountChip(count: group.accounts.length),
                     ],
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
+                  if (subtitle.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),
-            const SizedBox(height: 12),
-            // Items Container (The Group Card)
+            const SizedBox(height: 10),
             Container(
               decoration: BoxDecoration(
-                color: theme.colorScheme.surface.withAlpha(theme.brightness == Brightness.light ? 200 : 100),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(
-                  color: theme.colorScheme.outlineVariant.withAlpha(theme.brightness == Brightness.light ? 60 : 40),
+                color: theme.colorScheme.surface.withAlpha(
+                  theme.brightness == Brightness.light ? 230 : 90,
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: theme.colorScheme.shadow.withAlpha(10),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
+                borderRadius: BorderRadius.circular(AppRadii.panel),
+                border: Border.all(
+                  color: theme.colorScheme.outlineVariant.withAlpha(
+                    theme.brightness == Brightness.light ? 60 : 40,
                   ),
-                ],
+                ),
               ),
               clipBehavior: Clip.antiAlias,
               child: Column(
@@ -491,26 +430,9 @@ class _AccountListViewState extends State<AccountListView> {
                 }).toList(),
               ),
             ),
-            if (groups.indexOf(group) < groups.length - 1)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 24),
-                child: Row(
-                  children: [
-                    Expanded(child: Divider(color: theme.colorScheme.outlineVariant.withAlpha(80), thickness: 0.5)),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Icon(
-                        Icons.more_horiz_rounded,
-                        size: 16,
-                        color: theme.colorScheme.outlineVariant,
-                      ),
-                    ),
-                    Expanded(child: Divider(color: theme.colorScheme.outlineVariant.withAlpha(80), thickness: 0.5)),
-                  ],
-                ),
-              )
-            else
-              const SizedBox(height: 24),
+            SizedBox(
+              height: groups.indexOf(group) < groups.length - 1 ? 18 : 24,
+            ),
           ],
         );
       }).toList(),
@@ -552,7 +474,7 @@ class _AccountListViewState extends State<AccountListView> {
                             maxWidth: AppSectionWidths.panel,
                             child: Padding(
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 20,
+                                horizontal: 8,
                               ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -579,23 +501,11 @@ class _AccountListViewState extends State<AccountListView> {
                                       ),
                                     ],
                                   ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    _text(
-                                      context,
-                                      '视图已锁定，点击上方筛选快速切换类别。',
-                                      'View locked, use the dropdown to switch categories.',
-                                    ),
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      color: theme.colorScheme.onSurfaceVariant
-                                          .withAlpha(180),
-                                    ),
-                                  ),
                                 ],
                               ),
                             ),
                           ),
-                          const SizedBox(height: 18),
+                          const SizedBox(height: 14),
                         ],
                       ),
                     ),

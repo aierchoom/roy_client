@@ -4,6 +4,7 @@ import 'package:secret_roy/l10n/app_localizations.dart';
 
 import '../providers/enhanced_app_provider.dart';
 import '../widgets/adaptive_page.dart';
+import '../widgets/app_page_header.dart';
 import 'appearance_settings_view.dart';
 import 'password_tools_view.dart';
 import 'security_settings_view.dart';
@@ -19,63 +20,13 @@ class SettingsView extends StatelessWidget {
   }
 
   Widget _buildHeroCard(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDesktop = AppBreakpoints.isDesktop(context);
-
-    return Container(
-      padding: EdgeInsets.all(isDesktop ? 20 : 16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            theme.colorScheme.primaryContainer,
-            theme.colorScheme.tertiaryContainer,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surface.withAlpha(210),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Icon(
-              Icons.settings_outlined,
-              size: 28,
-              color: theme.colorScheme.primary,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _text(context, '\u8bbe\u7f6e\u4e2d\u5fc3', 'Settings Center'),
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: theme.colorScheme.onPrimaryContainer,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  _text(
-                    context,
-                    '\u4e2a\u6027\u5316\u3001\u5b89\u5168\u3001\u5bc6\u7801\u5de5\u5177\u3001\u540c\u6b65\u4e0e\u6a21\u677f\u7ba1\u7406',
-                    'Visuals, security, password tools, sync, and templates',
-                  ),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onPrimaryContainer.withAlpha(150),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+    return AppPageHeader(
+      icon: Icons.settings_outlined,
+      title: _text(context, '\u8bbe\u7f6e\u4e2d\u5fc3', 'Settings Center'),
+      subtitle: _text(
+        context,
+        '\u4e2a\u6027\u5316\u3001\u5b89\u5168\u3001\u5bc6\u7801\u5de5\u5177\u3001\u540c\u6b65\u4e0e\u6a21\u677f\u7ba1\u7406',
+        'Visuals, security, password tools, sync, and templates',
       ),
     );
   }

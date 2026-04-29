@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../models/account_item.dart';
 import '../../models/account_template.dart';
 import '../../providers/enhanced_app_provider.dart';
+import '../../theme/app_design_tokens.dart';
 import '../../widgets/adaptive_page.dart';
 import '../accounts/account_edit_view.dart';
 import '../../widgets/account_list_tile.dart';
@@ -141,40 +142,6 @@ class _HomeSearchViewState extends State<HomeSearchView> {
       if (visibleKeys.contains(entry.key)) return false;
       return entry.value.trim().isNotEmpty;
     }).length;
-  }
-
-  Widget _buildAppIcon(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Container(
-      width: 84,
-      height: 84,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: LinearGradient(
-          colors: [theme.colorScheme.primary, theme.colorScheme.tertiary],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: theme.colorScheme.primary.withAlpha(60),
-            blurRadius: 24,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        'R',
-        style: theme.textTheme.headlineLarge?.copyWith(
-          color: Colors.white,
-          fontWeight: FontWeight.w900,
-          fontSize: 44,
-          letterSpacing: -1.5,
-        ),
-      ),
-    );
   }
 
   Widget _buildTemplateMultiSelect(
@@ -317,17 +284,13 @@ class _HomeSearchViewState extends State<HomeSearchView> {
     final theme = Theme.of(context);
 
     return Container(
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            theme.colorScheme.primaryContainer,
-            theme.colorScheme.tertiaryContainer,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(AppRadii.panel),
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withAlpha(90),
         ),
-        borderRadius: BorderRadius.circular(28),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -335,14 +298,14 @@ class _HomeSearchViewState extends State<HomeSearchView> {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.surface.withAlpha(210),
-                  borderRadius: BorderRadius.circular(16),
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(AppRadii.control),
                 ),
                 child: Icon(
                   Icons.search_rounded,
-                  size: 28,
+                  size: 24,
                   color: theme.colorScheme.primary,
                 ),
               ),
@@ -352,10 +315,10 @@ class _HomeSearchViewState extends State<HomeSearchView> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      _text('\u4e3b\u9875', 'Home'),
+                      _text('\u641c\u7d22', 'Search'),
                       style: theme.textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.w700,
-                        color: theme.colorScheme.onPrimaryContainer,
+                        color: theme.colorScheme.onSurface,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -365,9 +328,7 @@ class _HomeSearchViewState extends State<HomeSearchView> {
                         'Find accounts here by keywords and templates.',
                       ),
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onPrimaryContainer.withAlpha(
-                          190,
-                        ),
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -456,7 +417,14 @@ class _HomeSearchViewState extends State<HomeSearchView> {
     final theme = Theme.of(context);
     final activeTemplateIds = _activeSelectedTemplateIds(provider.allTemplates);
 
-    return Card(
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(AppRadii.panel),
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withAlpha(90),
+        ),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(18),
         child: Column(
@@ -513,6 +481,7 @@ class _HomeSearchViewState extends State<HomeSearchView> {
                           template: template,
                           hasMissingTemplate: template == null,
                           legacyFieldCount: legacyFieldCount,
+                          density: AccountListTileDensity.search,
                           onEdit: () => _openAccount(context, account),
                           onDelete: () => _deleteAccount(context, account),
                           localeText: (ctx, zh, en) => _text(zh, en),
@@ -539,9 +508,7 @@ class _HomeSearchViewState extends State<HomeSearchView> {
         builder: (context, constraints) {
           return Column(
             children: [
-              SizedBox(height: constraints.maxHeight * 0.04),
-              _buildAppIcon(context),
-              const SizedBox(height: 24),
+              SizedBox(height: constraints.maxHeight * 0.03),
               AdaptiveSection(
                 maxWidth: AppSectionWidths.hero,
                 alignment: Alignment.center,
@@ -624,15 +591,9 @@ class _ConflictAlertBanner extends StatelessWidget {
         borderRadius: BorderRadius.circular(18),
         child: Ink(
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                theme.colorScheme.error.withAlpha(200),
-                theme.colorScheme.errorContainer,
-              ],
-              begin: Alignment.centerLeft,
-              end: Alignment.centerRight,
-            ),
-            borderRadius: BorderRadius.circular(18),
+            color: theme.colorScheme.errorContainer,
+            borderRadius: BorderRadius.circular(AppRadii.panel),
+            border: Border.all(color: theme.colorScheme.error.withAlpha(80)),
           ),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -650,7 +611,7 @@ class _ConflictAlertBanner extends StatelessWidget {
                     textColor: theme.colorScheme.error,
                     child: Icon(
                       Icons.merge_type_outlined,
-                      color: Colors.white,
+                      color: theme.colorScheme.error,
                       size: 20,
                     ),
                   ),
@@ -666,7 +627,7 @@ class _ConflictAlertBanner extends StatelessWidget {
                           '$count sync conflict(s) detected',
                         ),
                         style: theme.textTheme.titleSmall?.copyWith(
-                          color: Colors.white,
+                          color: theme.colorScheme.onErrorContainer,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -677,7 +638,9 @@ class _ConflictAlertBanner extends StatelessWidget {
                           'Tap to review and resolve field conflicts',
                         ),
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: Colors.white.withAlpha(200),
+                          color: theme.colorScheme.onErrorContainer.withAlpha(
+                            190,
+                          ),
                         ),
                       ),
                     ],
@@ -685,7 +648,7 @@ class _ConflictAlertBanner extends StatelessWidget {
                 ),
                 Icon(
                   Icons.chevron_right_rounded,
-                  color: Colors.white.withAlpha(200),
+                  color: theme.colorScheme.error,
                 ),
               ],
             ),

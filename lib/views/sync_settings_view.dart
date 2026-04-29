@@ -11,7 +11,9 @@ import '../services/lan_pairing_service.dart';
 import '../services/service_manager.dart';
 import '../services/vault_pairing_service.dart';
 import '../sync/sync_service.dart';
+import '../theme/app_design_tokens.dart';
 import '../widgets/adaptive_page.dart';
+import '../widgets/app_page_header.dart';
 import '../widgets/sync_settings_dialogs.dart';
 
 class SyncSettingsView extends StatefulWidget {
@@ -21,9 +23,12 @@ class SyncSettingsView extends StatefulWidget {
   State<SyncSettingsView> createState() => _SyncSettingsViewState();
 }
 
+enum _SyncSettingsSection { sync, linking, diagnostics }
+
 class _SyncSettingsViewState extends State<SyncSettingsView> {
   final _serviceManager = ServiceManager.instance;
 
+  _SyncSettingsSection _activeSection = _SyncSettingsSection.sync;
   bool _isLoading = false;
   bool _isSavingSyncServer = false;
   String _syncServerUrl = ServiceManager.defaultSyncServerUrl;
@@ -1325,61 +1330,12 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
   }
 
   Widget _buildHeroCard(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            theme.colorScheme.primaryContainer,
-            theme.colorScheme.tertiaryContainer,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surface.withAlpha(210),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Icon(
-              Icons.sync_outlined,
-              size: 28,
-              color: theme.colorScheme.primary,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _text('分布式同步中心', 'Distributed Sync Center'),
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: theme.colorScheme.onPrimaryContainer,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  _text(
-                    '端到端加密的本地优先架构，确保数据在多设备间安全同步。',
-                    'Local-first architecture with end-to-end encrypted synchronization.',
-                  ),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onPrimaryContainer.withAlpha(160),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+    return AppPageHeader(
+      icon: Icons.sync_outlined,
+      title: _text('分布式同步中心', 'Distributed Sync Center'),
+      subtitle: _text(
+        '端到端加密的本地优先架构，确保数据在多设备间安全同步。',
+        'Local-first architecture with end-to-end encrypted synchronization.',
       ),
     );
   }
@@ -1395,20 +1351,13 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
     return Container(
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadii.panel),
         border: Border.all(
           color: theme.colorScheme.outlineVariant.withAlpha(80),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: theme.shadowColor.withAlpha(8),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(AppSpacing.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1422,7 +1371,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                         title,
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w800,
-                          letterSpacing: -0.2,
+                          letterSpacing: 0,
                         ),
                       ),
                       if (subtitle.isNotEmpty) ...[
@@ -1448,6 +1397,129 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
     );
   }
 
+  String _sectionTitle(_SyncSettingsSection section) {
+    return switch (section) {
+      _SyncSettingsSection.sync => _text('同步控制', 'Sync'),
+      _SyncSettingsSection.linking => _text('设备链接与恢复', 'Link & Recover'),
+      _SyncSettingsSection.diagnostics => _text('诊断', 'Diagnostics'),
+    };
+  }
+
+  String _sectionSubtitle(_SyncSettingsSection section) {
+    return switch (section) {
+      _SyncSettingsSection.sync => _text(
+        '服务器地址、连接状态和即时同步。',
+        'Server URL, connection state, and manual sync.',
+      ),
+      _SyncSettingsSection.linking => _text(
+        '面对面链接、远程配对和离线恢复码。',
+        'Face-to-face linking, remote pairing, and recovery codes.',
+      ),
+      _SyncSettingsSection.diagnostics => _text(
+        '设备标识、同步元数据和技术说明。',
+        'Device identity, sync metadata, and technical notes.',
+      ),
+    };
+  }
+
+  IconData _sectionIcon(_SyncSettingsSection section) {
+    return switch (section) {
+      _SyncSettingsSection.sync => Icons.sync_outlined,
+      _SyncSettingsSection.linking => Icons.add_link_outlined,
+      _SyncSettingsSection.diagnostics => Icons.manage_search_outlined,
+    };
+  }
+
+  Widget _buildSectionSelector(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(AppRadii.panel),
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withAlpha(100),
+        ),
+      ),
+      child: Wrap(
+        spacing: AppSpacing.sm,
+        runSpacing: AppSpacing.sm,
+        children: [
+          for (final section in _SyncSettingsSection.values)
+            _buildSectionPill(context, section),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionPill(BuildContext context, _SyncSettingsSection section) {
+    final theme = Theme.of(context);
+    final selected = _activeSection == section;
+    final foreground = selected
+        ? theme.colorScheme.primary
+        : theme.colorScheme.onSurfaceVariant;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => setState(() => _activeSection = section),
+        borderRadius: BorderRadius.circular(AppRadii.button),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.sm,
+          ),
+          decoration: BoxDecoration(
+            color: selected
+                ? theme.colorScheme.primary.withAlpha(18)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(AppRadii.button),
+            border: Border.all(
+              color: selected
+                  ? theme.colorScheme.primary.withAlpha(48)
+                  : Colors.transparent,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(_sectionIcon(section), size: 18, color: foreground),
+              const SizedBox(width: AppSpacing.sm),
+              Text(
+                _sectionTitle(section),
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: foreground,
+                  fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActiveSection(BuildContext context) {
+    return switch (_activeSection) {
+      _SyncSettingsSection.sync => _buildSectionCard(
+        context: context,
+        title: _sectionTitle(_SyncSettingsSection.sync),
+        subtitle: _sectionSubtitle(_SyncSettingsSection.sync),
+        child: _buildSyncContent(context),
+      ),
+      _SyncSettingsSection.linking => _buildVaultLinkSection(context),
+      _SyncSettingsSection.diagnostics => Column(
+        children: [
+          _buildDiagnosticSection(context),
+          const SizedBox(height: 16),
+          _buildTechnicalInsights(context),
+        ],
+      ),
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
     final syncListenable = Listenable.merge([
@@ -1464,25 +1536,13 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
               ? const Center(child: CircularProgressIndicator())
               : AdaptivePage(
                   child: ListView(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
+                    padding: const EdgeInsets.fromLTRB(0, 16, 0, 120),
                     children: [
                       _buildHeroCard(context),
                       const SizedBox(height: 16),
-                      _buildSectionCard(
-                        context: context,
-                        title: _text('同步控制', 'Sync Controls'),
-                        subtitle: _text(
-                          '管理同步服务器地址并执行即时数据同步。',
-                          'Manage the server URL and trigger immediate synchronization.',
-                        ),
-                        child: _buildSyncContent(context),
-                      ),
+                      _buildSectionSelector(context),
                       const SizedBox(height: 16),
-                      _buildVaultLinkSection(context),
-                      const SizedBox(height: 16),
-                      _buildDiagnosticSection(context),
-                      const SizedBox(height: 16),
-                      _buildTechnicalInsights(context),
+                      _buildActiveSection(context),
                       const SizedBox(height: 48),
                     ],
                   ),

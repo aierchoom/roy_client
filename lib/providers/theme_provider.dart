@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../theme/app_design_tokens.dart';
+
 class AppThemeProvider extends ChangeNotifier {
   static const String _keyThemeMode = 'app_theme_mode';
   static const String _keyColorSeed = 'app_color_seed';
   static const String _keyTrueBlack = 'app_true_black';
 
   ThemeMode _themeMode = ThemeMode.system;
-  Color _colorSeed = Colors.deepPurple;
+  Color _colorSeed = AppBrandColors.defaultSeed;
   bool _trueBlack = false;
 
   final SharedPreferences _prefs;
@@ -25,7 +27,7 @@ class AppThemeProvider extends ChangeNotifier {
     _themeMode = ThemeMode.values[modeIndex];
 
     final colorValue =
-        _prefs.getInt(_keyColorSeed) ?? Colors.deepPurple.toARGB32();
+        _prefs.getInt(_keyColorSeed) ?? AppBrandColors.defaultSeed.toARGB32();
     _colorSeed = Color(colorValue);
 
     _trueBlack = _prefs.getBool(_keyTrueBlack) ?? false;
