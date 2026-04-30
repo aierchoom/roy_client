@@ -23,6 +23,8 @@ Each report should include:
 
 | Date | Report | Scope |
 |---|---|---|
+| 2026-04-30 | [2026-04-30-code-scan-global-roadmap.md](2026-04-30-code-scan-global-roadmap.md) | Code-scan global roadmap refresh |
+| 2026-04-30 | [2026-04-30-totp-disclosure-health-check.md](2026-04-30-totp-disclosure-health-check.md) | TOTP disclosure health check |
 | 2026-04-30 | [2026-04-30-totp-ui-sync-closure.md](2026-04-30-totp-ui-sync-closure.md) | TOTP UI and sync closure |
 | 2026-04-30 | [2026-04-30-totp-template-field.md](2026-04-30-totp-template-field.md) | TOTP template field |
 | 2026-04-30 | [2026-04-30-totp-service-foundation.md](2026-04-30-totp-service-foundation.md) | TOTP service foundation |
