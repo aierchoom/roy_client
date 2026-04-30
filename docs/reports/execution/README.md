@@ -23,6 +23,9 @@ Each report should include:
 
 | Date | Report | Scope |
 |---|---|---|
+| 2026-04-30 | [2026-04-30-totp-ui-sync-closure.md](2026-04-30-totp-ui-sync-closure.md) | TOTP UI and sync closure |
+| 2026-04-30 | [2026-04-30-totp-template-field.md](2026-04-30-totp-template-field.md) | TOTP template field |
+| 2026-04-30 | [2026-04-30-totp-service-foundation.md](2026-04-30-totp-service-foundation.md) | TOTP service foundation |
 | 2026-04-30 | [2026-04-30-2fa-feasibility-plan.md](2026-04-30-2fa-feasibility-plan.md) | 2FA/TOTP feasibility and implementation plan |
 | 2026-04-30 | [2026-04-30-full-iteration-quality-convergence.md](2026-04-30-full-iteration-quality-convergence.md) | Full iteration quality convergence |
 | 2026-04-30 | [2026-04-30-crash-recovery-loop.md](2026-04-30-crash-recovery-loop.md) | Crash recovery loop |

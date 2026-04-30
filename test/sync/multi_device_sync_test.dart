@@ -8,6 +8,7 @@ import 'package:secret_roy/models/hlc.dart';
 import 'package:secret_roy/models/local_sync_change.dart';
 import 'package:secret_roy/services/identity_service.dart';
 import 'package:secret_roy/services/secure_storage_service.dart';
+import 'package:secret_roy/services/totp_service.dart';
 import 'package:secret_roy/sync/crdt_merge_engine.dart';
 import 'package:secret_roy/sync/sync_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -315,28 +316,46 @@ AccountItem _baseItem({
   required String name,
   required String email,
   required String password,
+  String? totpConfig,
   required int version,
   required SyncStatus syncStatus,
   required Hlc nameHlc,
   required Hlc emailHlc,
   required Hlc passwordHlc,
+  Hlc? totpHlc,
   bool isDeleted = false,
   Hlc? deleteHlc,
 }) {
+  final data = {'password': password};
+  final dataHlc = {'password': passwordHlc};
+  if (totpConfig != null) {
+    data['totp_secret'] = totpConfig;
+    dataHlc['totp_secret'] = totpHlc ?? passwordHlc;
+  }
+
   return AccountItem(
     id: id,
     name: name,
     email: email,
     templateId: 'web_account',
-    data: {'password': password},
+    data: data,
     createdAt: 1,
     nameHlc: nameHlc,
     emailHlc: emailHlc,
-    dataHlc: {'password': passwordHlc},
+    dataHlc: dataHlc,
     serverVersion: version,
     syncStatus: syncStatus,
     isDeleted: isDeleted,
     deleteHlc: deleteHlc,
+  );
+}
+
+String _totpConfig({
+  String account = 'owner@example.com',
+  String secret = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ',
+}) {
+  return TotpService.encodeConfig(
+    'otpauth://totp/Example:$account?secret=$secret&issuer=Example',
   );
 }
 
@@ -392,6 +411,70 @@ void main() {
     expect(pulledItem.data['password'], 'super-secret');
     expect(pulledItem.syncStatus, SyncStatus.synchronized);
     expect(pulledItem.serverVersion, 1);
+  });
+
+  test('trusted devices sync TOTP secret and generate the same code', () async {
+    final server = await _InMemoryVaultServer.start(vaultId);
+    addTearDown(server.close);
+    SharedPreferences.setMockInitialValues({'sync_server_url': server.baseUrl});
+
+    final clientA = await _TestClient.create(
+      vaultId: vaultId,
+      deviceId: 'device_aaaaaa111111',
+      privateKey: privateKey,
+      symmetricKey: symmetricKey,
+    );
+    final clientB = await _TestClient.create(
+      vaultId: vaultId,
+      deviceId: 'device_bbbbbb222222',
+      privateKey: privateKey,
+      symmetricKey: symmetricKey,
+    );
+
+    final totpConfig = _totpConfig();
+    clientA.storage.accounts['account_1'] = _baseItem(
+      id: 'account_1',
+      name: '2FA Account',
+      email: 'owner@example.com',
+      password: 'super-secret',
+      totpConfig: totpConfig,
+      version: 0,
+      syncStatus: SyncStatus.pendingPush,
+      nameHlc: const Hlc(10, 0, 'device_aaaaaa111111'),
+      emailHlc: const Hlc(10, 1, 'device_aaaaaa111111'),
+      passwordHlc: const Hlc(10, 2, 'device_aaaaaa111111'),
+      totpHlc: const Hlc(10, 3, 'device_aaaaaa111111'),
+    );
+
+    final pushResult = await clientA.syncService.syncNow();
+    final pullResult = await clientB.syncService.syncNow();
+    final pushedItem = clientA.storage.accounts['account_1']!;
+    final pulledItem = clientB.storage.accounts['account_1']!;
+    final pushedTotp = pushedItem.data['totp_secret']!;
+    final pulledTotp = pulledItem.data['totp_secret']!;
+    final fixedTime = DateTime.fromMillisecondsSinceEpoch(59000, isUtc: true);
+    final pushedCode = const TotpService()
+        .generate(TotpService.parseConfig(pushedTotp), at: fixedTime)
+        .value;
+    final pulledCode = const TotpService()
+        .generate(TotpService.parseConfig(pulledTotp), at: fixedTime)
+        .value;
+    final serverPayload =
+        server.getItem('account_1')?['encrypted_signed_payload'] as String?;
+
+    expect(pushResult.success, isTrue);
+    expect(pushResult.pushed, isTrue);
+    expect(pullResult.success, isTrue);
+    expect(pullResult.pulled, isTrue);
+    expect(pulledTotp, totpConfig);
+    expect(pushedCode, '287082');
+    expect(pulledCode, pushedCode);
+    expect(pulledItem.syncStatus, SyncStatus.synchronized);
+    expect(serverPayload, isNotNull);
+    expect(serverPayload, contains('sroy-sync:'));
+    expect(serverPayload, isNot(contains('totp_secret')));
+    expect(serverPayload, isNot(contains('GEZDGNBVGY3TQOJQ')));
+    expect(serverPayload, isNot(contains('otpauth://')));
   });
 
   test(
@@ -474,6 +557,100 @@ void main() {
       );
     },
   );
+
+  test('concurrent TOTP secret edits enter the conflict inbox', () async {
+    final server = await _InMemoryVaultServer.start(vaultId);
+    addTearDown(server.close);
+    SharedPreferences.setMockInitialValues({'sync_server_url': server.baseUrl});
+
+    final clientA = await _TestClient.create(
+      vaultId: vaultId,
+      deviceId: 'device_aaaaaa111111',
+      privateKey: privateKey,
+      symmetricKey: symmetricKey,
+    );
+    final clientB = await _TestClient.create(
+      vaultId: vaultId,
+      deviceId: 'device_bbbbbb222222',
+      privateKey: privateKey,
+      symmetricKey: symmetricKey,
+    );
+
+    final initialTotp = _totpConfig(account: 'initial@example.com');
+    clientA.storage.accounts['account_1'] = _baseItem(
+      id: 'account_1',
+      name: '2FA Account',
+      email: 'owner@example.com',
+      password: 'super-secret',
+      totpConfig: initialTotp,
+      version: 0,
+      syncStatus: SyncStatus.pendingPush,
+      nameHlc: const Hlc(10, 0, 'base'),
+      emailHlc: const Hlc(10, 1, 'base'),
+      passwordHlc: const Hlc(10, 2, 'base'),
+      totpHlc: const Hlc(10, 3, 'base'),
+    );
+    await clientA.syncService.syncNow();
+    await clientB.syncService.syncNow();
+
+    final totpFromA = _totpConfig(
+      account: 'a@example.com',
+      secret: 'JBSWY3DPEHPK3PXP',
+    );
+    final totpFromB = _totpConfig(
+      account: 'b@example.com',
+      secret: 'JBSWY3DPEHPK3PXQ',
+    );
+    clientA.storage.accounts['account_1'] = _baseItem(
+      id: 'account_1',
+      name: '2FA Account',
+      email: 'owner@example.com',
+      password: 'super-secret',
+      totpConfig: totpFromA,
+      version: 1,
+      syncStatus: SyncStatus.pendingPush,
+      nameHlc: const Hlc(10, 0, 'base'),
+      emailHlc: const Hlc(10, 1, 'base'),
+      passwordHlc: const Hlc(10, 2, 'base'),
+      totpHlc: const Hlc(20, 0, 'device_aaaaaa111111'),
+    );
+    clientB.storage.accounts['account_1'] = _baseItem(
+      id: 'account_1',
+      name: '2FA Account',
+      email: 'owner@example.com',
+      password: 'super-secret',
+      totpConfig: totpFromB,
+      version: 1,
+      syncStatus: SyncStatus.pendingPush,
+      nameHlc: const Hlc(10, 0, 'base'),
+      emailHlc: const Hlc(10, 1, 'base'),
+      passwordHlc: const Hlc(10, 2, 'base'),
+      totpHlc: const Hlc(30, 0, 'device_bbbbbb222222'),
+    );
+
+    final pushAResult = await clientA.syncService.syncNow();
+    final mergeBResult = await clientB.syncService.syncNow();
+    final mergedItem = clientB.storage.accounts['account_1']!;
+    final conflictLogs = clientB.storage.conflictLogs['account_1'] ?? const [];
+
+    expect(pushAResult.success, isTrue);
+    expect(pushAResult.pushed, isTrue);
+    expect(mergeBResult.success, isTrue);
+    expect(mergeBResult.pulled, isTrue);
+    expect(mergedItem.syncStatus, SyncStatus.conflict);
+    expect(mergedItem.data['totp_secret'], totpFromB);
+    expect(
+      conflictLogs.map((log) => log.fieldKey),
+      contains('data.totp_secret'),
+    );
+    expect(
+      conflictLogs
+          .where((log) => log.fieldKey == 'data.totp_secret')
+          .single
+          .fieldValue,
+      totpFromA,
+    );
+  });
 
   test(
     'remote delete wins over an older local modification on another device',

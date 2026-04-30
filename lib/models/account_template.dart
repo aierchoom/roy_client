@@ -10,6 +10,7 @@ enum AccountFieldType {
   phone,
   url,
   time,
+  totp,
   custom,
 }
 
@@ -62,6 +63,16 @@ String templateBadgeText(String title) {
 }
 
 class AccountFieldAttributes {
+  static const String totpDefaultHint =
+      'Base32 \u5bc6\u94a5\u6216 otpauth://totp URI';
+  static const AccountFieldAttributes totpDefaults = AccountFieldAttributes(
+    type: AccountFieldType.totp,
+    isSecret: true,
+    isSearchable: false,
+    isCopyable: true,
+    hint: totpDefaultHint,
+  );
+
   final AccountFieldType type;
   final bool isPrimary;
   final bool isRequired;
@@ -495,6 +506,13 @@ final AccountTemplate websiteTemplate = AccountTemplate(
         isSecret: true,
         hint: '\u8f93\u5165\u6216\u751f\u6210\u5bc6\u7801',
       ),
+    ),
+    AccountField(
+      fieldKey: 'totp_secret',
+      label: '2FA \u5bc6\u94a5',
+      description:
+          '\u7528\u4e8e\u751f\u6210\u52a8\u6001\u9a8c\u8bc1\u7801\u7684 TOTP \u5bc6\u94a5\u3002',
+      attributes: AccountFieldAttributes.totpDefaults,
     ),
     AccountField(
       fieldKey: 'notes',

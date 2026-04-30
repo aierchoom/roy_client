@@ -116,9 +116,9 @@ class _FieldEditorDialogState extends State<FieldEditorDialog> {
   void _submit() {
     final label = _labelCtrl.text.trim();
     if (label.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请输入字段名称。')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('请输入字段名称。')));
       return;
     }
 
@@ -129,8 +129,9 @@ class _FieldEditorDialogState extends State<FieldEditorDialog> {
         rawKey: widget.originallyPersisted
             ? (widget.initial?.fieldKey ?? '')
             : _keyCtrl.text.trim(),
-        description:
-            _descriptionCtrl.text.trim().isEmpty ? null : _descriptionCtrl.text.trim(),
+        description: _descriptionCtrl.text.trim().isEmpty
+            ? null
+            : _descriptionCtrl.text.trim(),
         attributes: AccountFieldAttributes(
           type: _type,
           isPrimary: _isPrimary,
@@ -146,6 +147,21 @@ class _FieldEditorDialogState extends State<FieldEditorDialog> {
     );
   }
 
+  void _setFieldType(AccountFieldType value) {
+    setState(() {
+      _type = value;
+      if (value == AccountFieldType.totp) {
+        const defaults = AccountFieldAttributes.totpDefaults;
+        _isSecret = defaults.isSecret;
+        _isSearchable = defaults.isSearchable;
+        _isCopyable = defaults.isCopyable;
+        if (_hintCtrl.text.trim().isEmpty) {
+          _hintCtrl.text = defaults.hint ?? '';
+        }
+      }
+    });
+  }
+
   @override
   void dispose() {
     _labelCtrl.dispose();
@@ -158,9 +174,7 @@ class _FieldEditorDialogState extends State<FieldEditorDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text(
-        widget.initial == null ? '新增字段' : '编辑字段',
-      ),
+      title: Text(widget.initial == null ? '新增字段' : '编辑字段'),
       content: SizedBox(
         width: 500,
         child: SingleChildScrollView(
@@ -170,9 +184,7 @@ class _FieldEditorDialogState extends State<FieldEditorDialog> {
               TextField(
                 controller: _labelCtrl,
                 textInputAction: TextInputAction.next,
-                decoration: const InputDecoration(
-                  labelText: '字段名称',
-                ),
+                decoration: const InputDecoration(labelText: '字段名称'),
               ),
               const SizedBox(height: 12),
               TextField(
@@ -189,9 +201,7 @@ class _FieldEditorDialogState extends State<FieldEditorDialog> {
               const SizedBox(height: 12),
               DropdownButtonFormField<AccountFieldType>(
                 initialValue: _type,
-                decoration: const InputDecoration(
-                  labelText: '字段类型',
-                ),
+                decoration: const InputDecoration(labelText: '字段类型'),
                 items: AccountFieldType.values
                     .map(
                       (fieldType) => DropdownMenuItem(
@@ -202,16 +212,14 @@ class _FieldEditorDialogState extends State<FieldEditorDialog> {
                     .toList(),
                 onChanged: (value) {
                   if (value == null) return;
-                  setState(() => _type = value);
+                  _setFieldType(value);
                 },
               ),
               if (_type == AccountFieldType.time) ...[
                 const SizedBox(height: 12),
                 DropdownButtonFormField<TimeFieldFormat>(
                   initialValue: _timeFormat,
-                  decoration: const InputDecoration(
-                    labelText: '时间格式',
-                  ),
+                  decoration: const InputDecoration(labelText: '时间格式'),
                   items: [
                     DropdownMenuItem(
                       value: TimeFieldFormat.full,
@@ -240,17 +248,13 @@ class _FieldEditorDialogState extends State<FieldEditorDialog> {
               TextField(
                 controller: _hintCtrl,
                 textInputAction: TextInputAction.next,
-                decoration: const InputDecoration(
-                  labelText: '提示文本',
-                ),
+                decoration: const InputDecoration(labelText: '提示文本'),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: _descriptionCtrl,
                 maxLines: 2,
-                decoration: const InputDecoration(
-                  labelText: '字段说明',
-                ),
+                decoration: const InputDecoration(labelText: '字段说明'),
               ),
               const SizedBox(height: 8),
               SwitchListTile(
@@ -298,10 +302,7 @@ class _FieldEditorDialogState extends State<FieldEditorDialog> {
           onPressed: () => Navigator.pop(context),
           child: Text(AppLocalizations.of(context)!.cancel),
         ),
-        FilledButton(
-          onPressed: _submit,
-          child: const Text('保存字段'),
-        ),
+        FilledButton(onPressed: _submit, child: const Text('保存字段')),
       ],
     );
   }

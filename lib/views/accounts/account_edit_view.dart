@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/cupertino.dart';
@@ -9,6 +11,7 @@ import '../../models/account_template.dart';
 import '../../models/hlc.dart';
 import '../../providers/enhanced_app_provider.dart';
 import '../../services/service_manager.dart';
+import '../../services/totp_service.dart';
 import '../../widgets/adaptive_page.dart';
 import '../../widgets/green_add_button.dart';
 import '../../widgets/password_generator_sheet.dart';
@@ -36,6 +39,7 @@ class _AccountEditViewState extends State<AccountEditView> {
   final Map<String, String> _draftData = {};
   final Map<String, String> _removedLegacyData = {};
   AccountTemplate? _currentTemplate;
+  Timer? _totpRefreshTimer;
 
   String _text(String zh, String en) {
     return Localizations.localeOf(context).languageCode == 'zh' ? zh : en;
@@ -43,6 +47,10 @@ class _AccountEditViewState extends State<AccountEditView> {
 
   bool _isTimeField(AccountField field) {
     return field.attributes.type == AccountFieldType.time;
+  }
+
+  bool _isTotpField(AccountField field) {
+    return field.attributes.type == AccountFieldType.totp;
   }
 
   DateTime? _tryParseDateTime(String raw, TimeFieldFormat format) {
@@ -208,6 +216,10 @@ class _AccountEditViewState extends State<AccountEditView> {
       _emailCtrl.text = widget.initial!.email;
       _pickedTag = widget.initial!.templateId;
     }
+    _totpRefreshTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted || !_hasVisibleTotpFields) return;
+      setState(() {});
+    });
   }
 
   @override
@@ -269,6 +281,9 @@ class _AccountEditViewState extends State<AccountEditView> {
   Set<String> get _visibleFieldKeys =>
       _currentTemplate?.fields.map((field) => field.fieldKey).toSet() ??
       <String>{};
+
+  bool get _hasVisibleTotpFields =>
+      _currentTemplate?.fields.any(_isTotpField) ?? false;
 
   bool get _hasMissingTemplate =>
       _pickedTag != null && _currentTemplate == null;
@@ -391,6 +406,47 @@ class _AccountEditViewState extends State<AccountEditView> {
     });
   }
 
+  String _totpErrorMessage(Object error) {
+    if (error is TotpException) {
+      return error.message;
+    }
+    return error.toString();
+  }
+
+  bool _normalizeTotpFieldsForSave() {
+    final template = _currentTemplate;
+    if (template == null) return true;
+
+    final normalizedValues = <String, String>{};
+    for (final field in template.fields.where(_isTotpField)) {
+      final controller = _fieldCtrls[field.fieldKey];
+      final raw = controller?.text.trim() ?? '';
+      if (raw.isEmpty) continue;
+
+      try {
+        normalizedValues[field.fieldKey] = TotpService.encodeConfig(raw);
+      } catch (error) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _text(
+                '${field.label} 无法解析：${_totpErrorMessage(error)}',
+                '${field.label} cannot be parsed: ${_totpErrorMessage(error)}',
+              ),
+            ),
+          ),
+        );
+        return false;
+      }
+    }
+
+    for (final entry in normalizedValues.entries) {
+      _fieldCtrls[entry.key]?.text = entry.value;
+      _draftData[entry.key] = entry.value;
+    }
+    return true;
+  }
+
   void _save() {
     final name = _nameCtrl.text.trim();
     if (name.isEmpty) {
@@ -441,6 +497,8 @@ class _AccountEditViewState extends State<AccountEditView> {
     }
 
     _persistVisibleFieldDrafts();
+    if (!_normalizeTotpFieldsForSave()) return;
+
     final data = Map<String, String>.from(_draftData);
     for (final key in _removedLegacyData.keys) {
       if (_visibleFieldKeys.contains(key)) continue;
@@ -496,6 +554,35 @@ class _AccountEditViewState extends State<AccountEditView> {
     );
   }
 
+  Future<void> _copyTotpCode(AccountField field, String rawConfig) async {
+    final trimmed = rawConfig.trim();
+    if (trimmed.isEmpty) {
+      await _copyValue(field.label, '');
+      return;
+    }
+
+    try {
+      final config = TotpService.parseConfig(trimmed);
+      final code = const TotpService().generate(config);
+      await _copyValue(
+        _text('${field.label} 验证码', '${field.label} code'),
+        code.value,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _text(
+              '${field.label} 无法生成验证码：${_totpErrorMessage(error)}',
+              '${field.label} cannot generate a code: ${_totpErrorMessage(error)}',
+            ),
+          ),
+        ),
+      );
+    }
+  }
+
   String _buildCopyAllText() {
     final lines = <String>[];
 
@@ -503,6 +590,16 @@ class _AccountEditViewState extends State<AccountEditView> {
       for (final field in _currentTemplate!.fields) {
         final value = _fieldCtrls[field.fieldKey]?.text.trim() ?? '';
         if (value.isEmpty) continue;
+        if (_isTotpField(field)) {
+          try {
+            final config = TotpService.parseConfig(value);
+            final code = const TotpService().generate(config);
+            lines.add('${field.label} ${_text('验证码', 'Code')}: ${code.value}');
+          } catch (_) {
+            // Invalid TOTP values are already surfaced in the field card.
+          }
+          continue;
+        }
         lines.add('${field.label}: $value');
       }
     }
@@ -635,10 +732,14 @@ class _AccountEditViewState extends State<AccountEditView> {
           visualDensity: VisualDensity.compact,
           iconSize: 18,
           tooltip: _text(
-            '\u590d\u5236\u5b57\u6bb5\u5185\u5bb9',
-            'Copy field value',
+            _isTotpField(field)
+                ? '复制当前验证码'
+                : '\u590d\u5236\u5b57\u6bb5\u5185\u5bb9',
+            _isTotpField(field) ? 'Copy current code' : 'Copy field value',
           ),
-          onPressed: () => _copyValue(field.label, controller.text),
+          onPressed: _isTotpField(field)
+              ? () => _copyTotpCode(field, controller.text)
+              : () => _copyValue(field.label, controller.text),
           icon: const Icon(Icons.content_copy_outlined),
         ),
       );
@@ -686,6 +787,9 @@ class _AccountEditViewState extends State<AccountEditView> {
   }
 
   Color _fieldAccentColor(ThemeData theme, AccountField field) {
+    if (_isTotpField(field)) {
+      return theme.colorScheme.primary;
+    }
     if (field.attributes.isSecret) {
       return theme.colorScheme.tertiary;
     }
@@ -696,6 +800,139 @@ class _AccountEditViewState extends State<AccountEditView> {
       return theme.colorScheme.primary;
     }
     return theme.colorScheme.secondary;
+  }
+
+  Widget _buildTotpPanel(
+    BuildContext context,
+    AccountField field,
+    TextEditingController controller,
+    Color accent,
+  ) {
+    final raw = controller.text.trim();
+    if (raw.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final theme = Theme.of(context);
+    TotpConfig config;
+    TotpCode code;
+    try {
+      config = TotpService.parseConfig(raw);
+      code = const TotpService().generate(config);
+    } catch (error) {
+      final errorColor = theme.colorScheme.error;
+      return Container(
+        width: double.infinity,
+        margin: const EdgeInsets.only(top: 12),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.errorContainer.withAlpha(90),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: errorColor.withAlpha(90)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.error_outline, size: 18, color: errorColor),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                _text(
+                  'TOTP 配置无效：${_totpErrorMessage(error)}',
+                  'Invalid TOTP config: ${_totpErrorMessage(error)}',
+                ),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onErrorContainer,
+                  height: 1.35,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final owner = [
+      config.issuer,
+      config.account,
+    ].where((part) => (part ?? '').trim().isNotEmpty).join(' / ');
+    final metadata =
+        '${TotpService.algorithmName(config.algorithm)} · ${config.digits} digits · ${config.period}s';
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: _softSurface(theme, tint: accent, tintAlpha: 12),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: accent.withAlpha(54)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _text('当前验证码', 'Current code'),
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: accent,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      code.value,
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        color: theme.colorScheme.onSurface,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton.filledTonal(
+                tooltip: _text('复制当前验证码', 'Copy current code'),
+                onPressed: () => _copyTotpCode(field, raw),
+                icon: const Icon(Icons.content_copy_outlined),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          LinearProgressIndicator(
+            value: code.secondsRemaining / code.period,
+            minHeight: 5,
+            borderRadius: BorderRadius.circular(999),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _text(
+              '剩余 ${code.secondsRemaining} 秒 · $metadata',
+              '${code.secondsRemaining}s remaining · $metadata',
+            ),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          if (owner.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              owner,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   Widget _buildOverviewCard(BuildContext context) {
@@ -1206,7 +1443,9 @@ class _AccountEditViewState extends State<AccountEditView> {
                     borderRadius: BorderRadius.circular(15),
                   ),
                   child: Icon(
-                    field.attributes.isSecret
+                    _isTotpField(field)
+                        ? Icons.verified_user_outlined
+                        : field.attributes.isSecret
                         ? Icons.key_outlined
                         : _isTimeField(field)
                         ? Icons.schedule_outlined
@@ -1331,8 +1570,10 @@ class _AccountEditViewState extends State<AccountEditView> {
                                 TimeFieldFormat.monthYear) ||
                         !_isEditing ||
                         !field.attributes.isEditable,
-                    keyboardType:
-                        field.attributes.timeFormat == TimeFieldFormat.monthYear
+                    keyboardType: _isTotpField(field)
+                        ? TextInputType.visiblePassword
+                        : field.attributes.timeFormat ==
+                              TimeFieldFormat.monthYear
                         ? TextInputType.number
                         : null,
                     inputFormatters:
@@ -1342,11 +1583,16 @@ class _AccountEditViewState extends State<AccountEditView> {
                     onTap: canPickInlineTime
                         ? () => _pickDateTimeField(field, controller)
                         : null,
+                    onChanged: _isTotpField(field)
+                        ? (_) => setState(() {})
+                        : null,
                     decoration: InputDecoration(
                       labelText: field.label,
                       hintText: field.attributes.hint,
                       prefixIcon: Icon(
-                        field.attributes.isSecret
+                        _isTotpField(field)
+                            ? Icons.verified_user_outlined
+                            : field.attributes.isSecret
                             ? Icons.password_outlined
                             : _isTimeField(field)
                             ? Icons.schedule_outlined
@@ -1359,6 +1605,8 @@ class _AccountEditViewState extends State<AccountEditView> {
                       ),
                     ),
                   ),
+                  if (_isTotpField(field) && controller != null)
+                    _buildTotpPanel(context, field, controller, accent),
                 ],
               ),
             ),
@@ -1819,6 +2067,7 @@ class _AccountEditViewState extends State<AccountEditView> {
 
   @override
   void dispose() {
+    _totpRefreshTimer?.cancel();
     _nameCtrl.dispose();
     _emailCtrl.dispose();
     for (final controller in _fieldCtrls.values) {
