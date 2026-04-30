@@ -3,7 +3,9 @@ import 'package:provider/provider.dart';
 
 import '../../models/account_item.dart';
 import '../../models/account_template.dart';
+import '../../models/local_sync_change.dart';
 import '../../providers/enhanced_app_provider.dart';
+import '../../sync/sync_service.dart';
 import '../../theme/app_design_tokens.dart';
 import '../../widgets/adaptive_page.dart';
 import '../accounts/account_edit_view.dart';
@@ -103,6 +105,184 @@ class _HomeSearchViewState extends State<HomeSearchView> {
     if (confirmed == true && mounted) {
       await provider.deleteAccount(account.id);
     }
+  }
+
+  Future<void> _pushLocalChange(
+    BuildContext context,
+    LocalSyncChange change,
+  ) async {
+    final provider = context.read<EnhancedAppProvider>();
+    final result = await provider.pushLocalSyncChange(change.id);
+    if (!mounted || !context.mounted) return;
+    _showSyncResultSnack(context, result);
+  }
+
+  Future<void> _pushAllLocalChanges(BuildContext context) async {
+    final provider = context.read<EnhancedAppProvider>();
+    final result = await provider.pushAllLocalSyncChanges();
+    if (!mounted || !context.mounted) return;
+    _showSyncResultSnack(context, result);
+  }
+
+  Future<void> _discardLocalChange(
+    BuildContext context,
+    LocalSyncChange change,
+  ) async {
+    final provider = context.read<EnhancedAppProvider>();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(_text('撤销本地变更', 'Discard Local Change')),
+        content: Text(
+          _text(
+            '将把“${change.title}”恢复到本次变更前的状态，此变更不会推送到其他设备。',
+            'This restores "${change.title}" to its previous local state and will not push it to other devices.',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(_text('取消', 'Cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(_text('撤销', 'Discard')),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      await provider.discardLocalSyncChange(change.id);
+    }
+  }
+
+  void _showSyncResultSnack(BuildContext context, SyncResult result) {
+    final message = result.success
+        ? _text('已推送已确认的本地变更。', 'Approved local changes pushed.')
+        : _text('同步失败：${result.error}', 'Sync failed: ${result.error}');
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  void _showLocalChangeDetails(BuildContext context, LocalSyncChange change) {
+    final fields = _localChangeFields(change);
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        final theme = Theme.of(context);
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  change.title,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '${_localChangeActionLabel(change.action)} · ${_localChangeEntityLabel(change.entityType)}',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: fields
+                      .map(
+                        (field) => Chip(
+                          label: Text(field),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      )
+                      .toList(),
+                ),
+                if (change.isDelete) ...[
+                  const SizedBox(height: 14),
+                  Text(
+                    _text(
+                      '这是删除类变更。推送后，其他可信设备会直接同步该删除，除非存在本地冲突。',
+                      'This is a delete change. Once pushed, other trusted devices will apply it unless they have local conflicts.',
+                    ),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.error,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _discardLocalChange(context, change);
+                        },
+                        child: Text(_text('撤销', 'Discard')),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _pushLocalChange(context, change);
+                        },
+                        child: Text(_text('推送', 'Push')),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  String _localChangeActionLabel(LocalSyncAction action) {
+    return switch (action) {
+      LocalSyncAction.create => _text('新增', 'Create'),
+      LocalSyncAction.update => _text('修改', 'Update'),
+      LocalSyncAction.delete => _text('删除', 'Delete'),
+    };
+  }
+
+  String _localChangeEntityLabel(LocalSyncEntityType type) {
+    return switch (type) {
+      LocalSyncEntityType.account => _text('账号', 'Account'),
+      LocalSyncEntityType.template => _text('模板', 'Template'),
+    };
+  }
+
+  List<String> _localChangeFields(LocalSyncChange change) {
+    if (change.changedFields.isEmpty) {
+      return [_text('记录内容', 'Record content')];
+    }
+    return change.changedFields
+        .map((field) {
+          return switch (field) {
+            'record.created' => _text('新建记录', 'New record'),
+            'record.deleted' => _text('删除记录', 'Deleted record'),
+            'record.updated' => _text('记录内容', 'Record content'),
+            'name' => _text('名称', 'Name'),
+            'email' => _text('邮箱', 'Email'),
+            'template' || 'templateId' => _text('模板', 'Template'),
+            _ when field.startsWith('data.') => field.substring(5),
+            _ => field,
+          };
+        })
+        .toList(growable: false);
   }
 
   List<AccountItem> _buildResults(
@@ -275,6 +455,89 @@ class _HomeSearchViewState extends State<HomeSearchView> {
     );
   }
 
+  Widget _buildLocalSyncQueuePanel(
+    BuildContext context,
+    List<LocalSyncChange> changes,
+  ) {
+    final theme = Theme.of(context);
+    final previewChanges = changes.take(3).toList(growable: false);
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primaryContainer.withAlpha(96),
+        borderRadius: BorderRadius.circular(AppRadii.control),
+        border: Border.all(color: theme.colorScheme.primary.withAlpha(70)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.outbox_rounded,
+                size: 20,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  _text(
+                    '待同步变更 ${changes.length} 项',
+                    '${changes.length} local change(s) waiting',
+                  ),
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              TextButton.icon(
+                onPressed: () => _pushAllLocalChanges(context),
+                icon: const Icon(Icons.cloud_upload_outlined, size: 18),
+                label: Text(_text('推送全部', 'Push All')),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _text(
+              '本机编辑和删除会先停在这里，确认后才会同步给其他可信设备。',
+              'Local edits and deletes stay here until you approve the push.',
+            ),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 12),
+          ...previewChanges.map(
+            (change) => _LocalSyncChangeRow(
+              change: change,
+              actionLabel: _localChangeActionLabel(change.action),
+              entityLabel: _localChangeEntityLabel(change.entityType),
+              fields: _localChangeFields(change),
+              onTap: () => _showLocalChangeDetails(context, change),
+              onPush: () => _pushLocalChange(context, change),
+              onDiscard: () => _discardLocalChange(context, change),
+            ),
+          ),
+          if (changes.length > previewChanges.length)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                _text(
+                  '还有 ${changes.length - previewChanges.length} 项变更未展开。',
+                  '${changes.length - previewChanges.length} more change(s) hidden.',
+                ),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildHeroCard(
     BuildContext context,
     EnhancedAppProvider provider,
@@ -364,6 +627,10 @@ class _HomeSearchViewState extends State<HomeSearchView> {
               onTap: onOpenConflicts,
               textBuilder: _text,
             ),
+          ],
+          if (provider.localSyncChanges.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            _buildLocalSyncQueuePanel(context, provider.localSyncChanges),
           ],
           const SizedBox(height: 18),
           Column(
@@ -563,6 +830,94 @@ class _QuickBadge extends StatelessWidget {
         style: theme.textTheme.labelMedium?.copyWith(
           color: theme.colorScheme.onPrimaryContainer,
           fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
+class _LocalSyncChangeRow extends StatelessWidget {
+  final LocalSyncChange change;
+  final String actionLabel;
+  final String entityLabel;
+  final List<String> fields;
+  final VoidCallback onTap;
+  final VoidCallback onPush;
+  final VoidCallback onDiscard;
+
+  const _LocalSyncChangeRow({
+    required this.change,
+    required this.actionLabel,
+    required this.entityLabel,
+    required this.fields,
+    required this.onTap,
+    required this.onPush,
+    required this.onDiscard,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDelete = change.action == LocalSyncAction.delete;
+    final tint = isDelete ? theme.colorScheme.error : theme.colorScheme.primary;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Material(
+        color: theme.colorScheme.surface.withAlpha(210),
+        borderRadius: BorderRadius.circular(AppRadii.control),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(AppRadii.control),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(
+              children: [
+                Icon(
+                  isDelete
+                      ? Icons.delete_outline_rounded
+                      : Icons.edit_note_rounded,
+                  color: tint,
+                  size: 20,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        change.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        '$actionLabel · $entityLabel · ${fields.take(3).join(', ')}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: MaterialLocalizations.of(context).cancelButtonLabel,
+                  onPressed: onDiscard,
+                  icon: const Icon(Icons.undo_rounded, size: 18),
+                ),
+                IconButton(
+                  tooltip: 'Push',
+                  onPressed: onPush,
+                  icon: const Icon(Icons.cloud_upload_outlined, size: 18),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

@@ -1,8 +1,11 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:secret_roy/models/account_item.dart';
 import 'package:secret_roy/models/account_template.dart';
 import 'package:secret_roy/services/identity_service.dart';
 import 'package:secret_roy/services/secure_storage_service.dart';
+import 'package:secret_roy/system/service_manager/sync_server_url_store.dart';
 import 'package:secret_roy/system/service_manager/vault_dump_coordinator.dart';
 import 'package:secret_roy/sync/sync_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -38,6 +41,9 @@ class _FakeSecureStorageService extends SecureStorageService {
   Future<List<AccountTemplate>> loadDirtyTemplates() async => [];
 
   @override
+  Future<void> ensurePendingSyncOutboxEntries(String vaultId) async {}
+
+  @override
   Future<List<AccountItem>> loadAccounts({bool includeDeleted = false}) async =>
       [];
 
@@ -70,6 +76,14 @@ IdentityService _identityWithVault({
             'sym_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
       }),
   );
+}
+
+String _recoveryMarker(String phase, {int localVersion = 0}) {
+  return jsonEncode({
+    'phase': phase,
+    'local_version': localVersion,
+    'started_at': '2026-04-30T10:00:00.000Z',
+  });
 }
 
 void main() {
@@ -231,9 +245,36 @@ void main() {
   );
 
   test(
-    'initialize migrates legacy dirty flag into vault-scoped metadata',
+    'sync server URL store scopes migrated legacy values by vault',
     () async {
-      final storage = _FakeSecureStorageService()..settings['sync_dirty'] = '1';
+      SharedPreferences.setMockInitialValues({
+        'sync_server_url': 'http://legacy.local',
+      });
+      const store = SyncServerUrlStore(defaultUrl: _emptyDefaultSyncUrl);
+
+      final migrated = await store.read(vaultId: 'vault_1111');
+      await store.write('http://vault2.local', vaultId: 'vault_2222');
+      final prefs = await SharedPreferences.getInstance();
+
+      expect(migrated, 'http://legacy.local');
+      expect(
+        prefs.getString('sync_server_url_vault_1111'),
+        'http://legacy.local',
+      );
+      expect(await store.read(vaultId: 'vault_2222'), 'http://vault2.local');
+      expect(await store.read(), 'http://legacy.local');
+    },
+  );
+
+  test(
+    'initialize migrates legacy sync metadata into vault-scoped keys',
+    () async {
+      const lastSync = '2026-04-30T10:00:00.000Z';
+      final storage = _FakeSecureStorageService()
+        ..settings['sync_dirty'] = '1'
+        ..settings['sync_version'] = '12'
+        ..settings['sync_last_time'] = lastSync
+        ..settings['sync_recovery'] = _recoveryMarker('pull', localVersion: 12);
       final identityService = _identityWithVault(
         vaultId: 'vault_11111111111111111111111111111111',
       );
@@ -247,15 +288,36 @@ void main() {
       await syncService.initialize();
 
       expect(syncService.isDirty, isTrue);
+      expect(syncService.localVersion, 12);
+      expect(syncService.lastSyncTime, DateTime.parse(lastSync));
+      expect(syncService.recoveryPhase, 'pull');
       expect(
         storage.settings['sync_dirty_vault_11111111111111111111111111111111'],
         '1',
       );
+      expect(
+        storage.settings['sync_version_vault_11111111111111111111111111111111'],
+        '12',
+      );
+      expect(
+        storage
+            .settings['sync_last_time_vault_11111111111111111111111111111111'],
+        lastSync,
+      );
+      expect(
+        storage
+            .settings['sync_recovery_vault_11111111111111111111111111111111'],
+        isNotEmpty,
+      );
     },
   );
 
-  test('dirty state is isolated per vault', () async {
-    final storage = _FakeSecureStorageService();
+  test('sync metadata state is isolated per vault', () async {
+    final storage = _FakeSecureStorageService()
+      ..settings['sync_version_vault_11111111111111111111111111111111'] = '7'
+      ..settings['sync_dirty_vault_11111111111111111111111111111111'] = '1'
+      ..settings['sync_recovery_vault_11111111111111111111111111111111'] =
+          _recoveryMarker('push', localVersion: 7);
     final firstIdentity = _identityWithVault(
       vaultId: 'vault_11111111111111111111111111111111',
     );
@@ -271,7 +333,6 @@ void main() {
       identityService: firstIdentity,
     );
     await firstSyncService.initialize();
-    await firstSyncService.markDirty();
 
     final secondSyncService = SyncService(
       storageService: storage,
@@ -280,7 +341,11 @@ void main() {
     await secondSyncService.initialize();
 
     expect(firstSyncService.isDirty, isTrue);
+    expect(firstSyncService.localVersion, 7);
+    expect(firstSyncService.recoveryPhase, 'push');
     expect(secondSyncService.isDirty, isFalse);
+    expect(secondSyncService.localVersion, 0);
+    expect(secondSyncService.recoveryPhase, isNull);
     expect(
       storage.settings['sync_dirty_vault_11111111111111111111111111111111'],
       '1',
@@ -311,3 +376,5 @@ void main() {
     expect(storage.replaceAllDataForImportCalled, isFalse);
   });
 }
+
+String _emptyDefaultSyncUrl() => '';

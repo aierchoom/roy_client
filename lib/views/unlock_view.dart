@@ -43,14 +43,17 @@ class _UnlockViewState extends State<UnlockView> {
       return;
     }
 
-    final hasDatabase = await _serviceManager.storageService.isDatabaseInitialized();
+    final hasDatabase = await _serviceManager.storageService
+        .isDatabaseInitialized();
     final hasIdentity = await _serviceManager.checkIdentityExists();
-    
+
     if (!mounted) return;
 
     setState(() {
-      // 如果数据库存在但身份密钥丢失（或者都没有），都视为“首次运行”状态以重新初始化
-      _isFirstRun = !hasDatabase || !hasIdentity;
+      // Only a clean device can create a fresh vault identity implicitly.
+      // If a database exists but identity keys are missing, unlock must fail
+      // through ServiceManager instead of silently rebasing old data.
+      _isFirstRun = !hasDatabase && !hasIdentity;
       _checkingStatus = false;
     });
   }
@@ -133,10 +136,12 @@ class _UnlockViewState extends State<UnlockView> {
       case UnlockResult.alreadyInProgress:
       case UnlockResult.error:
         setState(
-          () => _errorMessage = _text(
-            '\u89e3\u9501\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u518d\u8bd5\u3002',
-            'Unlock failed. Please try again.',
-          ),
+          () => _errorMessage =
+              _serviceManager.errorMessage ??
+              _text(
+                '\u89e3\u9501\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u518d\u8bd5\u3002',
+                'Unlock failed. Please try again.',
+              ),
         );
         return;
     }

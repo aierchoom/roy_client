@@ -1,4 +1,4 @@
-﻿# SecretRoy Executive Summary
+# SecretRoy Executive Summary
 
 Navigation:
 [Docs Home](../README.md) |

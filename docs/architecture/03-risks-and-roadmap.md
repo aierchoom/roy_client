@@ -1,4 +1,4 @@
-﻿# SecretRoy Risks and Roadmap
+# SecretRoy Risks and Roadmap
 
 Navigation:
 [Docs Home](../README.md) |

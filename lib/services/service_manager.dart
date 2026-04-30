@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/account_item.dart';
 import '../models/account_template.dart';
+import '../models/local_sync_change.dart';
 import '../sync/sync_service.dart';
 import '../system/service_manager/default_sync_server_url.dart';
 import '../system/service_manager/password_tools.dart';
@@ -144,7 +145,10 @@ class ServiceManager extends ChangeNotifier {
 
   Future<UnlockResult> _completeUnlock(String password) async {
     try {
-      await _identityService.initialize();
+      final hasDatabase = await _secureStorageService.isDatabaseInitialized();
+      await _identityService.initialize(
+        allowGenerateVaultIdentity: !hasDatabase,
+      );
       final didUnlock = await _cryptoService.initMasterKey(password);
       if (!didUnlock) {
         await _secureStorageService.close();
@@ -161,10 +165,22 @@ class ServiceManager extends ChangeNotifier {
       );
       _autoLockService.unlock();
       await _syncService.initialize();
+      await _secureStorageService.ensurePendingSyncOutboxEntries(
+        _identityService.vaultId,
+      );
 
       unawaited(_syncService.connect());
       _updateState(ServiceManagerState.unlocked);
       return UnlockResult.success;
+    } on IdentityCorruptedException catch (e, stack) {
+      if (kDebugMode) {
+        debugPrint('Failed to unlock because identity is corrupted: $e');
+        debugPrint(stack.toString());
+      }
+      _setError(
+        'Vault identity is missing or damaged. Use a recovery route or reset the local vault before continuing. $e',
+      );
+      return UnlockResult.error;
     } catch (e, stack) {
       if (kDebugMode) {
         debugPrint('Failed to unlock with password: $e');
@@ -313,16 +329,54 @@ class ServiceManager extends ChangeNotifier {
 
   Future<void> saveAccount(AccountItem account) async {
     if (!isUnlocked) return;
+    final before = await _secureStorageService.getAccountById(
+      account.id,
+      includeDeleted: true,
+    );
     await _secureStorageService.saveAccount(account);
-    await _syncService.markDirty();
-    unawaited(_syncService.syncNow());
+    final after = await _secureStorageService.getAccountById(
+      account.id,
+      includeDeleted: true,
+    );
+    if (after != null) {
+      await _secureStorageService.recordLocalSyncChange(
+        vaultId: _identityService.vaultId,
+        entityType: LocalSyncEntityType.account,
+        entityId: after.id,
+        action: before == null
+            ? LocalSyncAction.create
+            : LocalSyncAction.update,
+        title: after.name,
+        beforeSnapshot: before?.toJson(),
+        afterSnapshot: after.toJson(),
+        baseServerVersion: before?.serverVersion ?? after.serverVersion,
+      );
+    }
+    await _syncService.reconcileDirtyState();
   }
 
   Future<void> deleteAccount(String id) async {
     if (!isUnlocked) return;
+    final before = await _secureStorageService.getAccountById(
+      id,
+      includeDeleted: true,
+    );
     await _secureStorageService.deleteAccount(id);
-    await _syncService.markDirty();
-    unawaited(_syncService.syncNow());
+    final after = await _secureStorageService.getAccountById(
+      id,
+      includeDeleted: true,
+    );
+    await _secureStorageService.recordLocalSyncChange(
+      vaultId: _identityService.vaultId,
+      entityType: LocalSyncEntityType.account,
+      entityId: id,
+      action: LocalSyncAction.delete,
+      title: before?.name ?? after?.name ?? id,
+      beforeSnapshot: before?.toJson(),
+      afterSnapshot: after?.toJson(),
+      baseServerVersion: before?.serverVersion ?? after?.serverVersion ?? 0,
+    );
+    await _syncService.reconcileDirtyState();
   }
 
   Future<int> countAccountsByTemplate(String templateId) async {
@@ -332,9 +386,28 @@ class ServiceManager extends ChangeNotifier {
 
   Future<void> saveTemplate(AccountTemplate template) async {
     if (!isUnlocked) return;
+    final before = await _secureStorageService.loadTemplateById(
+      template.templateId,
+    );
     await _secureStorageService.saveTemplate(template);
-    await _syncService.markDirty();
-    unawaited(_syncService.syncNow());
+    final after = await _secureStorageService.loadTemplateById(
+      template.templateId,
+    );
+    if (after != null && after.isCustom) {
+      await _secureStorageService.recordLocalSyncChange(
+        vaultId: _identityService.vaultId,
+        entityType: LocalSyncEntityType.template,
+        entityId: after.templateId,
+        action: before == null
+            ? LocalSyncAction.create
+            : LocalSyncAction.update,
+        title: after.title,
+        beforeSnapshot: before?.toJson(),
+        afterSnapshot: after.toJson(),
+        baseServerVersion: before?.serverVersion ?? after.serverVersion,
+      );
+    }
+    await _syncService.reconcileDirtyState();
   }
 
   Future<void> deleteTemplate(String id) async {
@@ -343,9 +416,20 @@ class ServiceManager extends ChangeNotifier {
     if (usageCount > 0) {
       throw TemplateInUseException(templateId: id, usageCount: usageCount);
     }
+    final before = await _secureStorageService.loadTemplateById(id);
     await _secureStorageService.deleteTemplate(id);
-    await _syncService.markDirty();
-    unawaited(_syncService.syncNow());
+    final after = await _secureStorageService.loadTemplateById(id);
+    await _secureStorageService.recordLocalSyncChange(
+      vaultId: _identityService.vaultId,
+      entityType: LocalSyncEntityType.template,
+      entityId: id,
+      action: LocalSyncAction.delete,
+      title: before?.title ?? after?.title ?? id,
+      beforeSnapshot: before?.toJson(),
+      afterSnapshot: after?.toJson(),
+      baseServerVersion: before?.serverVersion ?? after?.serverVersion ?? 0,
+    );
+    await _syncService.reconcileDirtyState();
   }
 
   Future<bool> connectToSyncServer() async {
@@ -383,6 +467,67 @@ class ServiceManager extends ChangeNotifier {
     );
   }
 
+  Future<List<LocalSyncChange>> loadOpenLocalSyncChanges() async {
+    if (!isUnlocked || !_identityService.hasIdentity) {
+      return const <LocalSyncChange>[];
+    }
+    await _secureStorageService.ensurePendingSyncOutboxEntries(
+      _identityService.vaultId,
+    );
+    return _secureStorageService.loadOpenLocalSyncChanges(
+      vaultId: _identityService.vaultId,
+    );
+  }
+
+  Future<SyncResult> approveAndSyncLocalChanges({
+    Iterable<String>? changeIds,
+  }) async {
+    if (!isUnlocked || !_identityService.hasIdentity) {
+      return SyncResult.failure('Vault is locked.');
+    }
+
+    await _secureStorageService.approveLocalSyncChanges(
+      vaultId: _identityService.vaultId,
+      ids: changeIds,
+    );
+    await _syncService.markDirty();
+    final result = await syncNow();
+    notifyListeners();
+    return result;
+  }
+
+  Future<void> discardLocalSyncChange(String changeId) async {
+    if (!isUnlocked || !_identityService.hasIdentity) return;
+
+    final change = await _secureStorageService.getLocalSyncChange(changeId);
+    if (change == null) return;
+
+    final before = change.beforeSnapshot;
+    if (change.entityType == LocalSyncEntityType.account) {
+      if (before == null) {
+        await _secureStorageService.hardDeleteAccount(change.entityId);
+      } else {
+        await _secureStorageService.saveAccount(
+          AccountItem.fromJson(before),
+          isSyncMerge: true,
+        );
+      }
+    } else {
+      if (before == null) {
+        await _secureStorageService.hardDeleteTemplate(change.entityId);
+      } else {
+        await _secureStorageService.saveTemplate(
+          AccountTemplate.fromJson(before),
+          isSyncMerge: true,
+        );
+      }
+    }
+
+    await _secureStorageService.deleteLocalSyncChange(changeId);
+    await _syncService.reconcileDirtyState();
+    notifyListeners();
+  }
+
   SyncState get syncState => _syncService.state;
   String? get syncErrorMessage => _syncService.errorMessage;
   String? get syncStatusNote => _syncService.statusNote;
@@ -391,13 +536,15 @@ class ServiceManager extends ChangeNotifier {
   bool get hasDirtyData => _syncService.isDirty;
 
   Future<String?> getSyncServerUrl() async {
-    return _syncServerUrlStore.read();
+    return _syncServerUrlStore.read(
+      vaultId: _identityService.hasIdentity ? _identityService.vaultId : null,
+    );
   }
 
   Future<void> setSyncServerUrl(String url) async {
     if (!isUnlocked) return;
 
-    await _syncServerUrlStore.write(url);
+    await _syncServerUrlStore.write(url, vaultId: _identityService.vaultId);
     await disconnectFromSyncServer();
     notifyListeners();
   }
@@ -462,7 +609,7 @@ class ServiceManager extends ChangeNotifier {
   }) async {
     final VaultDumpImportPlan? dumpPlan;
     try {
-      dumpPlan = _validateIncomingVaultDump(preview);
+      dumpPlan = await _validateIncomingVaultDump(preview);
     } on VaultDumpImportException catch (error) {
       throw VaultImportException(error.message);
     }
@@ -495,7 +642,10 @@ class ServiceManager extends ChangeNotifier {
 
       final syncServerUrl = preview.syncServerUrl;
       if (syncServerUrl != null && syncServerUrl.isNotEmpty) {
-        await _syncServerUrlStore.write(syncServerUrl);
+        await _syncServerUrlStore.write(
+          syncServerUrl,
+          vaultId: preview.vaultId,
+        );
       }
 
       await _syncService.initialize();
@@ -515,15 +665,15 @@ class ServiceManager extends ChangeNotifier {
     }
   }
 
-  VaultDumpImportPlan? _validateIncomingVaultDump(
+  Future<VaultDumpImportPlan?> _validateIncomingVaultDump(
     VaultIdentityImportPreview preview,
-  ) {
+  ) async {
     final vaultDump = preview.vaultDump;
     if (vaultDump == null || vaultDump.isEmpty) {
       return null;
     }
 
-    return _vaultDumpCoordinator.validateEncryptedVaultDump(
+    return await _vaultDumpCoordinator.validateEncryptedVaultDump(
       vaultDumpJson: vaultDump,
       vaultId: preview.vaultId,
       privateKey: preview.privateKey,
@@ -733,7 +883,10 @@ class ServiceManager extends ChangeNotifier {
   AutoLockDuration get autoLockDuration => _autoLockService.duration;
 
   Future<String> _resolveSyncServerUrl({bool allowEmpty = false}) async {
-    return _syncServerUrlStore.resolve(allowEmpty: allowEmpty);
+    return _syncServerUrlStore.resolve(
+      vaultId: _identityService.hasIdentity ? _identityService.vaultId : null,
+      allowEmpty: allowEmpty,
+    );
   }
 
   static String generatePassword({

@@ -44,7 +44,7 @@ class VaultDumpCoordinator {
       'templates': templatesList.map((template) => template.toJson()).toList(),
     };
 
-    return SyncPayloadCodec.encodePayload(
+    return await SyncPayloadCodec.encodePayload(
       payloadJson: payloadJson,
       vaultId: identityService.vaultId,
       nodeId: identityService.deviceId,
@@ -60,7 +60,7 @@ class VaultDumpCoordinator {
       );
     }
 
-    final plan = validateEncryptedVaultDump(
+    final plan = await validateEncryptedVaultDump(
       vaultDumpJson: vaultDumpJson,
       vaultId: identityService.vaultId,
       privateKey: identityService.privateKey,
@@ -69,18 +69,18 @@ class VaultDumpCoordinator {
     await importValidatedVaultDump(plan);
   }
 
-  VaultDumpImportPlan validateEncryptedVaultDump({
+  Future<VaultDumpImportPlan> validateEncryptedVaultDump({
     required String vaultDumpJson,
     required String vaultId,
     required String privateKey,
     required String symmetricKey,
-  }) {
+  }) async {
     if (vaultDumpJson.trim().isEmpty) {
       throw const VaultDumpImportException('Vault dump is empty.');
     }
 
     try {
-      final payloadJson = SyncPayloadCodec.decodePayload(
+      final payloadJson = await SyncPayloadCodec.decodePayload(
         encodedPayload: vaultDumpJson,
         expectedVaultId: vaultId,
         privateKey: privateKey,

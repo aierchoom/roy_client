@@ -1,4 +1,4 @@
-﻿# SecretRoy 架构深度解读
+# SecretRoy 架构深度解读
 
 > 更适合阅读的拆分文档集见：[README.md](README.md)
 >

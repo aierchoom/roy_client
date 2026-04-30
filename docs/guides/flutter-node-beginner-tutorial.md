@@ -1,4 +1,4 @@
-﻿# SecretRoy 教学级源码教程
+# SecretRoy 教学级源码教程
 
 > 如果你想看“架构评审/专业解读”风格，而不是初学者教程，请直接阅读：`docs/architecture/architecture-deep-dive.md`
 

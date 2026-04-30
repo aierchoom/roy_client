@@ -126,6 +126,10 @@ void main() {
       final mergedHlcKeys = result.mergedItem.dataHlc.keys.toSet();
       final expectedKeys = {...local.data.keys, ...remote.data.keys};
 
+      expect(result.mergedItem.name, isNotEmpty);
+      expect(result.mergedItem.email, isNotEmpty);
+      expect(result.mergedItem.templateId, local.templateId);
+      expect(result.mergedItem.createdAt, local.createdAt);
       expect(mergedKeys, expectedKeys);
       expect(mergedHlcKeys, expectedKeys);
       expect(
@@ -172,6 +176,51 @@ void main() {
     },
   );
 
+  test('newest tombstone wins when both sides deleted the same record', () {
+    final local = _item(
+      id: 'account_dual_tombstone',
+      name: 'Local Deleted',
+      email: 'local@example.com',
+      nameHlc: const Hlc(10, 0, 'local'),
+      emailHlc: const Hlc(10, 1, 'local'),
+      data: {'password': 'local-secret'},
+      dataHlc: {'password': const Hlc(10, 2, 'local')},
+      isDeleted: true,
+      deleteHlc: const Hlc(90, 0, 'local'),
+      syncStatus: SyncStatus.pendingPush,
+      serverVersion: 4,
+    );
+
+    final remote = _item(
+      id: 'account_dual_tombstone',
+      name: 'Remote Deleted',
+      email: 'remote@example.com',
+      nameHlc: const Hlc(20, 0, 'remote'),
+      emailHlc: const Hlc(20, 1, 'remote'),
+      data: {'password': 'remote-secret'},
+      dataHlc: {'password': const Hlc(20, 2, 'remote')},
+      isDeleted: true,
+      deleteHlc: const Hlc(120, 0, 'remote'),
+      syncStatus: SyncStatus.synchronized,
+      serverVersion: 9,
+    );
+
+    final remoteWins = CrdtMergeEngine.merge(local, remote);
+    final localWins = CrdtMergeEngine.merge(
+      local.copyWith(deleteHlc: const Hlc(130, 0, 'local')),
+      remote,
+    );
+
+    expect(remoteWins.mergedItem.isDeleted, isTrue);
+    expect(remoteWins.mergedItem.deleteHlc, const Hlc(120, 0, 'remote'));
+    expect(remoteWins.mergedItem.serverVersion, 9);
+    expect(remoteWins.conflictLogs, isEmpty);
+
+    expect(localWins.mergedItem.isDeleted, isTrue);
+    expect(localWins.mergedItem.deleteHlc, const Hlc(130, 0, 'local'));
+    expect(localWins.conflictLogs, isEmpty);
+  });
+
   test(
     'fast-forward merge keeps synchronized status and adopts remote server version',
     () {
@@ -208,6 +257,103 @@ void main() {
       expect(result.mergedItem.data['password'], 'new-secret');
     },
   );
+
+  test(
+    'conflict logs preserve losing values without changing merge winners',
+    () {
+      final local = _item(
+        id: 'account_conflict_log_invariant',
+        name: 'Local Winner',
+        email: 'local@example.com',
+        nameHlc: const Hlc(80, 0, 'local'),
+        emailHlc: const Hlc(20, 0, 'local'),
+        data: {'password': 'local-secret', 'note': 'local-note'},
+        dataHlc: {
+          'password': const Hlc(20, 0, 'local'),
+          'note': const Hlc(90, 0, 'local'),
+        },
+        syncStatus: SyncStatus.pendingPush,
+        serverVersion: 2,
+      );
+
+      final remote = _item(
+        id: 'account_conflict_log_invariant',
+        name: 'Remote Loser',
+        email: 'remote@example.com',
+        nameHlc: const Hlc(70, 0, 'remote'),
+        emailHlc: const Hlc(85, 0, 'remote'),
+        data: {'password': 'remote-secret', 'note': 'remote-note'},
+        dataHlc: {
+          'password': const Hlc(95, 0, 'remote'),
+          'note': const Hlc(70, 0, 'remote'),
+        },
+        syncStatus: SyncStatus.synchronized,
+        serverVersion: 3,
+      );
+
+      final result = CrdtMergeEngine.merge(local, remote);
+      final logsByField = {
+        for (final log in result.conflictLogs) log.fieldKey: log.fieldValue,
+      };
+
+      expect(result.mergedItem.name, 'Local Winner');
+      expect(result.mergedItem.email, 'remote@example.com');
+      expect(result.mergedItem.data['password'], 'remote-secret');
+      expect(result.mergedItem.data['note'], 'local-note');
+      expect(result.mergedItem.serverVersion, 3);
+      expect(logsByField, {
+        'name': 'Remote Loser',
+        'email': 'local@example.com',
+        'data.password': 'local-secret',
+        'data.note': 'remote-note',
+      });
+    },
+  );
+
+  test('interleaved field winners remain pushable after merge', () {
+    final local = _item(
+      id: 'account_interleaved_push',
+      name: 'Local Name',
+      email: 'old@example.com',
+      nameHlc: const Hlc(60, 0, 'local'),
+      emailHlc: const Hlc(10, 0, 'local'),
+      data: {'password': 'old-secret', 'note': 'local-note'},
+      dataHlc: {
+        'password': const Hlc(10, 0, 'local'),
+        'note': const Hlc(70, 0, 'local'),
+      },
+      syncStatus: SyncStatus.synchronized,
+      serverVersion: 2,
+    );
+
+    final remote = _item(
+      id: 'account_interleaved_push',
+      name: 'Remote Name',
+      email: 'remote@example.com',
+      nameHlc: const Hlc(50, 0, 'remote'),
+      emailHlc: const Hlc(80, 0, 'remote'),
+      data: {'password': 'remote-secret', 'note': 'remote-note'},
+      dataHlc: {
+        'password': const Hlc(90, 0, 'remote'),
+        'note': const Hlc(40, 0, 'remote'),
+      },
+      syncStatus: SyncStatus.synchronized,
+      serverVersion: 12,
+    );
+
+    final result = CrdtMergeEngine.merge(local, remote);
+
+    expect(result.mergedItem.syncStatus, SyncStatus.pendingPush);
+    expect(result.mergedItem.serverVersion, 12);
+    expect(result.mergedItem.isDeleted, isFalse);
+    expect(result.mergedItem.name, 'Local Name');
+    expect(result.mergedItem.email, 'remote@example.com');
+    expect(result.mergedItem.data, {
+      'password': 'remote-secret',
+      'note': 'local-note',
+    });
+    expect(result.mergedItem.dataHlc.keys.toSet(), {'password', 'note'});
+  });
 
   test(
     'cross-device merge only emits conflict logs for fields that actually diverge',

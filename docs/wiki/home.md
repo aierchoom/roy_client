@@ -1,4 +1,4 @@
-﻿# SecretRoy 企业级 Wiki
+# SecretRoy 企业级 Wiki
 
 **版本**: v1.1.0
 **最后更新**: 2026-04-29

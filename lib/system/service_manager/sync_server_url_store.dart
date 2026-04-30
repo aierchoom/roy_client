@@ -12,24 +12,48 @@ class SyncServerUrlStore {
     this.defaultUrl = defaultSyncServerUrlForCurrentPlatform,
   });
 
-  Future<String?> read() async {
+  Future<String?> read({String? vaultId}) async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_prefsKey);
+    final scopedKey = _keyForVault(vaultId);
+    if (scopedKey == _prefsKey) {
+      return prefs.getString(_prefsKey);
+    }
+
+    final scopedValue = prefs.getString(scopedKey);
+    if (scopedValue != null) {
+      return scopedValue;
+    }
+
+    final legacyValue = prefs.getString(_prefsKey);
+    if (legacyValue != null) {
+      await prefs.setString(scopedKey, legacyValue);
+    }
+    return legacyValue;
   }
 
-  Future<void> write(String url) async {
+  Future<void> write(String url, {String? vaultId}) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_prefsKey, url);
+    await prefs.setString(_keyForVault(vaultId), url);
   }
 
-  Future<String> resolve({bool allowEmpty = false}) async {
-    final normalized = normalize((await read()) ?? defaultUrl());
+  Future<String> resolve({String? vaultId, bool allowEmpty = false}) async {
+    final normalized = normalize(
+      (await read(vaultId: vaultId)) ?? defaultUrl(),
+    );
     if (normalized.isEmpty && !allowEmpty) {
       throw const VaultPairingServiceException(
         'Sync server URL is not configured.',
       );
     }
     return normalized;
+  }
+
+  static String _keyForVault(String? vaultId) {
+    final normalizedVaultId = vaultId?.trim();
+    if (normalizedVaultId == null || normalizedVaultId.isEmpty) {
+      return _prefsKey;
+    }
+    return '${_prefsKey}_$normalizedVaultId';
   }
 
   static String normalize(String rawUrl) {

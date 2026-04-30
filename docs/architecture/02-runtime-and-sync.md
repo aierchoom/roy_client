@@ -1,4 +1,4 @@
-﻿# SecretRoy Runtime and Sync
+# SecretRoy Runtime and Sync
 
 Navigation:
 [Docs Home](../README.md) |

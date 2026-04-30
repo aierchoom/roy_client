@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 
-import 'package:crypto/crypto.dart';
+import 'package:cryptography/cryptography.dart';
 
 import '../models/account_item.dart';
 import '../models/account_template.dart';
@@ -16,60 +16,56 @@ class SyncPayloadException implements Exception {
 }
 
 class SyncPayloadCodec {
+  static const String prefix = 'sroy-sync:';
   static const int _currentVersion = 1;
-  static const int _nonceLength = 16;
+  static const String _algorithmName = 'aes-256-gcm-hkdf-sha256';
+  static const int _nonceLength = 12;
+  static const int _saltLength = 16;
+  static const int _keyLength = 32;
   static final Random _random = Random.secure();
 
-  static String encodePayload({
+  static Future<String> encodePayload({
     required Map<String, dynamic> payloadJson,
     required String vaultId,
     required String nodeId,
     required String privateKey,
     required String symmetricKey,
-  }) {
-    final nonceBytes = _randomBytes(_nonceLength);
-    final plaintextBytes = utf8.encode(jsonEncode(payloadJson));
-    final encryptionKey = _deriveKey(
-      label: 'sync-payload-encryption',
-      vaultId: vaultId,
-      secret: symmetricKey,
-    );
-    final macKey = _deriveKey(
-      label: 'sync-payload-mac',
-      vaultId: vaultId,
-      secret: '$privateKey|$symmetricKey',
-    );
-
-    final ciphertextBytes = _xorWithKeystream(
-      plaintextBytes,
-      keyBytes: encryptionKey,
-      nonceBytes: nonceBytes,
-    );
-
-    final nonce = base64Encode(nonceBytes);
-    final ciphertext = base64Encode(ciphertextBytes);
-    final mac = _computeMac(
-      macKey: macKey,
+  }) async {
+    final salt = _randomBytes(_saltLength);
+    final nonce = _randomBytes(_nonceLength);
+    final additionalData = _additionalData(
       version: _currentVersion,
       vaultId: vaultId,
       nodeId: nodeId,
+    );
+    final secretKey = await _derivePayloadKey(
+      vaultId: vaultId,
+      privateKey: privateKey,
+      symmetricKey: symmetricKey,
+      salt: salt,
+    );
+    final secretBox = await AesGcm.with256bits().encrypt(
+      utf8.encode(jsonEncode(payloadJson)),
+      secretKey: secretKey,
       nonce: nonce,
-      ciphertext: ciphertext,
+      aad: additionalData,
     );
 
     final envelope = {
       'v': _currentVersion,
+      'alg': _algorithmName,
       'vault_id': vaultId,
       'node_id': nodeId,
-      'nonce': nonce,
-      'ciphertext': ciphertext,
-      'mac': mac,
+      'salt': _encodeBase64Url(salt),
+      'nonce': _encodeBase64Url(secretBox.nonce),
+      'ciphertext': _encodeBase64Url(secretBox.cipherText),
+      'mac': _encodeBase64Url(secretBox.mac.bytes),
     };
 
-    return base64Encode(utf8.encode(jsonEncode(envelope)));
+    return '$prefix${_encodeBase64Url(utf8.encode(jsonEncode(envelope)))}';
   }
 
-  static String encodeAccount({
+  static Future<String> encodeAccount({
     required AccountItem item,
     required String vaultId,
     required String nodeId,
@@ -87,7 +83,7 @@ class SyncPayloadCodec {
     );
   }
 
-  static String encodeTemplate({
+  static Future<String> encodeTemplate({
     required AccountTemplate template,
     required String vaultId,
     required String nodeId,
@@ -105,7 +101,7 @@ class SyncPayloadCodec {
     );
   }
 
-  static String encode({
+  static Future<String> encode({
     required AccountItem item,
     required String vaultId,
     required String nodeId,
@@ -121,34 +117,23 @@ class SyncPayloadCodec {
     );
   }
 
-  static Map<String, dynamic> decodePayload({
+  static Future<Map<String, dynamic>> decodePayload({
     required String encodedPayload,
     required String expectedVaultId,
     required String privateKey,
     required String symmetricKey,
-  }) {
-    late final Map<String, dynamic> decodedJson;
-    try {
-      final payloadBytes = base64Decode(encodedPayload);
-      final payloadJson = jsonDecode(utf8.decode(payloadBytes));
-      decodedJson = Map<String, dynamic>.from(payloadJson as Map);
-    } catch (_) {
-      throw const SyncPayloadException('Payload is not valid base64 JSON.');
-    }
-
-    if (!_looksLikeEnvelope(decodedJson)) {
-      return decodedJson;
-    }
-
-    final version = decodedJson['v'];
-    final vaultId = decodedJson['vault_id'];
-    final nodeId = decodedJson['node_id'];
-    final nonce = decodedJson['nonce'];
-    final ciphertext = decodedJson['ciphertext'];
-    final mac = decodedJson['mac'];
+  }) async {
+    final envelope = _decodeEnvelope(encodedPayload);
+    final version = envelope['v'];
+    final algorithm = envelope['alg'];
+    final vaultId = envelope['vault_id'];
+    final nodeId = envelope['node_id'];
 
     if (version is! int || version != _currentVersion) {
       throw const SyncPayloadException('Unsupported payload version.');
+    }
+    if (algorithm != _algorithmName) {
+      throw const SyncPayloadException('Unsupported payload algorithm.');
     }
     if (vaultId is! String || vaultId.isEmpty) {
       throw const SyncPayloadException('Payload vault id is missing.');
@@ -159,52 +144,48 @@ class SyncPayloadCodec {
     if (nodeId is! String || nodeId.isEmpty) {
       throw const SyncPayloadException('Payload node id is missing.');
     }
-    if (nonce is! String || ciphertext is! String || mac is! String) {
+
+    final salt = _readBase64UrlBytes(envelope, 'salt');
+    final nonce = _readBase64UrlBytes(envelope, 'nonce');
+    final ciphertext = _readBase64UrlBytes(envelope, 'ciphertext');
+    final macBytes = _readBase64UrlBytes(envelope, 'mac');
+    if (salt.length < _saltLength ||
+        nonce.length != _nonceLength ||
+        ciphertext.isEmpty ||
+        macBytes.isEmpty) {
       throw const SyncPayloadException('Payload envelope is incomplete.');
     }
 
-    final macKey = _deriveKey(
-      label: 'sync-payload-mac',
-      vaultId: vaultId,
-      secret: '$privateKey|$symmetricKey',
-    );
-    final expectedMac = _computeMac(
-      macKey: macKey,
-      version: version,
-      vaultId: vaultId,
-      nodeId: nodeId,
-      nonce: nonce,
-      ciphertext: ciphertext,
-    );
-    if (!_constantTimeEquals(expectedMac, mac)) {
-      throw const SyncPayloadException('Payload integrity check failed.');
-    }
-
     try {
-      final encryptionKey = _deriveKey(
-        label: 'sync-payload-encryption',
+      final secretKey = await _derivePayloadKey(
         vaultId: vaultId,
-        secret: symmetricKey,
+        privateKey: privateKey,
+        symmetricKey: symmetricKey,
+        salt: salt,
       );
-      final plaintextBytes = _xorWithKeystream(
-        base64Decode(ciphertext),
-        keyBytes: encryptionKey,
-        nonceBytes: base64Decode(nonce),
+      final plaintextBytes = await AesGcm.with256bits().decrypt(
+        SecretBox(ciphertext, nonce: nonce, mac: Mac(macBytes)),
+        secretKey: secretKey,
+        aad: _additionalData(
+          version: version,
+          vaultId: vaultId,
+          nodeId: nodeId,
+        ),
       );
-      final accountJson = jsonDecode(utf8.decode(plaintextBytes));
-      return Map<String, dynamic>.from(accountJson as Map);
+      final payloadJson = jsonDecode(utf8.decode(plaintextBytes));
+      return Map<String, dynamic>.from(payloadJson as Map);
     } catch (_) {
       throw const SyncPayloadException('Payload decryption failed.');
     }
   }
 
-  static AccountItem decode({
+  static Future<AccountItem> decode({
     required String encodedPayload,
     required String expectedVaultId,
     required String privateKey,
     required String symmetricKey,
-  }) {
-    final payloadJson = decodePayload(
+  }) async {
+    final payloadJson = await decodePayload(
       encodedPayload: encodedPayload,
       expectedVaultId: expectedVaultId,
       privateKey: privateKey,
@@ -213,85 +194,71 @@ class SyncPayloadCodec {
     return AccountItem.fromJson(payloadJson);
   }
 
-  static bool _looksLikeEnvelope(Map<String, dynamic> json) {
-    return json.containsKey('v') &&
-        json.containsKey('vault_id') &&
-        json.containsKey('node_id') &&
-        json.containsKey('nonce') &&
-        json.containsKey('ciphertext') &&
-        json.containsKey('mac');
+  static Map<String, dynamic> _decodeEnvelope(String encodedPayload) {
+    final normalized = encodedPayload.trim();
+    if (!normalized.startsWith(prefix)) {
+      throw const SyncPayloadException(
+        'Payload is not a SecretRoy encrypted sync envelope.',
+      );
+    }
+
+    try {
+      final envelopeJson = jsonDecode(
+        utf8.decode(_decodeBase64Url(normalized.substring(prefix.length))),
+      );
+      return Map<String, dynamic>.from(envelopeJson as Map);
+    } catch (_) {
+      throw const SyncPayloadException('Payload is not valid envelope JSON.');
+    }
   }
 
-  static List<int> _deriveKey({
-    required String label,
+  static Future<SecretKey> _derivePayloadKey({
     required String vaultId,
-    required String secret,
+    required String privateKey,
+    required String symmetricKey,
+    required List<int> salt,
   }) {
-    return sha256.convert(utf8.encode('$label|$vaultId|$secret')).bytes;
+    return Hkdf(hmac: Hmac.sha256(), outputLength: _keyLength).deriveKey(
+      secretKey: SecretKey(utf8.encode('$symmetricKey|$privateKey')),
+      nonce: salt,
+      info: utf8.encode('sroy-sync-payload|$_algorithmName|$vaultId'),
+    );
   }
 
-  static String _computeMac({
-    required List<int> macKey,
+  static List<int> _additionalData({
     required int version,
     required String vaultId,
     required String nodeId,
-    required String nonce,
-    required String ciphertext,
   }) {
-    final input = '$version|$vaultId|$nodeId|$nonce|$ciphertext';
-    final digest = Hmac(sha256, macKey).convert(utf8.encode(input));
-    return base64Encode(digest.bytes);
+    return utf8.encode(
+      'v=$version;alg=$_algorithmName;vault=$vaultId;node=$nodeId',
+    );
   }
 
-  static List<int> _xorWithKeystream(
-    List<int> input, {
-    required List<int> keyBytes,
-    required List<int> nonceBytes,
-  }) {
-    final output = List<int>.filled(input.length, 0);
-    var offset = 0;
-    var blockIndex = 0;
-
-    while (offset < input.length) {
-      final block = sha256.convert([
-        ...keyBytes,
-        ...nonceBytes,
-        ..._blockCounter(blockIndex),
-      ]).bytes;
-      for (var i = 0; i < block.length && offset < input.length; i++) {
-        output[offset] = input[offset] ^ block[i];
-        offset += 1;
-      }
-      blockIndex += 1;
+  static List<int> _readBase64UrlBytes(
+    Map<String, dynamic> envelope,
+    String key,
+  ) {
+    final value = envelope[key];
+    if (value is! String || value.isEmpty) {
+      throw const SyncPayloadException('Payload envelope is incomplete.');
     }
-
-    return output;
-  }
-
-  static List<int> _blockCounter(int value) {
-    return [
-      (value >> 24) & 0xFF,
-      (value >> 16) & 0xFF,
-      (value >> 8) & 0xFF,
-      value & 0xFF,
-    ];
+    try {
+      return _decodeBase64Url(value);
+    } catch (_) {
+      throw const SyncPayloadException('Payload envelope is incomplete.');
+    }
   }
 
   static List<int> _randomBytes(int length) {
     return List<int>.generate(length, (_) => _random.nextInt(256));
   }
 
-  static bool _constantTimeEquals(String left, String right) {
-    final leftBytes = utf8.encode(left);
-    final rightBytes = utf8.encode(right);
-    if (leftBytes.length != rightBytes.length) {
-      return false;
-    }
+  static String _encodeBase64Url(List<int> bytes) {
+    return base64UrlEncode(bytes).replaceAll('=', '');
+  }
 
-    var diff = 0;
-    for (var i = 0; i < leftBytes.length; i++) {
-      diff |= leftBytes[i] ^ rightBytes[i];
-    }
-    return diff == 0;
+  static List<int> _decodeBase64Url(String value) {
+    return base64Url.decode(base64Url.normalize(value));
   }
 }

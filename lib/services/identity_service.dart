@@ -124,8 +124,8 @@ class IdentityService {
 
   String? _deviceId;
   String? _vaultId;
-  String? _privateKeyMock;
-  String? _symmetricKeyMock;
+  String? _privateKeyMaterial;
+  String? _symmetricKeyMaterial;
 
   IdentityService({required this.secureStorage, Uuid? uuid})
     : _uuid = uuid ?? const Uuid();
@@ -136,20 +136,23 @@ class IdentityService {
   bool get hasIdentity =>
       _deviceId != null &&
       _vaultId != null &&
-      _privateKeyMock != null &&
-      _symmetricKeyMock != null;
+      _privateKeyMaterial != null &&
+      _symmetricKeyMaterial != null;
 
   Future<bool> checkIdentityExists() async {
     final storedVaultId = await secureStorage.read(key: _vaultIdKey);
     final storedPrivateKey = await secureStorage.read(key: _privateKeyKey);
     final storedSymmetricKey = await secureStorage.read(key: _symmetricKeyKey);
-    return storedVaultId != null &&
-        storedPrivateKey != null &&
-        storedSymmetricKey != null;
+    return _isValidVaultIdentity(
+      vaultId: storedVaultId,
+      privateKey: storedPrivateKey,
+      symmetricKey: storedSymmetricKey,
+    );
   }
 
-  String get privateKey => _requireValue(_privateKeyMock, 'privateKey');
-  String get symmetricKey => _requireValue(_symmetricKeyMock, 'symmetricKey');
+  String get privateKey => _requireValue(_privateKeyMaterial, 'privateKey');
+  String get symmetricKey =>
+      _requireValue(_symmetricKeyMaterial, 'symmetricKey');
 
   String exportTransferCode({String? syncServerUrl, String? vaultDump}) {
     final payload = {
@@ -395,12 +398,15 @@ class IdentityService {
     VaultIdentityImportPreview preview,
   ) async {
     _vaultId = preview.vaultId;
-    _privateKeyMock = preview.privateKey;
-    _symmetricKeyMock = preview.symmetricKey;
+    _privateKeyMaterial = preview.privateKey;
+    _symmetricKeyMaterial = preview.symmetricKey;
 
     await secureStorage.write(key: _vaultIdKey, value: _vaultId!);
-    await secureStorage.write(key: _privateKeyKey, value: _privateKeyMock!);
-    await secureStorage.write(key: _symmetricKeyKey, value: _symmetricKeyMock!);
+    await secureStorage.write(key: _privateKeyKey, value: _privateKeyMaterial!);
+    await secureStorage.write(
+      key: _symmetricKeyKey,
+      value: _symmetricKeyMaterial!,
+    );
   }
 
   VaultIdentityImportPreview currentImportPreview() {
@@ -444,7 +450,7 @@ class IdentityService {
     }
   }
 
-  Future<void> initialize() async {
+  Future<void> initialize({bool allowGenerateVaultIdentity = true}) async {
     await _ensureDeviceId();
 
     final storedVaultId = await secureStorage.read(key: _vaultIdKey);
@@ -462,6 +468,11 @@ class IdentityService {
         .toList();
 
     if (populatedIdentityKeys.isEmpty) {
+      if (!allowGenerateVaultIdentity) {
+        throw const IdentityCorruptedException(
+          missingKeys: [_vaultIdKey, _privateKeyKey, _symmetricKeyKey],
+        );
+      }
       await _generateIdentity();
       return;
     }
@@ -489,18 +500,21 @@ class IdentityService {
     }
 
     _vaultId = storedVaultId;
-    _privateKeyMock = storedPrivateKey;
-    _symmetricKeyMock = storedSymmetricKey;
+    _privateKeyMaterial = storedPrivateKey;
+    _symmetricKeyMaterial = storedSymmetricKey;
   }
 
   Future<void> _generateIdentity() async {
     _vaultId = 'vault_${_randomHex(32)}';
-    _privateKeyMock = 'priv_${_randomHex(64)}';
-    _symmetricKeyMock = 'sym_${_randomHex(64)}';
+    _privateKeyMaterial = 'priv_${_randomHex(64)}';
+    _symmetricKeyMaterial = 'sym_${_randomHex(64)}';
 
     await secureStorage.write(key: _vaultIdKey, value: _vaultId!);
-    await secureStorage.write(key: _privateKeyKey, value: _privateKeyMock!);
-    await secureStorage.write(key: _symmetricKeyKey, value: _symmetricKeyMock!);
+    await secureStorage.write(key: _privateKeyKey, value: _privateKeyMaterial!);
+    await secureStorage.write(
+      key: _symmetricKeyKey,
+      value: _symmetricKeyMaterial!,
+    );
   }
 
   Future<void> _ensureDeviceId() async {
@@ -534,6 +548,19 @@ class IdentityService {
   bool _isValidDeviceId(String value) {
     return _currentDeviceIdPattern.hasMatch(value) ||
         _legacyDeviceIdPattern.hasMatch(value);
+  }
+
+  bool _isValidVaultIdentity({
+    required String? vaultId,
+    required String? privateKey,
+    required String? symmetricKey,
+  }) {
+    return vaultId != null &&
+        privateKey != null &&
+        symmetricKey != null &&
+        _vaultIdPattern.hasMatch(vaultId) &&
+        _privateKeyPattern.hasMatch(privateKey) &&
+        _symmetricKeyPattern.hasMatch(symmetricKey);
   }
 
   String _requireValue(String? value, String fieldName) {
