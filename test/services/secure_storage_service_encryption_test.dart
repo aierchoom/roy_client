@@ -125,6 +125,37 @@ void main() {
 
     await storage.close(dispose: true);
   });
+
+  test('recovers when encrypted database replacement is interrupted', () async {
+    final storage = SecureStorageService(databaseCipher: cipher);
+    await storage.initialize(deviceId: 'device_test');
+    await storage.saveAccount(_account());
+
+    final encryptedPath = await storage.getDatabaseFilePath();
+    await storage.close(dispose: true);
+
+    final encryptedFile = File(encryptedPath);
+    final backupFile = File('$encryptedPath.bak');
+    final tempFile = File('$encryptedPath.tmp');
+    await encryptedFile.rename(backupFile.path);
+    await tempFile.writeAsBytes(Uint8List.fromList([1, 2, 3]), flush: true);
+
+    expect(encryptedFile.existsSync(), isFalse);
+    expect(backupFile.existsSync(), isTrue);
+    expect(tempFile.existsSync(), isTrue);
+
+    final reopenedStorage = SecureStorageService(databaseCipher: cipher);
+    await reopenedStorage.initialize(deviceId: 'device_test');
+    final account = await reopenedStorage.getAccountById('account_1');
+
+    expect(account, isNotNull);
+    expect(account!.data['password'], 'secret-password');
+    expect(encryptedFile.existsSync(), isTrue);
+    expect(backupFile.existsSync(), isFalse);
+    expect(tempFile.existsSync(), isFalse);
+
+    await reopenedStorage.close(dispose: true);
+  });
 }
 
 AccountItem _account() {

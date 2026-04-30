@@ -23,6 +23,18 @@ Each report should include:
 
 | Date | Report | Scope |
 |---|---|---|
+| 2026-04-30 | [2026-04-30-full-iteration-quality-convergence.md](2026-04-30-full-iteration-quality-convergence.md) | Full iteration quality convergence |
+| 2026-04-30 | [2026-04-30-crash-recovery-loop.md](2026-04-30-crash-recovery-loop.md) | Crash recovery loop |
+| 2026-04-30 | [2026-04-30-t0-t7-quality-convergence-rerun.md](2026-04-30-t0-t7-quality-convergence-rerun.md) | T0-T7 quality convergence rerun |
+| 2026-04-30 | [2026-04-30-t0-t7-quality-convergence.md](2026-04-30-t0-t7-quality-convergence.md) | T0-T7 quality convergence |
+| 2026-04-30 | [2026-04-30-minimal-two-device-sync.md](2026-04-30-minimal-two-device-sync.md) | Minimal two-device sync tests |
+| 2026-04-30 | [2026-04-30-crdt-merge-invariants.md](2026-04-30-crdt-merge-invariants.md) | CRDT merge invariant tests |
+| 2026-04-30 | [2026-04-30-sync-conflict-recovery-paths.md](2026-04-30-sync-conflict-recovery-paths.md) | Sync conflict recovery paths |
+| 2026-04-30 | [2026-04-30-sync-conflict-types.md](2026-04-30-sync-conflict-types.md) | Sync conflict type protocol |
+| 2026-04-30 | [2026-04-30-sync-payload-aead.md](2026-04-30-sync-payload-aead.md) | Sync payload AEAD/E2EE boundary |
+| 2026-04-30 | [2026-04-30-sync-metadata-vault-scope.md](2026-04-30-sync-metadata-vault-scope.md) | Sync metadata vault scoping |
+| 2026-04-30 | [2026-04-30-vault-device-identity.md](2026-04-30-vault-device-identity.md) | Vault/device identity lifecycle hardening |
+| 2026-04-29 | [2026-04-29-local-outbound-sync-review.md](2026-04-29-local-outbound-sync-review.md) | Local outbound sync review |
 | 2026-04-29 | [2026-04-29-key-linking-quality-convergence.md](2026-04-29-key-linking-quality-convergence.md) | Local key linking quality convergence |
 | 2026-04-28 | [2026-04-28-client-service-manager-system-refactor.md](2026-04-28-client-service-manager-system-refactor.md) | ServiceManager system-module refactor |
 | 2026-04-28 | [2026-04-28-project-todo-linkage.md](2026-04-28-project-todo-linkage.md) | Project TODO linkage |

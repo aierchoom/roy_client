@@ -1,4 +1,4 @@
-﻿# 账户与模板业务分析
+# 账户与模板业务分析
 
 **生成日期**: 2026-04-19
 **分析范围**: `roy_client` 当前代码实现下，账户、模板、模板字段变更对数据库和用户行为的影响
@@ -27,15 +27,15 @@
 
 ### 1.2 当前代码里的关键事实
 
-- `accounts` 和 `templates` 是两张独立表，`accounts.template_id` 只是普通文本字段  
+- `accounts` 和 `templates` 是两张独立表，`accounts.template_id` 只是普通文本字段
   参考: `lib/services/secure_storage_service.dart:124-145`
-- 删除模板时，只删除 `templates` 表对应记录，不会处理 `accounts` 表  
+- 删除模板时，只删除 `templates` 表对应记录，不会处理 `accounts` 表
   参考: `lib/services/secure_storage_service.dart:316-320`
-- UI 层删除自定义模板前，会先检查是否仍被账户使用；若有使用则阻止删除  
+- UI 层删除自定义模板前，会先检查是否仍被账户使用；若有使用则阻止删除
   参考: `lib/views/templates/template_list_view.dart:67-109`
-- 已存在字段的 `fieldKey` 在模板编辑页被锁定，避免直接改 key  
+- 已存在字段的 `fieldKey` 在模板编辑页被锁定，避免直接改 key
   参考: `lib/views/templates/template_edit_view.dart:222-230`, `338-345`
-- 删除模板字段只是把字段从模板内存列表移除，没有任何账户迁移逻辑  
+- 删除模板字段只是把字段从模板内存列表移除，没有任何账户迁移逻辑
   参考: `lib/views/templates/template_edit_view.dart:777-780`
 - 账户编辑页只按“当前模板字段列表”生成编辑控件，再把这些控件重新序列化为新的 `data`
   - 模板不存在时直接返回，不会恢复旧字段

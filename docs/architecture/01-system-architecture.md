@@ -1,4 +1,4 @@
-﻿# SecretRoy System Architecture
+# SecretRoy System Architecture
 
 Navigation:
 [Docs Home](../README.md) |

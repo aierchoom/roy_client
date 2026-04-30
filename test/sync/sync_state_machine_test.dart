@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:secret_roy/models/account_item.dart';
 import 'package:secret_roy/models/account_template.dart';
 import 'package:secret_roy/models/hlc.dart';
+import 'package:secret_roy/models/local_sync_change.dart';
 import 'package:secret_roy/services/identity_service.dart';
 import 'package:secret_roy/services/secure_storage_service.dart';
 import 'package:secret_roy/sync/sync_service.dart';
@@ -28,6 +29,10 @@ class _MemorySecureKeyValueStore implements SecureKeyValueStore {
 class _FakeSecureStorageService extends SecureStorageService {
   final Map<String, String> settings = {};
   final Map<String, AccountItem> accounts = {};
+  final Map<String, AccountTemplate> templates = {};
+  final List<String> pushedLocalSyncChangeIds = [];
+  List<LocalSyncChange>? approvedChangesOverride;
+  bool autoApprovePending = true;
 
   @override
   bool get isOpen => true;
@@ -71,7 +76,112 @@ class _FakeSecureStorageService extends SecureStorageService {
   }
 
   @override
-  Future<List<AccountTemplate>> loadDirtyTemplates() async => [];
+  Future<List<AccountTemplate>> loadDirtyTemplates() async {
+    return templates.values
+        .where(
+          (item) => item.isCustom && item.syncStatus != SyncStatus.synchronized,
+        )
+        .toList();
+  }
+
+  @override
+  Future<void> ensurePendingSyncOutboxEntries(String vaultId) async {}
+
+  @override
+  Future<List<LocalSyncChange>> loadApprovedLocalSyncChanges({
+    required String vaultId,
+  }) async {
+    if (approvedChangesOverride != null) {
+      return approvedChangesOverride!;
+    }
+    if (!autoApprovePending) return [];
+    return accounts.values
+        .where((item) => item.syncStatus == SyncStatus.pendingPush)
+        .map((item) => _approvedChange(vaultId, item))
+        .toList();
+  }
+
+  @override
+  Future<bool> hasOpenLocalSyncChanges(String vaultId) async {
+    return !autoApprovePending &&
+        accounts.values.any(
+          (item) => item.syncStatus == SyncStatus.pendingPush,
+        );
+  }
+
+  @override
+  Future<void> markLocalSyncChangesPushing(Iterable<String> ids) async {}
+
+  @override
+  Future<void> markLocalSyncChangesPushed(Iterable<String> ids) async {
+    pushedLocalSyncChangeIds.addAll(ids);
+  }
+
+  @override
+  Future<void> markLocalSyncChangesFailed(
+    Iterable<String> ids,
+    String errorMessage,
+  ) async {}
+
+  @override
+  Future<void> markLocalSyncChangesConflict(
+    Iterable<String> ids,
+    String errorMessage,
+  ) async {}
+}
+
+LocalSyncChange _approvedChange(String vaultId, AccountItem item) {
+  return LocalSyncChange(
+    id: 'change_${item.id}',
+    vaultId: vaultId,
+    entityType: LocalSyncEntityType.account,
+    entityId: item.id,
+    action: item.isDeleted ? LocalSyncAction.delete : LocalSyncAction.update,
+    title: item.name,
+    beforeJson: null,
+    afterJson: null,
+    diff: const {
+      'changed_fields': ['record.updated'],
+    },
+    baseServerVersion: item.serverVersion,
+    status: LocalSyncStatus.approved,
+    createdAt: 1,
+    updatedAt: 1,
+    approvedAt: 1,
+  );
+}
+
+LocalSyncChange _approvedTemplateChange(String vaultId, String templateId) {
+  return LocalSyncChange(
+    id: 'template_change_$templateId',
+    vaultId: vaultId,
+    entityType: LocalSyncEntityType.template,
+    entityId: templateId,
+    action: LocalSyncAction.update,
+    title: 'Template',
+    beforeJson: null,
+    afterJson: null,
+    diff: const {
+      'changed_fields': ['record.updated'],
+    },
+    baseServerVersion: 0,
+    status: LocalSyncStatus.approved,
+    createdAt: 1,
+    updatedAt: 1,
+    approvedAt: 1,
+  );
+}
+
+AccountTemplate _cleanTemplateWithId(String templateId) {
+  return AccountTemplate(
+    templateId: templateId,
+    title: 'Template',
+    subTitle: 'Test template',
+    category: TemplateCategory.login,
+    fields: const [],
+    isCustom: true,
+    syncStatus: SyncStatus.synchronized,
+  );
 }
 
 IdentityService _identityService() {
@@ -377,6 +487,46 @@ void main() {
     },
   );
 
+  test(
+    'syncNow surfaces invalid payload conflict types from push responses',
+    () async {
+      final identity = _identityService();
+      await identity.initialize();
+
+      final storage = _FakeSecureStorageService()
+        ..accounts['account_1'] = _pendingItem();
+      final server = await _SyncProbeServer.start(
+        postStatusCode: 400,
+        postBody: jsonEncode({
+          'error': 'Invalid encrypted payload envelope for item account_1',
+          'conflict_type': 'invalid_payload',
+          'item_id': 'account_1',
+        }),
+      );
+      addTearDown(server.close);
+
+      final syncService = SyncService(
+        storageService: storage,
+        identityService: identity,
+        config: SyncConfig(serverUrl: server.baseUrl),
+      );
+      addTearDown(syncService.dispose);
+      await syncService.initialize();
+
+      final result = await syncService.syncNow();
+
+      expect(result.success, isFalse);
+      expect(result.error, contains('Invalid encrypted payload envelope'));
+      expect(syncService.state, SyncState.error);
+      expect(syncService.errorMessage, contains('Sync payload rejected'));
+      expect(
+        syncService.statusNote,
+        'The sync server rejected a local encrypted payload. Reopen the item and retry; inspect client logs if it repeats.',
+      );
+      expect(server.postCount, 1);
+    },
+  );
+
   test('syncNow rejects malformed pull responses before pushing', () async {
     final identity = _identityService();
     await identity.initialize();
@@ -459,5 +609,79 @@ void main() {
     expect(result.pushed, isTrue);
     expect(syncService.state, SyncState.synced);
     expect(syncService.statusNote, 'Pushed local changes.');
+  });
+
+  test(
+    'approved outbox status updates are scoped by entity type and id',
+    () async {
+      final identity = _identityService();
+      await identity.initialize();
+      final vaultId = identity.vaultId;
+
+      final account = _pendingItem();
+      final storage = _FakeSecureStorageService()
+        ..accounts[account.id] = account
+        ..templates[account.id] = _cleanTemplateWithId(account.id)
+        ..approvedChangesOverride = [
+          _approvedChange(vaultId, account),
+          _approvedTemplateChange(vaultId, account.id),
+        ];
+      final server = await _SyncProbeServer.start(
+        postBody: jsonEncode({
+          'success': true,
+          'max_version': 2,
+          'accepted_versions': {account.id: 2},
+        }),
+      );
+      addTearDown(server.close);
+
+      final syncService = SyncService(
+        storageService: storage,
+        identityService: identity,
+        config: SyncConfig(serverUrl: server.baseUrl),
+      );
+      addTearDown(syncService.dispose);
+      await syncService.initialize();
+
+      final result = await syncService.syncNow();
+
+      expect(result.success, isTrue);
+      expect(storage.pushedLocalSyncChangeIds, ['change_${account.id}']);
+      expect(
+        storage.pushedLocalSyncChangeIds,
+        isNot(contains('template_change_${account.id}')),
+      );
+    },
+  );
+
+  test('syncNow does not push unapproved local changes', () async {
+    final identity = _identityService();
+    await identity.initialize();
+
+    final storage = _FakeSecureStorageService()
+      ..autoApprovePending = false
+      ..accounts['account_1'] = _pendingItem();
+    final server = await _SyncProbeServer.start();
+    addTearDown(server.close);
+
+    final syncService = SyncService(
+      storageService: storage,
+      identityService: identity,
+      config: SyncConfig(serverUrl: server.baseUrl),
+    );
+    addTearDown(syncService.dispose);
+    await syncService.initialize();
+
+    final result = await syncService.syncNow();
+
+    expect(result.success, isTrue);
+    expect(result.pushed, isFalse);
+    expect(server.postCount, 0);
+    expect(storage.accounts['account_1']!.syncStatus, SyncStatus.pendingPush);
+    expect(syncService.isDirty, isTrue);
+    expect(
+      syncService.statusNote,
+      'Local changes are waiting for review before push.',
+    );
   });
 }

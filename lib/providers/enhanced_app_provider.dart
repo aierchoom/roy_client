@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../models/account_item.dart';
 import '../models/account_template.dart';
+import '../models/local_sync_change.dart';
 import '../services/secure_storage_service.dart';
 import '../services/service_manager.dart';
 import '../sync/sync_service.dart';
@@ -14,6 +15,7 @@ class EnhancedAppProvider extends ChangeNotifier {
 
   List<AccountItem> _accounts = [];
   List<AccountTemplate> _customTemplates = [];
+  List<LocalSyncChange> _localSyncChanges = [];
   String _searchQuery = '';
   Set<String> _selectedTags = {};
   bool _isLoading = false;
@@ -31,6 +33,7 @@ class EnhancedAppProvider extends ChangeNotifier {
   ];
   List<AccountItem> get allAccounts => _accounts;
   List<AccountTemplate> get customTemplates => _customTemplates;
+  List<LocalSyncChange> get localSyncChanges => _localSyncChanges;
   String get searchQuery => _searchQuery;
   Set<String> get selectedTags => _selectedTags;
   bool get isLoading => _isLoading;
@@ -93,6 +96,9 @@ class EnhancedAppProvider extends ChangeNotifier {
     _customTemplates = List<AccountTemplate>.of(
       await _storageService.loadCustomTemplates(),
     );
+    _localSyncChanges = List<LocalSyncChange>.of(
+      await _serviceManager.loadOpenLocalSyncChanges(),
+    );
     // Count total conflict logs across all accounts
     int count = 0;
     for (final acc in _accounts) {
@@ -113,6 +119,7 @@ class EnhancedAppProvider extends ChangeNotifier {
 
     _accounts = [];
     _customTemplates = [];
+    _localSyncChanges = [];
     notifyListeners();
   }
 
@@ -124,6 +131,7 @@ class EnhancedAppProvider extends ChangeNotifier {
     _setLoading(true);
     _accounts = [];
     _customTemplates = [];
+    _localSyncChanges = [];
     notifyListeners();
 
     await _loadData();
@@ -229,7 +237,9 @@ class EnhancedAppProvider extends ChangeNotifier {
   }
 
   int countAccountsByTemplate(String templateId) {
-    return _accounts.where((account) => account.templateId == templateId).length;
+    return _accounts
+        .where((account) => account.templateId == templateId)
+        .length;
   }
 
   Future<void> deleteCustomTemplate(String templateId) async {
@@ -272,6 +282,25 @@ class EnhancedAppProvider extends ChangeNotifier {
 
   Future<SyncResult> syncNow() async {
     return _serviceManager.syncNow();
+  }
+
+  Future<SyncResult> pushAllLocalSyncChanges() async {
+    final result = await _serviceManager.approveAndSyncLocalChanges();
+    await _loadData();
+    return result;
+  }
+
+  Future<SyncResult> pushLocalSyncChange(String changeId) async {
+    final result = await _serviceManager.approveAndSyncLocalChanges(
+      changeIds: [changeId],
+    );
+    await _loadData();
+    return result;
+  }
+
+  Future<void> discardLocalSyncChange(String changeId) async {
+    await _serviceManager.discardLocalSyncChange(changeId);
+    await _loadData();
   }
 
   void _setLoading(bool value) {

@@ -86,12 +86,12 @@ sequenceDiagram
     Ser-->>Mob: 3. ACCEPTED: 返回 base_server_version = 15
 
     Note over PC: 4. 操作: PC也在离线时改了这个特定网站的密码。<br/>本地HLC: 1002-DeviceP
-    
+
     PC->>Ser: 5. PULL: Fetch `since=10` 的差距更新
     Ser-->>PC: 6. 返回: 版本15的手机密文
-    
+
     Note over PC: 7. MERGE: 解密手机包。<br/>对比字段 HLC。<br/>由于 1002>1001，保留自身离线写的密码。<br/>保留手机写的用户名。
-    
+
     PC->>Ser: 8. PUSH: 上报合并后的最新态，由于附有期待版本且签名无误
     Ser-->>PC: 9. ACCEPTED: 版本刷到 16，大一统状态达成。
 ```

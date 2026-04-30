@@ -11,19 +11,20 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart' as ffi;
 import '../models/account_item.dart';
 import '../models/account_template.dart';
 import '../models/hlc.dart';
+import '../models/local_sync_change.dart';
 import '../sync/crdt_merge_engine.dart';
 import 'database_file_cipher.dart';
 
 bool get _isDesktop =>
     !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
 
-enum StorageItemType { account, template, setting }
+enum StorageItemType { account, template, setting, localSyncChange }
 
 class SecureStorageService {
   static const String _databaseName = 'secret_roy_vault.db';
   static const String _encryptedDatabaseName = 'secret_roy_vault.db.enc';
   static const String _workingDatabaseName = 'secret_roy_vault.runtime.db';
-  static const int _databaseVersion = 4;
+  static const int _databaseVersion = 5;
 
   DatabaseFileCipher? _databaseCipher;
 
@@ -189,6 +190,7 @@ class SecureStorageService {
       await _database!.execute('DELETE FROM accounts');
       await _database!.execute('DELETE FROM templates WHERE is_custom = 1');
       await _database!.execute('DELETE FROM conflict_logs');
+      await _database!.execute('DELETE FROM local_sync_changes');
       await _persistAfterMutation();
       _notifyChange(
         StorageChangeEvent(
@@ -216,6 +218,7 @@ class SecureStorageService {
     batch.delete('accounts');
     batch.delete('templates', where: 'is_custom = 1');
     batch.delete('conflict_logs');
+    batch.delete('local_sync_changes');
 
     for (final template in templates) {
       batch.insert('templates', {
@@ -317,6 +320,7 @@ class SecureStorageService {
     final workingPath = _workingDatabasePath!;
     await _deleteWorkingDatabase();
     await Directory(dirname(workingPath)).create(recursive: true);
+    await _recoverInterruptedEncryptedDatabaseWrite();
 
     final encryptedFile = File(_encryptedDatabasePath!);
     if (!encryptedFile.existsSync()) {
@@ -330,6 +334,29 @@ class SecureStorageService {
       encryptedBytes,
     );
     await _writeFileAtomically(workingPath, plaintextBytes);
+  }
+
+  Future<void> _recoverInterruptedEncryptedDatabaseWrite() async {
+    final encryptedPath = _encryptedDatabasePath;
+    if (encryptedPath == null) {
+      return;
+    }
+
+    final targetFile = File(encryptedPath);
+    final backupFile = File('$encryptedPath.bak');
+    final tempFile = File('$encryptedPath.tmp');
+
+    if (!targetFile.existsSync() && backupFile.existsSync()) {
+      await backupFile.rename(targetFile.path);
+    }
+
+    if (targetFile.existsSync() && tempFile.existsSync()) {
+      await tempFile.delete();
+    }
+
+    if (targetFile.existsSync() && backupFile.existsSync()) {
+      await backupFile.delete();
+    }
   }
 
   Future<void> _setRuntimePragmas() async {
@@ -530,6 +557,8 @@ class SecureStorageService {
       )
     ''');
 
+    await _createLocalSyncChangesTable(db);
+
     await db.execute(
       'CREATE INDEX idx_accounts_template ON accounts(template_id)',
     );
@@ -592,6 +621,39 @@ class SecureStorageService {
       );
       await db.execute('ALTER TABLE templates ADD COLUMN delete_hlc TEXT');
     }
+
+    if (oldVersion < 5) {
+      await _createLocalSyncChangesTable(db);
+    }
+  }
+
+  Future<void> _createLocalSyncChangesTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS local_sync_changes (
+        id TEXT PRIMARY KEY,
+        vault_id TEXT NOT NULL,
+        entity_type TEXT NOT NULL,
+        entity_id TEXT NOT NULL,
+        action TEXT NOT NULL,
+        title TEXT NOT NULL,
+        before_json TEXT,
+        after_json TEXT,
+        diff_json TEXT NOT NULL,
+        base_server_version INTEGER DEFAULT 0,
+        status TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        approved_at INTEGER,
+        pushed_at INTEGER,
+        error_message TEXT
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_local_sync_changes_open ON local_sync_changes(vault_id, status, updated_at)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_local_sync_changes_entity ON local_sync_changes(vault_id, entity_type, entity_id)',
+    );
   }
 
   Future<List<Map<String, dynamic>>> _query(
@@ -1085,6 +1147,465 @@ class SecureStorageService {
       return null;
     }
   }
+
+  Future<void> recordLocalSyncChange({
+    required String vaultId,
+    required LocalSyncEntityType entityType,
+    required String entityId,
+    required LocalSyncAction action,
+    required String title,
+    required Map<String, dynamic>? beforeSnapshot,
+    required Map<String, dynamic>? afterSnapshot,
+    required int baseServerVersion,
+    bool skipIfUnchanged = false,
+  }) async {
+    if (!isOpen) return;
+
+    try {
+      final existingRows = await _query(
+        'local_sync_changes',
+        where:
+            'vault_id = ? AND entity_type = ? AND entity_id = ? AND status IN (${_openStatusPlaceholders()})',
+        whereArgs: [
+          vaultId,
+          entityType.name,
+          entityId,
+          ..._openLocalSyncStatusNames,
+        ],
+        orderBy: 'created_at ASC',
+        limit: 1,
+      );
+      final existing = existingRows.isEmpty
+          ? null
+          : LocalSyncChange.fromDatabaseRow(existingRows.first);
+
+      final originalBefore = existing?.beforeSnapshot ?? beforeSnapshot;
+      final effectiveAction = _coalesceLocalSyncAction(
+        existing: existing,
+        nextAction: action,
+        originalBefore: originalBefore,
+      );
+      final beforeJson = originalBefore == null
+          ? null
+          : jsonEncode(originalBefore);
+      final afterJson = afterSnapshot == null
+          ? null
+          : jsonEncode(afterSnapshot);
+
+      if (existing?.action == LocalSyncAction.create &&
+          action == LocalSyncAction.delete) {
+        await deleteLocalSyncChange(existing!.id);
+        if (entityType == LocalSyncEntityType.account) {
+          await hardDeleteAccount(entityId);
+        } else {
+          await hardDeleteTemplate(entityId);
+        }
+        return;
+      }
+      if (skipIfUnchanged &&
+          existing != null &&
+          existing.action == effectiveAction &&
+          existing.beforeJson == beforeJson &&
+          existing.afterJson == afterJson) {
+        return;
+      }
+
+      final changedFields = _changedReviewFields(
+        before: originalBefore,
+        after: afterSnapshot,
+        action: effectiveAction,
+      );
+      if (effectiveAction == LocalSyncAction.update && changedFields.isEmpty) {
+        if (existing != null) {
+          await deleteLocalSyncChange(existing.id);
+        }
+        return;
+      }
+
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final id =
+          existing?.id ??
+          'local-${vaultId.hashCode}-${entityType.name}-$entityId-$now';
+
+      await _database!.insert('local_sync_changes', {
+        'id': id,
+        'vault_id': vaultId,
+        'entity_type': entityType.name,
+        'entity_id': entityId,
+        'action': effectiveAction.name,
+        'title': title.trim().isEmpty ? entityId : title.trim(),
+        'before_json': beforeJson,
+        'after_json': afterJson,
+        'diff_json': jsonEncode({'changed_fields': changedFields}),
+        'base_server_version': existing?.baseServerVersion ?? baseServerVersion,
+        'status': LocalSyncStatus.pendingReview.name,
+        'created_at': existing?.createdAt ?? now,
+        'updated_at': now,
+        'approved_at': null,
+        'pushed_at': null,
+        'error_message': null,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+
+      await _persistAfterMutation();
+      _notifyChange(
+        StorageChangeEvent(
+          type: StorageItemType.localSyncChange,
+          action: StorageAction.save,
+          id: id,
+        ),
+      );
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Failed to record local sync change: $e');
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> ensurePendingSyncOutboxEntries(String vaultId) async {
+    if (!isOpen) return;
+    try {
+      final pendingAccounts = await loadPendingSyncAccounts();
+      for (final account in pendingAccounts) {
+        await recordLocalSyncChange(
+          vaultId: vaultId,
+          entityType: LocalSyncEntityType.account,
+          entityId: account.id,
+          action: account.isDeleted
+              ? LocalSyncAction.delete
+              : account.serverVersion == 0
+              ? LocalSyncAction.create
+              : LocalSyncAction.update,
+          title: account.name,
+          beforeSnapshot: null,
+          afterSnapshot: account.toJson(),
+          baseServerVersion: account.serverVersion,
+          skipIfUnchanged: true,
+        );
+      }
+
+      final dirtyTemplates = await loadDirtyTemplates();
+      for (final template in dirtyTemplates) {
+        await recordLocalSyncChange(
+          vaultId: vaultId,
+          entityType: LocalSyncEntityType.template,
+          entityId: template.templateId,
+          action: template.isDeleted
+              ? LocalSyncAction.delete
+              : template.serverVersion == 0
+              ? LocalSyncAction.create
+              : LocalSyncAction.update,
+          title: template.title,
+          beforeSnapshot: null,
+          afterSnapshot: template.toJson(),
+          baseServerVersion: template.serverVersion,
+          skipIfUnchanged: true,
+        );
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Failed to ensure pending sync outbox entries: $e');
+      }
+    }
+  }
+
+  Future<List<LocalSyncChange>> loadOpenLocalSyncChanges({
+    required String vaultId,
+  }) async {
+    if (!isOpen) return [];
+    try {
+      final rows = await _query(
+        'local_sync_changes',
+        where: 'vault_id = ? AND status IN (${_openStatusPlaceholders()})',
+        whereArgs: [vaultId, ..._openLocalSyncStatusNames],
+        orderBy: 'updated_at DESC',
+      );
+      return rows.map(LocalSyncChange.fromDatabaseRow).toList();
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Failed to load local sync changes: $e');
+      }
+      return [];
+    }
+  }
+
+  Future<List<LocalSyncChange>> loadApprovedLocalSyncChanges({
+    required String vaultId,
+  }) async {
+    if (!isOpen) return [];
+    try {
+      final rows = await _query(
+        'local_sync_changes',
+        where: 'vault_id = ? AND status = ?',
+        whereArgs: [vaultId, LocalSyncStatus.approved.name],
+        orderBy: 'approved_at ASC',
+      );
+      return rows.map(LocalSyncChange.fromDatabaseRow).toList();
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Failed to load approved local sync changes: $e');
+      }
+      return [];
+    }
+  }
+
+  Future<LocalSyncChange?> getLocalSyncChange(String id) async {
+    if (!isOpen) return null;
+    try {
+      final rows = await _query(
+        'local_sync_changes',
+        where: 'id = ?',
+        whereArgs: [id],
+        limit: 1,
+      );
+      if (rows.isEmpty) return null;
+      return LocalSyncChange.fromDatabaseRow(rows.first);
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Failed to load local sync change: $e');
+      }
+      return null;
+    }
+  }
+
+  Future<bool> hasOpenLocalSyncChanges(String vaultId) async {
+    if (!isOpen) return false;
+    try {
+      final rows = await _database!.rawQuery(
+        'SELECT COUNT(*) AS count FROM local_sync_changes WHERE vault_id = ? AND status IN (${_openStatusPlaceholders()})',
+        [vaultId, ..._openLocalSyncStatusNames],
+      );
+      return (Sqflite.firstIntValue(rows) ?? 0) > 0;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> approveLocalSyncChanges({
+    required String vaultId,
+    Iterable<String>? ids,
+  }) async {
+    if (!isOpen) return;
+    final idList = ids?.toList(growable: false) ?? const <String>[];
+    if (ids != null && idList.isEmpty) return;
+
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final where = idList.isEmpty
+        ? 'vault_id = ? AND status IN (?, ?, ?)'
+        : 'vault_id = ? AND id IN (${List.filled(idList.length, '?').join(', ')}) AND status IN (?, ?, ?)';
+    final whereArgs = <Object?>[
+      vaultId,
+      if (idList.isNotEmpty) ...idList,
+      LocalSyncStatus.pendingReview.name,
+      LocalSyncStatus.failed.name,
+      LocalSyncStatus.conflict.name,
+    ];
+
+    await _database!.update(
+      'local_sync_changes',
+      {
+        'status': LocalSyncStatus.approved.name,
+        'approved_at': now,
+        'updated_at': now,
+        'error_message': null,
+      },
+      where: where,
+      whereArgs: whereArgs,
+    );
+    await _persistAfterMutation();
+    _notifyChange(
+      StorageChangeEvent(
+        type: StorageItemType.localSyncChange,
+        action: StorageAction.save,
+      ),
+    );
+  }
+
+  Future<void> markLocalSyncChangesPushing(Iterable<String> ids) {
+    return _updateLocalSyncChangeStatus(ids, LocalSyncStatus.pushing);
+  }
+
+  Future<void> markLocalSyncChangesPushed(Iterable<String> ids) {
+    return _updateLocalSyncChangeStatus(
+      ids,
+      LocalSyncStatus.pushed,
+      terminal: true,
+    );
+  }
+
+  Future<void> markLocalSyncChangesFailed(
+    Iterable<String> ids,
+    String errorMessage,
+  ) {
+    return _updateLocalSyncChangeStatus(
+      ids,
+      LocalSyncStatus.failed,
+      errorMessage: errorMessage,
+    );
+  }
+
+  Future<void> markLocalSyncChangesConflict(
+    Iterable<String> ids,
+    String errorMessage,
+  ) {
+    return _updateLocalSyncChangeStatus(
+      ids,
+      LocalSyncStatus.conflict,
+      errorMessage: errorMessage,
+    );
+  }
+
+  Future<void> deleteLocalSyncChange(String id) async {
+    if (!isOpen) return;
+    await _database!.delete(
+      'local_sync_changes',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    await _persistAfterMutation();
+    _notifyChange(
+      StorageChangeEvent(
+        type: StorageItemType.localSyncChange,
+        action: StorageAction.delete,
+        id: id,
+      ),
+    );
+  }
+
+  Future<void> hardDeleteAccount(String id) async {
+    if (!isOpen) return;
+    await _database!.delete('accounts', where: 'id = ?', whereArgs: [id]);
+    await _persistAfterMutation();
+    _notifyChange(
+      StorageChangeEvent(
+        type: StorageItemType.account,
+        action: StorageAction.delete,
+        id: id,
+      ),
+    );
+  }
+
+  Future<void> hardDeleteTemplate(String id) async {
+    if (!isOpen) return;
+    await _database!.delete('templates', where: 'id = ?', whereArgs: [id]);
+    await _persistAfterMutation();
+    _notifyChange(
+      StorageChangeEvent(
+        type: StorageItemType.template,
+        action: StorageAction.delete,
+        id: id,
+      ),
+    );
+  }
+
+  Future<void> _updateLocalSyncChangeStatus(
+    Iterable<String> ids,
+    LocalSyncStatus status, {
+    bool terminal = false,
+    String? errorMessage,
+  }) async {
+    if (!isOpen) return;
+    final idList = ids.toList(growable: false);
+    if (idList.isEmpty) return;
+
+    final now = DateTime.now().millisecondsSinceEpoch;
+    await _database!.update(
+      'local_sync_changes',
+      {
+        'status': status.name,
+        'updated_at': now,
+        'pushed_at': terminal ? now : null,
+        'error_message': errorMessage,
+      },
+      where: 'id IN (${List.filled(idList.length, '?').join(', ')})',
+      whereArgs: idList,
+    );
+    await _persistAfterMutation();
+    _notifyChange(
+      StorageChangeEvent(
+        type: StorageItemType.localSyncChange,
+        action: StorageAction.save,
+      ),
+    );
+  }
+
+  List<String> get _openLocalSyncStatusNames => const [
+    'pendingReview',
+    'approved',
+    'pushing',
+    'failed',
+    'conflict',
+  ];
+
+  String _openStatusPlaceholders() {
+    return List.filled(_openLocalSyncStatusNames.length, '?').join(', ');
+  }
+
+  LocalSyncAction _coalesceLocalSyncAction({
+    required LocalSyncChange? existing,
+    required LocalSyncAction nextAction,
+    required Map<String, dynamic>? originalBefore,
+  }) {
+    if (nextAction == LocalSyncAction.delete) {
+      return LocalSyncAction.delete;
+    }
+    if (existing?.action == LocalSyncAction.create) {
+      return LocalSyncAction.create;
+    }
+    if (nextAction == LocalSyncAction.create) {
+      return LocalSyncAction.create;
+    }
+    if (originalBefore == null && nextAction == LocalSyncAction.create) {
+      return LocalSyncAction.create;
+    }
+    return LocalSyncAction.update;
+  }
+
+  List<String> _changedReviewFields({
+    required Map<String, dynamic>? before,
+    required Map<String, dynamic>? after,
+    required LocalSyncAction action,
+  }) {
+    switch (action) {
+      case LocalSyncAction.create:
+        return const ['record.created'];
+      case LocalSyncAction.delete:
+        return const ['record.deleted'];
+      case LocalSyncAction.update:
+        if (before == null || after == null) {
+          return const ['record.updated'];
+        }
+        final changed = <String>{};
+        for (final key in {...before.keys, ...after.keys}) {
+          if (_reviewIgnoredSnapshotKeys.contains(key)) continue;
+          final beforeValue = before[key];
+          final afterValue = after[key];
+          if (key == 'data' && beforeValue is Map && afterValue is Map) {
+            for (final fieldKey in {...beforeValue.keys, ...afterValue.keys}) {
+              if (beforeValue[fieldKey] != afterValue[fieldKey]) {
+                changed.add('data.$fieldKey');
+              }
+            }
+            continue;
+          }
+          if (jsonEncode(beforeValue) != jsonEncode(afterValue)) {
+            changed.add(key);
+          }
+        }
+        return changed.toList()..sort();
+    }
+  }
+
+  static const Set<String> _reviewIgnoredSnapshotKeys = {
+    'nameHlc',
+    'emailHlc',
+    'dataHlc',
+    'hlc',
+    'syncStatus',
+    'serverVersion',
+    'isDeleted',
+    'deleteHlc',
+  };
 
   Future<String?> getSetting(String key) async {
     if (!isOpen) return null;

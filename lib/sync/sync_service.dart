@@ -11,6 +11,7 @@ import '../models/account_item.dart';
 import '../models/account_template.dart';
 import '../services/identity_service.dart';
 import '../services/secure_storage_service.dart';
+import '../models/local_sync_change.dart';
 import 'crdt_merge_engine.dart';
 import 'sync_payload_codec.dart';
 
@@ -128,6 +129,8 @@ class SyncService extends ChangeNotifier {
 
   String _syncRecoveryKey(String vaultId) => 'sync_recovery_$vaultId';
 
+  String _syncServerUrlKey(String vaultId) => 'sync_server_url_$vaultId';
+
   @visibleForTesting
   String? get recoveryPhase => _pendingRecovery?.phase.name;
 
@@ -141,27 +144,28 @@ class SyncService extends ChangeNotifier {
     }
 
     final vaultId = _identityService.vaultId;
-    final versionStr = await _storageService.getSetting(
-      _syncVersionKey(vaultId),
+    final versionStr = await _readVaultScopedSetting(
+      vaultId: vaultId,
+      scopedKey: _syncVersionKey(vaultId),
+      legacyKey: 'sync_version',
     );
     _localVersion = int.tryParse(versionStr ?? '') ?? 0;
 
-    final lastSyncStr = await _storageService.getSetting(
-      _syncLastTimeKey(vaultId),
+    final lastSyncStr = await _readVaultScopedSetting(
+      vaultId: vaultId,
+      scopedKey: _syncLastTimeKey(vaultId),
+      legacyKey: 'sync_last_time',
     );
     _lastSyncTime = lastSyncStr == null ? null : DateTime.tryParse(lastSyncStr);
 
-    final dirtyKey = _syncDirtyKey(vaultId);
-    var dirtyStr = await _storageService.getSetting(dirtyKey);
-    if (dirtyStr == null) {
-      final legacyDirtyStr = await _storageService.getSetting('sync_dirty');
-      if (legacyDirtyStr != null) {
-        dirtyStr = legacyDirtyStr;
-        await _storageService.setSetting(dirtyKey, legacyDirtyStr);
-      }
-    }
+    final dirtyStr = await _readVaultScopedSetting(
+      vaultId: vaultId,
+      scopedKey: _syncDirtyKey(vaultId),
+      legacyKey: 'sync_dirty',
+    );
     _isDirty = dirtyStr == '1';
 
+    await _storageService.ensurePendingSyncOutboxEntries(vaultId);
     await _loadRecoveryMarker(vaultId);
 
     debugPrint('[Sync] Initialized. Vault: $vaultId, Version: $_localVersion');
@@ -176,6 +180,24 @@ class SyncService extends ChangeNotifier {
       _syncDirtyKey(_identityService.vaultId),
       '1',
     );
+    notifyListeners();
+  }
+
+  Future<void> reconcileDirtyState() async {
+    if (!_identityService.hasIdentity) return;
+    final hasOpenChanges = await _storageService.hasOpenLocalSyncChanges(
+      _identityService.vaultId,
+    );
+    _isDirty = hasOpenChanges;
+    await _storageService.setSetting(
+      _syncDirtyKey(_identityService.vaultId),
+      hasOpenChanges ? '1' : '0',
+    );
+    if (hasOpenChanges) {
+      _statusNote ??= 'Local changes are waiting for review before push.';
+    } else {
+      _statusNote = null;
+    }
     notifyListeners();
   }
 
@@ -266,18 +288,26 @@ class SyncService extends ChangeNotifier {
           final pushCount = await _runPushPhase(serverUrl);
 
           await _recordSyncTime();
-          _isDirty = false;
+          final hasOpenLocalChanges = await _storageService
+              .hasOpenLocalSyncChanges(_identityService.vaultId);
+          _isDirty = hasOpenLocalChanges;
           await _storageService.setSetting(
             _syncDirtyKey(_identityService.vaultId),
-            '0',
+            hasOpenLocalChanges ? '1' : '0',
           );
           await _clearRecoveryMarker();
-          _statusNote = _buildSuccessStatusNote(
-            recovered: recoveredCount > 0,
-            pulled: pullCount > 0,
-            pushed: pushCount > 0,
-            notice: _queuedConflictNotice,
-          );
+          _statusNote = hasOpenLocalChanges
+              ? _buildQueuedLocalChangesStatusNote(
+                  pulled: recoveredCount > 0 || pullCount > 0,
+                  pushed: pushCount > 0,
+                  notice: _queuedConflictNotice,
+                )
+              : _buildSuccessStatusNote(
+                  recovered: recoveredCount > 0,
+                  pulled: pullCount > 0,
+                  pushed: pushCount > 0,
+                  notice: _queuedConflictNotice,
+                );
           _updateState(SyncState.synced);
 
           return SyncResult.success(
@@ -345,6 +375,14 @@ class SyncService extends ChangeNotifier {
     }
 
     if (e is _SyncHttpException) {
+      if (e.conflictType == 'invalid_payload') {
+        _setError(
+          'Sync payload rejected: ${e.logMessage}',
+          statusNote:
+              'The sync server rejected a local encrypted payload. Reopen the item and retry; inspect client logs if it repeats.',
+        );
+        return SyncResult.failure(e.userMessage);
+      }
       _setError('Sync failed: ${e.logMessage}', statusNote: e.userMessage);
       return SyncResult.failure(e.userMessage);
     }
@@ -404,6 +442,26 @@ class SyncService extends ChangeNotifier {
       return 'Pushed local changes.';
     }
     return 'Already up to date.';
+  }
+
+  String _buildQueuedLocalChangesStatusNote({
+    required bool pulled,
+    required bool pushed,
+    String? notice,
+  }) {
+    if (notice != null && notice.isNotEmpty) {
+      return '$notice Local changes are still waiting for review.';
+    }
+    if (pulled && pushed) {
+      return 'Pulled remote updates and pushed approved changes. Local changes are still waiting for review.';
+    }
+    if (pulled) {
+      return 'Pulled remote updates. Local changes are waiting for review.';
+    }
+    if (pushed) {
+      return 'Pushed approved changes. Local changes are still waiting for review.';
+    }
+    return 'Local changes are waiting for review before push.';
   }
 
   Future<Map<String, dynamic>> _fetchRemoteChanges(
@@ -552,7 +610,7 @@ class SyncService extends ChangeNotifier {
       final remoteVersion = _readRemoteVersion(remoteEncoded);
       final isRemoteDeleted = remoteEncoded['is_deleted'] == true;
 
-      final payload = _decryptAndVerifyPayload(remoteEncoded);
+      final payload = await _decryptAndVerifyPayload(remoteEncoded);
       final type = payload['_type'] as String?;
 
       if (type == 'template') {
@@ -630,7 +688,7 @@ class SyncService extends ChangeNotifier {
       final remoteEncoded = _readRemoteRecord(item);
       final remoteVersion = _readRemoteVersion(remoteEncoded);
       final isRemoteDeleted = remoteEncoded['is_deleted'] == true;
-      final payload = _decryptAndVerifyPayload(remoteEncoded);
+      final payload = await _decryptAndVerifyPayload(remoteEncoded);
       final type = payload['_type'] as String?;
 
       if (type == 'template') {
@@ -663,7 +721,11 @@ class SyncService extends ChangeNotifier {
   }
 
   Future<void> _loadRecoveryMarker(String vaultId) async {
-    final raw = await _storageService.getSetting(_syncRecoveryKey(vaultId));
+    final raw = await _readVaultScopedSetting(
+      vaultId: vaultId,
+      scopedKey: _syncRecoveryKey(vaultId),
+      legacyKey: 'sync_recovery',
+    );
     if (raw == null || raw.isEmpty) {
       _pendingRecovery = null;
       return;
@@ -715,11 +777,18 @@ class SyncService extends ChangeNotifier {
     debugPrint(
       '[Sync] Recovering interrupted ${marker.phase.name} phase from version ${marker.localVersion}.',
     );
-    final recoveredCount = await _pullAndMergeLatestSnapshot(serverUrl);
+    final recoveredCount = marker.phase == _SyncRecoveryPhase.pull
+        ? await _pullFromVersion(serverUrl, marker.localVersion)
+        : await _pullAndMergeLatestSnapshot(serverUrl);
     _queuedConflictNotice ??=
         'Recovered from an interrupted ${marker.phase.name} cycle before continuing sync.';
     await _clearRecoveryMarker();
     return recoveredCount;
+  }
+
+  Future<int> _pullFromVersion(String serverUrl, int sinceVersion) async {
+    final data = await _fetchRemoteChanges(serverUrl, since: sinceVersion);
+    return _applyRemoteChanges(data);
   }
 
   Future<void> _handleConflict(
@@ -736,9 +805,13 @@ class SyncService extends ChangeNotifier {
         await _handleRemoteMissingConflict(serverUrl, itemId);
         return;
       case 'stale_base_version':
+        await _handleStaleBaseConflict(serverUrl, itemId);
+        return;
       case 'concurrent_edit':
+        await _handleConcurrentEditConflict(serverUrl, itemId);
+        return;
       case 'concurrent_delete':
-        await _handleVersionConflict(serverUrl, itemId, conflict.conflictType!);
+        await _handleConcurrentDeleteConflict(serverUrl, itemId);
         return;
       default:
         if (conflict.serverActual == 0) {
@@ -751,6 +824,9 @@ class SyncService extends ChangeNotifier {
           conflict.serverIsDeleted == true
               ? 'concurrent_delete'
               : 'stale_base_version',
+          fallbackNotice: conflict.serverIsDeleted == true
+              ? 'Remote delete was accepted for this item. Restore from history only if this was unexpected.'
+              : 'Remote changes were merged locally after a stale-base conflict.',
         );
         return;
     }
@@ -778,6 +854,8 @@ class SyncService extends ChangeNotifier {
         ),
         isSyncMerge: true,
       );
+      _queuedConflictNotice =
+          'Remote record was already missing. Local delete is marked synchronized.';
       return;
     }
 
@@ -800,11 +878,48 @@ class SyncService extends ChangeNotifier {
         'Remote record missing. Review the conflict inbox before overwriting.';
   }
 
+  Future<void> _handleStaleBaseConflict(String serverUrl, String itemId) async {
+    await _handleVersionConflict(
+      serverUrl,
+      itemId,
+      'stale_base_version',
+      fallbackNotice:
+          'Remote changes were merged locally after a stale-base conflict.',
+    );
+  }
+
+  Future<void> _handleConcurrentEditConflict(
+    String serverUrl,
+    String itemId,
+  ) async {
+    await _handleVersionConflict(
+      serverUrl,
+      itemId,
+      'concurrent_edit',
+      fallbackNotice:
+          'Concurrent remote edits were merged locally. Review the conflict inbox before overwriting.',
+    );
+  }
+
+  Future<void> _handleConcurrentDeleteConflict(
+    String serverUrl,
+    String itemId,
+  ) async {
+    await _handleVersionConflict(
+      serverUrl,
+      itemId,
+      'concurrent_delete',
+      fallbackNotice:
+          'Remote delete was accepted for this item. Restore from history only if this was unexpected.',
+    );
+  }
+
   Future<void> _handleVersionConflict(
     String serverUrl,
     String itemId,
-    String conflictType,
-  ) async {
+    String conflictType, {
+    required String fallbackNotice,
+  }) async {
     final beforeCount = (await _storageService.getConflictLogs(itemId)).length;
     await _pullAndMergeLatestSnapshot(serverUrl);
 
@@ -839,67 +954,119 @@ class SyncService extends ChangeNotifier {
         _ =>
           'Remote changes were merged locally. Sync will retry with the reconciled record.',
       };
+      return;
+    }
+
+    if (_queuedConflictNotice == null || _queuedConflictNotice!.isEmpty) {
+      _queuedConflictNotice = fallbackNotice;
     }
   }
 
   Future<int> _runPushPhase(String serverUrl) async {
+    final vaultId = _identityService.vaultId;
+    final approvedChanges = await _storageService.loadApprovedLocalSyncChanges(
+      vaultId: vaultId,
+    );
+    final approvedChangeKeys = approvedChanges
+        .map(_localSyncChangeEntityKey)
+        .toSet();
+
     final allPendingAccounts = await _storageService.loadPendingSyncAccounts();
     final dirtyAccounts = allPendingAccounts
-        .where((a) => a.syncStatus == SyncStatus.pendingPush)
+        .where(
+          (a) =>
+              a.syncStatus == SyncStatus.pendingPush &&
+              approvedChangeKeys.contains(
+                _syncEntityKey(LocalSyncEntityType.account, a.id),
+              ),
+        )
         .toList();
-    final dirtyTemplates = await _storageService.loadDirtyTemplates();
+    final dirtyTemplates = (await _storageService.loadDirtyTemplates())
+        .where(
+          (template) => approvedChangeKeys.contains(
+            _syncEntityKey(LocalSyncEntityType.template, template.templateId),
+          ),
+        )
+        .toList();
 
     final List<dynamic> dirtyItems = [...dirtyAccounts, ...dirtyTemplates];
 
     if (dirtyItems.isEmpty) {
-      if (allPendingAccounts.isNotEmpty) {
+      if (allPendingAccounts.isNotEmpty || approvedChanges.isNotEmpty) {
         debugPrint(
-          '[Sync] Push Phase: ${allPendingAccounts.length} items pending, but all are in Conflict state.',
+          '[Sync] Push Phase: local changes exist, but none are approved and pushable.',
         );
       }
       return 0;
     }
 
-    final vaultId = _identityService.vaultId;
+    final pushedItemKeys = dirtyItems.map(_syncItemEntityKey).toSet();
+    final pushingChangeIds = approvedChanges
+        .where(
+          (change) =>
+              pushedItemKeys.contains(_localSyncChangeEntityKey(change)),
+        )
+        .map((change) => change.id)
+        .toList(growable: false);
+    await _storageService.markLocalSyncChangesPushing(pushingChangeIds);
+
     debugPrint(
       '[Sync] >>> Push Phase Start. Items to push: ${dirtyItems.length}',
     );
-    final pushPayloads = dirtyItems.map((item) {
-      final ciphertext = _encryptAndSign(item);
-      final String itemId = (item is AccountItem)
-          ? item.id
-          : (item as AccountTemplate).templateId;
-      final int serverVersion = (item is AccountItem)
-          ? item.serverVersion
-          : (item as AccountTemplate).serverVersion;
-      final bool isDeleted = (item is AccountItem)
-          ? item.isDeleted
-          : (item as AccountTemplate).isDeleted;
+    final pushPayloads = await Future.wait(
+      dirtyItems.map((item) async {
+        final ciphertext = await _encryptAndSign(item);
+        final String itemId = (item is AccountItem)
+            ? item.id
+            : (item as AccountTemplate).templateId;
+        final int serverVersion = (item is AccountItem)
+            ? item.serverVersion
+            : (item as AccountTemplate).serverVersion;
+        final bool isDeleted = (item is AccountItem)
+            ? item.isDeleted
+            : (item as AccountTemplate).isDeleted;
 
-      return {
-        'id': itemId,
-        'expected_base_version': serverVersion,
-        'is_deleted': isDeleted,
-        'encrypted_signed_payload': ciphertext,
-      };
-    }).toList();
+        return {
+          'id': itemId,
+          'expected_base_version': serverVersion,
+          'is_deleted': isDeleted,
+          'encrypted_signed_payload': ciphertext,
+        };
+      }).toList(),
+    );
 
-    final response = await http
-        .post(
-          Uri.parse('$serverUrl/vaults/$vaultId/sync'),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({'pushes': pushPayloads}),
-        )
-        .timeout(const Duration(seconds: 15));
+    late final Map<String, dynamic> acceptedVersions;
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$serverUrl/vaults/$vaultId/sync'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'pushes': pushPayloads}),
+          )
+          .timeout(const Duration(seconds: 15));
 
-    if (response.statusCode == 409) {
-      throw _ConflictException(response.body);
+      if (response.statusCode == 409) {
+        await _storageService.markLocalSyncChangesConflict(
+          pushingChangeIds,
+          response.body,
+        );
+        throw _ConflictException(response.body);
+      }
+      _throwIfSyncHttpError(response, phase: 'push');
+
+      final respData = _decodeSyncResponse(response, phase: 'push');
+      acceptedVersions = _readAcceptedVersions(respData);
+    } catch (e) {
+      if (e is! _ConflictException) {
+        await _storageService.markLocalSyncChangesFailed(
+          pushingChangeIds,
+          e.toString(),
+        );
+      }
+      rethrow;
     }
-    _throwIfSyncHttpError(response, phase: 'push');
 
-    final respData = _decodeSyncResponse(response, phase: 'push');
-    final acceptedVersions = _readAcceptedVersions(respData);
-
+    final acceptedChangeIds = <String>[];
     for (final item in dirtyItems) {
       final String itemId = (item is AccountItem)
           ? item.id
@@ -926,7 +1093,14 @@ class SyncService extends ChangeNotifier {
       if (newVersion > _localVersion) {
         _localVersion = newVersion;
       }
+      final itemKey = _syncItemEntityKey(item);
+      acceptedChangeIds.addAll(
+        approvedChanges
+            .where((change) => _localSyncChangeEntityKey(change) == itemKey)
+            .map((change) => change.id),
+      );
     }
+    await _storageService.markLocalSyncChangesPushed(acceptedChangeIds);
 
     await _storageService.setSetting(
       _syncVersionKey(_identityService.vaultId),
@@ -938,7 +1112,25 @@ class SyncService extends ChangeNotifier {
     return dirtyItems.length;
   }
 
-  String _encryptAndSign(dynamic item) {
+  String _syncItemEntityKey(dynamic item) {
+    if (item is AccountItem) {
+      return _syncEntityKey(LocalSyncEntityType.account, item.id);
+    }
+    if (item is AccountTemplate) {
+      return _syncEntityKey(LocalSyncEntityType.template, item.templateId);
+    }
+    throw ArgumentError('Unsupported sync item type: ${item.runtimeType}');
+  }
+
+  String _localSyncChangeEntityKey(LocalSyncChange change) {
+    return _syncEntityKey(change.entityType, change.entityId);
+  }
+
+  String _syncEntityKey(LocalSyncEntityType type, String entityId) {
+    return '${type.name}:$entityId';
+  }
+
+  Future<String> _encryptAndSign(dynamic item) {
     if (item is AccountItem) {
       return SyncPayloadCodec.encodeAccount(
         item: item,
@@ -959,7 +1151,7 @@ class SyncService extends ChangeNotifier {
     throw ArgumentError('Unsupported sync item type: ${item.runtimeType}');
   }
 
-  Map<String, dynamic> _decryptAndVerifyPayload(
+  Future<Map<String, dynamic>> _decryptAndVerifyPayload(
     Map<String, dynamic> remoteRecord,
   ) {
     final cipher = _readEncryptedPayload(remoteRecord);
@@ -973,12 +1165,28 @@ class SyncService extends ChangeNotifier {
 
   Future<String> _getSyncServerUrl() async {
     final prefs = await SharedPreferences.getInstance();
-    var url =
-        prefs.getString('sync_server_url') ??
-        await _storageService.getSetting('sync_server_url');
-    if (url != null) {
-      await prefs.setString('sync_server_url', url);
+    const legacyKey = 'sync_server_url';
+    String? url;
+
+    if (_identityService.hasIdentity) {
+      final scopedKey = _syncServerUrlKey(_identityService.vaultId);
+      url =
+          prefs.getString(scopedKey) ??
+          await _storageService.getSetting(scopedKey);
+      if (url == null) {
+        url =
+            prefs.getString(legacyKey) ??
+            await _storageService.getSetting(legacyKey);
+        if (url != null) {
+          await prefs.setString(scopedKey, url);
+        }
+      }
+    } else {
+      url =
+          prefs.getString(legacyKey) ??
+          await _storageService.getSetting(legacyKey);
     }
+
     url = (url ?? _config.serverUrl).trim();
     if (url.isEmpty) {
       return '';
@@ -990,6 +1198,28 @@ class SyncService extends ChangeNotifier {
       url = 'http://$url';
     }
     return url;
+  }
+
+  Future<String?> _readVaultScopedSetting({
+    required String vaultId,
+    required String scopedKey,
+    required String legacyKey,
+  }) async {
+    final scopedValue = await _storageService.getSetting(scopedKey);
+    if (scopedValue != null) {
+      return scopedValue;
+    }
+
+    final legacyValue = await _storageService.getSetting(legacyKey);
+    if (legacyValue != null) {
+      await _storageService.setSetting(scopedKey, legacyValue);
+      debugPrint(
+        '[Sync] Migrated $legacyKey to $scopedKey for vault $vaultId.',
+      );
+      return legacyValue;
+    }
+
+    return null;
   }
 
   Future<void> _recordSyncTime() async {
@@ -1019,31 +1249,38 @@ class SyncService extends ChangeNotifier {
       return;
     }
 
+    final serverError = _extractServerErrorPayload(response.body);
     throw _SyncHttpException(
       phase: phase,
       statusCode: response.statusCode,
-      serverMessage: _extractServerErrorMessage(response.body),
+      serverMessage: serverError.message,
+      conflictType: serverError.conflictType,
+      itemId: serverError.itemId,
     );
   }
 
-  String? _extractServerErrorMessage(String body) {
+  _SyncServerErrorPayload _extractServerErrorPayload(String body) {
     if (body.isEmpty) {
-      return null;
+      return const _SyncServerErrorPayload();
     }
 
     try {
       final decoded = jsonDecode(body);
       if (decoded is Map<String, dynamic>) {
         final error = decoded['error'];
-        if (error is String && error.isNotEmpty) {
-          return error;
-        }
+        final conflictType = decoded['conflict_type'];
+        final itemId = decoded['item_id'];
+        return _SyncServerErrorPayload(
+          message: error is String && error.isNotEmpty ? error : null,
+          conflictType: conflictType is String ? conflictType : null,
+          itemId: itemId is String ? itemId : null,
+        );
       }
     } catch (_) {
       // Ignore non-JSON error bodies and fall back to generic status text.
     }
 
-    return null;
+    return const _SyncServerErrorPayload();
   }
 
   void _startPeriodicSync() {
@@ -1112,15 +1349,27 @@ class _ConflictException implements Exception {
   }
 }
 
+class _SyncServerErrorPayload {
+  final String? message;
+  final String? conflictType;
+  final String? itemId;
+
+  const _SyncServerErrorPayload({this.message, this.conflictType, this.itemId});
+}
+
 class _SyncHttpException implements Exception {
   final String phase;
   final int statusCode;
   final String? serverMessage;
+  final String? conflictType;
+  final String? itemId;
 
   const _SyncHttpException({
     required this.phase,
     required this.statusCode,
     this.serverMessage,
+    this.conflictType,
+    this.itemId,
   });
 
   String get userMessage {

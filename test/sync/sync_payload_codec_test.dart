@@ -31,17 +31,17 @@ void main() {
   const symmetricKey =
       'sym_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
 
-  test('encodes and decodes a signed encrypted payload', () {
+  test('encodes and decodes an AEAD encrypted payload', () async {
     final item = _item();
 
-    final encoded = SyncPayloadCodec.encode(
+    final encoded = await SyncPayloadCodec.encode(
       item: item,
       vaultId: vaultId,
       nodeId: deviceId,
       privateKey: privateKey,
       symmetricKey: symmetricKey,
     );
-    final decoded = SyncPayloadCodec.decode(
+    final decoded = await SyncPayloadCodec.decode(
       encodedPayload: encoded,
       expectedVaultId: vaultId,
       privateKey: privateKey,
@@ -49,12 +49,13 @@ void main() {
     );
 
     expect(decoded.toJson(), item.toJson());
+    expect(encoded.startsWith(SyncPayloadCodec.prefix), isTrue);
     expect(encoded.contains(item.name), isFalse);
     expect(encoded.contains(item.data['password']!), isFalse);
   });
 
-  test('rejects tampered payload envelope', () {
-    final encoded = SyncPayloadCodec.encode(
+  test('rejects tampered payload envelope', () async {
+    final encoded = await SyncPayloadCodec.encode(
       item: _item(),
       vaultId: vaultId,
       nodeId: deviceId,
@@ -62,12 +63,22 @@ void main() {
       symmetricKey: symmetricKey,
     );
     final envelope =
-        jsonDecode(utf8.decode(base64Decode(encoded))) as Map<String, dynamic>;
+        jsonDecode(
+              utf8.decode(
+                base64Url.decode(
+                  base64Url.normalize(
+                    encoded.substring(SyncPayloadCodec.prefix.length),
+                  ),
+                ),
+              ),
+            )
+            as Map<String, dynamic>;
     envelope['ciphertext'] = '${envelope['ciphertext']}tampered';
-    final tampered = base64Encode(utf8.encode(jsonEncode(envelope)));
+    final tampered =
+        '${SyncPayloadCodec.prefix}${base64UrlEncode(utf8.encode(jsonEncode(envelope))).replaceAll('=', '')}';
 
-    expect(
-      () => SyncPayloadCodec.decode(
+    await expectLater(
+      SyncPayloadCodec.decode(
         encodedPayload: tampered,
         expectedVaultId: vaultId,
         privateKey: privateKey,
@@ -77,14 +88,14 @@ void main() {
         isA<SyncPayloadException>().having(
           (error) => error.message,
           'message',
-          'Payload integrity check failed.',
+          'Payload decryption failed.',
         ),
       ),
     );
   });
 
-  test('rejects payload from a different vault', () {
-    final encoded = SyncPayloadCodec.encode(
+  test('rejects payload from a different vault', () async {
+    final encoded = await SyncPayloadCodec.encode(
       item: _item(),
       vaultId: vaultId,
       nodeId: deviceId,
@@ -92,8 +103,8 @@ void main() {
       symmetricKey: symmetricKey,
     );
 
-    expect(
-      () => SyncPayloadCodec.decode(
+    await expectLater(
+      SyncPayloadCodec.decode(
         encodedPayload: encoded,
         expectedVaultId: otherVaultId,
         privateKey: privateKey,
@@ -109,17 +120,24 @@ void main() {
     );
   });
 
-  test('keeps compatibility with legacy base64 payloads', () {
+  test('rejects legacy base64 plaintext payloads', () async {
     final item = _item();
     final legacyPayload = base64Encode(utf8.encode(jsonEncode(item.toJson())));
 
-    final decoded = SyncPayloadCodec.decode(
-      encodedPayload: legacyPayload,
-      expectedVaultId: vaultId,
-      privateKey: privateKey,
-      symmetricKey: symmetricKey,
+    await expectLater(
+      SyncPayloadCodec.decode(
+        encodedPayload: legacyPayload,
+        expectedVaultId: vaultId,
+        privateKey: privateKey,
+        symmetricKey: symmetricKey,
+      ),
+      throwsA(
+        isA<SyncPayloadException>().having(
+          (error) => error.message,
+          'message',
+          'Payload is not a SecretRoy encrypted sync envelope.',
+        ),
+      ),
     );
-
-    expect(decoded.toJson(), item.toJson());
   });
 }

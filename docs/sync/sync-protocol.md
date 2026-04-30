@@ -72,22 +72,22 @@ AccountItem performMerge(AccountItem local, AccountItem remote) {
   for (String key in allKeys(local, remote)) {
       SyncValue lField = local.fields[key];
       SyncValue rField = remote.fields[key];
-      
+
       if (lField == null) { mergedFields[key] = rField; continue; }
       if (rField == null) { mergedFields[key] = lField; continue; }
-      
+
       // 核心：HLC 仲裁机
       if (HLC.compare(rField.hlc, lField.hlc) > 0) {
           mergedFields[key] = rField; // 远端更新，采用远端
           // 本地数据由于较老被覆盖，抽离存入覆写日志
-          if(lField.v != rField.v) conflictLogs.add(ConflictLog(key, lField)); 
+          if(lField.v != rField.v) conflictLogs.add(ConflictLog(key, lField));
       } else {
           mergedFields[key] = lField; // 本地更新较晚，保留本地意见
           // 远端传来但过时，同样记录
-          if(lField.v != rField.v) conflictLogs.add(ConflictLog(key, rField)); 
+          if(lField.v != rField.v) conflictLogs.add(ConflictLog(key, rField));
       }
   }
-  
+
   // 3. 落地冲突历史记录，供用户在 UI 侧手动挑选“反悔复写”
   if (conflictLogs.isNotEmpty) {
       ConflictLogService.save(local.id, conflictLogs);

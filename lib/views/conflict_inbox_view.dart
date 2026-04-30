@@ -94,15 +94,9 @@ class _ConflictInboxViewState extends State<ConflictInboxView> {
               '已保留本地版本，并准备覆盖远端缺失记录',
               'Local version kept and queued to overwrite the missing remote record',
             )
-          : _t(
-              '已恢复该版本并准备推送',
-              'Value restored and queued for push',
-            );
+          : _t('已恢复该版本并准备推送', 'Value restored and queued for push');
       messenger.showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: Colors.green,
-        ),
+        SnackBar(content: Text(message), backgroundColor: Colors.green),
       );
     }
 
@@ -262,6 +256,26 @@ class _ConflictLogRow extends StatelessWidget {
 
   bool get _isRemoteMissingConflict => log.fieldKey == 'record.remote_missing';
 
+  String get _conflictTypeLabel {
+    if (_isRemoteMissingConflict) {
+      return textBuilder('远端缺失', 'Remote missing');
+    }
+    return textBuilder('字段并发修改', 'Concurrent field edit');
+  }
+
+  String get _suggestionLabel {
+    if (_isRemoteMissingConflict) {
+      return textBuilder(
+        '检查后可选择覆盖远端',
+        'Review, then optionally overwrite remote',
+      );
+    }
+    return textBuilder(
+      '检查后选择保留当前值或恢复被覆盖值',
+      'Review, then keep current or restore overwritten value',
+    );
+  }
+
   String get _fieldLabel {
     if (_isRemoteMissingConflict) {
       return textBuilder('远端记录缺失', 'Remote Record Missing');
@@ -349,6 +363,15 @@ class _ConflictLogRow extends StatelessWidget {
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '${textBuilder('类型', 'Type')}: $_conflictTypeLabel · '
+                '${textBuilder('来源', 'Source')}: ${log.hlc.nodeId} · '
+                '${textBuilder('建议', 'Suggested')}: $_suggestionLabel',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
               ),
               const SizedBox(height: 12),
               _ValueChip(
@@ -471,7 +494,9 @@ class _ValueChip extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           SelectableText(
-            value.isEmpty ? textBuilderFallback(context, '（空）', '(empty)') : value,
+            value.isEmpty
+                ? textBuilderFallback(context, '（空）', '(empty)')
+                : value,
             style: theme.textTheme.bodyMedium?.copyWith(
               fontWeight: FontWeight.w500,
               color: theme.colorScheme.onSurface,

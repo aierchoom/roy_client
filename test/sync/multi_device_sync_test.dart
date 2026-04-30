@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:secret_roy/models/account_item.dart';
 import 'package:secret_roy/models/account_template.dart';
 import 'package:secret_roy/models/hlc.dart';
+import 'package:secret_roy/models/local_sync_change.dart';
 import 'package:secret_roy/services/identity_service.dart';
 import 'package:secret_roy/services/secure_storage_service.dart';
 import 'package:secret_roy/sync/crdt_merge_engine.dart';
@@ -85,6 +86,65 @@ class _FakeSecureStorageService extends SecureStorageService {
 
   @override
   Future<List<AccountTemplate>> loadDirtyTemplates() async => [];
+
+  @override
+  Future<void> ensurePendingSyncOutboxEntries(String vaultId) async {}
+
+  @override
+  Future<List<LocalSyncChange>> loadApprovedLocalSyncChanges({
+    required String vaultId,
+  }) async {
+    return accounts.values
+        .where((item) => item.syncStatus == SyncStatus.pendingPush)
+        .map((item) => _approvedChange(vaultId, item))
+        .toList();
+  }
+
+  @override
+  Future<bool> hasOpenLocalSyncChanges(String vaultId) async {
+    return accounts.values.any(
+      (item) => item.syncStatus == SyncStatus.pendingPush,
+    );
+  }
+
+  @override
+  Future<void> markLocalSyncChangesPushing(Iterable<String> ids) async {}
+
+  @override
+  Future<void> markLocalSyncChangesPushed(Iterable<String> ids) async {}
+
+  @override
+  Future<void> markLocalSyncChangesFailed(
+    Iterable<String> ids,
+    String errorMessage,
+  ) async {}
+
+  @override
+  Future<void> markLocalSyncChangesConflict(
+    Iterable<String> ids,
+    String errorMessage,
+  ) async {}
+}
+
+LocalSyncChange _approvedChange(String vaultId, AccountItem item) {
+  return LocalSyncChange(
+    id: 'change_${item.id}',
+    vaultId: vaultId,
+    entityType: LocalSyncEntityType.account,
+    entityId: item.id,
+    action: item.isDeleted ? LocalSyncAction.delete : LocalSyncAction.update,
+    title: item.name,
+    beforeJson: null,
+    afterJson: null,
+    diff: const {
+      'changed_fields': ['record.updated'],
+    },
+    baseServerVersion: item.serverVersion,
+    status: LocalSyncStatus.approved,
+    createdAt: 1,
+    updatedAt: 1,
+    approvedAt: 1,
+  );
 }
 
 class _InMemoryVaultServer {
@@ -92,6 +152,9 @@ class _InMemoryVaultServer {
   final HttpServer _server;
   final Map<String, Map<String, dynamic>> _items = {};
   int _currentVersion = 0;
+  bool isUnavailable = false;
+  int getCount = 0;
+  int postCount = 0;
 
   _InMemoryVaultServer._(this.vaultId, this._server) {
     _server.listen(_handleRequest);
@@ -114,7 +177,16 @@ class _InMemoryVaultServer {
     final path = request.uri.path;
     final expectedPath = '/vaults/$vaultId/sync';
 
+    if (isUnavailable) {
+      request.response.statusCode = HttpStatus.serviceUnavailable;
+      request.response.headers.contentType = ContentType.json;
+      request.response.write(jsonEncode({'error': 'Sync server unavailable'}));
+      await request.response.close();
+      return;
+    }
+
     if (request.method == 'GET' && path == expectedPath) {
+      getCount += 1;
       final since = int.parse(request.uri.queryParameters['since'] ?? '0');
       if (_currentVersion <= since) {
         request.response.statusCode = HttpStatus.notModified;
@@ -139,6 +211,7 @@ class _InMemoryVaultServer {
     }
 
     if (request.method == 'POST' && path == expectedPath) {
+      postCount += 1;
       final body = await utf8.decoder.bind(request).join();
       final decoded = jsonDecode(body) as Map<String, dynamic>;
       final pushes = (decoded['pushes'] as List<dynamic>? ?? const [])
@@ -475,6 +548,102 @@ void main() {
       expect(finalItem.isDeleted, isTrue);
       expect(finalItem.deleteHlc, const Hlc(30, 0, 'device_aaaaaa111111'));
       expect(finalItem.syncStatus, SyncStatus.synchronized);
+    },
+  );
+
+  test(
+    'device A keeps an offline edit pending and pushes it after recovery',
+    () async {
+      final server = await _InMemoryVaultServer.start(vaultId);
+      addTearDown(server.close);
+      SharedPreferences.setMockInitialValues({
+        'sync_server_url': server.baseUrl,
+      });
+
+      final clientA = await _TestClient.create(
+        vaultId: vaultId,
+        deviceId: 'device_aaaaaa111111',
+        privateKey: privateKey,
+        symmetricKey: symmetricKey,
+      );
+      final clientB = await _TestClient.create(
+        vaultId: vaultId,
+        deviceId: 'device_bbbbbb222222',
+        privateKey: privateKey,
+        symmetricKey: symmetricKey,
+      );
+
+      clientA.storage.accounts['account_1'] = _baseItem(
+        id: 'account_1',
+        name: 'Original',
+        email: 'owner@example.com',
+        password: 'super-secret',
+        version: 0,
+        syncStatus: SyncStatus.pendingPush,
+        nameHlc: const Hlc(10, 0, 'device_aaaaaa111111'),
+        emailHlc: const Hlc(10, 1, 'device_aaaaaa111111'),
+        passwordHlc: const Hlc(10, 2, 'device_aaaaaa111111'),
+      );
+      final initialPush = await clientA.syncService.syncNow();
+      final initialPull = await clientB.syncService.syncNow();
+
+      expect(initialPush.success, isTrue, reason: 'seed push from A');
+      expect(initialPull.success, isTrue, reason: 'seed pull into B');
+      expect(server.currentVersion, 1, reason: 'seed server version');
+
+      server.isUnavailable = true;
+      final postCountBeforeOfflineEdit = server.postCount;
+      clientA.storage.accounts['account_1'] = _baseItem(
+        id: 'account_1',
+        name: 'Offline Edit By A',
+        email: 'owner@example.com',
+        password: 'offline-secret',
+        version: 1,
+        syncStatus: SyncStatus.pendingPush,
+        nameHlc: const Hlc(40, 0, 'device_aaaaaa111111'),
+        emailHlc: const Hlc(10, 1, 'device_aaaaaa111111'),
+        passwordHlc: const Hlc(45, 0, 'device_aaaaaa111111'),
+      );
+
+      final pendingOfflineEdit = clientA.storage.accounts['account_1']!;
+
+      expect(server.currentVersion, 1, reason: 'server did not accept edit');
+      expect(
+        server.postCount,
+        postCountBeforeOfflineEdit,
+        reason: 'offline local edit does not contact the server',
+      );
+      expect(pendingOfflineEdit.syncStatus, SyncStatus.pendingPush);
+      expect(pendingOfflineEdit.serverVersion, 1);
+
+      server.isUnavailable = false;
+      final recoveryPush = await clientA.syncService.syncNow();
+      final recoveredLocal = clientA.storage.accounts['account_1']!;
+      final pullAfterRecovery = await clientB.syncService.syncNow();
+      final pulledByB = clientB.storage.accounts['account_1']!;
+
+      expect(recoveryPush.success, isTrue, reason: 'A recovery push');
+      expect(recoveryPush.pushed, isTrue);
+      expect(recoveredLocal.syncStatus, SyncStatus.synchronized);
+      expect(recoveredLocal.serverVersion, 2);
+      expect(
+        server.currentVersion,
+        2,
+        reason: 'server accepted recovered edit',
+      );
+
+      expect(
+        pullAfterRecovery.success,
+        isTrue,
+        reason: 'B pulls recovered edit',
+      );
+      expect(pullAfterRecovery.pulled, isTrue);
+      expect(pulledByB.name, 'Offline Edit By A');
+      expect(pulledByB.data['password'], 'offline-secret');
+      expect(pulledByB.syncStatus, SyncStatus.synchronized);
+      expect(pulledByB.serverVersion, 2);
+      expect(clientA.storage.conflictLogs['account_1'], isNull);
+      expect(clientB.storage.conflictLogs['account_1'], isNull);
     },
   );
 }

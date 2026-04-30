@@ -1,4 +1,4 @@
-﻿# SecretRoy 分布式系统质量改造 Backlog
+# SecretRoy 分布式系统质量改造 Backlog
 
 Navigation:
 [Docs Home](../README.md) |

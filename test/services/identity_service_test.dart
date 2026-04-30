@@ -16,6 +16,13 @@ class _MemorySecureKeyValueStore implements SecureKeyValueStore {
   }
 }
 
+const _validDeviceId = 'device_abcdef123456';
+const _validVaultId = 'vault_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const _validPrivateKey =
+    'priv_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const _validSymmetricKey =
+    'sym_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+
 void main() {
   test('initialize persists and reuses a generated identity', () async {
     final store = _MemorySecureKeyValueStore();
@@ -41,12 +48,87 @@ void main() {
     expect(secondService.symmetricKey, firstService.symmetricKey);
   });
 
+  test('independent stores generate different vault identities', () async {
+    final firstService = IdentityService(
+      secureStorage: _MemorySecureKeyValueStore(),
+    );
+    final secondService = IdentityService(
+      secureStorage: _MemorySecureKeyValueStore(),
+    );
+
+    await firstService.initialize();
+    await secondService.initialize();
+
+    expect(firstService.vaultId, isNot(secondService.vaultId));
+    expect(firstService.deviceId, isNot(secondService.deviceId));
+  });
+
+  test(
+    'initialize refuses to create a new vault identity when generation is disabled',
+    () async {
+      final store = _MemorySecureKeyValueStore({'device_id': _validDeviceId});
+
+      await expectLater(
+        IdentityService(
+          secureStorage: store,
+        ).initialize(allowGenerateVaultIdentity: false),
+        throwsA(
+          isA<IdentityCorruptedException>().having(
+            (error) => error.missingKeys,
+            'missingKeys',
+            containsAll(['vault_id', 'private_key', 'symmetric_key']),
+          ),
+        ),
+      );
+    },
+  );
+
+  test(
+    'missing device id is repaired when vault identity is complete',
+    () async {
+      final store = _MemorySecureKeyValueStore({
+        'vault_id': _validVaultId,
+        'private_key': _validPrivateKey,
+        'symmetric_key': _validSymmetricKey,
+      });
+
+      final service = IdentityService(secureStorage: store);
+      await service.initialize(allowGenerateVaultIdentity: false);
+
+      expect(service.deviceId, matches(RegExp(r'^device_[a-f0-9]{12}$')));
+      expect(service.vaultId, _validVaultId);
+      expect(service.privateKey, _validPrivateKey);
+      expect(service.symmetricKey, _validSymmetricKey);
+    },
+  );
+
+  test('checkIdentityExists validates vault identity material', () async {
+    final completeStore = _MemorySecureKeyValueStore({
+      'vault_id': _validVaultId,
+      'private_key': _validPrivateKey,
+      'symmetric_key': _validSymmetricKey,
+    });
+    final invalidStore = _MemorySecureKeyValueStore({
+      'vault_id': _validVaultId,
+      'private_key': 'not-a-private-key',
+      'symmetric_key': _validSymmetricKey,
+    });
+
+    expect(
+      await IdentityService(secureStorage: completeStore).checkIdentityExists(),
+      isTrue,
+    );
+    expect(
+      await IdentityService(secureStorage: invalidStore).checkIdentityExists(),
+      isFalse,
+    );
+  });
+
   test('initialize rejects partially persisted identity state', () async {
     final store = _MemorySecureKeyValueStore({
-      'device_id': 'device_abcdef123456',
-      'vault_id': 'vault_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      'private_key':
-          'priv_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      'device_id': _validDeviceId,
+      'vault_id': _validVaultId,
+      'private_key': _validPrivateKey,
     });
 
     expect(

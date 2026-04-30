@@ -5,8 +5,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:secret_roy/models/account_item.dart';
 import 'package:secret_roy/models/account_template.dart';
 import 'package:secret_roy/models/hlc.dart';
+import 'package:secret_roy/models/local_sync_change.dart';
 import 'package:secret_roy/services/identity_service.dart';
 import 'package:secret_roy/services/secure_storage_service.dart';
+import 'package:secret_roy/sync/crdt_merge_engine.dart';
 import 'package:secret_roy/sync/sync_payload_codec.dart';
 import 'package:secret_roy/sync/sync_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -28,6 +30,7 @@ class _MemorySecureKeyValueStore implements SecureKeyValueStore {
 class _FakeSecureStorageService extends SecureStorageService {
   final Map<String, String> settings = {};
   final Map<String, AccountItem> accounts = {};
+  final Map<String, List<ConflictLog>> conflictLogs = {};
 
   @override
   bool get isOpen => true;
@@ -71,7 +74,78 @@ class _FakeSecureStorageService extends SecureStorageService {
   }
 
   @override
+  Future<void> saveConflictLogs(List<ConflictLog> logs) async {
+    for (final log in logs) {
+      conflictLogs.putIfAbsent(log.accountId, () => []).add(log);
+    }
+  }
+
+  @override
+  Future<List<ConflictLog>> getConflictLogs(String accountId) async {
+    return List<ConflictLog>.from(conflictLogs[accountId] ?? const []);
+  }
+
+  @override
   Future<List<AccountTemplate>> loadDirtyTemplates() async => [];
+
+  @override
+  Future<void> ensurePendingSyncOutboxEntries(String vaultId) async {}
+
+  @override
+  Future<List<LocalSyncChange>> loadApprovedLocalSyncChanges({
+    required String vaultId,
+  }) async {
+    return accounts.values
+        .where((item) => item.syncStatus == SyncStatus.pendingPush)
+        .map((item) => _approvedChange(vaultId, item))
+        .toList();
+  }
+
+  @override
+  Future<bool> hasOpenLocalSyncChanges(String vaultId) async {
+    return accounts.values.any(
+      (item) => item.syncStatus == SyncStatus.pendingPush,
+    );
+  }
+
+  @override
+  Future<void> markLocalSyncChangesPushing(Iterable<String> ids) async {}
+
+  @override
+  Future<void> markLocalSyncChangesPushed(Iterable<String> ids) async {}
+
+  @override
+  Future<void> markLocalSyncChangesFailed(
+    Iterable<String> ids,
+    String errorMessage,
+  ) async {}
+
+  @override
+  Future<void> markLocalSyncChangesConflict(
+    Iterable<String> ids,
+    String errorMessage,
+  ) async {}
+}
+
+LocalSyncChange _approvedChange(String vaultId, AccountItem item) {
+  return LocalSyncChange(
+    id: 'change_${item.id}',
+    vaultId: vaultId,
+    entityType: LocalSyncEntityType.account,
+    entityId: item.id,
+    action: item.isDeleted ? LocalSyncAction.delete : LocalSyncAction.update,
+    title: item.name,
+    beforeJson: null,
+    afterJson: null,
+    diff: const {
+      'changed_fields': ['record.updated'],
+    },
+    baseServerVersion: item.serverVersion,
+    status: LocalSyncStatus.approved,
+    createdAt: 1,
+    updatedAt: 1,
+    approvedAt: 1,
+  );
 }
 
 class _StaticVaultServer {
@@ -81,7 +155,11 @@ class _StaticVaultServer {
   int getCount = 0;
   int postCount = 0;
 
-  _StaticVaultServer._(this.vaultId, this._server, this.items) {
+  _StaticVaultServer._(
+    this.vaultId,
+    this._server,
+    List<Map<String, dynamic>> items,
+  ) : items = List<Map<String, dynamic>>.from(items) {
     _server.listen(_handleRequest);
   }
 
@@ -131,17 +209,31 @@ class _StaticVaultServer {
 
     if (request.method == 'POST' && path == expectedPath) {
       postCount += 1;
+      final body = await utf8.decoder.bind(request).join();
+      final decoded = jsonDecode(body) as Map<String, dynamic>;
+      final pushes = (decoded['pushes'] as List<dynamic>? ?? const [])
+          .cast<Map<String, dynamic>>();
+      final acceptedVersions = <String, int>{};
+      var maxVersion = _maxVersion();
+      for (final push in pushes) {
+        maxVersion += 1;
+        final itemId = push['id'] as String;
+        items.removeWhere((item) => item['id'] == itemId);
+        items.add({
+          'id': itemId,
+          'version': maxVersion,
+          'is_deleted': push['is_deleted'] == true,
+          'encrypted_signed_payload': push['encrypted_signed_payload'],
+        });
+        acceptedVersions[itemId] = maxVersion;
+      }
+
       request.response.headers.contentType = ContentType.json;
       request.response.write(
         jsonEncode({
           'success': true,
-          'max_version': items.fold<int>(
-            0,
-            (current, item) => current > (item['version'] as int)
-                ? current
-                : item['version'] as int,
-          ),
-          'accepted_versions': const <String, int>{},
+          'max_version': maxVersion,
+          'accepted_versions': acceptedVersions,
         }),
       );
       await request.response.close();
@@ -150,6 +242,14 @@ class _StaticVaultServer {
 
     request.response.statusCode = HttpStatus.notFound;
     await request.response.close();
+  }
+
+  int _maxVersion() {
+    return items.fold<int>(
+      0,
+      (current, item) =>
+          current > (item['version'] as int) ? current : item['version'] as int,
+    );
   }
 }
 
@@ -174,17 +274,21 @@ AccountItem _item({
   required String name,
   required int serverVersion,
   required SyncStatus syncStatus,
+  String password = 'secret',
+  Hlc nameHlc = const Hlc(10, 0, 'device_aaaaaa111111'),
+  Hlc emailHlc = const Hlc(10, 1, 'device_aaaaaa111111'),
+  Hlc passwordHlc = const Hlc(10, 2, 'device_aaaaaa111111'),
 }) {
   return AccountItem(
     id: id,
     name: name,
     email: 'owner@example.com',
     templateId: 'web_account',
-    data: {'password': 'secret'},
+    data: {'password': password},
     createdAt: 1,
-    nameHlc: const Hlc(10, 0, 'device_aaaaaa111111'),
-    emailHlc: const Hlc(10, 1, 'device_aaaaaa111111'),
-    dataHlc: {'password': const Hlc(10, 2, 'device_aaaaaa111111')},
+    nameHlc: nameHlc,
+    emailHlc: emailHlc,
+    dataHlc: {'password': passwordHlc},
     serverVersion: serverVersion,
     syncStatus: syncStatus,
   );
@@ -225,6 +329,13 @@ void main() {
         serverVersion: 1,
         syncStatus: SyncStatus.synchronized,
       );
+      final remotePayload = await SyncPayloadCodec.encode(
+        item: remoteItem,
+        vaultId: vaultId,
+        nodeId: 'device_remote999',
+        privateKey: privateKey,
+        symmetricKey: symmetricKey,
+      );
       final server = await _StaticVaultServer.start(
         vaultId: vaultId,
         items: [
@@ -232,13 +343,7 @@ void main() {
             'id': remoteItem.id,
             'version': 1,
             'is_deleted': false,
-            'encrypted_signed_payload': SyncPayloadCodec.encode(
-              item: remoteItem,
-              vaultId: vaultId,
-              nodeId: 'device_remote999',
-              privateKey: privateKey,
-              symmetricKey: symmetricKey,
-            ),
+            'encrypted_signed_payload': remotePayload,
           },
         ],
       );
@@ -289,6 +394,16 @@ void main() {
         serverVersion: 1,
         syncStatus: SyncStatus.pendingPush,
       );
+      final acceptedPayload = await SyncPayloadCodec.encode(
+        item: acceptedItem.copyWith(
+          serverVersion: 1,
+          syncStatus: SyncStatus.synchronized,
+        ),
+        vaultId: vaultId,
+        nodeId: 'device_remote999',
+        privateKey: privateKey,
+        symmetricKey: symmetricKey,
+      );
       final server = await _StaticVaultServer.start(
         vaultId: vaultId,
         items: [
@@ -296,16 +411,7 @@ void main() {
             'id': acceptedItem.id,
             'version': 1,
             'is_deleted': false,
-            'encrypted_signed_payload': SyncPayloadCodec.encode(
-              item: acceptedItem.copyWith(
-                serverVersion: 1,
-                syncStatus: SyncStatus.synchronized,
-              ),
-              vaultId: vaultId,
-              nodeId: 'device_remote999',
-              privateKey: privateKey,
-              symmetricKey: symmetricKey,
-            ),
+            'encrypted_signed_payload': acceptedPayload,
           },
         ],
       );
@@ -337,6 +443,83 @@ void main() {
     },
   );
 
+  test(
+    'interrupted pull with no newer remote data keeps local edits pushable',
+    () async {
+      final identity = _identityService(
+        vaultId: vaultId,
+        deviceId: deviceId,
+        privateKey: privateKey,
+        symmetricKey: symmetricKey,
+      );
+      await identity.initialize();
+
+      final remoteBase = _item(
+        id: 'account_1',
+        name: 'Original Remote',
+        serverVersion: 1,
+        syncStatus: SyncStatus.synchronized,
+      );
+      final remotePayload = await SyncPayloadCodec.encode(
+        item: remoteBase,
+        vaultId: vaultId,
+        nodeId: 'device_remote999',
+        privateKey: privateKey,
+        symmetricKey: symmetricKey,
+      );
+      final server = await _StaticVaultServer.start(
+        vaultId: vaultId,
+        items: [
+          {
+            'id': remoteBase.id,
+            'version': 1,
+            'is_deleted': false,
+            'encrypted_signed_payload': remotePayload,
+          },
+        ],
+      );
+      addTearDown(server.close);
+
+      final storage = _FakeSecureStorageService()
+        ..settings['sync_version_$vaultId'] = '1'
+        ..settings['sync_recovery_$vaultId'] = _recoveryMarker(
+          'pull',
+          localVersion: 1,
+        )
+        ..accounts['account_1'] = _item(
+          id: 'account_1',
+          name: 'Local Offline Edit',
+          password: 'local-secret',
+          serverVersion: 1,
+          syncStatus: SyncStatus.pendingPush,
+          nameHlc: const Hlc(40, 0, 'device_abcdef123456'),
+          passwordHlc: const Hlc(45, 0, 'device_abcdef123456'),
+        );
+
+      final syncService = SyncService(
+        storageService: storage,
+        identityService: identity,
+        config: SyncConfig(serverUrl: server.baseUrl),
+      );
+      await syncService.initialize();
+
+      final result = await syncService.syncNow();
+      final recoveredItem = storage.accounts['account_1']!;
+
+      expect(result.success, isTrue);
+      expect(result.pushed, isTrue);
+      expect(result.conflictCount, 0);
+      expect(result.notice, contains('interrupted pull'));
+      expect(recoveredItem.name, 'Local Offline Edit');
+      expect(recoveredItem.data['password'], 'local-secret');
+      expect(recoveredItem.syncStatus, SyncStatus.synchronized);
+      expect(recoveredItem.serverVersion, 2);
+      expect(storage.conflictLogs['account_1'], isNull);
+      expect(storage.settings['sync_recovery_$vaultId'], isEmpty);
+      expect(server.postCount, 1);
+    },
+  );
+
   test('successful sync clears the persisted recovery marker', () async {
     final identity = _identityService(
       vaultId: vaultId,
@@ -346,7 +529,10 @@ void main() {
     );
     await identity.initialize();
 
-    final server = await _StaticVaultServer.start(vaultId: vaultId, items: const []);
+    final server = await _StaticVaultServer.start(
+      vaultId: vaultId,
+      items: const [],
+    );
     addTearDown(server.close);
 
     final storage = _FakeSecureStorageService()

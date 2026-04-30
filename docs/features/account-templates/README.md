@@ -1,4 +1,4 @@
-﻿# Account Template Documentation
+# Account Template Documentation
 
 **Last updated**: 2026-04-28
 
