@@ -3,7 +3,7 @@
 **功能点**: 账户内置 2FA/TOTP 验证器
 **适用项目**: `roy_client`
 **最后更新**: 2026-04-30
-**状态**: 第一阶段已完成，后续增强待规划
+**状态**: 第一阶段已完成，P1 安全收敛已补齐
 
 ## 1. 结论
 
@@ -184,7 +184,7 @@ TotpCode code
 | 风险 | 处理 |
 |---|---|
 | TOTP secret 泄漏等价于第二因素泄漏 | secret 按保密字段处理，默认隐藏，不搜索 |
-| 复制验证码进入系统剪贴板 | 只复制短验证码，不默认复制 secret；后续可加剪贴板自动清理 |
+| 复制验证码进入系统剪贴板 | 只复制短验证码，不默认复制 secret；45 秒后自动清理未被替换的验证码 |
 | 服务端读取风险 | 继续使用现有 AEAD sync payload，服务端只见密文 |
 | 多设备时间漂移 | 第一阶段使用系统时间；UI 可提示设备时间不准会导致验证码失败 |
 | otpauth URI 解析错误 | 明确错误文案，不静默保存不可用配置 |
@@ -286,6 +286,21 @@ TotpCode code
 - `flutter test` 全量通过，结果为 97 passed, 1 skipped。
 - `git diff --check` 通过，仅有 CRLF 提示。
 
+### T11.6 列表暴露面与剪贴板体检
+
+- [x] 列表页和搜索卡片只提示“已配置 2FA”，不展示原始 TOTP secret。
+- [x] 展开列表详情时不提供 TOTP secret 的显示和复制入口。
+- [x] 复制 TOTP 验证码后，如果剪贴板内容未被用户替换，45 秒后自动清理。
+- [x] 补充列表暴露面和剪贴板清理测试。
+
+完成记录：
+
+- `AccountListTile` 对 `AccountFieldType.totp` 和遗留 `totp`/`2fa` 字段统一显示为配置状态，不再把 JSON/`otpauth://`/Base32 secret 放进摘要、展开详情或复制入口。
+- 新增 `SensitiveClipboardService`，用于复制短验证码后的延迟清理；清理前会读取当前剪贴板，仅在内容仍等于刚复制的验证码时清空，避免覆盖用户后续复制的新内容。
+- `AccountEditView` 的 TOTP 单字段复制和包含 TOTP 验证码的“复制全部信息”已接入敏感剪贴板清理。
+- 已通过 `flutter test test\services\sensitive_clipboard_service_test.dart` 和 `flutter test test\widgets\account_list_tile_test.dart`。
+- 已通过 `dart analyze lib test` 和 `flutter test` 全量测试；全量结果为 100 passed, 1 skipped。
+
 ## 7. 测试计划
 
 | 测试文件 | 覆盖 |
@@ -295,6 +310,8 @@ TotpCode code
 | `test/sync/sync_state_machine_test.dart` | 未审阅 TOTP secret 不 push |
 | `test/sync/multi_device_sync_test.dart` | 多设备同步后验证码一致 |
 | `test/sync/sync_conflict_recovery_test.dart` | TOTP secret 并发修改进入冲突箱 |
+| `test/widgets/account_list_tile_test.dart` | 列表页只提示已配置 2FA，不泄露或复制 TOTP secret |
+| `test/services/sensitive_clipboard_service_test.dart` | 验证码复制后的剪贴板延迟清理与用户替换保护 |
 
 ## 8. 开放问题
 
@@ -305,9 +322,9 @@ TotpCode code
 3. 是否允许自定义模板添加多个 TOTP 字段？
    - 推荐允许，企业账号可能同时有登录、恢复或管理员入口的不同 2FA。
 4. 是否显示验证码在列表页？
-   - 不推荐。列表页只提示“已配置 2FA”，验证码只在账号详情页显示。
+   - 已收敛。列表页只提示“已配置 2FA”，验证码只在账号详情页显示，列表展开详情也不显示或复制 secret。
 5. 是否在复制验证码后自动清理剪贴板？
-   - 推荐作为 P1 增强，第一阶段可以先做复制动作和文案提示。
+   - 已作为 P1 增强落地。复制验证码后 45 秒自动清理，且不会覆盖用户后续复制的新内容。
 
 ## 9. 初步排期建议
 
@@ -318,3 +335,4 @@ TotpCode code
 | 3 | 账号编辑/查看 UI | 用户可录入、查看、复制验证码 |
 | 4 | 同步与冲突回归 | 多设备和 outbox 语义稳定 |
 | 5 | 文档和执行报告 | 可提交、可维护 |
+| 6 | P1 安全收敛 | 列表不暴露 secret，验证码复制后自动清理 |

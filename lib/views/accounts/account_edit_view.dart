@@ -10,6 +10,7 @@ import '../../models/account_item.dart';
 import '../../models/account_template.dart';
 import '../../models/hlc.dart';
 import '../../providers/enhanced_app_provider.dart';
+import '../../services/sensitive_clipboard_service.dart';
 import '../../services/service_manager.dart';
 import '../../services/totp_service.dart';
 import '../../widgets/adaptive_page.dart';
@@ -527,7 +528,11 @@ class _AccountEditViewState extends State<AccountEditView> {
     Navigator.of(context).pop(item);
   }
 
-  Future<void> _copyValue(String label, String value) async {
+  Future<void> _copyValue(
+    String label,
+    String value, {
+    bool clearClipboard = false,
+  }) async {
     final trimmed = value.trim();
     final messenger = ScaffoldMessenger.of(context);
 
@@ -545,11 +550,22 @@ class _AccountEditViewState extends State<AccountEditView> {
       return;
     }
 
-    await Clipboard.setData(ClipboardData(text: trimmed));
+    if (clearClipboard) {
+      await SensitiveClipboardService.copy(trimmed);
+    } else {
+      await Clipboard.setData(ClipboardData(text: trimmed));
+    }
     if (!mounted) return;
     messenger.showSnackBar(
       SnackBar(
-        content: Text(_text('\u5df2\u590d\u5236 $label', 'Copied $label')),
+        content: Text(
+          clearClipboard
+              ? _text(
+                  '\u5df2\u590d\u5236 $label\uff0c45 \u79d2\u540e\u81ea\u52a8\u6e05\u7406\u526a\u8d34\u677f',
+                  'Copied $label. Clipboard clears in 45 seconds',
+                )
+              : _text('\u5df2\u590d\u5236 $label', 'Copied $label'),
+        ),
       ),
     );
   }
@@ -567,6 +583,7 @@ class _AccountEditViewState extends State<AccountEditView> {
       await _copyValue(
         _text('${field.label} 验证码', '${field.label} code'),
         code.value,
+        clearClipboard: true,
       );
     } catch (error) {
       if (!mounted) return;
@@ -1997,6 +2014,7 @@ class _AccountEditViewState extends State<AccountEditView> {
             onPressed: () => _copyValue(
               _text('\u5168\u90e8\u4fe1\u606f', 'All Information'),
               _buildCopyAllText(),
+              clearClipboard: _hasVisibleTotpFields,
             ),
           ),
         ],
