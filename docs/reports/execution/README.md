@@ -23,6 +23,7 @@ Each report should include:
 
 | Date | Report | Scope |
 |---|---|---|
+| 2026-04-30 | [2026-04-30-2fa-feasibility-plan.md](2026-04-30-2fa-feasibility-plan.md) | 2FA/TOTP feasibility and implementation plan |
 | 2026-04-30 | [2026-04-30-full-iteration-quality-convergence.md](2026-04-30-full-iteration-quality-convergence.md) | Full iteration quality convergence |
 | 2026-04-30 | [2026-04-30-crash-recovery-loop.md](2026-04-30-crash-recovery-loop.md) | Crash recovery loop |
 | 2026-04-30 | [2026-04-30-t0-t7-quality-convergence-rerun.md](2026-04-30-t0-t7-quality-convergence-rerun.md) | T0-T7 quality convergence rerun |
