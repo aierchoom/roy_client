@@ -58,6 +58,13 @@
 | T9 | 未开始 | 同步状态机清理 | 让 UI 消费稳定状态，不猜内部失败 |
 | T10 | 未开始 | 服务端持久化语义加固 | 强化薄后端的校验、幂等、错误分类和半写入恢复 |
 | T11 | 完成 | 2FA/TOTP 动态验证码 | 账号内置 TOTP 密钥保存、验证码生成、复制和同步 |
+| T12 | 未开始 | 全局敏感复制策略收敛 | 将 TOTP 已落地的剪贴板清理扩展到密码、配对码、恢复码和复制全部 |
+| T13 | 未开始 | Vault Health 本地体检面板 | 让加密、备份、恢复演练、弱/复用/陈旧凭据和待同步状态可见 |
+| T14 | 未开始 | 备份、恢复和导入一致性 | 建立加密导出、恢复预览、测试恢复和导入后 sync/outbox 语义 |
+| T15 | 未开始 | 解锁与密钥托管安全收敛 | 收敛生物识别、无密码模式、KDF 参数和运行期明文边界 |
+| T16 | 未开始 | 服务端认证、传输和诊断路线 | 为弱服务器补齐认证授权、HTTPS/TLS 指引和客户端健康检查 |
+| T17 | 未开始 | UI 架构与本地化收敛 | 拆分超大视图、统一本地化路径和核心组件规则 |
+| T18 | 未开始 | 2FA 下一阶段能力 | QR 导入、恢复码模板和 2FA 后续导入导出策略 |
 
 ## 3. T0 本地出站同步审阅收口
 
@@ -423,6 +430,7 @@
 - [x] 在账号编辑/查看页增加 TOTP 专用控件、验证码倒计时和复制动作。
 - [x] 验证 outbox、同步、冲突恢复和多设备一致性。
 - [x] 补执行报告、全局特性文档和测试维护说明。
+- [x] 收敛列表暴露面与验证码剪贴板清理。
 
 进展记录：
 
@@ -434,12 +442,220 @@
 - T11.3 已完成账号页 TOTP 使用闭环：粘贴 Base32/`otpauth://`/JSON，保存时规范化，查看时显示验证码、倒计时和复制动作。
 - T11.4 已完成同步回归：未审阅 TOTP 不 push，批准后走 AEAD 密文 payload，多设备验证码一致，并发修改进入 `data.totp_secret` 冲突日志。
 - T11.5 已完成文档与质量收敛：执行报告、全局特性文档、功能文档和测试维护记录已更新。
+- T11.6 已完成 P1 安全收敛：列表页和搜索卡片只提示“已配置 2FA”，不再展示或复制 TOTP secret；复制验证码后 45 秒自动清理未被替换的剪贴板内容。
 - 已通过 `flutter test test\services\totp_service_test.dart`、`flutter test test\models\account_template_test.dart`、`flutter test test\sync\sync_state_machine_test.dart`、`flutter test test\sync\multi_device_sync_test.dart`、`flutter test test\sync\sync_conflict_recovery_test.dart` 与 `dart analyze lib test`。
-- 已通过 `flutter test` 全量测试，结果为 97 passed, 1 skipped。
+- 已通过 `flutter test test\services\sensitive_clipboard_service_test.dart` 与 `flutter test test\widgets\account_list_tile_test.dart`。
+- 已通过 `flutter test` 全量测试，结果为 100 passed, 1 skipped。
 
 验收：
 
 - 固定时间戳下 TOTP 结果符合 RFC 6238 向量。
 - 粘贴 Base32 secret 或 `otpauth://totp` URI 后可保存并生成验证码。
 - TOTP secret 默认隐藏、不参与搜索、不被服务端明文读取。
+- 列表页、搜索卡片和复制全部不泄露 TOTP secret。
+- 复制验证码后，剪贴板会在内容未被替换时自动清理。
 - 未审阅的 TOTP 修改不会自动 push；批准后可信设备可同步并生成同一验证码。
+
+## 15. T12 全局敏感复制策略收敛
+
+来源：2026-04-30 代码扫描。
+
+目标：
+
+- 将 `SensitiveClipboardService` 从 TOTP 验证码扩展为统一敏感复制策略。
+- 避免密码、恢复码、配对码、完整账号复制等敏感内容长期停留在系统剪贴板。
+
+代码扫描证据：
+
+- `lib/services/sensitive_clipboard_service.dart` 已为 TOTP 验证码提供 45 秒条件清理。
+- `password_tools_view.dart`、`password_generator_sheet.dart`、`sync_settings_view.dart`、`account_list_tile.dart` 和部分账号复制路径仍直接调用 `Clipboard.setData`。
+
+任务拆分：
+
+- [ ] 梳理所有 `Clipboard.setData` 调用并按风险分级。
+- [ ] 为生成密码、账号详情复制、复制全部、配对码、离线恢复码制定默认清理时长。
+- [ ] 不清理普通非敏感 UI 文本，避免过度打扰用户。
+- [ ] 补剪贴板不覆盖用户后续复制内容的回归测试。
+- [ ] 更新安全文档和功能文档。
+
+验收：
+
+- 高风险敏感复制统一走 `SensitiveClipboardService`。
+- 用户后续复制的新内容不会被定时清理误删。
+- 文档能解释哪些内容会自动清理、哪些不会。
+
+## 16. T13 Vault Health 本地体检面板
+
+来源：2026-04-30 代码扫描。
+
+目标：
+
+- 把本地保险库健康状态变成可见产品能力，而不是散落在设置页和执行报告里。
+
+候选指标：
+
+- 本地数据库是否加密落盘。
+- 最近备份时间和最近恢复演练时间。
+- 待同步变更数量、冲突数量、恢复 marker 是否存在。
+- 弱密码、复用密码、陈旧记录、缺少 URL、缺少恢复码、缺少 2FA 的账号。
+- vaultId/deviceId 是否完整。
+
+涉及范围：
+
+- `SecureStorageService`
+- `EnhancedCryptoService`
+- `IdentityService`
+- `SyncService`
+- `home_search_view.dart`
+- 新增健康计算 service 或 view model
+
+任务拆分：
+
+- [ ] 定义只读 health model，不直接修改账号数据。
+- [ ] 建立账号安全体检规则：弱、复用、陈旧、不完整、缺少恢复数据。
+- [ ] 建立 vault 运行体检规则：加密、备份、导入、同步、冲突。
+- [ ] 在首页或设置页增加低噪音入口。
+- [ ] 补本地 health service 单测。
+
+验收：
+
+- 离线状态下也能完成本地体检。
+- 体检结果不上传、不泄露 secret。
+- 每个风险项都能指向一个可执行下一步。
+
+## 17. T14 备份、恢复和导入一致性
+
+来源：2026-04-30 代码扫描。
+
+目标：
+
+- 将 vault dump 从“配对链路里的数据包”升级为可理解、可演练、可恢复的本地能力。
+
+代码扫描证据：
+
+- `VaultDumpCoordinator` 已支持加密导出、验证和导入。
+- 导入时会把 dump 中账号转成 `SyncStatus.synchronized`，后续需要评估源状态是否应保留为 reviewable/outbox。
+- `docs/features/local-outbound-sync-review/test-maintenance.md` 已把“vault dump 导入后重建 outbox/syncStatus”列为 P1。
+
+任务拆分：
+
+- [ ] 定义 encrypted backup package 与 pairing dump 的边界。
+- [ ] 增加恢复预览：账号数、模板数、vaultId、是否覆盖当前本地数据。
+- [ ] 增加测试恢复流程，不真正切换当前 vault。
+- [ ] 明确导入后 `syncStatus`、outbox、conflict log 和本地 dirty 的重建规则。
+- [ ] 补导入失败回滚、半导入恢复和 sync/outbox 语义测试。
+
+验收：
+
+- 用户可以在灾难发生前验证备份可恢复。
+- 导入失败不留下半成功 vault。
+- 导入后的普通数据同步状态可解释，不静默扩散。
+
+## 18. T15 解锁与密钥托管安全收敛
+
+来源：2026-04-30 代码扫描。
+
+目标：
+
+- 收敛主密码、生物识别、无密码模式和运行期明文边界，避免安全文案超过真实实现。
+
+代码扫描证据：
+
+- `BiometricAuthService` 仍通过 `master_key_biometric_v1` 保存可回填主密码。
+- `ServiceManager` 暴露 no-password mode。
+- `EnhancedCryptoService` 已有 PBKDF2 verifier 和数据库文件 key envelope，但 KDF 参数、平台密钥托管和运行期明文窗口仍需复核。
+
+任务拆分：
+
+- [ ] 重新定义生物识别解锁的安全边界和可接受实现。
+- [ ] 评估 no-password mode 是否继续保留、降级为开发模式或加更强警告。
+- [ ] 明确主密码 verifier、database key envelope、vault identity key 的分层边界。
+- [ ] 补生物识别/无密码状态机测试。
+- [ ] 更新 `docs/security/beta-risk-register.md`。
+
+验收：
+
+- 安全设置页文案和真实密钥托管一致。
+- 外部 Beta 前不再存在“明文主密码长期托管但 UI 暗示安全”的错位。
+
+## 19. T16 服务端认证、传输和诊断路线
+
+来源：2026-04-30 代码扫描，包含 sibling `roy_server`。
+
+目标：
+
+- 保持弱服务器路线，但补齐外部 Beta 前必须具备的认证、传输和诊断边界。
+
+代码扫描证据：
+
+- `roy_server/system/` 已拆分路由、vault、sync、pairing、http 模块，并有原子写入、限流、request id、安全头和测试。
+- 服务器仍是无账号认证的 HTTP 服务，适合受控环境，不适合公网暴露。
+- 客户端 `sync_settings_view.dart` 已有诊断区，但 server URL health check 和安全提示还可以继续产品化。
+
+任务拆分：
+
+- [ ] 定义 sync/pairing route 的最小认证授权策略。
+- [ ] 明确 HTTPS/TLS 或反向代理部署指引。
+- [ ] 客户端连接测试展示 server version、health、数据目录健康和安全提示。
+- [ ] 服务端诊断不输出 payload 明文、pairing bundle 或 vault 密钥材料。
+- [ ] 补服务端认证、TLS 配置指引和客户端诊断测试。
+
+验收：
+
+- 公网/局域网/本机三类部署风险可解释。
+- 未认证请求不能读写 vault。
+- 诊断信息可复制给自己排障，但不泄露 secret。
+
+## 20. T17 UI 架构与本地化收敛
+
+来源：2026-04-30 代码扫描。
+
+目标：
+
+- 控制超大视图继续膨胀，并把 UI 文案路径逐步统一。
+
+代码扫描证据：
+
+- `account_edit_view.dart`、`sync_settings_view.dart`、`secure_storage_service.dart`、`sync_service.dart` 均已超过 1400 行或接近高复杂度边界。
+- `ui-quality-convergence-plan.md` 已记录 `_text(...)`、直接中文字符串和生成式 l10n 并存。
+
+任务拆分：
+
+- [ ] 先从 `account_edit_view.dart` 拆出 TOTP panel、legacy fields、field card 或 copy policy。
+- [ ] 从 `sync_settings_view.dart` 拆出 pairing、diagnostics、server config 子组件。
+- [ ] 新增/重写页面优先使用统一本地化资源。
+- [ ] 把通用状态 chip、危险提示、字段行样式沉淀为组件。
+- [ ] 补 widget 测试覆盖拆分后的关键交互。
+
+验收：
+
+- 拆分不改变用户可见行为。
+- 新功能不继续把 UI、业务校验和协议状态塞进同一个 view。
+
+## 21. T18 2FA 下一阶段能力
+
+来源：2026-04-30 代码扫描。
+
+目标：
+
+- 在当前手动 TOTP 闭环稳定后，规划 2FA 的下一批能力，不和安全/恢复主线抢优先级。
+
+候选范围：
+
+- QR 扫码导入。
+- 二维码导出是否允许以及如何提示风险。
+- 恢复码模板或 recovery code 字段类型。
+- 多 TOTP 字段的命名和筛选。
+- 设备时间漂移提示。
+
+任务拆分：
+
+- [ ] 先写 QR/恢复码可行性和权限风险分析。
+- [ ] 决定是否引入相机插件。
+- [ ] 补 UI 原型和手工验收路径。
+- [ ] 补同步、导入导出和列表不暴露回归测试。
+
+验收：
+
+- 不把二维码、恢复码或验证码推到列表页暴露。
+- 不新增服务端 TOTP route。

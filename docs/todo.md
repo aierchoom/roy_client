@@ -10,7 +10,7 @@ Navigation:
 | Document Type | Project TODO |
 | Scope | Architecture, security, sync, server hardening, testing, documentation, and candidate features |
 | Source Conclusion | [Architecture decision summary](architecture/00-executive-summary.md#decision-summary) |
-| Last Updated | 2026-04-28 |
+| Last Updated | 2026-04-30 |
 
 ## Source Conclusion
 
@@ -20,6 +20,47 @@ This TODO is derived from the architecture conclusion:
 - SecretRoy is not yet a directly product-ready security system.
 
 The work below should therefore prioritize correctness, security, recovery, architecture clarity, and testability before broad feature expansion.
+
+## 2026-04-30 Code Scan Update
+
+This roadmap was refreshed after scanning the current client code, the sibling
+sync server layout, the active product docs, the security risk register, and the
+test inventory.
+
+Current implemented baseline:
+
+- Sync payloads use `sroy-sync:` AES-256-GCM + HKDF envelopes through
+  `SyncPayloadCodec`.
+- Vault/device identity, vault-scoped sync metadata, explicit conflict types,
+  conflict recovery, CRDT regression coverage, crash recovery, and minimal
+  two-device sync tests have landed.
+- The first TOTP authenticator phase has landed: algorithm service, TOTP field
+  type, account UI, outbox/sync/conflict regression, list non-disclosure, and
+  sensitive clipboard cleanup for TOTP codes.
+- The sync server has been split into `system/` modules with atomic JSON vault
+  writes, request limits, body validation, rate limits, security headers,
+  request IDs, and pairing lifecycle tests.
+
+Current code-derived pressure points:
+
+- `SyncService` still exposes broad UI-facing states that mix transport,
+  protocol, persistence, conflict, and recovery meaning.
+- `SecuritySettingsView`, `BiometricAuthService`, and no-password mode still
+  need a stronger key-custody design before external security claims.
+- `VaultDumpCoordinator` validates encrypted dumps, but restore confidence,
+  test-restore UX, and import sync/outbox semantics need a product-level route.
+- Several sensitive copy paths still use raw `Clipboard.setData`, while TOTP now
+  has a safer service path.
+- Large feature files such as `account_edit_view.dart`, `sync_settings_view.dart`,
+  `secure_storage_service.dart`, and `sync_service.dart` remain active
+  architecture debt.
+
+Execution queue alignment:
+
+- Near-term execution should continue with `T9` sync status cleanup and `T10`
+  server persistence semantics.
+- New global roadmap items should be tracked as `T12+` in
+  `docs/product/iteration-tasks.md` rather than scattered in feature notes.
 
 ## Current Product Decision
 
@@ -163,42 +204,65 @@ Primary outcomes:
 
 ### Authenticator Feature
 
-- Start with a local encrypted TOTP authenticator MVP.
-- Implement TOTP/HOTP core and `otpauth://` parsing before UI.
-- Store TOTP secrets only inside the encrypted local database.
-- Delay TOTP secret sync until sync payload AEAD/E2EE, identity, and recovery baselines are stronger.
+- Keep the completed local encrypted TOTP authenticator as the first phase.
+- Preserve the current rule: TOTP secrets live in encrypted account data and use
+  existing outbox review, AEAD sync payloads, CRDT merge, and conflict inbox.
+- Next TOTP work should focus on QR import, recovery-code templates, and
+  broader sensitive clipboard policy only after the security and restore
+  roadmap is clear.
 
 ## P0 - Security And Correctness
 
-- Replace transitional identity keys with a real vault/device key lifecycle.
-- Move sync payload protection from the current custom envelope toward a standard AEAD/E2EE design.
-- Keep improving local database encryption around unlock order, runtime plaintext lifetime, corruption checks, backup, and recovery.
-- Continue the architecture split: keep extracting focused `system/` helpers from oversized services without changing public APIs unnecessarily.
-- Preserve local-only operation while refactoring security, sync, and service boundaries.
-- Namespace all sync metadata by vault and remove cross-vault state leakage risks.
-- Formalize sync conflict types instead of treating most protocol conflicts as a generic `409`.
-- Expand conflict recovery so remote-missing, stale-base, concurrent-edit, and concurrent-delete paths are explicit.
-- Add invariant tests for CRDT merge behavior and sync state transitions.
-- Establish a minimal two-device sync integration baseline.
-- Add server URL health-check UX before any sync write path.
+- Add server authentication and authorization for sync and pairing routes before
+  any external or public-network Beta claim.
+- Define transport hardening expectations: HTTPS/TLS setup, local-network
+  warnings, and client diagnostics for insecure or unreachable endpoints.
+- Replace biometric/no-password plaintext master-password storage with a
+  stronger key-custody strategy or clearly gate it as non-production.
+- Keep improving local database encryption around unlock order, runtime
+  plaintext lifetime, corruption checks, backup, and recovery.
+- Preserve local-only operation while refactoring security, sync, and service
+  boundaries.
+- Keep AEAD payload, vault identity, conflict recovery, and two-device baselines
+  under regression so these completed foundations do not drift.
 
 ## P1 - Runtime Robustness
 
-- Strengthen server persistence semantics for validation, atomic writes, duplicate requests, and error classification.
-- Add structured diagnostics for unlock, encryption, sync, conflict recovery, and import/export flows.
-- Build crash-recovery tests for interrupted pull, push, database replacement, and encrypted DB rewrite.
-- Clean up sync status semantics so UI consumes stable states instead of inferring internal failures.
-- Keep reducing oversized service and view files into focused modules where responsibility boundaries are clear.
+- Clean up sync status semantics so UI consumes stable states instead of
+  inferring internal failures.
+- Strengthen server persistence semantics for validation, atomic writes,
+  duplicate requests, idempotency, and error classification.
+- Add structured diagnostics for unlock, encryption, sync, conflict recovery,
+  server health, and import/export flows.
+- Build a visible vault health surface for encryption state, backup age,
+  restore-test status, weak/reused/stale credentials, incomplete records, TOTP
+  coverage, and unsynced changes.
+- Add encrypted export/import, restore preview, and test-restore flows as
+  visible product capabilities.
+- Rebuild import/outbox semantics so vault dump restore does not silently mark
+  unsafe local state as synchronized when the source state should remain
+  reviewable.
+- Extend sensitive clipboard cleanup beyond TOTP codes to generated passwords,
+  account detail copy, pairing codes, and recovery codes where appropriate.
+- Keep reducing oversized service and view files into focused modules where
+  responsibility boundaries are clear.
 - Add architecture README files for new subsystem folders when they become canonical extension points.
-- Add vault health checks for weak, reused, stale, incomplete, and unsynced records.
-- Add encrypted export/import and test-restore flows as visible product capabilities.
 - Add sync server setup guidance in the client: URL validation, health result, data safety notes, and first-sync confirmation.
 - Add server-side diagnostics that are safe to display or copy without leaking vault secrets.
 
 ## P2 - Product And Feature Evolution
 
-- Design an internal TOTP authenticator feature with encrypted secret storage, QR/manual import, countdown, copy, search, and encrypted backup/export.
+- Add TOTP QR import, QR export decisions, and recovery-code templates after the
+  completed manual TOTP path remains stable.
+- Add local import strategy for browser CSV, generic CSV, and common password
+  manager exports without weakening local encryption.
+- Converge localization so newly touched screens stop mixing `_text(...)`,
+  direct Chinese strings, and generated localization resources.
+- Continue UI quality convergence around flatter account, template, settings,
+  sync, and search surfaces.
 - Build data repair tooling for damaged sync metadata, conflict logs, tombstones, and version drift.
+- Introduce property-based or model-based tests for sync state transitions and
+  merge invariants once the state model is cleaner.
 - Consider a stronger server storage abstraction only after protocol, recovery, and test baselines are stable.
 - Consider optional server packaging only after the one-command/manual setup path is already clear.
 
