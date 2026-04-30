@@ -11,12 +11,14 @@ class AccountFieldDisplayData {
   final String label;
   final String value;
   final bool isSecret;
+  final bool canCopy;
   final IconData icon;
 
   const AccountFieldDisplayData({
     required this.label,
     required this.value,
     required this.isSecret,
+    this.canCopy = true,
     required this.icon,
   });
 }
@@ -136,21 +138,26 @@ class _AccountListTileState extends State<AccountListTile> {
     }) {
       final trimmed = value.trim();
       if (trimmed.isEmpty) return;
+      final isTotp = _looksLikeTotpField(label: label, key: key, type: type);
+      final displayValue = isTotp
+          ? widget.localeText(context, '已配置 2FA', '2FA configured')
+          : trimmed;
 
-      final dedupeKey = '${label.toLowerCase()}|$trimmed';
+      final dedupeKey = '${label.toLowerCase()}|$displayValue';
       if (seen.contains(dedupeKey)) return;
       seen.add(dedupeKey);
 
       fields.add(
         AccountFieldDisplayData(
           label: label,
-          value: trimmed,
-          isSecret: isSecret,
+          value: displayValue,
+          isSecret: isTotp ? false : isSecret,
+          canCopy: !isTotp,
           icon: _iconForField(
             label: label,
             key: key,
             type: type,
-            isSecret: isSecret,
+            isSecret: isTotp ? false : isSecret,
           ),
         ),
       );
@@ -182,6 +189,43 @@ class _AccountListTileState extends State<AccountListTile> {
     }
 
     return fields;
+  }
+
+  bool _looksLikeTotpField({
+    required String label,
+    String? key,
+    AccountFieldType? type,
+  }) {
+    if (type == AccountFieldType.totp) return true;
+    final normalized = '${key ?? ''} $label'.toLowerCase();
+    return normalized.contains('totp') ||
+        normalized.contains('2fa') ||
+        normalized.contains('mfa') ||
+        normalized.contains('验证器') ||
+        normalized.contains('验证码密钥');
+  }
+
+  bool _hasConfiguredTotp() {
+    if (widget.template != null) {
+      for (final field in widget.template!.fields) {
+        if (!_looksLikeTotpField(
+          label: field.label,
+          key: field.fieldKey,
+          type: field.attributes.type,
+        )) {
+          continue;
+        }
+        if ((widget.account.data[field.fieldKey] ?? '').trim().isNotEmpty) {
+          return true;
+        }
+      }
+    }
+
+    for (final entry in widget.account.data.entries) {
+      if (!_looksLikeTotpField(label: entry.key, key: entry.key)) continue;
+      if (entry.value.trim().isNotEmpty) return true;
+    }
+    return false;
   }
 
   String _formatKeyLabel(String key) {
@@ -216,6 +260,9 @@ class _AccountListTileState extends State<AccountListTile> {
     AccountFieldType? type,
     required bool isSecret,
   }) {
+    if (_looksLikeTotpField(label: label, key: key, type: type)) {
+      return Icons.verified_user_outlined;
+    }
     if (isSecret) return Icons.lock_outline_rounded;
 
     final composite = '${key ?? ''} $label';
@@ -303,6 +350,13 @@ class _AccountListTileState extends State<AccountListTile> {
         (field) => field.attributes.isPrimary,
       );
       for (final field in primaryFields) {
+        if (_looksLikeTotpField(
+          label: field.label,
+          key: field.fieldKey,
+          type: field.attributes.type,
+        )) {
+          continue;
+        }
         addSegment(
           field.label,
           widget.account.data[field.fieldKey] ?? '',
@@ -323,6 +377,13 @@ class _AccountListTileState extends State<AccountListTile> {
     if (segments.length < 2 && widget.template != null) {
       for (final field in widget.template!.fields) {
         if (field.attributes.isPrimary) continue;
+        if (_looksLikeTotpField(
+          label: field.label,
+          key: field.fieldKey,
+          type: field.attributes.type,
+        )) {
+          continue;
+        }
         addSegment(
           field.label,
           widget.account.data[field.fieldKey] ?? '',
@@ -427,6 +488,16 @@ class _AccountListTileState extends State<AccountListTile> {
             '\u5386\u53f2\u5b57\u6bb5 ${widget.legacyFieldCount}',
             'Legacy ${widget.legacyFieldCount}',
           ),
+          tint: accent,
+        ),
+      );
+    }
+
+    if (_hasConfiguredTotp()) {
+      chips.add(
+        _StatusChip(
+          icon: Icons.verified_user_outlined,
+          label: widget.localeText(context, '已配置 2FA', '2FA enabled'),
           tint: accent,
         ),
       );
@@ -731,6 +802,7 @@ class _AccountListTileState extends State<AccountListTile> {
                                     label: fieldEntries[i].label,
                                     value: fieldEntries[i].value,
                                     isSecret: fieldEntries[i].isSecret,
+                                    canCopy: fieldEntries[i].canCopy,
                                     icon: fieldEntries[i].icon,
                                     accent: accent,
                                     onCopy: () => _copyValue(
@@ -765,6 +837,7 @@ class AccountFieldRow extends StatelessWidget {
   final String label;
   final String value;
   final bool isSecret;
+  final bool canCopy;
   final IconData icon;
   final Color accent;
   final VoidCallback onCopy;
@@ -775,6 +848,7 @@ class AccountFieldRow extends StatelessWidget {
     required this.label,
     required this.value,
     required this.isSecret,
+    this.canCopy = true,
     required this.icon,
     required this.accent,
     required this.onCopy,
@@ -787,6 +861,7 @@ class AccountFieldRow extends StatelessWidget {
       label: label,
       value: value,
       isSecret: isSecret,
+      canCopy: canCopy,
       icon: icon,
       accent: accent,
       onCopy: onCopy,
@@ -799,6 +874,7 @@ class AccountFieldRowBody extends StatefulWidget {
   final String label;
   final String value;
   final bool isSecret;
+  final bool canCopy;
   final IconData icon;
   final Color accent;
   final VoidCallback onCopy;
@@ -809,6 +885,7 @@ class AccountFieldRowBody extends StatefulWidget {
     required this.label,
     required this.value,
     required this.isSecret,
+    this.canCopy = true,
     required this.icon,
     required this.accent,
     required this.onCopy,
@@ -895,16 +972,17 @@ class _AccountFieldRowBodyState extends State<AccountFieldRowBody> {
                 color: widget.accent.withAlpha(190),
               ),
             ),
-          IconButton(
-            tooltip: widget.copyTooltip,
-            onPressed: widget.onCopy,
-            visualDensity: VisualDensity.compact,
-            iconSize: 18,
-            icon: Icon(
-              Icons.content_copy_outlined,
-              color: widget.accent.withAlpha(190),
+          if (widget.canCopy)
+            IconButton(
+              tooltip: widget.copyTooltip,
+              onPressed: widget.onCopy,
+              visualDensity: VisualDensity.compact,
+              iconSize: 18,
+              icon: Icon(
+                Icons.content_copy_outlined,
+                color: widget.accent.withAlpha(190),
+              ),
             ),
-          ),
         ],
       ),
     );
