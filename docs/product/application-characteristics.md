@@ -47,6 +47,7 @@ SecretRoy 是一个本地优先的个人密钥/账号保险库应用。
 | 本地加密数据库 | 用户数据的本地事实存储 | `SecureStorageService`, `DatabaseFileCipher`, `DatabaseFileKeyManager` | 加密落盘、运行时明文清理、数据库迁移、导入覆盖 |
 | 账号管理 | 保存、编辑、删除用户账号和字段数据 | `account_edit_view.dart`, `account_list_view.dart`, `AccountItem` | 历史字段保留、敏感字段展示、删除可控、模板缺失保护 |
 | 模板管理 | 定义账号字段结构和内置/自定义模板 | `template_edit_view.dart`, `template_list_view.dart`, `AccountTemplate` | 模板删除保护、字段变更不静默丢数据、内置模板中文优先 |
+| 2FA/TOTP 验证器 | 在账号内保存网站 TOTP 密钥并本地生成动态验证码 | `totp_service.dart`, `account_edit_view.dart`, `AccountFieldType.totp` | secret 默认隐藏、不搜索、不泄露到服务端、复制验证码而不是 secret、多设备时间一致性 |
 | 首页搜索与任务聚合 | 搜索账号，并聚合需要用户处理的事项 | `home_search_view.dart`, `EnhancedAppProvider` | 待同步变更、冲突入口、搜索结果、移动端布局 |
 | 密码工具 | 生成和评估密码强度 | `password_tools_view.dart`, `password_generator_sheet.dart` | 字符池覆盖、强度提示、填入/复制动作 |
 | 外观设置 | 控制主题、色彩和视觉偏好 | `appearance_settings_view.dart`, `theme_provider.dart` | 专业工具感、浅/深色、布局不溢出 |
@@ -434,6 +435,7 @@ ServiceManager 必须防绕过。
 | 改动范围 | 必测方向 |
 |---|---|
 | 账号保存/删除 | 是否进入 outbox，是否误 push，是否可撤销 |
+| 2FA/TOTP | 算法向量、输入解析、验证码复制、secret 隐藏、outbox 审阅、密文同步、多设备一致性、并发冲突 |
 | 模板保存/删除 | 是否保护被引用模板，是否记录待同步变更 |
 | SyncService | pendingReview 是否仍禁止 push，approved 是否可 push |
 | 密钥链接 | vaultId 是否一致，deviceId 是否保持本机唯一 |
@@ -476,7 +478,19 @@ T0-T7 断代质量收敛的历史基线：
 
 当时全量测试结果为 76 passed, 1 skipped；跳过项是 Windows runner 下不稳定的 UDP broadcast discovery 测试。T8 新增恢复测试后，当前全量基线已更新为 78 passed, 1 skipped。
 
-如果后续这些长链路测试再次超时，需要优先判断是 Flutter 测试进程权限/生命周期问题，还是同步链路真实阻塞。
+当前 T11 2FA/TOTP 动态验证码第一阶段已通过：
+
+- `test/services/totp_service_test.dart`
+- `test/models/account_template_test.dart`
+- `test/sync/sync_state_machine_test.dart`
+- `test/sync/multi_device_sync_test.dart`
+- `test/sync/sync_conflict_recovery_test.dart`
+- `dart analyze lib test`
+- `flutter test`，结果为 97 passed, 1 skipped；跳过项仍是 Windows runner 下不稳定的 UDP broadcast discovery。
+
+T11 的同步原则是：TOTP secret 只作为 `AccountItem.data` 中的保密字段参与现有本地加密、outbox 审阅、AEAD payload、CRDT merge 和 conflict inbox；不新增服务端 TOTP route、metadata key 或独立同步状态。
+
+当前全量测试基线已更新为 97 passed, 1 skipped。如果后续这些长链路测试再次超时，需要优先判断是 Flutter 测试进程权限/生命周期问题，还是同步链路真实阻塞。
 
 ## 12. 功能迭代准入检查表
 

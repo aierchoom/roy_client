@@ -238,6 +238,8 @@ class _AccountListTileState extends State<AccountListTile> {
         return Icons.link_outlined;
       case AccountFieldType.time:
         return Icons.schedule_outlined;
+      case AccountFieldType.totp:
+        return Icons.verified_user_outlined;
       case AccountFieldType.custom:
         return Icons.extension_outlined;
       case null:

@@ -57,7 +57,7 @@
 | T8 | 完成 | 崩溃恢复闭环 | pull/push/数据库替换中断后可恢复 |
 | T9 | 未开始 | 同步状态机清理 | 让 UI 消费稳定状态，不猜内部失败 |
 | T10 | 未开始 | 服务端持久化语义加固 | 强化薄后端的校验、幂等、错误分类和半写入恢复 |
-| T11 | 计划中 | 2FA/TOTP 动态验证码 | 账号内置 TOTP 密钥保存、验证码生成、复制和同步 |
+| T11 | 完成 | 2FA/TOTP 动态验证码 | 账号内置 TOTP 密钥保存、验证码生成、复制和同步 |
 
 ## 3. T0 本地出站同步审阅收口
 
@@ -417,12 +417,25 @@
 
 任务拆分：
 
-- [ ] 实现 TOTP service、Base32 和 `otpauth://` 解析。
-- [ ] 新增 `AccountFieldType.totp` 并接入模板编辑。
-- [ ] 给内置网站模板增加可选 `totp_secret` 字段。
-- [ ] 在账号编辑/查看页增加 TOTP 专用控件、验证码倒计时和复制动作。
-- [ ] 验证 outbox、同步、冲突恢复和多设备一致性。
-- [ ] 补执行报告、全局特性文档和测试维护说明。
+- [x] 实现 TOTP service、Base32 和 `otpauth://` 解析。
+- [x] 新增 `AccountFieldType.totp` 并接入模板编辑。
+- [x] 给内置网站模板增加可选 `totp_secret` 字段。
+- [x] 在账号编辑/查看页增加 TOTP 专用控件、验证码倒计时和复制动作。
+- [x] 验证 outbox、同步、冲突恢复和多设备一致性。
+- [x] 补执行报告、全局特性文档和测试维护说明。
+
+进展记录：
+
+- T11.1 已完成纯 Dart TOTP 算法层：`TotpService` 支持 Base32、JSON 配置、`otpauth://totp`、SHA1/SHA256/SHA512 HOTP/TOTP 和明确错误分类。
+- 新增 `test/services/totp_service_test.dart`，覆盖 RFC 6238 向量、URI/JSON 解析、倒计时和非法输入。
+- 已通过 `flutter test test\services\totp_service_test.dart` 与 `dart analyze lib test`。
+- T11.2 已完成字段和模板接入：`AccountFieldType.totp`、`AccountFieldAttributes.totpDefaults`、模板编辑器标签/图标/样例值、内置网站模板 `totp_secret`。
+- 已通过 `flutter test test\models\account_template_test.dart`、`flutter test test\services\totp_service_test.dart` 与 `dart analyze lib test`。
+- T11.3 已完成账号页 TOTP 使用闭环：粘贴 Base32/`otpauth://`/JSON，保存时规范化，查看时显示验证码、倒计时和复制动作。
+- T11.4 已完成同步回归：未审阅 TOTP 不 push，批准后走 AEAD 密文 payload，多设备验证码一致，并发修改进入 `data.totp_secret` 冲突日志。
+- T11.5 已完成文档与质量收敛：执行报告、全局特性文档、功能文档和测试维护记录已更新。
+- 已通过 `flutter test test\services\totp_service_test.dart`、`flutter test test\models\account_template_test.dart`、`flutter test test\sync\sync_state_machine_test.dart`、`flutter test test\sync\multi_device_sync_test.dart`、`flutter test test\sync\sync_conflict_recovery_test.dart` 与 `dart analyze lib test`。
+- 已通过 `flutter test` 全量测试，结果为 97 passed, 1 skipped。
 
 验收：
 

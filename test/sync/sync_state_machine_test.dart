@@ -9,6 +9,7 @@ import 'package:secret_roy/models/hlc.dart';
 import 'package:secret_roy/models/local_sync_change.dart';
 import 'package:secret_roy/services/identity_service.dart';
 import 'package:secret_roy/services/secure_storage_service.dart';
+import 'package:secret_roy/services/totp_service.dart';
 import 'package:secret_roy/sync/sync_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -197,19 +198,32 @@ IdentityService _identityService() {
   );
 }
 
-AccountItem _pendingItem() {
+AccountItem _pendingItem({String? totpConfig}) {
+  final data = {'password': 'secret'};
+  final dataHlc = {'password': const Hlc(10, 2, 'device_abcdef123456')};
+  if (totpConfig != null) {
+    data['totp_secret'] = totpConfig;
+    dataHlc['totp_secret'] = const Hlc(10, 3, 'device_abcdef123456');
+  }
+
   return AccountItem(
     id: 'account_1',
     name: 'Local Name',
     email: 'owner@example.com',
     templateId: 'web_account',
-    data: const {'password': 'secret'},
+    data: data,
     createdAt: 1,
     nameHlc: const Hlc(10, 0, 'device_abcdef123456'),
     emailHlc: const Hlc(10, 1, 'device_abcdef123456'),
-    dataHlc: const {'password': Hlc(10, 2, 'device_abcdef123456')},
+    dataHlc: dataHlc,
     serverVersion: 0,
     syncStatus: SyncStatus.pendingPush,
+  );
+}
+
+String _totpConfig({String account = 'owner@example.com'}) {
+  return TotpService.encodeConfig(
+    'otpauth://totp/Example:$account?secret=JBSWY3DPEHPK3PXP&issuer=Example',
   );
 }
 
@@ -224,6 +238,7 @@ class _SyncProbeServer {
   final String? postBody;
   int getCount = 0;
   int postCount = 0;
+  String? lastPostBody;
 
   _SyncProbeServer._(
     this._server,
@@ -287,6 +302,7 @@ class _SyncProbeServer {
 
     if (request.method == 'POST' && request.uri.path.endsWith('/sync')) {
       postCount += 1;
+      lastPostBody = await utf8.decoder.bind(request).join();
       request.response.statusCode = postStatusCode;
       request.response.headers.contentType = ContentType.json;
       request.response.write(
@@ -683,5 +699,81 @@ void main() {
       syncService.statusNote,
       'Local changes are waiting for review before push.',
     );
+  });
+
+  test('syncNow does not push unapproved TOTP secret changes', () async {
+    final identity = _identityService();
+    await identity.initialize();
+
+    final totpConfig = _totpConfig();
+    final storage = _FakeSecureStorageService()
+      ..autoApprovePending = false
+      ..accounts['account_1'] = _pendingItem(totpConfig: totpConfig);
+    final server = await _SyncProbeServer.start();
+    addTearDown(server.close);
+
+    final syncService = SyncService(
+      storageService: storage,
+      identityService: identity,
+      config: SyncConfig(serverUrl: server.baseUrl),
+    );
+    addTearDown(syncService.dispose);
+    await syncService.initialize();
+
+    final result = await syncService.syncNow();
+
+    expect(result.success, isTrue);
+    expect(result.pushed, isFalse);
+    expect(server.postCount, 0);
+    expect(server.lastPostBody, isNull);
+    expect(storage.accounts['account_1']!.data['totp_secret'], totpConfig);
+    expect(storage.accounts['account_1']!.syncStatus, SyncStatus.pendingPush);
+    expect(syncService.isDirty, isTrue);
+    expect(
+      syncService.statusNote,
+      'Local changes are waiting for review before push.',
+    );
+  });
+
+  test('approved TOTP secret push only sends encrypted payload', () async {
+    final identity = _identityService();
+    await identity.initialize();
+
+    final totpConfig = _totpConfig();
+    final storage = _FakeSecureStorageService()
+      ..accounts['account_1'] = _pendingItem(totpConfig: totpConfig);
+    final server = await _SyncProbeServer.start(
+      postBody: jsonEncode({
+        'success': true,
+        'max_version': 1,
+        'accepted_versions': {'account_1': 1},
+      }),
+    );
+    addTearDown(server.close);
+
+    final syncService = SyncService(
+      storageService: storage,
+      identityService: identity,
+      config: SyncConfig(serverUrl: server.baseUrl),
+    );
+    addTearDown(syncService.dispose);
+    await syncService.initialize();
+
+    final result = await syncService.syncNow();
+    final postBody = server.lastPostBody ?? '';
+    final syncedItem = storage.accounts['account_1']!;
+
+    expect(result.success, isTrue);
+    expect(result.pushed, isTrue);
+    expect(server.postCount, 1);
+    expect(postBody, contains('encrypted_signed_payload'));
+    expect(postBody, contains('sroy-sync:'));
+    expect(postBody, isNot(contains('totp_secret')));
+    expect(postBody, isNot(contains('JBSWY3DPEHPK3PXP')));
+    expect(postBody, isNot(contains('otpauth://')));
+    expect(storage.pushedLocalSyncChangeIds, ['change_account_1']);
+    expect(syncedItem.syncStatus, SyncStatus.synchronized);
+    expect(syncedItem.serverVersion, 1);
+    expect(syncedItem.data['totp_secret'], totpConfig);
   });
 }

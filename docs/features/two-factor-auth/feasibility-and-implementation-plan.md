@@ -3,7 +3,7 @@
 **功能点**: 账户内置 2FA/TOTP 验证器
 **适用项目**: `roy_client`
 **最后更新**: 2026-04-30
-**状态**: 计划阶段，未进入实现
+**状态**: 第一阶段已完成，后续增强待规划
 
 ## 1. 结论
 
@@ -20,6 +20,15 @@ TOTP 手动密钥 / otpauth:// URI 导入
 ```
 
 不推荐第一阶段就做 QR 扫码、服务端 MFA、登录 SecretRoy 时的第二因素校验。它们会引入相机权限、平台插件、恢复流程和锁屏安全语义，应该在 TOTP 核心闭环稳定后再扩展。
+
+同步策略结论：
+
+```text
+2FA/TOTP 不引入独立同步协议。
+TOTP secret 和配置属于账号保密数据。
+它们跟随 AccountItem.data 走现有本地加密、AEAD sync payload、outbox 审阅、CRDT merge 和 conflict inbox。
+服务端仍只保存密文，不参与验证码生成、校验或冲突判断。
+```
 
 ## 2. 当前代码适配性
 
@@ -45,6 +54,7 @@ TOTP 手动密钥 / otpauth:// URI 导入
 - 支持复制当前验证码。
 - TOTP secret 默认隐藏，不参与搜索。
 - 同步和导入仍沿用现有账号密文链路。
+- 多设备同步后，各可信设备用本地系统时间从同一 TOTP secret 生成验证码。
 
 ### 3.2 第一阶段非目标
 
@@ -184,59 +194,97 @@ TotpCode code
 
 ### T11.1 TOTP 算法与解析
 
-- 新增 `TotpConfig`、`TotpCode`、`TotpService`。
-- 实现 Base32 decoder。
-- 实现 `otpauth://totp` parser。
-- 实现 SHA1/SHA256/SHA512 HOTP/TOTP。
-- 增加 RFC 6238 测试向量和 URI 解析测试。
+- [x] 新增 `TotpConfig`、`TotpCode`、`TotpService`。
+- [x] 实现 Base32 decoder。
+- [x] 实现 `otpauth://totp` parser。
+- [x] 实现 SHA1/SHA256/SHA512 HOTP/TOTP。
+- [x] 增加 RFC 6238 测试向量和 URI 解析测试。
 
 验收：
 
-- 固定时间戳生成结果稳定。
-- 非法 secret、非法 digits、非法 period 有明确错误。
+- [x] 固定时间戳生成结果稳定。
+- [x] 非法 secret、非法 digits、非法 period 有明确错误。
+
+完成记录：
+
+- `lib/services/totp_service.dart` 已落地纯 Dart 算法层，不依赖 UI 或账号模型。
+- `test/services/totp_service_test.dart` 覆盖 RFC 6238 SHA1/SHA256/SHA512 向量、Base32 输入规整、JSON/URI 解析、倒计时和错误输入。
+- 已通过 `flutter test test\services\totp_service_test.dart` 与 `dart analyze lib test`。
+- T11.3 已将 TOTP 字段从普通保密输入升级为专用录入/查看控件。
 
 ### T11.2 模型与模板接入
 
-- 新增 `AccountFieldType.totp`。
-- 模板编辑字段类型增加“2FA 验证码”。
-- 内置网站模板增加 `totp_secret` 可选字段。
-- 更新模板序列化和回归测试。
+- [x] 新增 `AccountFieldType.totp`。
+- [x] 模板编辑字段类型增加“2FA 验证码”。
+- [x] 内置网站模板增加 `totp_secret` 可选字段。
+- [x] 更新模板序列化和回归测试。
 
 验收：
 
-- 旧模板 JSON 仍能 fallback。
-- 新字段不会破坏现有账号。
+- [x] 旧模板 JSON 仍能 fallback。
+- [x] 新字段不会破坏现有账号。
+
+完成记录：
+
+- `AccountFieldAttributes.totpDefaults` 统一 TOTP 字段默认值：保密、不可搜索、可复制。
+- `websiteTemplate` 已增加可选 `totp_secret` 字段。
+- 模板编辑器已显示 TOTP 字段类型、图标和样例值。
+- 已通过 `flutter test test\models\account_template_test.dart` 与 `dart analyze lib test`。
 
 ### T11.3 账号编辑与查看体验
 
-- 为 TOTP 字段新增专用输入控件。
-- 支持 Base32 secret 和 `otpauth://` 粘贴。
-- 显示当前验证码、倒计时、复制按钮。
-- 密钥默认隐藏。
+- [x] 为 TOTP 字段新增专用输入控件。
+- [x] 支持 Base32 secret 和 `otpauth://` 粘贴。
+- [x] 显示当前验证码、倒计时、复制按钮。
+- [x] 密钥默认隐藏。
 
 验收：
 
-- 用户能从常见网站提供的 TOTP secret 完成录入。
-- 复制的是当前验证码，不是 secret。
+- [x] 用户能从常见网站提供的 TOTP secret 完成录入。
+- [x] 复制的是当前验证码，不是 secret。
+
+完成记录：
+
+- `AccountEditView` 对 `AccountFieldType.totp` 显示验证码面板，包含当前验证码、剩余秒数、配置元信息和复制按钮。
+- TOTP 输入支持 Base32 secret、`otpauth://totp` URI 和结构化 JSON；保存时通过 `TotpService.encodeConfig()` 规范化。
+- 无效 TOTP 配置会在字段内展示错误，并在保存时阻止写入。
+- “复制全部信息”和 TOTP 字段复制动作只复制当前验证码，不复制 secret。
+- 已通过 `flutter test test\services\totp_service_test.dart`、`flutter test test\models\account_template_test.dart` 与 `dart analyze lib test`。
 
 ### T11.4 同步、冲突和 outbox 回归
 
-- 确认修改 TOTP 字段进入本地待审队列。
-- 确认未批准时不会 push。
-- 确认批准后密文同步到另一设备并可生成同一验证码。
-- 确认并发修改 TOTP secret 进入冲突处理。
+- [x] 确认 TOTP 字段作为 `AccountItem.data` 的普通保密字段进入现有同步机制。
+- [x] 确认修改 TOTP 字段进入本地待审队列。
+- [x] 确认未批准时不会 push。
+- [x] 确认批准后密文同步到另一设备并可生成同一验证码。
+- [x] 确认并发修改 TOTP secret 进入冲突处理。
+- [x] 确认不新增服务端 TOTP route、metadata key 或独立同步状态。
 
 验收：
 
-- `sync_state_machine_test.dart` 增加 TOTP 字段未审阅不 push。
-- `multi_device_sync_test.dart` 增加 TOTP secret 多设备一致性。
+- [x] `sync_state_machine_test.dart` 增加 TOTP 字段未审阅不 push。
+- [x] `multi_device_sync_test.dart` 增加 TOTP secret 多设备一致性。
+
+完成记录：
+
+- `sync_state_machine_test.dart` 覆盖未审阅 TOTP 修改不 push，以及批准后请求体只包含 `encrypted_signed_payload`，不泄露 `totp_secret`、Base32 secret 或 `otpauth://`。
+- `multi_device_sync_test.dart` 覆盖可信设备同步同一 TOTP secret 后生成同一验证码。
+- `multi_device_sync_test.dart` 覆盖并发修改 `totp_secret` 进入 `data.totp_secret` 冲突日志。
+- 已通过 `flutter test test\sync\sync_state_machine_test.dart`、`flutter test test\sync\multi_device_sync_test.dart`、`flutter test test\sync\sync_conflict_recovery_test.dart` 与 `dart analyze lib test`。
 
 ### T11.5 文档与质量收敛
 
-- 更新 `application-characteristics.md`。
-- 新增执行报告。
-- 补充手工验收清单。
-- 全量 `dart analyze lib test` 和 `flutter test`。
+- [x] 更新 `application-characteristics.md`。
+- [x] 新增执行报告。
+- [x] 补充手工验收清单。
+- [x] 全量 `dart analyze lib test` 和定向 Flutter 测试。
+
+完成记录：
+
+- 新增 `docs/reports/execution/2026-04-30-totp-ui-sync-closure.md`。
+- `docs/product/application-characteristics.md` 已补充 2FA/TOTP 功能点、同步边界和测试维护点。
+- `flutter test` 全量通过，结果为 97 passed, 1 skipped。
+- `git diff --check` 通过，仅有 CRLF 提示。
 
 ## 7. 测试计划
 
