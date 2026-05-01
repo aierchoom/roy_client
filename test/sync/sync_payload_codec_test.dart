@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:secret_roy/models/account_item.dart';
 import 'package:secret_roy/models/hlc.dart';
+import 'package:secret_roy/models/totp_credential.dart';
+import 'package:secret_roy/services/totp_service.dart';
 import 'package:secret_roy/sync/sync_payload_codec.dart';
 
 AccountItem _item() {
@@ -139,5 +141,38 @@ void main() {
         ),
       ),
     );
+  });
+
+  test('encodes independent TOTP credentials as encrypted payloads', () async {
+    final credential = TotpCredential(
+      id: 'totp_1',
+      label: 'GitHub',
+      config: TotpService.parseConfig(
+        'otpauth://totp/GitHub:alice?secret=JBSWY3DPEHPK3PXP&issuer=GitHub',
+      ),
+      linkedAccountIds: const ['account_1'],
+      createdAt: 1,
+      labelHlc: const Hlc(10, 0, 'device_a'),
+      configHlc: const Hlc(10, 1, 'device_a'),
+      linksHlc: const Hlc(10, 2, 'device_a'),
+    );
+
+    final encoded = await SyncPayloadCodec.encodeTotpCredential(
+      credential: credential,
+      vaultId: vaultId,
+      nodeId: deviceId,
+      privateKey: privateKey,
+      symmetricKey: symmetricKey,
+    );
+    final decoded = await SyncPayloadCodec.decodePayload(
+      encodedPayload: encoded,
+      expectedVaultId: vaultId,
+      privateKey: privateKey,
+      symmetricKey: symmetricKey,
+    );
+
+    expect(decoded['_type'], 'totp_credential');
+    expect(TotpCredential.fromJson(decoded).toJson(), credential.toJson());
+    expect(encoded.contains('JBSWY3DPEHPK3PXP'), isFalse);
   });
 }

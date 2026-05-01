@@ -10,12 +10,12 @@ void main() {
       ]);
     });
 
-    test('website template keeps password and TOTP hidden by default', () {
+    test('website template uses a 2FA link field without storing secrets', () {
       final passwordField = websiteTemplate.fields.firstWhere(
         (field) => field.fieldKey == 'password',
       );
       final totpField = websiteTemplate.fields.firstWhere(
-        (field) => field.fieldKey == 'totp_secret',
+        (field) => field.fieldKey == 'totp',
       );
 
       expect(websiteTemplate.isCustom, isFalse);
@@ -24,41 +24,19 @@ void main() {
         'website',
         'username',
         'password',
-        'totp_secret',
+        'totp',
         'notes',
       ]);
       expect(passwordField.attributes.isSecret, isTrue);
       expect(passwordField.attributes.isRequired, isTrue);
       expect(passwordField.attributes.type, AccountFieldType.password);
-      expect(totpField.label, '2FA 密钥');
       expect(totpField.attributes.type, AccountFieldType.totp);
-      expect(totpField.attributes.isSecret, isTrue);
-      expect(totpField.attributes.isRequired, isFalse);
-      expect(totpField.attributes.isSearchable, isFalse);
-      expect(totpField.attributes.isCopyable, isTrue);
-      expect(totpField.attributes.hint, AccountFieldAttributes.totpDefaultHint);
-    });
-
-    test('serializes and parses TOTP field attributes', () {
-      const attributes = AccountFieldAttributes(
-        type: AccountFieldType.totp,
-        isSecret: true,
-        isSearchable: false,
-        isCopyable: true,
-        hint: 'Base32 密钥或 otpauth://totp URI',
+      expect(totpField.attributes.isSecret, isFalse);
+      expect(totpField.attributes.isCopyable, isFalse);
+      expect(
+        websiteTemplate.fields.any((field) => field.fieldKey == 'totp_secret'),
+        isFalse,
       );
-
-      final parsed = AccountFieldAttributes.fromJson(attributes.toJson());
-
-      expect(parsed.type, AccountFieldType.totp);
-      expect(parsed.isSecret, isTrue);
-      expect(parsed.isSearchable, isFalse);
-      expect(parsed.isCopyable, isTrue);
-      expect(parsed.hint, AccountFieldAttributes.totpDefaultHint);
-      expect(AccountFieldAttributes.totpDefaults.type, AccountFieldType.totp);
-      expect(AccountFieldAttributes.totpDefaults.isSecret, isTrue);
-      expect(AccountFieldAttributes.totpDefaults.isSearchable, isFalse);
-      expect(AccountFieldAttributes.totpDefaults.isCopyable, isTrue);
     });
 
     test('uses a safe sync status fallback for unreadable template data', () {

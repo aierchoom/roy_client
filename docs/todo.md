@@ -34,9 +34,10 @@ Current implemented baseline:
 - Vault/device identity, vault-scoped sync metadata, explicit conflict types,
   conflict recovery, CRDT regression coverage, crash recovery, and minimal
   two-device sync tests have landed.
-- The first TOTP authenticator phase has landed: algorithm service, TOTP field
-  type, account UI, outbox/sync/conflict regression, list non-disclosure, and
-  sensitive clipboard cleanup for TOTP codes.
+- The first TOTP authenticator phase has landed: algorithm service,
+  independent TOTP credentials, template-level 2FA link fields, account UI,
+  outbox/sync/conflict regression, list non-disclosure, and sensitive clipboard
+  cleanup for TOTP codes.
 - The sync server has been split into `system/` modules with atomic JSON vault
   writes, request limits, body validation, rate limits, security headers,
   request IDs, and pairing lifecycle tests.
@@ -207,9 +208,10 @@ Primary outcomes:
 - Keep the completed local encrypted TOTP authenticator as the first phase.
 - Preserve the current rule: TOTP secrets live in encrypted account data and use
   existing outbox review, AEAD sync payloads, CRDT merge, and conflict inbox.
-- Next TOTP work should focus on QR import, recovery-code templates, and
-  broader sensitive clipboard policy only after the security and restore
-  roadmap is clear.
+- TOTP QR import has landed for mobile camera scan, active QR image paste, and
+  clipboard text fallback. Next TOTP work should focus on recovery-code
+  templates, QR export decisions, device time drift hints, and broader
+  sensitive clipboard policy after the security and restore roadmap is clear.
 
 ## P0 - Security And Correctness
 
@@ -252,8 +254,8 @@ Primary outcomes:
 
 ## P2 - Product And Feature Evolution
 
-- Add TOTP QR import, QR export decisions, and recovery-code templates after the
-  completed manual TOTP path remains stable.
+- Add TOTP QR export decisions, recovery-code templates, and device time drift
+  hints after the completed manual and QR-import TOTP paths remain stable.
 - Add local import strategy for browser CSV, generic CSV, and common password
   manager exports without weakening local encryption.
 - Converge localization so newly touched screens stop mixing `_text(...)`,

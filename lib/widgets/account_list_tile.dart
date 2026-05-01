@@ -30,6 +30,7 @@ class AccountListTile extends StatefulWidget {
   final AccountTemplate? template;
   final bool hasMissingTemplate;
   final int legacyFieldCount;
+  final int linkedTotpCredentialCount;
   final AccountListTileDensity density;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
@@ -41,6 +42,7 @@ class AccountListTile extends StatefulWidget {
     required this.template,
     required this.hasMissingTemplate,
     required this.legacyFieldCount,
+    this.linkedTotpCredentialCount = 0,
     this.density = AccountListTileDensity.library,
     required this.onEdit,
     required this.onDelete,
@@ -138,10 +140,7 @@ class _AccountListTileState extends State<AccountListTile> {
     }) {
       final trimmed = value.trim();
       if (trimmed.isEmpty) return;
-      final isTotp = _looksLikeTotpField(label: label, key: key, type: type);
-      final displayValue = isTotp
-          ? widget.localeText(context, '已配置 2FA', '2FA configured')
-          : trimmed;
+      final displayValue = trimmed;
 
       final dedupeKey = '${label.toLowerCase()}|$displayValue';
       if (seen.contains(dedupeKey)) return;
@@ -151,13 +150,12 @@ class _AccountListTileState extends State<AccountListTile> {
         AccountFieldDisplayData(
           label: label,
           value: displayValue,
-          isSecret: isTotp ? false : isSecret,
-          canCopy: !isTotp,
+          isSecret: isSecret,
           icon: _iconForField(
             label: label,
             key: key,
             type: type,
-            isSecret: isTotp ? false : isSecret,
+            isSecret: isSecret,
           ),
         ),
       );
@@ -191,41 +189,8 @@ class _AccountListTileState extends State<AccountListTile> {
     return fields;
   }
 
-  bool _looksLikeTotpField({
-    required String label,
-    String? key,
-    AccountFieldType? type,
-  }) {
-    if (type == AccountFieldType.totp) return true;
-    final normalized = '${key ?? ''} $label'.toLowerCase();
-    return normalized.contains('totp') ||
-        normalized.contains('2fa') ||
-        normalized.contains('mfa') ||
-        normalized.contains('验证器') ||
-        normalized.contains('验证码密钥');
-  }
-
   bool _hasConfiguredTotp() {
-    if (widget.template != null) {
-      for (final field in widget.template!.fields) {
-        if (!_looksLikeTotpField(
-          label: field.label,
-          key: field.fieldKey,
-          type: field.attributes.type,
-        )) {
-          continue;
-        }
-        if ((widget.account.data[field.fieldKey] ?? '').trim().isNotEmpty) {
-          return true;
-        }
-      }
-    }
-
-    for (final entry in widget.account.data.entries) {
-      if (!_looksLikeTotpField(label: entry.key, key: entry.key)) continue;
-      if (entry.value.trim().isNotEmpty) return true;
-    }
-    return false;
+    return widget.linkedTotpCredentialCount > 0;
   }
 
   String _formatKeyLabel(String key) {
@@ -260,9 +225,6 @@ class _AccountListTileState extends State<AccountListTile> {
     AccountFieldType? type,
     required bool isSecret,
   }) {
-    if (_looksLikeTotpField(label: label, key: key, type: type)) {
-      return Icons.verified_user_outlined;
-    }
     if (isSecret) return Icons.lock_outline_rounded;
 
     final composite = '${key ?? ''} $label';
@@ -350,13 +312,6 @@ class _AccountListTileState extends State<AccountListTile> {
         (field) => field.attributes.isPrimary,
       );
       for (final field in primaryFields) {
-        if (_looksLikeTotpField(
-          label: field.label,
-          key: field.fieldKey,
-          type: field.attributes.type,
-        )) {
-          continue;
-        }
         addSegment(
           field.label,
           widget.account.data[field.fieldKey] ?? '',
@@ -377,13 +332,6 @@ class _AccountListTileState extends State<AccountListTile> {
     if (segments.length < 2 && widget.template != null) {
       for (final field in widget.template!.fields) {
         if (field.attributes.isPrimary) continue;
-        if (_looksLikeTotpField(
-          label: field.label,
-          key: field.fieldKey,
-          type: field.attributes.type,
-        )) {
-          continue;
-        }
         addSegment(
           field.label,
           widget.account.data[field.fieldKey] ?? '',
@@ -427,7 +375,7 @@ class _AccountListTileState extends State<AccountListTile> {
     final theme = Theme.of(context);
     final fieldLabel = widget.localeText(
       context,
-      '$fieldCount 个字段',
+      '$fieldCount \u4e2a\u5b57\u6bb5',
       '$fieldCount fields',
     );
 
@@ -438,7 +386,7 @@ class _AccountListTileState extends State<AccountListTile> {
         const SizedBox(width: 6),
         Flexible(
           child: Text(
-            '$templateName · $fieldLabel',
+            '$templateName 路 $fieldLabel',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: theme.textTheme.labelMedium?.copyWith(
@@ -497,7 +445,11 @@ class _AccountListTileState extends State<AccountListTile> {
       chips.add(
         _StatusChip(
           icon: Icons.verified_user_outlined,
-          label: widget.localeText(context, '已配置 2FA', '2FA enabled'),
+          label: widget.localeText(
+            context,
+            '\u5df2\u5173\u8054 2FA',
+            '2FA enabled',
+          ),
           tint: accent,
         ),
       );

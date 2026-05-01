@@ -28,13 +28,26 @@ class _AccountListViewState extends State<AccountListView> {
   Future<void> _openEditor(BuildContext context, {AccountItem? initial}) async {
     final result = await Navigator.push<AccountItem>(
       context,
-      MaterialPageRoute(builder: (_) => AccountEditView(initial: initial)),
+      MaterialPageRoute(
+        builder: (_) => AccountEditView(
+          initial: initial,
+          initialTemplateId: initial == null ? _activeTemplateId : null,
+        ),
+      ),
     );
     if (result == null || !context.mounted) return;
 
     final provider = context.read<EnhancedAppProvider>();
     if (initial == null) {
       await provider.addAccount(result);
+      if (!context.mounted) return;
+      if (_activeTemplateId != null && _activeTemplateId != result.templateId) {
+        setState(() {
+          _activeTemplateId = provider.getTemplate(result.templateId) == null
+              ? null
+              : result.templateId;
+        });
+      }
       return;
     }
 
@@ -413,6 +426,9 @@ class _AccountListViewState extends State<AccountListView> {
                         template: accountTemplate,
                         hasMissingTemplate: accountTemplate == null,
                         legacyFieldCount: legacyFieldCount,
+                        linkedTotpCredentialCount: provider
+                            .totpCredentialsForAccount(account.id)
+                            .length,
                         onEdit: () => _openEditor(context, initial: account),
                         onDelete: () => _deleteAccount(context, account),
                         localeText: _text,

@@ -57,14 +57,14 @@
 | T8 | 完成 | 崩溃恢复闭环 | pull/push/数据库替换中断后可恢复 |
 | T9 | 未开始 | 同步状态机清理 | 让 UI 消费稳定状态，不猜内部失败 |
 | T10 | 未开始 | 服务端持久化语义加固 | 强化薄后端的校验、幂等、错误分类和半写入恢复 |
-| T11 | 完成 | 2FA/TOTP 动态验证码 | 账号内置 TOTP 密钥保存、验证码生成、复制和同步 |
+| T11 | 完成 | 2FA/TOTP 动态验证码 | 独立 2FA 凭据、验证码生成、账号关联和密文同步 |
 | T12 | 未开始 | 全局敏感复制策略收敛 | 将 TOTP 已落地的剪贴板清理扩展到密码、配对码、恢复码和复制全部 |
 | T13 | 未开始 | Vault Health 本地体检面板 | 让加密、备份、恢复演练、弱/复用/陈旧凭据和待同步状态可见 |
 | T14 | 未开始 | 备份、恢复和导入一致性 | 建立加密导出、恢复预览、测试恢复和导入后 sync/outbox 语义 |
 | T15 | 未开始 | 解锁与密钥托管安全收敛 | 收敛生物识别、无密码模式、KDF 参数和运行期明文边界 |
 | T16 | 未开始 | 服务端认证、传输和诊断路线 | 为弱服务器补齐认证授权、HTTPS/TLS 指引和客户端健康检查 |
 | T17 | 未开始 | UI 架构与本地化收敛 | 拆分超大视图、统一本地化路径和核心组件规则 |
-| T18 | 未开始 | 2FA 下一阶段能力 | QR 导入、恢复码模板和 2FA 后续导入导出策略 |
+| T18 | 进行中 | 2FA 下一阶段能力 | QR 扫码与二维码图片主动粘贴导入已落地，继续推进恢复码模板和 2FA 后续导出策略 |
 
 ## 3. T0 本地出站同步审阅收口
 
@@ -415,46 +415,44 @@
 ## 14. T11 2FA/TOTP 动态验证码
 
 目标：
-
-- 在账号中保存网站 2FA/TOTP 密钥，并在本地生成动态验证码。
+- 将 2FA/TOTP 作为独立保密对象管理，而不是账号信息字段。
+- 账号信息页只维护和 2FA 项的关联关系。
+- 同步复用既有 AEAD payload、outbox 审阅和服务端密文存储。
 
 计划文档：
-
 - `docs/features/two-factor-auth/feasibility-and-implementation-plan.md`
 
 任务拆分：
-
 - [x] 实现 TOTP service、Base32 和 `otpauth://` 解析。
-- [x] 新增 `AccountFieldType.totp` 并接入模板编辑。
-- [x] 给内置网站模板增加可选 `totp_secret` 字段。
-- [x] 在账号编辑/查看页增加 TOTP 专用控件、验证码倒计时和复制动作。
-- [x] 验证 outbox、同步、冲突恢复和多设备一致性。
-- [x] 补执行报告、全局特性文档和测试维护说明。
-- [x] 收敛列表暴露面与验证码剪贴板清理。
+- [x] 新增独立 `TotpCredential` 模型。
+- [x] 新增 `totp_credentials` 加密存储表和 CRUD。
+- [x] 新增 `LocalSyncEntityType.totpCredential` 与 `_type = "totp_credential"` AEAD payload。
+- [x] 2FA 页面展示独立 2FA 项，支持新增、编辑、删除、复制验证码和账号关联。
+- [x] 账号编辑页在模板 2FA 字段处展示“关联 2FA”面板，账号字段区域不再保存 TOTP secret。
+- [x] 内置网站模板提供 2FA 关联字段；模板编辑器支持 2FA 关联字段类型。
+- [x] 移除旧账号字段式 TOTP 兼容服务和测试。
+- [x] 补执行报告、功能文档、全局特性文档和同步测试。
 
 进展记录：
-
 - T11.1 已完成纯 Dart TOTP 算法层：`TotpService` 支持 Base32、JSON 配置、`otpauth://totp`、SHA1/SHA256/SHA512 HOTP/TOTP 和明确错误分类。
-- 新增 `test/services/totp_service_test.dart`，覆盖 RFC 6238 向量、URI/JSON 解析、倒计时和非法输入。
-- 已通过 `flutter test test\services\totp_service_test.dart` 与 `dart analyze lib test`。
-- T11.2 已完成字段和模板接入：`AccountFieldType.totp`、`AccountFieldAttributes.totpDefaults`、模板编辑器标签/图标/样例值、内置网站模板 `totp_secret`。
-- 已通过 `flutter test test\models\account_template_test.dart`、`flutter test test\services\totp_service_test.dart` 与 `dart analyze lib test`。
-- T11.3 已完成账号页 TOTP 使用闭环：粘贴 Base32/`otpauth://`/JSON，保存时规范化，查看时显示验证码、倒计时和复制动作。
-- T11.4 已完成同步回归：未审阅 TOTP 不 push，批准后走 AEAD 密文 payload，多设备验证码一致，并发修改进入 `data.totp_secret` 冲突日志。
-- T11.5 已完成文档与质量收敛：执行报告、全局特性文档、功能文档和测试维护记录已更新。
-- T11.6 已完成 P1 安全收敛：列表页和搜索卡片只提示“已配置 2FA”，不再展示或复制 TOTP secret；复制验证码后 45 秒自动清理未被替换的剪贴板内容。
-- 已通过 `flutter test test\services\totp_service_test.dart`、`flutter test test\models\account_template_test.dart`、`flutter test test\sync\sync_state_machine_test.dart`、`flutter test test\sync\multi_device_sync_test.dart`、`flutter test test\sync\sync_conflict_recovery_test.dart` 与 `dart analyze lib test`。
-- 已通过 `flutter test test\services\sensitive_clipboard_service_test.dart` 与 `flutter test test\widgets\account_list_tile_test.dart`。
-- 已通过 `flutter test` 全量测试，结果为 100 passed, 1 skipped。
+- T11.2 原账号字段式 secret 方案已废弃；项目尚未生产发布，不保留旧 `totp_secret` 兼容路线。新的 `AccountFieldType.totp` 仅表示模板里的 2FA 关联控件。
+- T11.3 已完成独立 2FA 凭据模型和本地加密存储。
+- T11.4 已完成独立 2FA 同步：凭据作为单独 AEAD payload 进入 outbox，服务端只保存密文。
+- T11.5 已完成 2FA 页面、移动端扫码、桌面端主动粘贴二维码图片导入。
+- T11.6 已完成账号信息解耦：账号列表只提示已关联 2FA，账号编辑页只在模板 2FA 字段处维护关联关系，并可现场新建独立 2FA 项。
 
 验收：
-
 - 固定时间戳下 TOTP 结果符合 RFC 6238 向量。
-- 粘贴 Base32 secret 或 `otpauth://totp` URI 后可保存并生成验证码。
-- TOTP secret 默认隐藏、不参与搜索、不被服务端明文读取。
-- 列表页、搜索卡片和复制全部不泄露 TOTP secret。
-- 复制验证码后，剪贴板会在内容未被替换时自动清理。
-- 未审阅的 TOTP 修改不会自动 push；批准后可信设备可同步并生成同一验证码。
+- 新建账号不依赖 TOTP secret 字段，保存后能正常显示在账号列表。
+- 2FA 项可独立新增、编辑、删除、复制验证码，并可关联到账号。
+- 模板 2FA 字段可关联已有 2FA，也可新建独立 2FA 项。
+- TOTP secret 不进入账号数据字段、搜索摘要、账号列表明文或服务端明文。
+- 未审阅的 2FA credential 不会自动 push；批准后可信设备可同步并生成同一验证码。
+
+后续：
+- 为账号关联面板补 widget test。
+- 为 `totp_credentials` 增加真实 SQLite migration 测试。
+- 评估验证码复制是否纳入全局敏感剪切板策略。
 
 ## 15. T12 全局敏感复制策略收敛
 
@@ -640,9 +638,13 @@
 
 - 在当前手动 TOTP 闭环稳定后，规划 2FA 的下一批能力，不和安全/恢复主线抢优先级。
 
+已完成范围：
+
+- 移动端 QR 扫码导入。
+- 二维码图片主动粘贴导入；图片不可用时兜底导入二维码文本、`otpauth://totp` URI 或标注 Base32 secret。
+
 候选范围：
 
-- QR 扫码导入。
 - 二维码导出是否允许以及如何提示风险。
 - 恢复码模板或 recovery code 字段类型。
 - 多 TOTP 字段的命名和筛选。
@@ -650,10 +652,11 @@
 
 任务拆分：
 
-- [ ] 先写 QR/恢复码可行性和权限风险分析。
-- [ ] 决定是否引入相机插件。
-- [ ] 补 UI 原型和手工验收路径。
-- [ ] 补同步、导入导出和列表不暴露回归测试。
+- [x] 写 QR/恢复码可行性和权限风险分析。
+- [x] 决定并引入相机插件。
+- [x] 补 QR 导入 UI 和手工验收路径。
+- [x] 补扫码、粘贴文本和二维码图片主动粘贴导入解析测试。
+- [ ] 补恢复码、二维码导出和列表不暴露回归测试。
 
 验收：
 

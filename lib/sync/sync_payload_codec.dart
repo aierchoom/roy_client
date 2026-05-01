@@ -5,6 +5,7 @@ import 'package:cryptography/cryptography.dart';
 
 import '../models/account_item.dart';
 import '../models/account_template.dart';
+import '../models/totp_credential.dart';
 
 class SyncPayloadException implements Exception {
   final String message;
@@ -92,6 +93,24 @@ class SyncPayloadCodec {
   }) {
     final json = template.toJson();
     json['_type'] = 'template';
+    return encodePayload(
+      payloadJson: json,
+      vaultId: vaultId,
+      nodeId: nodeId,
+      privateKey: privateKey,
+      symmetricKey: symmetricKey,
+    );
+  }
+
+  static Future<String> encodeTotpCredential({
+    required TotpCredential credential,
+    required String vaultId,
+    required String nodeId,
+    required String privateKey,
+    required String symmetricKey,
+  }) {
+    final json = credential.toJson();
+    json['_type'] = 'totp_credential';
     return encodePayload(
       payloadJson: json,
       vaultId: vaultId,

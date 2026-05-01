@@ -1,38 +1,37 @@
-# 2FA / TOTP 功能计划
+# 2FA / TOTP 功能说明
 
-**最后更新**: 2026-04-30
-**当前状态**: 第一阶段已完成，P1 安全收敛已补齐
+- **最后更新**: 2026-05-01
+- **当前状态**: 2FA 是独立功能；账号信息只维护和 2FA 项的关联关系。
 
 | 文档 | 用途 |
 |---|---|
-| [feasibility-and-implementation-plan.md](feasibility-and-implementation-plan.md) | 2FA/TOTP 的可行性分析、边界、实现路线和测试计划 |
+| [feasibility-and-implementation-plan.md](feasibility-and-implementation-plan.md) | 2FA/TOTP 的可行性、架构边界、实现路线和测试计划 |
 
 ## 功能定位
 
-本轮 2FA 计划先聚焦“账户内置 TOTP 验证器”：
+2FA/TOTP 在 SecretRoy 中是独立的保密对象；账号模板可以声明一个 2FA 关联字段，但该字段只作为快捷入口，不保存 TOTP secret。
 
 ```text
-用户在账号里保存网站的 2FA 密钥
+用户在 2FA 页面创建或导入 TOTP 项
 -> SecretRoy 本地生成动态验证码
--> 验证码可查看、复制，并随账号密文同步到可信设备
+-> TOTP 项可以关联到一个或多个账号
+-> 同步时作为独立 encrypted payload 进入既有 outbox
 ```
 
-已落地能力：
+## 已落地能力
 
-- 网站模板内置可选 `totp_secret` 字段。
-- 支持 Base32 secret、`otpauth://totp` URI 和结构化 JSON。
-- 保存时规范化为结构化 JSON，便于后续稳定解析和迁移。
-- 账号页显示当前验证码、倒计时和复制验证码按钮。
-- TOTP secret 默认隐藏、不参与搜索、不在服务端明文出现。
-- 列表页和搜索卡片只提示“已配置 2FA”，不展示、不复制 TOTP secret。
-- 复制 TOTP 验证码后，如果剪贴板内容未被用户替换，会在 45 秒后自动清理。
-- 修改 TOTP secret 继续进入 outbox 审阅；批准后通过现有 AEAD payload 同步。
-- 多设备同步后，各可信设备从同一 secret 生成同一验证码。
-- 并发修改 `totp_secret` 时进入现有 `data.totp_secret` 冲突日志。
+- 新增独立 `TotpCredential` 模型，保存 TOTP 配置、显示名称和 `linkedAccountIds`。
+- 新增 `totp_credentials` 本地加密存储表，带 HLC、`serverVersion`、`syncStatus` 和 tombstone 字段。
+- 同步层新增 `LocalSyncEntityType.totpCredential` 与 `_type = "totp_credential"` AEAD payload。
+- `2FA` 页面展示独立 2FA 项，支持新增、编辑、删除、复制当前验证码和关联账号。
+- 账号编辑页在模板声明 2FA 字段时展示“关联 2FA”区域，可选择已有 2FA，也可现场新建独立 2FA 项。
+- 内置网站模板包含 `2FA` 关联字段，但不包含 `totp_secret` 字段。
+- 移动端支持扫码导入；桌面端支持用户主动粘贴二维码图片，不依赖读取剪切板。
+- TOTP secret 不进入搜索摘要、账号列表明文、服务端明文或未加密同步体。
 
-本轮不做：
+## 边界
 
-- 不做 SecretRoy 解锁时的登录 MFA。
-- 不接入短信、邮箱、推送或云端 MFA。
-- 不让服务端参与验证码生成或读取 TOTP 密钥。
-- 不做 QR 扫码、二维码导出或 WebAuthn/passkey。
+- 不做 SecretRoy 解锁时的 MFA。
+- 不做短信、邮箱、推送或云端 MFA。
+- 不兼容旧账号字段式 TOTP 数据。项目尚未生产发布，当前方案直接移除旧 `totp_secret` secret 字段路线。
+- 服务端只保存加密 payload，不参与验证码生成、校验或解析。

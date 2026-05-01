@@ -115,7 +115,7 @@ class _TemplateEditViewState extends State<TemplateEditView> {
       case AccountFieldType.time:
         return '\u65f6\u95f4';
       case AccountFieldType.totp:
-        return '2FA \u9a8c\u8bc1\u7801';
+        return '2FA';
       case AccountFieldType.custom:
         return '\u81ea\u5b9a\u4e49';
     }
@@ -138,7 +138,7 @@ class _TemplateEditViewState extends State<TemplateEditView> {
       case AccountFieldType.time:
         return Icons.schedule_outlined;
       case AccountFieldType.totp:
-        return Icons.verified_user_outlined;
+        return Icons.password_outlined;
       case AccountFieldType.custom:
         return Icons.extension_outlined;
     }
@@ -159,7 +159,7 @@ class _TemplateEditViewState extends State<TemplateEditView> {
       case AccountFieldType.time:
         return 'YYYY-MM-DD HH:mm';
       case AccountFieldType.totp:
-        return '123456';
+        return '\u5173\u8054 2FA';
       case AccountFieldType.password:
         return '••••••••';
       case AccountFieldType.text:

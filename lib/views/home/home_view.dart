@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../widgets/platform_builder.dart';
 import '../accounts/account_list_view.dart';
+import '../accounts/totp_account_list_view.dart';
 import '../settings_view.dart';
 import 'home_search_view.dart';
 import 'layouts/home_view_desktop.dart';
@@ -20,6 +21,7 @@ class _HomeViewState extends State<HomeView> {
   final List<Widget> _pages = const [
     AccountListView(),
     HomeSearchView(),
+    TotpAccountListView(),
     SettingsView(),
   ];
 

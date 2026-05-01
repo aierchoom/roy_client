@@ -12,19 +12,27 @@ import '../models/account_item.dart';
 import '../models/account_template.dart';
 import '../models/hlc.dart';
 import '../models/local_sync_change.dart';
+import '../models/totp_credential.dart';
 import '../sync/crdt_merge_engine.dart';
 import 'database_file_cipher.dart';
+import 'totp_service.dart';
 
 bool get _isDesktop =>
     !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
 
-enum StorageItemType { account, template, setting, localSyncChange }
+enum StorageItemType {
+  account,
+  template,
+  totpCredential,
+  setting,
+  localSyncChange,
+}
 
 class SecureStorageService {
   static const String _databaseName = 'secret_roy_vault.db';
   static const String _encryptedDatabaseName = 'secret_roy_vault.db.enc';
   static const String _workingDatabaseName = 'secret_roy_vault.runtime.db';
-  static const int _databaseVersion = 5;
+  static const int _databaseVersion = 6;
 
   DatabaseFileCipher? _databaseCipher;
 
@@ -188,6 +196,7 @@ class SecureStorageService {
     if (!isOpen) return;
     try {
       await _database!.execute('DELETE FROM accounts');
+      await _database!.execute('DELETE FROM totp_credentials');
       await _database!.execute('DELETE FROM templates WHERE is_custom = 1');
       await _database!.execute('DELETE FROM conflict_logs');
       await _database!.execute('DELETE FROM local_sync_changes');
@@ -209,6 +218,7 @@ class SecureStorageService {
   Future<void> replaceAllDataForImport({
     required List<AccountTemplate> templates,
     required List<AccountItem> accounts,
+    List<TotpCredential> totpCredentials = const <TotpCredential>[],
   }) async {
     if (!isOpen) {
       throw StateError('Encrypted storage is not open.');
@@ -216,6 +226,7 @@ class SecureStorageService {
 
     final batch = _database!.batch();
     batch.delete('accounts');
+    batch.delete('totp_credentials');
     batch.delete('templates', where: 'is_custom = 1');
     batch.delete('conflict_logs');
     batch.delete('local_sync_changes');
@@ -258,6 +269,17 @@ class SecureStorageService {
         'is_deleted': itemToSave.isDeleted ? 1 : 0,
         'delete_hlc': itemToSave.deleteHlc?.toString(),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+
+    for (final credential in totpCredentials) {
+      final itemToSave = credential.copyWith(
+        syncStatus: SyncStatus.synchronized,
+      );
+      batch.insert(
+        'totp_credentials',
+        _totpCredentialRow(itemToSave),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
     }
 
     await batch.commit(noResult: true);
@@ -549,6 +571,8 @@ class SecureStorageService {
       )
     ''');
 
+    await _createTotpCredentialsTable(db);
+
     await db.execute('''
       CREATE TABLE settings (
         key TEXT PRIMARY KEY,
@@ -625,6 +649,33 @@ class SecureStorageService {
     if (oldVersion < 5) {
       await _createLocalSyncChangesTable(db);
     }
+
+    if (oldVersion < 6) {
+      await _createTotpCredentialsTable(db);
+    }
+  }
+
+  Future<void> _createTotpCredentialsTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS totp_credentials (
+        id TEXT PRIMARY KEY,
+        label TEXT NOT NULL,
+        config TEXT NOT NULL,
+        linked_account_ids TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        modified_at INTEGER NOT NULL,
+        label_hlc TEXT,
+        config_hlc TEXT,
+        links_hlc TEXT,
+        server_version INTEGER DEFAULT 0,
+        sync_status INTEGER DEFAULT 1,
+        is_deleted INTEGER DEFAULT 0,
+        delete_hlc TEXT
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_totp_credentials_modified ON totp_credentials(modified_at)',
+    );
   }
 
   Future<void> _createLocalSyncChangesTable(Database db) async {
@@ -850,6 +901,165 @@ class SecureStorageService {
     );
   }
 
+  Future<List<TotpCredential>> loadTotpCredentials({
+    bool includeDeleted = false,
+  }) async {
+    if (!isOpen || _database == null) return [];
+
+    try {
+      final rows = await _query(
+        'totp_credentials',
+        where: includeDeleted ? null : 'is_deleted = 0',
+        orderBy: 'modified_at DESC',
+      );
+      return rows
+          .map(_mapToTotpCredential)
+          .whereType<TotpCredential>()
+          .toList();
+    } catch (e) {
+      if (kDebugMode) debugPrint('Failed to load TOTP credentials: $e');
+      return [];
+    }
+  }
+
+  Future<List<TotpCredential>> loadDirtyTotpCredentials() async {
+    if (!isOpen || _database == null) return [];
+
+    try {
+      final rows = await _query(
+        'totp_credentials',
+        where: 'sync_status != ?',
+        whereArgs: [SyncStatus.synchronized.index],
+      );
+      return rows
+          .map(_mapToTotpCredential)
+          .whereType<TotpCredential>()
+          .toList();
+    } catch (e) {
+      if (kDebugMode) debugPrint('Failed to load dirty TOTP credentials: $e');
+      return [];
+    }
+  }
+
+  Future<TotpCredential?> getTotpCredentialById(
+    String id, {
+    bool includeDeleted = false,
+  }) async {
+    if (!isOpen || _database == null) return null;
+
+    try {
+      final rows = await _query(
+        'totp_credentials',
+        where: includeDeleted ? 'id = ?' : 'id = ? AND is_deleted = 0',
+        whereArgs: [id],
+        limit: 1,
+      );
+      if (rows.isEmpty) return null;
+      return _mapToTotpCredential(rows.first);
+    } catch (e) {
+      if (kDebugMode) debugPrint('Failed to load TOTP credential by id: $e');
+      return null;
+    }
+  }
+
+  Future<void> saveTotpCredential(
+    TotpCredential credential, {
+    bool isSyncMerge = false,
+  }) async {
+    if (!isOpen || _database == null) return;
+
+    TotpCredential itemToSave = credential;
+
+    if (!isSyncMerge) {
+      final existingRows = await _query(
+        'totp_credentials',
+        where: 'id = ?',
+        whereArgs: [credential.id],
+      );
+      final newStamp = Hlc.now(_deviceId);
+
+      if (existingRows.isNotEmpty) {
+        final old = _mapToTotpCredential(existingRows.first);
+        if (old != null) {
+          final labelHlc = credential.label != old.label
+              ? newStamp
+              : old.labelHlc;
+          final configHlc =
+              _totpConfigJson(credential.config) != _totpConfigJson(old.config)
+              ? newStamp
+              : old.configHlc;
+          final linksHlc =
+              listEquals(credential.linkedAccountIds, old.linkedAccountIds)
+              ? old.linksHlc
+              : newStamp;
+
+          itemToSave = credential.copyWith(
+            labelHlc: labelHlc,
+            configHlc: configHlc,
+            linksHlc: linksHlc,
+            syncStatus: SyncStatus.pendingPush,
+            isDeleted: false,
+            serverVersion: old.serverVersion,
+          );
+        }
+      } else {
+        itemToSave = credential.copyWith(
+          labelHlc: newStamp,
+          configHlc: newStamp,
+          linksHlc: newStamp,
+          syncStatus: SyncStatus.pendingPush,
+          isDeleted: false,
+        );
+      }
+    }
+
+    await _database!.insert(
+      'totp_credentials',
+      _totpCredentialRow(itemToSave),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+
+    await _persistAfterMutation();
+    _notifyChange(
+      StorageChangeEvent(
+        type: StorageItemType.totpCredential,
+        action: StorageAction.save,
+        id: itemToSave.id,
+      ),
+    );
+  }
+
+  Future<void> deleteTotpCredential(
+    String id, {
+    bool isSyncMerge = false,
+    Hlc? syncDeleteHlc,
+  }) async {
+    if (!isOpen || _database == null) return;
+
+    final stamp = syncDeleteHlc ?? Hlc.now(_deviceId);
+
+    await _database!.update(
+      'totp_credentials',
+      {
+        'is_deleted': 1,
+        'delete_hlc': stamp.toString(),
+        'sync_status': SyncStatus.pendingPush.index,
+        'modified_at': DateTime.now().millisecondsSinceEpoch,
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+
+    await _persistAfterMutation();
+    _notifyChange(
+      StorageChangeEvent(
+        type: StorageItemType.totpCredential,
+        action: StorageAction.delete,
+        id: id,
+      ),
+    );
+  }
+
   Future<int> countAccountsByTemplate(String templateId) async {
     if (!isOpen) return 0;
     try {
@@ -955,6 +1165,52 @@ class SecureStorageService {
       if (kDebugMode) debugPrint('Skipping unreadable account row: $e');
       return null;
     }
+  }
+
+  Map<String, dynamic> _totpCredentialRow(TotpCredential credential) {
+    return {
+      'id': credential.id,
+      'label': credential.label,
+      'config': _totpConfigJson(credential.config),
+      'linked_account_ids': jsonEncode(credential.linkedAccountIds),
+      'created_at': credential.createdAt,
+      'modified_at': DateTime.now().millisecondsSinceEpoch,
+      'label_hlc': credential.labelHlc.toString(),
+      'config_hlc': credential.configHlc.toString(),
+      'links_hlc': credential.linksHlc.toString(),
+      'server_version': credential.serverVersion,
+      'sync_status': credential.syncStatus.index,
+      'is_deleted': credential.isDeleted ? 1 : 0,
+      'delete_hlc': credential.deleteHlc?.toString(),
+    };
+  }
+
+  TotpCredential? _mapToTotpCredential(Map<String, dynamic> row) {
+    try {
+      final configRaw = row['config'] as String;
+      final linkedRaw = row['linked_account_ids'] as String? ?? '[]';
+      return TotpCredential.fromJson({
+        'id': row['id'],
+        'label': row['label'],
+        'config': jsonDecode(configRaw),
+        'linkedAccountIds': jsonDecode(linkedRaw),
+        'createdAt': row['created_at'],
+        'labelHlc': row['label_hlc'],
+        'configHlc': row['config_hlc'],
+        'linksHlc': row['links_hlc'],
+        'serverVersion': row['server_version'],
+        'syncStatus': row['sync_status'],
+        'isDeleted': row['is_deleted'],
+        'deleteHlc': row['delete_hlc'],
+      });
+    } catch (e) {
+      if (kDebugMode) debugPrint('Skipping unreadable TOTP credential row: $e');
+      return null;
+    }
+  }
+
+  String _totpConfigJson(TotpConfig config) {
+    return jsonEncode(config.toJson());
   }
 
   Future<List<AccountTemplate>> loadCustomTemplates({
@@ -1165,12 +1421,12 @@ class SecureStorageService {
       final existingRows = await _query(
         'local_sync_changes',
         where:
-            'vault_id = ? AND entity_type = ? AND entity_id = ? AND status IN (${_openStatusPlaceholders()})',
+            'vault_id = ? AND entity_type = ? AND entity_id = ? AND status IN (${_coalescableStatusPlaceholders()})',
         whereArgs: [
           vaultId,
           entityType.name,
           entityId,
-          ..._openLocalSyncStatusNames,
+          ..._coalescableLocalSyncStatusNames,
         ],
         orderBy: 'created_at ASC',
         limit: 1,
@@ -1197,8 +1453,10 @@ class SecureStorageService {
         await deleteLocalSyncChange(existing!.id);
         if (entityType == LocalSyncEntityType.account) {
           await hardDeleteAccount(entityId);
-        } else {
+        } else if (entityType == LocalSyncEntityType.template) {
           await hardDeleteTemplate(entityId);
+        } else {
+          await hardDeleteTotpCredential(entityId);
         }
         return;
       }
@@ -1223,9 +1481,10 @@ class SecureStorageService {
       }
 
       final now = DateTime.now().millisecondsSinceEpoch;
+      final idStamp = DateTime.now().microsecondsSinceEpoch;
       final id =
           existing?.id ??
-          'local-${vaultId.hashCode}-${entityType.name}-$entityId-$now';
+          'local-${vaultId.hashCode}-${entityType.name}-$entityId-$idStamp';
 
       await _database!.insert('local_sync_changes', {
         'id': id,
@@ -1265,6 +1524,8 @@ class SecureStorageService {
   Future<void> ensurePendingSyncOutboxEntries(String vaultId) async {
     if (!isOpen) return;
     try {
+      await _recoverInterruptedLocalSyncPushes(vaultId);
+
       final pendingAccounts = await loadPendingSyncAccounts();
       for (final account in pendingAccounts) {
         await recordLocalSyncChange(
@@ -1302,11 +1563,62 @@ class SecureStorageService {
           skipIfUnchanged: true,
         );
       }
+
+      final dirtyTotpCredentials = await loadDirtyTotpCredentials();
+      for (final credential in dirtyTotpCredentials) {
+        await recordLocalSyncChange(
+          vaultId: vaultId,
+          entityType: LocalSyncEntityType.totpCredential,
+          entityId: credential.id,
+          action: credential.isDeleted
+              ? LocalSyncAction.delete
+              : credential.serverVersion == 0
+              ? LocalSyncAction.create
+              : LocalSyncAction.update,
+          title: credential.displayLabel,
+          beforeSnapshot: null,
+          afterSnapshot: credential.toJson(),
+          baseServerVersion: credential.serverVersion,
+          skipIfUnchanged: true,
+        );
+      }
     } catch (e) {
       if (kDebugMode) {
         debugPrint('Failed to ensure pending sync outbox entries: $e');
       }
     }
+  }
+
+  Future<void> refreshOpenLocalSyncChangeBaseVersion({
+    required String vaultId,
+    required LocalSyncEntityType entityType,
+    required String entityId,
+    required int baseServerVersion,
+  }) async {
+    if (!isOpen) return;
+
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final updated = await _database!.update(
+      'local_sync_changes',
+      {'base_server_version': baseServerVersion, 'updated_at': now},
+      where:
+          'vault_id = ? AND entity_type = ? AND entity_id = ? AND status IN (${_coalescableStatusPlaceholders()})',
+      whereArgs: [
+        vaultId,
+        entityType.name,
+        entityId,
+        ..._coalescableLocalSyncStatusNames,
+      ],
+    );
+    if (updated == 0) return;
+
+    await _persistAfterMutation();
+    _notifyChange(
+      StorageChangeEvent(
+        type: StorageItemType.localSyncChange,
+        action: StorageAction.save,
+      ),
+    );
   }
 
   Future<List<LocalSyncChange>> loadOpenLocalSyncChanges({
@@ -1422,7 +1734,11 @@ class SecureStorageService {
   }
 
   Future<void> markLocalSyncChangesPushing(Iterable<String> ids) {
-    return _updateLocalSyncChangeStatus(ids, LocalSyncStatus.pushing);
+    return _updateLocalSyncChangeStatus(
+      ids,
+      LocalSyncStatus.pushing,
+      fromStatuses: const [LocalSyncStatus.approved],
+    );
   }
 
   Future<void> markLocalSyncChangesPushed(Iterable<String> ids) {
@@ -1430,6 +1746,7 @@ class SecureStorageService {
       ids,
       LocalSyncStatus.pushed,
       terminal: true,
+      fromStatuses: const [LocalSyncStatus.pushing],
     );
   }
 
@@ -1441,6 +1758,7 @@ class SecureStorageService {
       ids,
       LocalSyncStatus.failed,
       errorMessage: errorMessage,
+      fromStatuses: const [LocalSyncStatus.pushing],
     );
   }
 
@@ -1452,6 +1770,7 @@ class SecureStorageService {
       ids,
       LocalSyncStatus.conflict,
       errorMessage: errorMessage,
+      fromStatuses: const [LocalSyncStatus.pushing],
     );
   }
 
@@ -1498,18 +1817,40 @@ class SecureStorageService {
     );
   }
 
+  Future<void> hardDeleteTotpCredential(String id) async {
+    if (!isOpen || _database == null) return;
+    await _database!.delete(
+      'totp_credentials',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    await _persistAfterMutation();
+    _notifyChange(
+      StorageChangeEvent(
+        type: StorageItemType.totpCredential,
+        action: StorageAction.delete,
+        id: id,
+      ),
+    );
+  }
+
   Future<void> _updateLocalSyncChangeStatus(
     Iterable<String> ids,
     LocalSyncStatus status, {
     bool terminal = false,
     String? errorMessage,
+    Iterable<LocalSyncStatus>? fromStatuses,
   }) async {
     if (!isOpen) return;
     final idList = ids.toList(growable: false);
     if (idList.isEmpty) return;
 
+    final fromStatusList = fromStatuses?.toList(growable: false);
+    final statusGuard = fromStatusList == null || fromStatusList.isEmpty
+        ? ''
+        : ' AND status IN (${List.filled(fromStatusList.length, '?').join(', ')})';
     final now = DateTime.now().millisecondsSinceEpoch;
-    await _database!.update(
+    final updated = await _database!.update(
       'local_sync_changes',
       {
         'status': status.name,
@@ -1517,9 +1858,16 @@ class SecureStorageService {
         'pushed_at': terminal ? now : null,
         'error_message': errorMessage,
       },
-      where: 'id IN (${List.filled(idList.length, '?').join(', ')})',
-      whereArgs: idList,
+      where:
+          'id IN (${List.filled(idList.length, '?').join(', ')})$statusGuard',
+      whereArgs: [
+        ...idList,
+        if (fromStatusList != null)
+          ...fromStatusList.map((status) => status.name),
+      ],
     );
+    if (updated == 0) return;
+
     await _persistAfterMutation();
     _notifyChange(
       StorageChangeEvent(
@@ -1537,8 +1885,44 @@ class SecureStorageService {
     'conflict',
   ];
 
+  List<String> get _coalescableLocalSyncStatusNames => const [
+    'pendingReview',
+    'approved',
+    'failed',
+    'conflict',
+  ];
+
   String _openStatusPlaceholders() {
     return List.filled(_openLocalSyncStatusNames.length, '?').join(', ');
+  }
+
+  String _coalescableStatusPlaceholders() {
+    return List.filled(_coalescableLocalSyncStatusNames.length, '?').join(', ');
+  }
+
+  Future<void> _recoverInterruptedLocalSyncPushes(String vaultId) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final updated = await _database!.update(
+      'local_sync_changes',
+      {
+        'status': LocalSyncStatus.failed.name,
+        'updated_at': now,
+        'pushed_at': null,
+        'error_message':
+            'Push was interrupted before acknowledgement. Review and push again.',
+      },
+      where: 'vault_id = ? AND status = ?',
+      whereArgs: [vaultId, LocalSyncStatus.pushing.name],
+    );
+    if (updated == 0) return;
+
+    await _persistAfterMutation();
+    _notifyChange(
+      StorageChangeEvent(
+        type: StorageItemType.localSyncChange,
+        action: StorageAction.save,
+      ),
+    );
   }
 
   LocalSyncAction _coalesceLocalSyncAction({
@@ -1600,6 +1984,9 @@ class SecureStorageService {
     'nameHlc',
     'emailHlc',
     'dataHlc',
+    'labelHlc',
+    'configHlc',
+    'linksHlc',
     'hlc',
     'syncStatus',
     'serverVersion',

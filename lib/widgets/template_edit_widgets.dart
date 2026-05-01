@@ -122,6 +122,7 @@ class _FieldEditorDialogState extends State<FieldEditorDialog> {
       return;
     }
 
+    final isTotp = _type == AccountFieldType.totp;
     Navigator.pop(
       context,
       FieldEditorResult(
@@ -134,14 +135,18 @@ class _FieldEditorDialogState extends State<FieldEditorDialog> {
             : _descriptionCtrl.text.trim(),
         attributes: AccountFieldAttributes(
           type: _type,
-          isPrimary: _isPrimary,
+          isPrimary: isTotp ? false : _isPrimary,
           isRequired: _isRequired,
-          isSecret: _isSecret,
-          isEditable: _isEditable,
-          isSearchable: _isSearchable,
-          isCopyable: _isCopyable,
+          isSecret: isTotp ? false : _isSecret,
+          isEditable: isTotp ? true : _isEditable,
+          isSearchable: isTotp ? false : _isSearchable,
+          isCopyable: isTotp ? false : _isCopyable,
           timeFormat: _timeFormat,
-          hint: _hintCtrl.text.trim().isEmpty ? null : _hintCtrl.text.trim(),
+          hint: isTotp
+              ? (_hintCtrl.text.trim().isEmpty
+                    ? '\u9009\u62e9\u6216\u65b0\u5efa 2FA'
+                    : _hintCtrl.text.trim())
+              : (_hintCtrl.text.trim().isEmpty ? null : _hintCtrl.text.trim()),
         ),
       ),
     );
@@ -151,13 +156,23 @@ class _FieldEditorDialogState extends State<FieldEditorDialog> {
     setState(() {
       _type = value;
       if (value == AccountFieldType.totp) {
-        const defaults = AccountFieldAttributes.totpDefaults;
-        _isSecret = defaults.isSecret;
-        _isSearchable = defaults.isSearchable;
-        _isCopyable = defaults.isCopyable;
-        if (_hintCtrl.text.trim().isEmpty) {
-          _hintCtrl.text = defaults.hint ?? '';
+        if (!widget.originallyPersisted && _labelCtrl.text.trim().isEmpty) {
+          _labelCtrl.text = '2FA';
         }
+        if (!widget.originallyPersisted && _keyCtrl.text.trim().isEmpty) {
+          _keyCtrl.text = 'totp';
+        }
+        if (_hintCtrl.text.trim().isEmpty) {
+          _hintCtrl.text = '\u9009\u62e9\u6216\u65b0\u5efa 2FA';
+        }
+        if (_descriptionCtrl.text.trim().isEmpty) {
+          _descriptionCtrl.text =
+              '\u5173\u8054\u72ec\u7acb 2FA \u51ed\u636e\uff0c\u4e0d\u5728\u8d26\u6237\u5b57\u6bb5\u91cc\u4fdd\u5b58\u5bc6\u94a5\u3002';
+        }
+        _isSecret = false;
+        _isSearchable = false;
+        _isCopyable = false;
+        _isPrimary = false;
       }
     });
   }
@@ -244,12 +259,30 @@ class _FieldEditorDialogState extends State<FieldEditorDialog> {
                   },
                 ),
               ],
-              const SizedBox(height: 12),
-              TextField(
-                controller: _hintCtrl,
-                textInputAction: TextInputAction.next,
-                decoration: const InputDecoration(labelText: '提示文本'),
-              ),
+              if (_type == AccountFieldType.totp) ...[
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.primaryContainer.withAlpha(90),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '2FA 字段只作为账号页的快捷关联入口；验证码密钥仍保存在独立 2FA 模块中。',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+              ] else ...[
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _hintCtrl,
+                  textInputAction: TextInputAction.next,
+                  decoration: const InputDecoration(labelText: '提示文本'),
+                ),
+              ],
               const SizedBox(height: 12),
               TextField(
                 controller: _descriptionCtrl,
@@ -263,36 +296,38 @@ class _FieldEditorDialogState extends State<FieldEditorDialog> {
                 title: const Text('必填'),
                 onChanged: (value) => setState(() => _isRequired = value),
               ),
-              SwitchListTile(
-                value: _isSecret,
-                contentPadding: EdgeInsets.zero,
-                title: const Text('保密字段'),
-                onChanged: (value) => setState(() => _isSecret = value),
-              ),
-              SwitchListTile(
-                value: _isEditable,
-                contentPadding: EdgeInsets.zero,
-                title: const Text('允许编辑'),
-                onChanged: (value) => setState(() => _isEditable = value),
-              ),
-              SwitchListTile(
-                value: _isSearchable,
-                contentPadding: EdgeInsets.zero,
-                title: const Text('可搜索'),
-                onChanged: (value) => setState(() => _isSearchable = value),
-              ),
-              SwitchListTile(
-                value: _isCopyable,
-                contentPadding: EdgeInsets.zero,
-                title: const Text('允许复制'),
-                onChanged: (value) => setState(() => _isCopyable = value),
-              ),
-              SwitchListTile(
-                value: _isPrimary,
-                contentPadding: EdgeInsets.zero,
-                title: const Text('主字段'),
-                onChanged: (value) => setState(() => _isPrimary = value),
-              ),
+              if (_type != AccountFieldType.totp) ...[
+                SwitchListTile(
+                  value: _isSecret,
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('保密字段'),
+                  onChanged: (value) => setState(() => _isSecret = value),
+                ),
+                SwitchListTile(
+                  value: _isEditable,
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('允许编辑'),
+                  onChanged: (value) => setState(() => _isEditable = value),
+                ),
+                SwitchListTile(
+                  value: _isSearchable,
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('可搜索'),
+                  onChanged: (value) => setState(() => _isSearchable = value),
+                ),
+                SwitchListTile(
+                  value: _isCopyable,
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('允许复制'),
+                  onChanged: (value) => setState(() => _isCopyable = value),
+                ),
+                SwitchListTile(
+                  value: _isPrimary,
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('主字段'),
+                  onChanged: (value) => setState(() => _isPrimary = value),
+                ),
+              ],
             ],
           ),
         ),

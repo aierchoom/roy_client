@@ -47,6 +47,17 @@ flutter pub get
 flutter run
 ```
 
+On Windows, prefer the local wrapper when tests touch SQLite or native assets:
+
+```powershell
+.\tool\flutter_test.ps1 test\sync
+.\tool\flutter_test.ps1 test\services\secure_storage_service_sync_outbox_test.dart
+```
+
+The wrapper keeps Flutter/Dart state under `.dart_appdata` and temporarily
+points sqlite3 native asset hooks at Windows' built-in `winsqlite3.dll`, so
+local test startup does not depend on downloading sqlite3 binaries from GitHub.
+
 For optional sync server development:
 
 ```bash

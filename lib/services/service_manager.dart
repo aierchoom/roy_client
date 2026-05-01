@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/account_item.dart';
 import '../models/account_template.dart';
 import '../models/local_sync_change.dart';
+import '../models/totp_credential.dart';
 import '../sync/sync_service.dart';
 import '../system/service_manager/default_sync_server_url.dart';
 import '../system/service_manager/password_tools.dart';
@@ -379,6 +380,58 @@ class ServiceManager extends ChangeNotifier {
     await _syncService.reconcileDirtyState();
   }
 
+  Future<void> saveTotpCredential(TotpCredential credential) async {
+    if (!isUnlocked) return;
+    final before = await _secureStorageService.getTotpCredentialById(
+      credential.id,
+      includeDeleted: true,
+    );
+    await _secureStorageService.saveTotpCredential(credential);
+    final after = await _secureStorageService.getTotpCredentialById(
+      credential.id,
+      includeDeleted: true,
+    );
+    if (after != null) {
+      await _secureStorageService.recordLocalSyncChange(
+        vaultId: _identityService.vaultId,
+        entityType: LocalSyncEntityType.totpCredential,
+        entityId: after.id,
+        action: before == null
+            ? LocalSyncAction.create
+            : LocalSyncAction.update,
+        title: after.displayLabel,
+        beforeSnapshot: before?.toJson(),
+        afterSnapshot: after.toJson(),
+        baseServerVersion: before?.serverVersion ?? after.serverVersion,
+      );
+    }
+    await _syncService.reconcileDirtyState();
+  }
+
+  Future<void> deleteTotpCredential(String id) async {
+    if (!isUnlocked) return;
+    final before = await _secureStorageService.getTotpCredentialById(
+      id,
+      includeDeleted: true,
+    );
+    await _secureStorageService.deleteTotpCredential(id);
+    final after = await _secureStorageService.getTotpCredentialById(
+      id,
+      includeDeleted: true,
+    );
+    await _secureStorageService.recordLocalSyncChange(
+      vaultId: _identityService.vaultId,
+      entityType: LocalSyncEntityType.totpCredential,
+      entityId: id,
+      action: LocalSyncAction.delete,
+      title: before?.displayLabel ?? after?.displayLabel ?? id,
+      beforeSnapshot: before?.toJson(),
+      afterSnapshot: after?.toJson(),
+      baseServerVersion: before?.serverVersion ?? after?.serverVersion ?? 0,
+    );
+    await _syncService.reconcileDirtyState();
+  }
+
   Future<int> countAccountsByTemplate(String templateId) async {
     if (!isUnlocked) return 0;
     return _secureStorageService.countAccountsByTemplate(templateId);
@@ -503,24 +556,37 @@ class ServiceManager extends ChangeNotifier {
     if (change == null) return;
 
     final before = change.beforeSnapshot;
-    if (change.entityType == LocalSyncEntityType.account) {
-      if (before == null) {
-        await _secureStorageService.hardDeleteAccount(change.entityId);
-      } else {
-        await _secureStorageService.saveAccount(
-          AccountItem.fromJson(before),
-          isSyncMerge: true,
-        );
-      }
-    } else {
-      if (before == null) {
-        await _secureStorageService.hardDeleteTemplate(change.entityId);
-      } else {
-        await _secureStorageService.saveTemplate(
-          AccountTemplate.fromJson(before),
-          isSyncMerge: true,
-        );
-      }
+    switch (change.entityType) {
+      case LocalSyncEntityType.account:
+        if (before == null) {
+          await _secureStorageService.hardDeleteAccount(change.entityId);
+        } else {
+          await _secureStorageService.saveAccount(
+            AccountItem.fromJson(before),
+            isSyncMerge: true,
+          );
+        }
+        break;
+      case LocalSyncEntityType.template:
+        if (before == null) {
+          await _secureStorageService.hardDeleteTemplate(change.entityId);
+        } else {
+          await _secureStorageService.saveTemplate(
+            AccountTemplate.fromJson(before),
+            isSyncMerge: true,
+          );
+        }
+        break;
+      case LocalSyncEntityType.totpCredential:
+        if (before == null) {
+          await _secureStorageService.hardDeleteTotpCredential(change.entityId);
+        } else {
+          await _secureStorageService.saveTotpCredential(
+            TotpCredential.fromJson(before),
+            isSyncMerge: true,
+          );
+        }
+        break;
     }
 
     await _secureStorageService.deleteLocalSyncChange(changeId);

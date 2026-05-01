@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../models/account_item.dart';
 import '../models/account_template.dart';
 import '../models/local_sync_change.dart';
+import '../models/totp_credential.dart';
 import '../services/secure_storage_service.dart';
 import '../services/service_manager.dart';
 import '../sync/sync_service.dart';
@@ -15,6 +16,7 @@ class EnhancedAppProvider extends ChangeNotifier {
 
   List<AccountItem> _accounts = [];
   List<AccountTemplate> _customTemplates = [];
+  List<TotpCredential> _totpCredentials = [];
   List<LocalSyncChange> _localSyncChanges = [];
   String _searchQuery = '';
   Set<String> _selectedTags = {};
@@ -32,6 +34,7 @@ class EnhancedAppProvider extends ChangeNotifier {
     ..._customTemplates,
   ];
   List<AccountItem> get allAccounts => _accounts;
+  List<TotpCredential> get totpCredentials => _totpCredentials;
   List<AccountTemplate> get customTemplates => _customTemplates;
   List<LocalSyncChange> get localSyncChanges => _localSyncChanges;
   String get searchQuery => _searchQuery;
@@ -71,6 +74,12 @@ class EnhancedAppProvider extends ChangeNotifier {
     }
   }
 
+  List<TotpCredential> totpCredentialsForAccount(String accountId) {
+    return _totpCredentials
+        .where((credential) => credential.isLinkedToAccount(accountId))
+        .toList(growable: false);
+  }
+
   SyncState get syncState => _serviceManager.syncState;
   bool get isSyncConnected => _serviceManager.isSyncConnected;
 
@@ -93,6 +102,9 @@ class EnhancedAppProvider extends ChangeNotifier {
     if (!_storageService.isOpen) return;
 
     _accounts = List<AccountItem>.of(await _storageService.loadAccounts());
+    _totpCredentials = List<TotpCredential>.of(
+      await _storageService.loadTotpCredentials(),
+    );
     _customTemplates = List<AccountTemplate>.of(
       await _storageService.loadCustomTemplates(),
     );
@@ -119,6 +131,7 @@ class EnhancedAppProvider extends ChangeNotifier {
 
     _accounts = [];
     _customTemplates = [];
+    _totpCredentials = [];
     _localSyncChanges = [];
     notifyListeners();
   }
@@ -131,6 +144,7 @@ class EnhancedAppProvider extends ChangeNotifier {
     _setLoading(true);
     _accounts = [];
     _customTemplates = [];
+    _totpCredentials = [];
     _localSyncChanges = [];
     notifyListeners();
 
@@ -201,6 +215,49 @@ class EnhancedAppProvider extends ChangeNotifier {
     try {
       await _serviceManager.deleteAccount(id);
       _accounts.removeWhere((account) => account.id == id);
+      notifyListeners();
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  Future<void> addTotpCredential(TotpCredential credential) async {
+    _setLoading(true);
+
+    try {
+      await _serviceManager.saveTotpCredential(credential);
+      _totpCredentials.insert(0, credential);
+      notifyListeners();
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  Future<void> updateTotpCredential(TotpCredential credential) async {
+    _setLoading(true);
+
+    try {
+      await _serviceManager.saveTotpCredential(credential);
+      final index = _totpCredentials.indexWhere(
+        (item) => item.id == credential.id,
+      );
+      if (index != -1) {
+        _totpCredentials[index] = credential;
+      } else {
+        _totpCredentials.insert(0, credential);
+      }
+      notifyListeners();
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  Future<void> deleteTotpCredential(String id) async {
+    _setLoading(true);
+
+    try {
+      await _serviceManager.deleteTotpCredential(id);
+      _totpCredentials.removeWhere((credential) => credential.id == id);
       notifyListeners();
     } finally {
       _setLoading(false);
