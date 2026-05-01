@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:secret_roy/models/account_item.dart';
 import 'package:secret_roy/models/account_template.dart';
+import 'package:secret_roy/models/totp_credential.dart';
 import 'package:secret_roy/services/identity_service.dart';
 import 'package:secret_roy/services/secure_storage_service.dart';
 import 'package:secret_roy/system/service_manager/sync_server_url_store.dart';
@@ -56,6 +57,7 @@ class _FakeSecureStorageService extends SecureStorageService {
   Future<void> replaceAllDataForImport({
     required List<AccountTemplate> templates,
     required List<AccountItem> accounts,
+    List<TotpCredential> totpCredentials = const <TotpCredential>[],
   }) async {
     replaceAllDataForImportCalled = true;
   }

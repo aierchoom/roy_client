@@ -9,11 +9,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/account_item.dart';
 import '../models/account_template.dart';
+import '../models/totp_credential.dart';
 import '../services/identity_service.dart';
 import '../services/secure_storage_service.dart';
 import '../models/local_sync_change.dart';
 import 'crdt_merge_engine.dart';
 import 'sync_payload_codec.dart';
+import 'totp_credential_merge_engine.dart';
 
 enum SyncState { offline, syncing, synced, error, conflictRecovery }
 
@@ -613,7 +615,43 @@ class SyncService extends ChangeNotifier {
       final payload = await _decryptAndVerifyPayload(remoteEncoded);
       final type = payload['_type'] as String?;
 
-      if (type == 'template') {
+      if (type == 'totp_credential') {
+        final remoteCredential = TotpCredential.fromJson(payload).copyWith(
+          serverVersion: remoteVersion,
+          syncStatus: SyncStatus.synchronized,
+          isDeleted: isRemoteDeleted,
+        );
+
+        final maybeLocal = await _storageService.getTotpCredentialById(
+          remoteCredential.id,
+          includeDeleted: true,
+        );
+        if (maybeLocal == null) {
+          await _storageService.saveTotpCredential(
+            remoteCredential,
+            isSyncMerge: true,
+          );
+        } else if (maybeLocal.syncStatus == SyncStatus.pendingPush ||
+            maybeLocal.syncStatus == SyncStatus.conflict) {
+          final merged = TotpCredentialMergeEngine.merge(
+            maybeLocal,
+            remoteCredential,
+          );
+          await _storageService.saveTotpCredential(
+            merged.copyWith(
+              syncStatus: _totpCredentialContentEquals(merged, remoteCredential)
+                  ? SyncStatus.synchronized
+                  : SyncStatus.pendingPush,
+            ),
+            isSyncMerge: true,
+          );
+        } else {
+          await _storageService.saveTotpCredential(
+            remoteCredential,
+            isSyncMerge: true,
+          );
+        }
+      } else if (type == 'template') {
         final remoteTemplate = AccountTemplate.fromJson(payload).copyWith(
           serverVersion: remoteVersion,
           syncStatus: SyncStatus.synchronized,
@@ -691,7 +729,17 @@ class SyncService extends ChangeNotifier {
       final payload = await _decryptAndVerifyPayload(remoteEncoded);
       final type = payload['_type'] as String?;
 
-      if (type == 'template') {
+      if (type == 'totp_credential') {
+        final remoteCredential = TotpCredential.fromJson(payload).copyWith(
+          serverVersion: remoteVersion,
+          syncStatus: SyncStatus.synchronized,
+          isDeleted: isRemoteDeleted,
+        );
+        await _storageService.saveTotpCredential(
+          remoteCredential,
+          isSyncMerge: true,
+        );
+      } else if (type == 'template') {
         final remoteTemplate = AccountTemplate.fromJson(payload).copyWith(
           serverVersion: remoteVersion,
           syncStatus: SyncStatus.synchronized,
@@ -800,6 +848,21 @@ class SyncService extends ChangeNotifier {
       return;
     }
 
+    final localAccount = await _storageService.getAccountById(
+      itemId,
+      includeDeleted: true,
+    );
+    if (localAccount == null) {
+      final localCredential = await _storageService.getTotpCredentialById(
+        itemId,
+        includeDeleted: true,
+      );
+      if (localCredential != null) {
+        await _handleTotpCredentialConflict(serverUrl, conflict);
+        return;
+      }
+    }
+
     switch (conflict.conflictType) {
       case 'remote_missing':
         await _handleRemoteMissingConflict(serverUrl, itemId);
@@ -830,6 +893,49 @@ class SyncService extends ChangeNotifier {
         );
         return;
     }
+  }
+
+  Future<void> _handleTotpCredentialConflict(
+    String serverUrl,
+    _ConflictException conflict,
+  ) async {
+    final itemId = conflict.itemId;
+    if (itemId == null) return;
+
+    final localCredential = await _storageService.getTotpCredentialById(
+      itemId,
+      includeDeleted: true,
+    );
+    if (localCredential == null) return;
+
+    if (conflict.conflictType == 'remote_missing' ||
+        conflict.serverActual == 0) {
+      await _storageService.saveTotpCredential(
+        localCredential.copyWith(
+          serverVersion: 0,
+          syncStatus: localCredential.isDeleted
+              ? SyncStatus.synchronized
+              : SyncStatus.pendingPush,
+        ),
+        isSyncMerge: true,
+      );
+      _queuedConflictNotice = localCredential.isDeleted
+          ? 'Remote 2FA item was already missing. Local delete is marked synchronized.'
+          : 'Remote 2FA item was missing. Sync will retry it as a new item.';
+      return;
+    }
+
+    await _pullAndMergeLatestSnapshot(serverUrl);
+    final mergedCredential = await _storageService.getTotpCredentialById(
+      itemId,
+      includeDeleted: true,
+    );
+    if (mergedCredential == null) return;
+
+    _queuedConflictNotice =
+        mergedCredential.syncStatus == SyncStatus.pendingPush
+        ? 'Remote 2FA changes were merged locally. Sync will retry with the reconciled item.'
+        : 'Remote 2FA changes were merged locally.';
   }
 
   Future<void> _handleRemoteMissingConflict(
@@ -988,11 +1094,26 @@ class SyncService extends ChangeNotifier {
           ),
         )
         .toList();
+    final allDirtyTotpCredentials = await _storageService
+        .loadDirtyTotpCredentials();
+    final dirtyTotpCredentials = allDirtyTotpCredentials
+        .where(
+          (credential) => approvedChangeKeys.contains(
+            _syncEntityKey(LocalSyncEntityType.totpCredential, credential.id),
+          ),
+        )
+        .toList();
 
-    final List<dynamic> dirtyItems = [...dirtyAccounts, ...dirtyTemplates];
+    final List<dynamic> dirtyItems = [
+      ...dirtyAccounts,
+      ...dirtyTemplates,
+      ...dirtyTotpCredentials,
+    ];
 
     if (dirtyItems.isEmpty) {
-      if (allPendingAccounts.isNotEmpty || approvedChanges.isNotEmpty) {
+      if (allPendingAccounts.isNotEmpty ||
+          allDirtyTotpCredentials.isNotEmpty ||
+          approvedChanges.isNotEmpty) {
         debugPrint(
           '[Sync] Push Phase: local changes exist, but none are approved and pushable.',
         );
@@ -1016,26 +1137,17 @@ class SyncService extends ChangeNotifier {
     final pushPayloads = await Future.wait(
       dirtyItems.map((item) async {
         final ciphertext = await _encryptAndSign(item);
-        final String itemId = (item is AccountItem)
-            ? item.id
-            : (item as AccountTemplate).templateId;
-        final int serverVersion = (item is AccountItem)
-            ? item.serverVersion
-            : (item as AccountTemplate).serverVersion;
-        final bool isDeleted = (item is AccountItem)
-            ? item.isDeleted
-            : (item as AccountTemplate).isDeleted;
 
         return {
-          'id': itemId,
-          'expected_base_version': serverVersion,
-          'is_deleted': isDeleted,
+          'id': _syncItemId(item),
+          'expected_base_version': _syncItemServerVersion(item),
+          'is_deleted': _syncItemIsDeleted(item),
           'encrypted_signed_payload': ciphertext,
         };
       }).toList(),
     );
 
-    late final Map<String, dynamic> acceptedVersions;
+    late final Map<String, int> acceptedVersionByItemId;
     try {
       final response = await http
           .post(
@@ -1055,7 +1167,11 @@ class SyncService extends ChangeNotifier {
       _throwIfSyncHttpError(response, phase: 'push');
 
       final respData = _decodeSyncResponse(response, phase: 'push');
-      acceptedVersions = _readAcceptedVersions(respData);
+      final acceptedVersions = _readAcceptedVersions(respData);
+      acceptedVersionByItemId = _validateAcceptedVersionsForItems(
+        acceptedVersions,
+        dirtyItems,
+      );
     } catch (e) {
       if (e is! _ConflictException) {
         await _storageService.markLocalSyncChangesFailed(
@@ -1068,27 +1184,10 @@ class SyncService extends ChangeNotifier {
 
     final acceptedChangeIds = <String>[];
     for (final item in dirtyItems) {
-      final String itemId = (item is AccountItem)
-          ? item.id
-          : (item as AccountTemplate).templateId;
-      final newVersion = _acceptedVersionFor(acceptedVersions, itemId);
-      if (newVersion == null) {
-        continue;
-      }
+      final itemId = _syncItemId(item);
+      final newVersion = acceptedVersionByItemId[itemId]!;
 
-      if (item is AccountItem) {
-        final cleanItem = item.copyWith(
-          syncStatus: SyncStatus.synchronized,
-          serverVersion: newVersion,
-        );
-        await _storageService.saveAccount(cleanItem, isSyncMerge: true);
-      } else if (item is AccountTemplate) {
-        final cleanTemplate = item.copyWith(
-          syncStatus: SyncStatus.synchronized,
-          serverVersion: newVersion,
-        );
-        await _storageService.saveTemplate(cleanTemplate, isSyncMerge: true);
-      }
+      await _applyAcceptedPushVersion(item, newVersion);
 
       if (newVersion > _localVersion) {
         _localVersion = newVersion;
@@ -1107,9 +1206,138 @@ class SyncService extends ChangeNotifier {
       '$_localVersion',
     );
     debugPrint(
-      '[Sync] <<< Push Phase Completed. Success items: ${acceptedVersions.length}',
+      '[Sync] <<< Push Phase Completed. Success items: ${acceptedVersionByItemId.length}',
     );
-    return dirtyItems.length;
+    return acceptedVersionByItemId.length;
+  }
+
+  Map<String, int> _validateAcceptedVersionsForItems(
+    Map<String, dynamic> acceptedVersions,
+    List<dynamic> dirtyItems,
+  ) {
+    final acceptedVersionByItemId = <String, int>{};
+    for (final item in dirtyItems) {
+      final itemId = _syncItemId(item);
+      final newVersion = _acceptedVersionFor(acceptedVersions, itemId);
+      if (newVersion == null) {
+        throw _SyncProtocolException(
+          'push response missing accepted version for $itemId.',
+        );
+      }
+      acceptedVersionByItemId[itemId] = newVersion;
+    }
+    return acceptedVersionByItemId;
+  }
+
+  Future<void> _applyAcceptedPushVersion(dynamic item, int newVersion) async {
+    if (item is AccountItem) {
+      final current = await _storageService.getAccountById(
+        item.id,
+        includeDeleted: true,
+      );
+      if (current == null) return;
+      if (!_sameSyncPayload(item, current)) {
+        await _storageService.saveAccount(
+          current.copyWith(
+            serverVersion: max(current.serverVersion, newVersion),
+            syncStatus: current.syncStatus == SyncStatus.synchronized
+                ? SyncStatus.pendingPush
+                : current.syncStatus,
+          ),
+          isSyncMerge: true,
+        );
+        await _refreshOpenChangeBaseVersion(item, newVersion);
+        return;
+      }
+      await _storageService.saveAccount(
+        item.copyWith(
+          syncStatus: SyncStatus.synchronized,
+          serverVersion: newVersion,
+        ),
+        isSyncMerge: true,
+      );
+      return;
+    }
+
+    if (item is AccountTemplate) {
+      final current = await _storageService.loadTemplateById(item.templateId);
+      if (current == null) return;
+      if (!_sameSyncPayload(item, current)) {
+        await _storageService.saveTemplate(
+          current.copyWith(
+            serverVersion: max(current.serverVersion, newVersion),
+            syncStatus: current.syncStatus == SyncStatus.synchronized
+                ? SyncStatus.pendingPush
+                : current.syncStatus,
+          ),
+          isSyncMerge: true,
+        );
+        await _refreshOpenChangeBaseVersion(item, newVersion);
+        return;
+      }
+      await _storageService.saveTemplate(
+        item.copyWith(
+          syncStatus: SyncStatus.synchronized,
+          serverVersion: newVersion,
+        ),
+        isSyncMerge: true,
+      );
+      return;
+    }
+
+    if (item is TotpCredential) {
+      final current = await _storageService.getTotpCredentialById(
+        item.id,
+        includeDeleted: true,
+      );
+      if (current == null) return;
+      if (!_sameSyncPayload(item, current)) {
+        await _storageService.saveTotpCredential(
+          current.copyWith(
+            serverVersion: max(current.serverVersion, newVersion),
+            syncStatus: current.syncStatus == SyncStatus.synchronized
+                ? SyncStatus.pendingPush
+                : current.syncStatus,
+          ),
+          isSyncMerge: true,
+        );
+        await _refreshOpenChangeBaseVersion(item, newVersion);
+        return;
+      }
+      await _storageService.saveTotpCredential(
+        item.copyWith(
+          syncStatus: SyncStatus.synchronized,
+          serverVersion: newVersion,
+        ),
+        isSyncMerge: true,
+      );
+      return;
+    }
+
+    throw ArgumentError('Unsupported sync item type: ${item.runtimeType}');
+  }
+
+  Future<void> _refreshOpenChangeBaseVersion(
+    dynamic item,
+    int baseServerVersion,
+  ) {
+    return _storageService.refreshOpenLocalSyncChangeBaseVersion(
+      vaultId: _identityService.vaultId,
+      entityType: _syncItemEntityType(item),
+      entityId: _syncItemId(item),
+      baseServerVersion: baseServerVersion,
+    );
+  }
+
+  bool _sameSyncPayload(dynamic left, dynamic right) {
+    if (left.runtimeType != right.runtimeType) return false;
+    final leftJson = Map<String, dynamic>.from(left.toJson() as Map);
+    final rightJson = Map<String, dynamic>.from(right.toJson() as Map);
+    for (final key in const ['serverVersion', 'syncStatus']) {
+      leftJson.remove(key);
+      rightJson.remove(key);
+    }
+    return jsonEncode(leftJson) == jsonEncode(rightJson);
   }
 
   String _syncItemEntityKey(dynamic item) {
@@ -1119,7 +1347,45 @@ class SyncService extends ChangeNotifier {
     if (item is AccountTemplate) {
       return _syncEntityKey(LocalSyncEntityType.template, item.templateId);
     }
+    if (item is TotpCredential) {
+      return _syncEntityKey(LocalSyncEntityType.totpCredential, item.id);
+    }
     throw ArgumentError('Unsupported sync item type: ${item.runtimeType}');
+  }
+
+  String _syncItemId(dynamic item) {
+    if (item is AccountItem) return item.id;
+    if (item is AccountTemplate) return item.templateId;
+    if (item is TotpCredential) return item.id;
+    throw ArgumentError('Unsupported sync item type: ${item.runtimeType}');
+  }
+
+  int _syncItemServerVersion(dynamic item) {
+    if (item is AccountItem) return item.serverVersion;
+    if (item is AccountTemplate) return item.serverVersion;
+    if (item is TotpCredential) return item.serverVersion;
+    throw ArgumentError('Unsupported sync item type: ${item.runtimeType}');
+  }
+
+  LocalSyncEntityType _syncItemEntityType(dynamic item) {
+    if (item is AccountItem) return LocalSyncEntityType.account;
+    if (item is AccountTemplate) return LocalSyncEntityType.template;
+    if (item is TotpCredential) return LocalSyncEntityType.totpCredential;
+    throw ArgumentError('Unsupported sync item type: ${item.runtimeType}');
+  }
+
+  bool _syncItemIsDeleted(dynamic item) {
+    if (item is AccountItem) return item.isDeleted;
+    if (item is AccountTemplate) return item.isDeleted;
+    if (item is TotpCredential) return item.isDeleted;
+    throw ArgumentError('Unsupported sync item type: ${item.runtimeType}');
+  }
+
+  bool _totpCredentialContentEquals(TotpCredential left, TotpCredential right) {
+    return left.label == right.label &&
+        jsonEncode(left.config.toJson()) == jsonEncode(right.config.toJson()) &&
+        listEquals(left.linkedAccountIds, right.linkedAccountIds) &&
+        left.isDeleted == right.isDeleted;
   }
 
   String _localSyncChangeEntityKey(LocalSyncChange change) {
@@ -1142,6 +1408,14 @@ class SyncService extends ChangeNotifier {
     } else if (item is AccountTemplate) {
       return SyncPayloadCodec.encodeTemplate(
         template: item,
+        vaultId: _identityService.vaultId,
+        nodeId: _identityService.deviceId,
+        privateKey: _identityService.privateKey,
+        symmetricKey: _identityService.symmetricKey,
+      );
+    } else if (item is TotpCredential) {
+      return SyncPayloadCodec.encodeTotpCredential(
+        credential: item,
         vaultId: _identityService.vaultId,
         nodeId: _identityService.deviceId,
         privateKey: _identityService.privateKey,

@@ -3,67 +3,65 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:secret_roy/models/account_item.dart';
 import 'package:secret_roy/models/account_template.dart';
 import 'package:secret_roy/models/hlc.dart';
-import 'package:secret_roy/services/totp_service.dart';
 import 'package:secret_roy/widgets/account_list_tile.dart';
 
 void main() {
-  String localeText(BuildContext context, String zh, String en) => zh;
+  String localeText(BuildContext context, String zh, String en) => en;
 
-  AccountTemplate templateWithTotp() {
+  AccountTemplate websiteTemplate() {
     return const AccountTemplate(
       templateId: 'website',
-      title: '网站',
-      subTitle: '登录信息',
+      title: 'Website',
+      subTitle: 'Login',
       category: TemplateCategory.login,
       fields: [
         AccountField(
           fieldKey: 'username',
-          label: '用户名',
+          label: 'Username',
           attributes: AccountFieldAttributes(
             type: AccountFieldType.text,
             isPrimary: true,
           ),
         ),
         AccountField(
-          fieldKey: 'totp_secret',
-          label: '2FA 密钥',
-          attributes: AccountFieldAttributes.totpDefaults,
+          fieldKey: 'password',
+          label: 'Password',
+          attributes: AccountFieldAttributes(
+            type: AccountFieldType.password,
+            isSecret: true,
+          ),
         ),
       ],
     );
   }
 
-  AccountItem accountWithTotp(String totpConfig) {
+  AccountItem account() {
     return AccountItem(
       id: 'account_1',
       name: 'Example',
       email: 'alice@example.com',
       templateId: 'website',
-      data: {'username': 'alice', 'totp_secret': totpConfig},
+      data: {'username': 'alice', 'password': 'secret-value'},
       createdAt: 1,
       nameHlc: Hlc.zero('local'),
       emailHlc: Hlc.zero('local'),
-      dataHlc: {'totp_secret': Hlc.zero('local')},
+      dataHlc: {'password': Hlc.zero('local')},
       syncStatus: SyncStatus.synchronized,
     );
   }
 
-  testWidgets('shows only configured 2FA state in account list rows', (
+  testWidgets('shows linked 2FA state without exposing a TOTP secret', (
     tester,
   ) async {
-    final totpConfig = TotpService.encodeConfig(
-      'otpauth://totp/Example:alice@example.com?'
-      'secret=JBSWY3DPEHPK3PXP&issuer=Example',
-    );
-
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
           body: AccountListTile(
-            account: accountWithTotp(totpConfig),
-            template: templateWithTotp(),
+            account: account(),
+            template: websiteTemplate(),
             hasMissingTemplate: false,
             legacyFieldCount: 0,
+            linkedTotpCredentialCount: 1,
             onEdit: () {},
             onDelete: () {},
             localeText: localeText,
@@ -72,17 +70,17 @@ void main() {
       ),
     );
 
-    expect(find.text('已配置 2FA'), findsOneWidget);
-    expect(find.textContaining('JBSWY3DPEHPK3PXP'), findsNothing);
+    expect(find.text('2FA enabled'), findsOneWidget);
     expect(find.textContaining('otpauth://'), findsNothing);
+    expect(find.textContaining('JBSWY3DPEHPK3PXP'), findsNothing);
 
-    await tester.tap(find.byTooltip('切换详情'));
+    await tester.tap(find.byTooltip('Toggle details'));
     await tester.pumpAndSettle();
 
-    expect(find.text('2FA 密钥'), findsOneWidget);
-    expect(find.text('已配置 2FA'), findsNWidgets(2));
-    expect(find.byTooltip('显示密码'), findsNothing);
-    expect(find.byTooltip('复制 2FA 密钥'), findsNothing);
+    expect(find.text('Field Details'), findsOneWidget);
+    expect(find.text('Password'), findsOneWidget);
+    expect(find.text('2FA enabled'), findsOneWidget);
+    expect(find.textContaining('otpauth://'), findsNothing);
     expect(find.textContaining('JBSWY3DPEHPK3PXP'), findsNothing);
   });
 }

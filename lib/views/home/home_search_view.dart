@@ -262,6 +262,7 @@ class _HomeSearchViewState extends State<HomeSearchView> {
     return switch (type) {
       LocalSyncEntityType.account => _text('账号', 'Account'),
       LocalSyncEntityType.template => _text('模板', 'Template'),
+      LocalSyncEntityType.totpCredential => _text('2FA', '2FA'),
     };
   }
 
@@ -748,6 +749,9 @@ class _HomeSearchViewState extends State<HomeSearchView> {
                           template: template,
                           hasMissingTemplate: template == null,
                           legacyFieldCount: legacyFieldCount,
+                          linkedTotpCredentialCount: provider
+                              .totpCredentialsForAccount(account.id)
+                              .length,
                           density: AccountListTileDensity.search,
                           onEdit: () => _openAccount(context, account),
                           onDelete: () => _deleteAccount(context, account),

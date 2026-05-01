@@ -7,6 +7,7 @@ import 'package:secret_roy/models/account_item.dart';
 import 'package:secret_roy/models/account_template.dart';
 import 'package:secret_roy/models/hlc.dart';
 import 'package:secret_roy/models/local_sync_change.dart';
+import 'package:secret_roy/models/totp_credential.dart';
 import 'package:secret_roy/services/identity_service.dart';
 import 'package:secret_roy/services/secure_storage_service.dart';
 import 'package:secret_roy/services/totp_service.dart';
@@ -31,7 +32,10 @@ class _FakeSecureStorageService extends SecureStorageService {
   final Map<String, String> settings = {};
   final Map<String, AccountItem> accounts = {};
   final Map<String, AccountTemplate> templates = {};
+  final Map<String, TotpCredential> totpCredentials = {};
   final List<String> pushedLocalSyncChangeIds = [];
+  final Map<String, int> refreshedBaseVersions = {};
+  FutureOr<void> Function(Iterable<String> ids)? onMarkPushing;
   List<LocalSyncChange>? approvedChangesOverride;
   bool autoApprovePending = true;
 
@@ -86,6 +90,32 @@ class _FakeSecureStorageService extends SecureStorageService {
   }
 
   @override
+  Future<List<TotpCredential>> loadDirtyTotpCredentials() async {
+    return totpCredentials.values
+        .where((item) => item.syncStatus != SyncStatus.synchronized)
+        .toList();
+  }
+
+  @override
+  Future<TotpCredential?> getTotpCredentialById(
+    String id, {
+    bool includeDeleted = false,
+  }) async {
+    final item = totpCredentials[id];
+    if (item == null) return null;
+    if (!includeDeleted && item.isDeleted) return null;
+    return item;
+  }
+
+  @override
+  Future<void> saveTotpCredential(
+    TotpCredential credential, {
+    bool isSyncMerge = false,
+  }) async {
+    totpCredentials[credential.id] = credential;
+  }
+
+  @override
   Future<void> ensurePendingSyncOutboxEntries(String vaultId) async {}
 
   @override
@@ -96,22 +126,34 @@ class _FakeSecureStorageService extends SecureStorageService {
       return approvedChangesOverride!;
     }
     if (!autoApprovePending) return [];
-    return accounts.values
-        .where((item) => item.syncStatus == SyncStatus.pendingPush)
-        .map((item) => _approvedChange(vaultId, item))
-        .toList();
+    return [
+      ...accounts.values
+          .where((item) => item.syncStatus == SyncStatus.pendingPush)
+          .map((item) => _approvedChange(vaultId, item)),
+      ...totpCredentials.values
+          .where((item) => item.syncStatus == SyncStatus.pendingPush)
+          .map((item) => _approvedTotpChange(vaultId, item)),
+    ];
   }
 
   @override
   Future<bool> hasOpenLocalSyncChanges(String vaultId) async {
     return !autoApprovePending &&
-        accounts.values.any(
-          (item) => item.syncStatus == SyncStatus.pendingPush,
-        );
+        (accounts.values.any(
+              (item) => item.syncStatus == SyncStatus.pendingPush,
+            ) ||
+            totpCredentials.values.any(
+              (item) => item.syncStatus == SyncStatus.pendingPush,
+            ));
   }
 
   @override
-  Future<void> markLocalSyncChangesPushing(Iterable<String> ids) async {}
+  Future<void> markLocalSyncChangesPushing(Iterable<String> ids) async {
+    final callback = onMarkPushing;
+    if (callback != null) {
+      await callback(ids);
+    }
+  }
 
   @override
   Future<void> markLocalSyncChangesPushed(Iterable<String> ids) async {
@@ -129,6 +171,16 @@ class _FakeSecureStorageService extends SecureStorageService {
     Iterable<String> ids,
     String errorMessage,
   ) async {}
+
+  @override
+  Future<void> refreshOpenLocalSyncChangeBaseVersion({
+    required String vaultId,
+    required LocalSyncEntityType entityType,
+    required String entityId,
+    required int baseServerVersion,
+  }) async {
+    refreshedBaseVersions['${entityType.name}:$entityId'] = baseServerVersion;
+  }
 }
 
 LocalSyncChange _approvedChange(String vaultId, AccountItem item) {
@@ -139,6 +191,27 @@ LocalSyncChange _approvedChange(String vaultId, AccountItem item) {
     entityId: item.id,
     action: item.isDeleted ? LocalSyncAction.delete : LocalSyncAction.update,
     title: item.name,
+    beforeJson: null,
+    afterJson: null,
+    diff: const {
+      'changed_fields': ['record.updated'],
+    },
+    baseServerVersion: item.serverVersion,
+    status: LocalSyncStatus.approved,
+    createdAt: 1,
+    updatedAt: 1,
+    approvedAt: 1,
+  );
+}
+
+LocalSyncChange _approvedTotpChange(String vaultId, TotpCredential item) {
+  return LocalSyncChange(
+    id: 'change_${item.id}',
+    vaultId: vaultId,
+    entityType: LocalSyncEntityType.totpCredential,
+    entityId: item.id,
+    action: item.isDeleted ? LocalSyncAction.delete : LocalSyncAction.update,
+    title: item.displayLabel,
     beforeJson: null,
     afterJson: null,
     diff: const {
@@ -198,13 +271,9 @@ IdentityService _identityService() {
   );
 }
 
-AccountItem _pendingItem({String? totpConfig}) {
+AccountItem _pendingItem() {
   final data = {'password': 'secret'};
   final dataHlc = {'password': const Hlc(10, 2, 'device_abcdef123456')};
-  if (totpConfig != null) {
-    data['totp_secret'] = totpConfig;
-    dataHlc['totp_secret'] = const Hlc(10, 3, 'device_abcdef123456');
-  }
 
   return AccountItem(
     id: 'account_1',
@@ -216,6 +285,21 @@ AccountItem _pendingItem({String? totpConfig}) {
     nameHlc: const Hlc(10, 0, 'device_abcdef123456'),
     emailHlc: const Hlc(10, 1, 'device_abcdef123456'),
     dataHlc: dataHlc,
+    serverVersion: 0,
+    syncStatus: SyncStatus.pendingPush,
+  );
+}
+
+TotpCredential _pendingTotpCredential({required String config}) {
+  return TotpCredential(
+    id: 'totp_1',
+    label: 'Example',
+    config: TotpService.parseConfig(config),
+    linkedAccountIds: const ['account_1'],
+    createdAt: 1,
+    labelHlc: const Hlc(10, 0, 'device_abcdef123456'),
+    configHlc: const Hlc(10, 1, 'device_abcdef123456'),
+    linksHlc: const Hlc(10, 2, 'device_abcdef123456'),
     serverVersion: 0,
     syncStatus: SyncStatus.pendingPush,
   );
@@ -308,11 +392,7 @@ class _SyncProbeServer {
       request.response.write(
         postBody ??
             (postStatusCode == 200
-                ? jsonEncode({
-                    'success': true,
-                    'max_version': 0,
-                    'accepted_versions': const <String, int>{},
-                  })
+                ? _defaultPostSuccessBody()
                 : jsonEncode({'error': postError ?? 'Push failed'})),
       );
       await request.response.close();
@@ -321,6 +401,24 @@ class _SyncProbeServer {
 
     request.response.statusCode = HttpStatus.notFound;
     await request.response.close();
+  }
+
+  String _defaultPostSuccessBody() {
+    final decoded = jsonDecode(lastPostBody ?? '{}');
+    final pushes = decoded is Map
+        ? (decoded['pushes'] as List<dynamic>? ?? const <dynamic>[])
+        : const <dynamic>[];
+    final acceptedVersions = <String, int>{};
+    for (final push in pushes) {
+      if (push is Map && push['id'] is String) {
+        acceptedVersions[push['id'] as String] = acceptedVersions.length + 1;
+      }
+    }
+    return jsonEncode({
+      'success': true,
+      'max_version': acceptedVersions.length,
+      'accepted_versions': acceptedVersions,
+    });
   }
 }
 
@@ -602,6 +700,85 @@ void main() {
     },
   );
 
+  test(
+    'syncNow rejects push acknowledgements missing accepted item versions',
+    () async {
+      final identity = _identityService();
+      await identity.initialize();
+
+      final storage = _FakeSecureStorageService()
+        ..accounts['account_1'] = _pendingItem();
+      final server = await _SyncProbeServer.start(
+        postBody: jsonEncode({
+          'success': true,
+          'max_version': 2,
+          'accepted_versions': const <String, int>{},
+        }),
+      );
+      addTearDown(server.close);
+
+      final syncService = SyncService(
+        storageService: storage,
+        identityService: identity,
+        config: SyncConfig(serverUrl: server.baseUrl),
+      );
+      addTearDown(syncService.dispose);
+      await syncService.initialize();
+
+      final result = await syncService.syncNow();
+
+      expect(result.success, isFalse);
+      expect(
+        result.error,
+        contains('push response missing accepted version for account_1'),
+      );
+      expect(storage.accounts['account_1']!.syncStatus, SyncStatus.pendingPush);
+      expect(server.postCount, 1);
+    },
+  );
+
+  test('accepted push preserves local edits made while pushing', () async {
+    final identity = _identityService();
+    await identity.initialize();
+
+    final original = _pendingItem();
+    final storage = _FakeSecureStorageService()
+      ..accounts[original.id] = original;
+    storage.onMarkPushing = (_) {
+      storage.accounts[original.id] = original.copyWith(
+        name: 'Edited During Push',
+        nameHlc: const Hlc(20, 0, 'device_abcdef123456'),
+        syncStatus: SyncStatus.pendingPush,
+      );
+    };
+    final server = await _SyncProbeServer.start(
+      postBody: jsonEncode({
+        'success': true,
+        'max_version': 2,
+        'accepted_versions': {original.id: 2},
+      }),
+    );
+    addTearDown(server.close);
+
+    final syncService = SyncService(
+      storageService: storage,
+      identityService: identity,
+      config: SyncConfig(serverUrl: server.baseUrl),
+    );
+    addTearDown(syncService.dispose);
+    await syncService.initialize();
+
+    final result = await syncService.syncNow();
+    final saved = storage.accounts[original.id]!;
+
+    expect(result.success, isTrue);
+    expect(saved.name, 'Edited During Push');
+    expect(saved.serverVersion, 2);
+    expect(saved.syncStatus, SyncStatus.pendingPush);
+    expect(storage.pushedLocalSyncChangeIds, ['change_${original.id}']);
+    expect(storage.refreshedBaseVersions['account:${original.id}'], 2);
+  });
+
   test('successful push leaves a stable success note for the UI', () async {
     final identity = _identityService();
     await identity.initialize();
@@ -701,14 +878,14 @@ void main() {
     );
   });
 
-  test('syncNow does not push unapproved TOTP secret changes', () async {
+  test('syncNow does not push unapproved 2FA credential changes', () async {
     final identity = _identityService();
     await identity.initialize();
 
     final totpConfig = _totpConfig();
     final storage = _FakeSecureStorageService()
       ..autoApprovePending = false
-      ..accounts['account_1'] = _pendingItem(totpConfig: totpConfig);
+      ..totpCredentials['totp_1'] = _pendingTotpCredential(config: totpConfig);
     final server = await _SyncProbeServer.start();
     addTearDown(server.close);
 
@@ -726,8 +903,14 @@ void main() {
     expect(result.pushed, isFalse);
     expect(server.postCount, 0);
     expect(server.lastPostBody, isNull);
-    expect(storage.accounts['account_1']!.data['totp_secret'], totpConfig);
-    expect(storage.accounts['account_1']!.syncStatus, SyncStatus.pendingPush);
+    expect(
+      storage.totpCredentials['totp_1']!.config.secret,
+      TotpService.parseConfig(totpConfig).secret,
+    );
+    expect(
+      storage.totpCredentials['totp_1']!.syncStatus,
+      SyncStatus.pendingPush,
+    );
     expect(syncService.isDirty, isTrue);
     expect(
       syncService.statusNote,
@@ -735,18 +918,18 @@ void main() {
     );
   });
 
-  test('approved TOTP secret push only sends encrypted payload', () async {
+  test('approved 2FA credential push only sends encrypted payload', () async {
     final identity = _identityService();
     await identity.initialize();
 
     final totpConfig = _totpConfig();
     final storage = _FakeSecureStorageService()
-      ..accounts['account_1'] = _pendingItem(totpConfig: totpConfig);
+      ..totpCredentials['totp_1'] = _pendingTotpCredential(config: totpConfig);
     final server = await _SyncProbeServer.start(
       postBody: jsonEncode({
         'success': true,
         'max_version': 1,
-        'accepted_versions': {'account_1': 1},
+        'accepted_versions': {'totp_1': 1},
       }),
     );
     addTearDown(server.close);
@@ -761,19 +944,21 @@ void main() {
 
     final result = await syncService.syncNow();
     final postBody = server.lastPostBody ?? '';
-    final syncedItem = storage.accounts['account_1']!;
+    final syncedItem = storage.totpCredentials['totp_1']!;
 
     expect(result.success, isTrue);
     expect(result.pushed, isTrue);
     expect(server.postCount, 1);
     expect(postBody, contains('encrypted_signed_payload'));
     expect(postBody, contains('sroy-sync:'));
-    expect(postBody, isNot(contains('totp_secret')));
     expect(postBody, isNot(contains('JBSWY3DPEHPK3PXP')));
     expect(postBody, isNot(contains('otpauth://')));
-    expect(storage.pushedLocalSyncChangeIds, ['change_account_1']);
+    expect(storage.pushedLocalSyncChangeIds, ['change_totp_1']);
     expect(syncedItem.syncStatus, SyncStatus.synchronized);
     expect(syncedItem.serverVersion, 1);
-    expect(syncedItem.data['totp_secret'], totpConfig);
+    expect(
+      syncedItem.config.secret,
+      TotpService.parseConfig(totpConfig).secret,
+    );
   });
 }

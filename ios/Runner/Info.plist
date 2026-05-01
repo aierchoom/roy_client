@@ -50,5 +50,7 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>SecretRoy uses the camera to scan 2FA QR codes.</string>
 </dict>
 </plist>

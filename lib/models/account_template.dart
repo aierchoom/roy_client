@@ -63,16 +63,6 @@ String templateBadgeText(String title) {
 }
 
 class AccountFieldAttributes {
-  static const String totpDefaultHint =
-      'Base32 \u5bc6\u94a5\u6216 otpauth://totp URI';
-  static const AccountFieldAttributes totpDefaults = AccountFieldAttributes(
-    type: AccountFieldType.totp,
-    isSecret: true,
-    isSearchable: false,
-    isCopyable: true,
-    hint: totpDefaultHint,
-  );
-
   final AccountFieldType type;
   final bool isPrimary;
   final bool isRequired;
@@ -508,11 +498,15 @@ final AccountTemplate websiteTemplate = AccountTemplate(
       ),
     ),
     AccountField(
-      fieldKey: 'totp_secret',
-      label: '2FA \u5bc6\u94a5',
+      fieldKey: 'totp',
+      label: '2FA',
       description:
-          '\u7528\u4e8e\u751f\u6210\u52a8\u6001\u9a8c\u8bc1\u7801\u7684 TOTP \u5bc6\u94a5\u3002',
-      attributes: AccountFieldAttributes.totpDefaults,
+          '\u5173\u8054\u72ec\u7acb\u7684 2FA/TOTP \u51ed\u636e\uff0c\u4e0d\u5728\u8d26\u6237\u5b57\u6bb5\u4e2d\u4fdd\u5b58\u52a8\u6001\u7801\u5bc6\u94a5\u3002',
+      attributes: AccountFieldAttributes(
+        type: AccountFieldType.totp,
+        isCopyable: false,
+        hint: '\u9009\u62e9\u6216\u65b0\u5efa 2FA',
+      ),
     ),
     AccountField(
       fieldKey: 'notes',

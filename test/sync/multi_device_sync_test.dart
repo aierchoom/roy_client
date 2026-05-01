@@ -6,6 +6,7 @@ import 'package:secret_roy/models/account_item.dart';
 import 'package:secret_roy/models/account_template.dart';
 import 'package:secret_roy/models/hlc.dart';
 import 'package:secret_roy/models/local_sync_change.dart';
+import 'package:secret_roy/models/totp_credential.dart';
 import 'package:secret_roy/services/identity_service.dart';
 import 'package:secret_roy/services/secure_storage_service.dart';
 import 'package:secret_roy/services/totp_service.dart';
@@ -30,6 +31,7 @@ class _MemorySecureKeyValueStore implements SecureKeyValueStore {
 class _FakeSecureStorageService extends SecureStorageService {
   final Map<String, String> settings = {};
   final Map<String, AccountItem> accounts = {};
+  final Map<String, TotpCredential> totpCredentials = {};
   final Map<String, List<ConflictLog>> conflictLogs = {};
 
   @override
@@ -74,6 +76,32 @@ class _FakeSecureStorageService extends SecureStorageService {
   }
 
   @override
+  Future<List<TotpCredential>> loadDirtyTotpCredentials() async {
+    return totpCredentials.values
+        .where((item) => item.syncStatus != SyncStatus.synchronized)
+        .toList();
+  }
+
+  @override
+  Future<TotpCredential?> getTotpCredentialById(
+    String id, {
+    bool includeDeleted = false,
+  }) async {
+    final item = totpCredentials[id];
+    if (item == null) return null;
+    if (!includeDeleted && item.isDeleted) return null;
+    return item;
+  }
+
+  @override
+  Future<void> saveTotpCredential(
+    TotpCredential credential, {
+    bool isSyncMerge = false,
+  }) async {
+    totpCredentials[credential.id] = credential;
+  }
+
+  @override
   Future<void> saveConflictLogs(List<ConflictLog> logs) async {
     for (final log in logs) {
       conflictLogs.putIfAbsent(log.accountId, () => []).add(log);
@@ -95,17 +123,24 @@ class _FakeSecureStorageService extends SecureStorageService {
   Future<List<LocalSyncChange>> loadApprovedLocalSyncChanges({
     required String vaultId,
   }) async {
-    return accounts.values
-        .where((item) => item.syncStatus == SyncStatus.pendingPush)
-        .map((item) => _approvedChange(vaultId, item))
-        .toList();
+    return [
+      ...accounts.values
+          .where((item) => item.syncStatus == SyncStatus.pendingPush)
+          .map((item) => _approvedChange(vaultId, item)),
+      ...totpCredentials.values
+          .where((item) => item.syncStatus == SyncStatus.pendingPush)
+          .map((item) => _approvedTotpChange(vaultId, item)),
+    ];
   }
 
   @override
   Future<bool> hasOpenLocalSyncChanges(String vaultId) async {
     return accounts.values.any(
-      (item) => item.syncStatus == SyncStatus.pendingPush,
-    );
+          (item) => item.syncStatus == SyncStatus.pendingPush,
+        ) ||
+        totpCredentials.values.any(
+          (item) => item.syncStatus == SyncStatus.pendingPush,
+        );
   }
 
   @override
@@ -135,6 +170,27 @@ LocalSyncChange _approvedChange(String vaultId, AccountItem item) {
     entityId: item.id,
     action: item.isDeleted ? LocalSyncAction.delete : LocalSyncAction.update,
     title: item.name,
+    beforeJson: null,
+    afterJson: null,
+    diff: const {
+      'changed_fields': ['record.updated'],
+    },
+    baseServerVersion: item.serverVersion,
+    status: LocalSyncStatus.approved,
+    createdAt: 1,
+    updatedAt: 1,
+    approvedAt: 1,
+  );
+}
+
+LocalSyncChange _approvedTotpChange(String vaultId, TotpCredential item) {
+  return LocalSyncChange(
+    id: 'change_${item.id}',
+    vaultId: vaultId,
+    entityType: LocalSyncEntityType.totpCredential,
+    entityId: item.id,
+    action: item.isDeleted ? LocalSyncAction.delete : LocalSyncAction.update,
+    title: item.displayLabel,
     beforeJson: null,
     afterJson: null,
     diff: const {
@@ -316,22 +372,16 @@ AccountItem _baseItem({
   required String name,
   required String email,
   required String password,
-  String? totpConfig,
   required int version,
   required SyncStatus syncStatus,
   required Hlc nameHlc,
   required Hlc emailHlc,
   required Hlc passwordHlc,
-  Hlc? totpHlc,
   bool isDeleted = false,
   Hlc? deleteHlc,
 }) {
   final data = {'password': password};
   final dataHlc = {'password': passwordHlc};
-  if (totpConfig != null) {
-    data['totp_secret'] = totpConfig;
-    dataHlc['totp_secret'] = totpHlc ?? passwordHlc;
-  }
 
   return AccountItem(
     id: id,
@@ -347,6 +397,31 @@ AccountItem _baseItem({
     syncStatus: syncStatus,
     isDeleted: isDeleted,
     deleteHlc: deleteHlc,
+  );
+}
+
+TotpCredential _baseTotpCredential({
+  required String id,
+  required String label,
+  required String config,
+  required int version,
+  required SyncStatus syncStatus,
+  required Hlc labelHlc,
+  required Hlc configHlc,
+  required Hlc linksHlc,
+  List<String> linkedAccountIds = const [],
+}) {
+  return TotpCredential(
+    id: id,
+    label: label,
+    config: TotpService.parseConfig(config),
+    linkedAccountIds: linkedAccountIds,
+    createdAt: 1,
+    labelHlc: labelHlc,
+    configHlc: configHlc,
+    linksHlc: linksHlc,
+    serverVersion: version,
+    syncStatus: syncStatus,
   );
 }
 
@@ -413,7 +488,7 @@ void main() {
     expect(pulledItem.serverVersion, 1);
   });
 
-  test('trusted devices sync TOTP secret and generate the same code', () async {
+  test('trusted devices sync independent 2FA credentials', () async {
     final server = await _InMemoryVaultServer.start(vaultId);
     addTearDown(server.close);
     SharedPreferences.setMockInitialValues({'sync_server_url': server.baseUrl});
@@ -432,47 +507,43 @@ void main() {
     );
 
     final totpConfig = _totpConfig();
-    clientA.storage.accounts['account_1'] = _baseItem(
-      id: 'account_1',
-      name: '2FA Account',
-      email: 'owner@example.com',
-      password: 'super-secret',
-      totpConfig: totpConfig,
+    clientA.storage.totpCredentials['totp_1'] = _baseTotpCredential(
+      id: 'totp_1',
+      label: 'Example 2FA',
+      config: totpConfig,
+      linkedAccountIds: const ['account_1'],
       version: 0,
       syncStatus: SyncStatus.pendingPush,
-      nameHlc: const Hlc(10, 0, 'device_aaaaaa111111'),
-      emailHlc: const Hlc(10, 1, 'device_aaaaaa111111'),
-      passwordHlc: const Hlc(10, 2, 'device_aaaaaa111111'),
-      totpHlc: const Hlc(10, 3, 'device_aaaaaa111111'),
+      labelHlc: const Hlc(10, 0, 'device_aaaaaa111111'),
+      configHlc: const Hlc(10, 1, 'device_aaaaaa111111'),
+      linksHlc: const Hlc(10, 2, 'device_aaaaaa111111'),
     );
 
     final pushResult = await clientA.syncService.syncNow();
     final pullResult = await clientB.syncService.syncNow();
-    final pushedItem = clientA.storage.accounts['account_1']!;
-    final pulledItem = clientB.storage.accounts['account_1']!;
-    final pushedTotp = pushedItem.data['totp_secret']!;
-    final pulledTotp = pulledItem.data['totp_secret']!;
+    final pushedCredential = clientA.storage.totpCredentials['totp_1']!;
+    final pulledCredential = clientB.storage.totpCredentials['totp_1']!;
     final fixedTime = DateTime.fromMillisecondsSinceEpoch(59000, isUtc: true);
     final pushedCode = const TotpService()
-        .generate(TotpService.parseConfig(pushedTotp), at: fixedTime)
+        .generate(pushedCredential.config, at: fixedTime)
         .value;
     final pulledCode = const TotpService()
-        .generate(TotpService.parseConfig(pulledTotp), at: fixedTime)
+        .generate(pulledCredential.config, at: fixedTime)
         .value;
     final serverPayload =
-        server.getItem('account_1')?['encrypted_signed_payload'] as String?;
+        server.getItem('totp_1')?['encrypted_signed_payload'] as String?;
 
     expect(pushResult.success, isTrue);
     expect(pushResult.pushed, isTrue);
     expect(pullResult.success, isTrue);
     expect(pullResult.pulled, isTrue);
-    expect(pulledTotp, totpConfig);
+    expect(pulledCredential.config.secret, pushedCredential.config.secret);
+    expect(pulledCredential.linkedAccountIds, ['account_1']);
     expect(pushedCode, '287082');
     expect(pulledCode, pushedCode);
-    expect(pulledItem.syncStatus, SyncStatus.synchronized);
+    expect(pulledCredential.syncStatus, SyncStatus.synchronized);
     expect(serverPayload, isNotNull);
     expect(serverPayload, contains('sroy-sync:'));
-    expect(serverPayload, isNot(contains('totp_secret')));
     expect(serverPayload, isNot(contains('GEZDGNBVGY3TQOJQ')));
     expect(serverPayload, isNot(contains('otpauth://')));
   });
@@ -558,7 +629,7 @@ void main() {
     },
   );
 
-  test('concurrent TOTP secret edits enter the conflict inbox', () async {
+  test('concurrent 2FA credential edits merge by HLC', () async {
     final server = await _InMemoryVaultServer.start(vaultId);
     addTearDown(server.close);
     SharedPreferences.setMockInitialValues({'sync_server_url': server.baseUrl});
@@ -577,79 +648,62 @@ void main() {
     );
 
     final initialTotp = _totpConfig(account: 'initial@example.com');
-    clientA.storage.accounts['account_1'] = _baseItem(
-      id: 'account_1',
-      name: '2FA Account',
-      email: 'owner@example.com',
-      password: 'super-secret',
-      totpConfig: initialTotp,
+    clientA.storage.totpCredentials['totp_1'] = _baseTotpCredential(
+      id: 'totp_1',
+      label: 'Original 2FA',
+      config: initialTotp,
+      linkedAccountIds: const ['account_1'],
       version: 0,
       syncStatus: SyncStatus.pendingPush,
-      nameHlc: const Hlc(10, 0, 'base'),
-      emailHlc: const Hlc(10, 1, 'base'),
-      passwordHlc: const Hlc(10, 2, 'base'),
-      totpHlc: const Hlc(10, 3, 'base'),
+      labelHlc: const Hlc(10, 0, 'base'),
+      configHlc: const Hlc(10, 1, 'base'),
+      linksHlc: const Hlc(10, 2, 'base'),
     );
     await clientA.syncService.syncNow();
     await clientB.syncService.syncNow();
 
-    final totpFromA = _totpConfig(
-      account: 'a@example.com',
-      secret: 'JBSWY3DPEHPK3PXP',
-    );
     final totpFromB = _totpConfig(
       account: 'b@example.com',
       secret: 'JBSWY3DPEHPK3PXQ',
     );
-    clientA.storage.accounts['account_1'] = _baseItem(
-      id: 'account_1',
-      name: '2FA Account',
-      email: 'owner@example.com',
-      password: 'super-secret',
-      totpConfig: totpFromA,
+    clientA.storage.totpCredentials['totp_1'] = _baseTotpCredential(
+      id: 'totp_1',
+      label: 'Updated By A',
+      config: initialTotp,
+      linkedAccountIds: const ['account_1'],
       version: 1,
       syncStatus: SyncStatus.pendingPush,
-      nameHlc: const Hlc(10, 0, 'base'),
-      emailHlc: const Hlc(10, 1, 'base'),
-      passwordHlc: const Hlc(10, 2, 'base'),
-      totpHlc: const Hlc(20, 0, 'device_aaaaaa111111'),
+      labelHlc: const Hlc(20, 0, 'device_aaaaaa111111'),
+      configHlc: const Hlc(10, 1, 'base'),
+      linksHlc: const Hlc(10, 2, 'base'),
     );
-    clientB.storage.accounts['account_1'] = _baseItem(
-      id: 'account_1',
-      name: '2FA Account',
-      email: 'owner@example.com',
-      password: 'super-secret',
-      totpConfig: totpFromB,
+    clientB.storage.totpCredentials['totp_1'] = _baseTotpCredential(
+      id: 'totp_1',
+      label: 'Original 2FA',
+      config: totpFromB,
+      linkedAccountIds: const ['account_1'],
       version: 1,
       syncStatus: SyncStatus.pendingPush,
-      nameHlc: const Hlc(10, 0, 'base'),
-      emailHlc: const Hlc(10, 1, 'base'),
-      passwordHlc: const Hlc(10, 2, 'base'),
-      totpHlc: const Hlc(30, 0, 'device_bbbbbb222222'),
+      labelHlc: const Hlc(10, 0, 'base'),
+      configHlc: const Hlc(30, 0, 'device_bbbbbb222222'),
+      linksHlc: const Hlc(10, 2, 'base'),
     );
 
     final pushAResult = await clientA.syncService.syncNow();
     final mergeBResult = await clientB.syncService.syncNow();
-    final mergedItem = clientB.storage.accounts['account_1']!;
-    final conflictLogs = clientB.storage.conflictLogs['account_1'] ?? const [];
+    final mergedCredential = clientB.storage.totpCredentials['totp_1']!;
 
     expect(pushAResult.success, isTrue);
     expect(pushAResult.pushed, isTrue);
     expect(mergeBResult.success, isTrue);
     expect(mergeBResult.pulled, isTrue);
-    expect(mergedItem.syncStatus, SyncStatus.conflict);
-    expect(mergedItem.data['totp_secret'], totpFromB);
+    expect(mergedCredential.label, 'Updated By A');
     expect(
-      conflictLogs.map((log) => log.fieldKey),
-      contains('data.totp_secret'),
+      mergedCredential.config.secret,
+      TotpService.parseConfig(totpFromB).secret,
     );
-    expect(
-      conflictLogs
-          .where((log) => log.fieldKey == 'data.totp_secret')
-          .single
-          .fieldValue,
-      totpFromA,
-    );
+    expect(mergedCredential.serverVersion, 3);
+    expect(mergedCredential.syncStatus, SyncStatus.synchronized);
   });
 
   test(

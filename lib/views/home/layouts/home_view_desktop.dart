@@ -190,6 +190,18 @@ class _DesktopDock extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             _DesktopNavItem(
+              icon: Icons.verified_user_outlined,
+              selectedIcon: Icons.verified_user,
+              label: '2FA',
+              description: labelBuilder(
+                '查看动态验证码账户',
+                'Accounts with codes',
+              ),
+              isSelected: selectedIndex == 2,
+              onTap: () => onDestinationSelected(2),
+            ),
+            const SizedBox(height: 8),
+            _DesktopNavItem(
               icon: Icons.settings_outlined,
               selectedIcon: Icons.settings,
               label: labelBuilder('设置', 'Settings'),
@@ -197,8 +209,8 @@ class _DesktopDock extends StatelessWidget {
                 '主题、安全与模板',
                 'Theme, security, templates',
               ),
-              isSelected: selectedIndex == 2,
-              onTap: () => onDestinationSelected(2),
+              isSelected: selectedIndex == 3,
+              onTap: () => onDestinationSelected(3),
             ),
             const Spacer(),
             Container(

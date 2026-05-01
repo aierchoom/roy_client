@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import '../models/account_item.dart';
 import '../models/account_template.dart';
 import '../models/hlc.dart';
@@ -18,17 +20,17 @@ class ConflictLog {
     required this.fieldValue,
     required this.hlc,
     int? savedAt,
-  })  : id = id ?? const Uuid().v4(),
-        savedAt = savedAt ?? DateTime.now().millisecondsSinceEpoch;
+  }) : id = id ?? const Uuid().v4(),
+       savedAt = savedAt ?? DateTime.now().millisecondsSinceEpoch;
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'account_id': accountId,
-        'key': fieldKey,
-        'value': fieldValue,
-        'hlc': hlc.toString(),
-        'saved_at': savedAt,
-      };
+    'id': id,
+    'account_id': accountId,
+    'key': fieldKey,
+    'value': fieldValue,
+    'hlc': hlc.toString(),
+    'saved_at': savedAt,
+  };
 
   factory ConflictLog.fromJson(Map<String, dynamic> json) {
     return ConflictLog(
@@ -65,14 +67,20 @@ class CrdtMergeEngine {
     if (localDel != null && remoteDel != null) {
       // 双方都删除了
       if (remoteDel.compareTo(localDel) > 0) {
-        return MergeResult(remote.copyWith(syncStatus: SyncStatus.synchronized), []);
+        return MergeResult(
+          remote.copyWith(syncStatus: SyncStatus.synchronized),
+          [],
+        );
       }
       return MergeResult(local, []);
     } else if (remoteDel != null) {
       // 远端删除了，本地没删。检查本地是否有比删除更晚的修改事实
       if (remoteDel.compareTo(_getMaxHlc(local)) > 0) {
         // 远端的删除确切发生了在本地最后一次修改之后 -> 远端删得对，接受墓碑
-        return MergeResult(remote.copyWith(syncStatus: SyncStatus.synchronized), logs);
+        return MergeResult(
+          remote.copyWith(syncStatus: SyncStatus.synchronized),
+          logs,
+        );
       }
       // 本地在它删除后又改了某内容 -> 本地复活了它，让本地的存续权获胜
     } else if (localDel != null) {
@@ -89,13 +97,27 @@ class CrdtMergeEngine {
       mergedName = remote.name;
       mergedNameHlc = remote.nameHlc;
       if (local.name != remote.name) {
-        logs.add(ConflictLog(accountId: local.id, fieldKey: 'name', fieldValue: local.name, hlc: local.nameHlc));
+        logs.add(
+          ConflictLog(
+            accountId: local.id,
+            fieldKey: 'name',
+            fieldValue: local.name,
+            hlc: local.nameHlc,
+          ),
+        );
       }
     } else {
       mergedName = local.name;
       mergedNameHlc = local.nameHlc;
       if (local.name != remote.name && remote.nameHlc.time > 0) {
-        logs.add(ConflictLog(accountId: remote.id, fieldKey: 'name', fieldValue: remote.name, hlc: remote.nameHlc));
+        logs.add(
+          ConflictLog(
+            accountId: remote.id,
+            fieldKey: 'name',
+            fieldValue: remote.name,
+            hlc: remote.nameHlc,
+          ),
+        );
       }
     }
 
@@ -105,13 +127,27 @@ class CrdtMergeEngine {
       mergedEmail = remote.email;
       mergedEmailHlc = remote.emailHlc;
       if (local.email != remote.email) {
-        logs.add(ConflictLog(accountId: local.id, fieldKey: 'email', fieldValue: local.email, hlc: local.emailHlc));
+        logs.add(
+          ConflictLog(
+            accountId: local.id,
+            fieldKey: 'email',
+            fieldValue: local.email,
+            hlc: local.emailHlc,
+          ),
+        );
       }
     } else {
       mergedEmail = local.email;
       mergedEmailHlc = local.emailHlc;
       if (local.email != remote.email && remote.emailHlc.time > 0) {
-        logs.add(ConflictLog(accountId: remote.id, fieldKey: 'email', fieldValue: remote.email, hlc: remote.emailHlc));
+        logs.add(
+          ConflictLog(
+            accountId: remote.id,
+            fieldKey: 'email',
+            fieldValue: remote.email,
+            hlc: remote.emailHlc,
+          ),
+        );
       }
     }
 
@@ -129,23 +165,44 @@ class CrdtMergeEngine {
         mergedData[key] = rVal!;
         mergedDataHlc[key] = rHlc;
         if (lVal != null && lVal != rVal) {
-          logs.add(ConflictLog(accountId: local.id, fieldKey: 'data.$key', fieldValue: lVal, hlc: lHlc));
+          logs.add(
+            ConflictLog(
+              accountId: local.id,
+              fieldKey: 'data.$key',
+              fieldValue: lVal,
+              hlc: lHlc,
+            ),
+          );
         }
       } else {
         mergedData[key] = lVal!;
         mergedDataHlc[key] = lHlc;
         if (rVal != null && lVal != rVal && rHlc.time > 0) {
-          logs.add(ConflictLog(accountId: remote.id, fieldKey: 'data.$key', fieldValue: rVal, hlc: rHlc));
+          logs.add(
+            ConflictLog(
+              accountId: remote.id,
+              fieldKey: 'data.$key',
+              fieldValue: rVal,
+              hlc: rHlc,
+            ),
+          );
         }
       }
     }
 
     // --- 3. 分析收敛状态 ---
     bool isPureFastForward = true;
-    if (mergedNameHlc.compareTo(remote.nameHlc) != 0) isPureFastForward = false;
-    if (mergedEmailHlc.compareTo(remote.emailHlc) != 0) isPureFastForward = false;
+    if (mergedNameHlc.compareTo(remote.nameHlc) != 0) {
+      isPureFastForward = false;
+    }
+    if (mergedEmailHlc.compareTo(remote.emailHlc) != 0) {
+      isPureFastForward = false;
+    }
     for (final key in mergedDataHlc.keys) {
-      if (mergedDataHlc[key]!.compareTo(remote.dataHlc[key] ?? Hlc.zero('remote')) != 0) {
+      if (mergedDataHlc[key]!.compareTo(
+            remote.dataHlc[key] ?? Hlc.zero('remote'),
+          ) !=
+          0) {
         isPureFastForward = false;
         break;
       }
@@ -193,31 +250,71 @@ class CrdtMergeEngine {
     return max;
   }
 
-  static AccountTemplate mergeTemplate(AccountTemplate local, AccountTemplate remote) {
+  static AccountTemplate mergeTemplate(
+    AccountTemplate local,
+    AccountTemplate remote,
+  ) {
     if (local.templateId != remote.templateId) {
       throw ArgumentError('Attempted to merge different templates.');
+    }
+
+    if (_sameTemplatePayload(local, remote)) {
+      return remote.copyWith(
+        serverVersion: local.serverVersion > remote.serverVersion
+            ? local.serverVersion
+            : remote.serverVersion,
+      );
     }
 
     final localDel = local.deleteHlc;
     final remoteDel = remote.deleteHlc;
 
     if (localDel != null && remoteDel != null) {
-      if (remoteDel.compareTo(localDel) > 0) return remote.copyWith(syncStatus: SyncStatus.synchronized);
-      return local;
+      if (remoteDel.compareTo(localDel) > 0) {
+        return remote.copyWith(syncStatus: SyncStatus.synchronized);
+      }
+      return _templateWithMaxServerVersion(local, remote);
     } else if (remoteDel != null) {
       if (remoteDel.compareTo(local.hlc ?? Hlc.zero('local')) > 0) {
         return remote.copyWith(syncStatus: SyncStatus.synchronized);
       }
     } else if (localDel != null) {
       if (localDel.compareTo(remote.hlc ?? Hlc.zero('remote')) > 0) {
-        return local;
+        return _templateWithMaxServerVersion(local, remote);
       }
     }
 
-    if ((remote.hlc ?? Hlc.zero('remote')).compareTo(local.hlc ?? Hlc.zero('local')) > 0) {
+    if ((remote.hlc ?? Hlc.zero('remote')).compareTo(
+          local.hlc ?? Hlc.zero('local'),
+        ) >
+        0) {
       return remote.copyWith(syncStatus: SyncStatus.synchronized);
     } else {
-      return local;
+      return _templateWithMaxServerVersion(local, remote);
     }
+  }
+
+  static AccountTemplate _templateWithMaxServerVersion(
+    AccountTemplate local,
+    AccountTemplate remote,
+  ) {
+    return local.copyWith(
+      serverVersion: local.serverVersion > remote.serverVersion
+          ? local.serverVersion
+          : remote.serverVersion,
+    );
+  }
+
+  static bool _sameTemplatePayload(
+    AccountTemplate local,
+    AccountTemplate remote,
+  ) {
+    final localJson = Map<String, dynamic>.from(local.toJson())
+      ..remove('serverVersion')
+      ..remove('syncStatus');
+    final remoteJson = Map<String, dynamic>.from(remote.toJson())
+      ..remove('serverVersion')
+      ..remove('syncStatus');
+    return jsonEncode(localJson) == jsonEncode(remoteJson);
   }
 }

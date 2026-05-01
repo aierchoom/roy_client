@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-enum LocalSyncEntityType { account, template }
+enum LocalSyncEntityType { account, template, totpCredential }
 
 enum LocalSyncAction { create, update, delete }
 
@@ -100,6 +100,9 @@ class LocalSyncChange {
   bool get isDelete => action == LocalSyncAction.delete;
 
   bool get isAccount => entityType == LocalSyncEntityType.account;
+
+  bool get isTotpCredential =>
+      entityType == LocalSyncEntityType.totpCredential;
 
   bool get canPush =>
       status == LocalSyncStatus.pendingReview ||
