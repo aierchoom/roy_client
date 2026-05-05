@@ -156,6 +156,14 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
           ),
         );
         return;
+      case BiometricSetupResult.noPasswordMode:
+        _showError(
+          _text(
+            '\u65e0\u5bc6\u7801\u6a21\u5f0f\u4e0b\u65e0\u6cd5\u542f\u7528\u751f\u7269\u8bc6\u522b\u3002\u8bf7\u5148\u8bbe\u7f6e\u4e3b\u5bc6\u7801\u3002',
+            'Biometrics cannot be enabled in no-password mode. Please set a master password first.',
+          ),
+        );
+        return;
       case BiometricSetupResult.error:
         _showError(
           _text(
@@ -453,9 +461,11 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: Text(_isNoPasswordMode 
-              ? _text('启用主密码', 'Enable Master Password') 
-              : _text('修改主密码', 'Change Master Password')),
+          title: Text(
+            _isNoPasswordMode
+                ? _text('启用主密码', 'Enable Master Password')
+                : _text('修改主密码', 'Change Master Password'),
+          ),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -467,8 +477,11 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
                     decoration: InputDecoration(
                       labelText: _text('当前主密码', 'Current Master Password'),
                       suffixIcon: IconButton(
-                        icon: Icon(obscureOld ? Icons.visibility_off : Icons.visibility),
-                        onPressed: () => setDialogState(() => obscureOld = !obscureOld),
+                        icon: Icon(
+                          obscureOld ? Icons.visibility_off : Icons.visibility,
+                        ),
+                        onPressed: () =>
+                            setDialogState(() => obscureOld = !obscureOld),
                       ),
                     ),
                   ),
@@ -478,8 +491,11 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
                   decoration: InputDecoration(
                     labelText: _text('新主密码', 'New Master Password'),
                     suffixIcon: IconButton(
-                      icon: Icon(obscureNew ? Icons.visibility_off : Icons.visibility),
-                      onPressed: () => setDialogState(() => obscureNew = !obscureNew),
+                      icon: Icon(
+                        obscureNew ? Icons.visibility_off : Icons.visibility,
+                      ),
+                      onPressed: () =>
+                          setDialogState(() => obscureNew = !obscureNew),
                     ),
                   ),
                 ),
@@ -500,9 +516,14 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
             ),
             FilledButton(
               onPressed: () {
-                if (newPasswordController.text != confirmPasswordController.text) {
+                if (newPasswordController.text !=
+                    confirmPasswordController.text) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(_text('两次输入的密码不一致', 'Passwords do not match')))
+                    SnackBar(
+                      content: Text(
+                        _text('两次输入的密码不一致', 'Passwords do not match'),
+                      ),
+                    ),
                   );
                   return;
                 }
@@ -521,7 +542,7 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
         _isNoPasswordMode ? '' : oldPasswordController.text,
         newPasswordController.text,
       );
-      
+
       if (mounted) {
         setState(() => _isLoading = false);
         if (success) {
@@ -530,10 +551,19 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
           final messenger = ScaffoldMessenger.of(context);
           setState(() => _isNoPasswordMode = noPassword);
           messenger.showSnackBar(
-            SnackBar(content: Text(_text('主密码更新成功', 'Master password updated successfully')))
+            SnackBar(
+              content: Text(
+                _text('主密码更新成功', 'Master password updated successfully'),
+              ),
+            ),
           );
         } else {
-          _showError(_text('更新失败，请检查当前密码是否正确', 'Update failed. Please check your current password.'));
+          _showError(
+            _text(
+              '更新失败，请检查当前密码是否正确',
+              'Update failed. Please check your current password.',
+            ),
+          );
         }
       }
     }
@@ -546,10 +576,15 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
   Widget _buildPasswordManagementTile(BuildContext context) {
     return _buildOptionTile(
       context: context,
-      title: _isNoPasswordMode ? _text('启用主密码保护', 'Enable Password Protection') : _text('修改主密码', 'Change Master Password'),
-      subtitle: _isNoPasswordMode 
+      title: _isNoPasswordMode
+          ? _text('启用主密码保护', 'Enable Password Protection')
+          : _text('修改主密码', 'Change Master Password'),
+      subtitle: _isNoPasswordMode
           ? _text('为您的数据设置一个强密码', 'Set a strong password for your data')
-          : _text('定期更换密码以提高安全性', 'Change password periodically for better security'),
+          : _text(
+              '定期更换密码以提高安全性',
+              'Change password periodically for better security',
+            ),
       icon: Icons.password_outlined,
       selected: false,
       onTap: _showChangePasswordDialog,
@@ -572,10 +607,19 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
                   const SizedBox(height: 16),
                   _buildSectionCard(
                     context: context,
-                    title: _text('\u4e3b\u5bc6\u7801\u7ba1\u7406', 'Master Password'),
-                    subtitle: _isNoPasswordMode 
-                        ? _text('\u60a8\u5f53\u524d\u5df2\u8df3\u8fc7\u4e3b\u5bc6\u7801\uff0c\u5efa\u8bae\u542f\u7528\u4ee5\u4fdd\u62a4\u6570\u636e\u5b89\u5168\u3002', 'You currently have no master password. Enable one for better security.')
-                        : _text('\u4fee\u6539\u60a8\u7684\u4fdd\u9669\u5e93\u4e3b\u5bc6\u7801\u3002', 'Change your vault master password.'),
+                    title: _text(
+                      '\u4e3b\u5bc6\u7801\u7ba1\u7406',
+                      'Master Password',
+                    ),
+                    subtitle: _isNoPasswordMode
+                        ? _text(
+                            '\u60a8\u5f53\u524d\u5df2\u8df3\u8fc7\u4e3b\u5bc6\u7801\uff0c\u5efa\u8bae\u542f\u7528\u4ee5\u4fdd\u62a4\u6570\u636e\u5b89\u5168\u3002',
+                            'You currently have no master password. Enable one for better security.',
+                          )
+                        : _text(
+                            '\u4fee\u6539\u60a8\u7684\u4fdd\u9669\u5e93\u4e3b\u5bc6\u7801\u3002',
+                            'Change your vault master password.',
+                          ),
                     child: _buildPasswordManagementTile(context),
                   ),
                   const SizedBox(height: 16),
@@ -646,7 +690,11 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
         children: [
           Row(
             children: [
-              Icon(Icons.warning_amber_rounded, color: theme.colorScheme.error, size: 20),
+              Icon(
+                Icons.warning_amber_rounded,
+                color: theme.colorScheme.error,
+                size: 20,
+              ),
               const SizedBox(width: 10),
               Text(
                 _text('危险区域', 'Danger Zone'),
@@ -674,7 +722,9 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
               style: FilledButton.styleFrom(
                 backgroundColor: theme.colorScheme.error,
                 foregroundColor: theme.colorScheme.onError,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
               ),
               onPressed: _showFactoryResetDialog,
               icon: const Icon(Icons.delete_forever_outlined),
@@ -714,18 +764,20 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
     if (confirm == true) {
       if (!mounted) return;
       setState(() => _isLoading = true);
-      
+
       await _serviceManager.resetApplication();
-      
+
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: Colors.red,
           duration: const Duration(seconds: 5),
-          content: Text(_text('数据已销毁，请手动重启应用。', 'Data destroyed. Please restart the app.')),
+          content: Text(
+            _text('数据已销毁，请手动重启应用。', 'Data destroyed. Please restart the app.'),
+          ),
         ),
       );
-      
+
       // Navigate to splash or exit
       Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
     }

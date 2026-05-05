@@ -9,6 +9,7 @@ import 'package:uuid/uuid.dart';
 abstract class SecureKeyValueStore {
   Future<String?> read({required String key});
   Future<void> write({required String key, required String value});
+  Future<void> delete({required String key});
 }
 
 class FlutterSecureKeyValueStore implements SecureKeyValueStore {
@@ -24,6 +25,11 @@ class FlutterSecureKeyValueStore implements SecureKeyValueStore {
   @override
   Future<void> write({required String key, required String value}) {
     return _storage.write(key: key, value: value);
+  }
+
+  @override
+  Future<void> delete({required String key}) {
+    return _storage.delete(key: key);
   }
 }
 
@@ -65,6 +71,7 @@ class VaultIdentityImportPreview {
   final String symmetricKey;
   final String? syncServerUrl;
   final String? vaultDump;
+  final String? vaultApiToken;
 
   const VaultIdentityImportPreview({
     required this.vaultId,
@@ -72,18 +79,24 @@ class VaultIdentityImportPreview {
     required this.symmetricKey,
     this.syncServerUrl,
     this.vaultDump,
+    this.vaultApiToken,
   });
 
   String? operator [](String key) {
     return switch (key) {
       'sync_server_url' => syncServerUrl,
       'vault_dump' => vaultDump,
+      'vault_api_token' => vaultApiToken,
       _ => null,
     };
   }
 
   Map<String, String?> toLegacyMap() {
-    return {'sync_server_url': syncServerUrl, 'vault_dump': vaultDump};
+    return {
+      'sync_server_url': syncServerUrl,
+      'vault_dump': vaultDump,
+      'vault_api_token': vaultApiToken,
+    };
   }
 }
 
@@ -94,6 +107,7 @@ class IdentityService {
   static const String _vaultIdKey = 'vault_id';
   static const String _privateKeyKey = 'private_key';
   static const String _symmetricKeyKey = 'symmetric_key';
+  static const String _vaultApiTokenKey = 'vault_api_token';
   static const int _secureLinkIterations = 150000;
   static const int _secureLinkSaltLength = 16;
   static const int _secureLinkNonceLength = 12;
@@ -126,18 +140,30 @@ class IdentityService {
   String? _vaultId;
   String? _privateKeyMaterial;
   String? _symmetricKeyMaterial;
+  String? _vaultApiToken;
 
   IdentityService({required this.secureStorage, Uuid? uuid})
     : _uuid = uuid ?? const Uuid();
 
   String get deviceId => _requireValue(_deviceId, 'deviceId');
   String get vaultId => _requireValue(_vaultId, 'vaultId');
+  String? get vaultApiToken => _vaultApiToken;
 
   bool get hasIdentity =>
       _deviceId != null &&
       _vaultId != null &&
       _privateKeyMaterial != null &&
       _symmetricKeyMaterial != null;
+
+  Future<void> setVaultApiToken(String? token) async {
+    if (token != null && token.isNotEmpty) {
+      _vaultApiToken = token;
+      await secureStorage.write(key: _vaultApiTokenKey, value: token);
+    } else {
+      _vaultApiToken = null;
+      await secureStorage.write(key: _vaultApiTokenKey, value: '');
+    }
+  }
 
   Future<bool> checkIdentityExists() async {
     final storedVaultId = await secureStorage.read(key: _vaultIdKey);
@@ -162,6 +188,7 @@ class IdentityService {
       'symmetric_key': symmetricKey,
       if (syncServerUrl != null) 'sync_server_url': syncServerUrl,
       if (vaultDump != null) 'vault_dump': vaultDump,
+      if (_vaultApiToken != null) 'vault_api_token': _vaultApiToken,
     };
     final encoded = base64UrlEncode(utf8.encode(jsonEncode(payload)));
     return '$_transferCodePrefix$encoded';
@@ -353,6 +380,7 @@ class IdentityService {
       symmetricKey: payload['symmetric_key'] as String?,
       syncServerUrl: payload['sync_server_url'] as String?,
       vaultDump: payload['vault_dump'] as String?,
+      vaultApiToken: payload['vault_api_token'] as String?,
       sourceLabel: 'transfer code',
     );
   }
@@ -365,6 +393,7 @@ class IdentityService {
     required String? symmetricKey,
     required String? syncServerUrl,
     required String? vaultDump,
+    String? vaultApiToken,
     required String sourceLabel,
   }) async {
     await _ensureDeviceId();
@@ -391,6 +420,7 @@ class IdentityService {
       symmetricKey: symmetricKey,
       syncServerUrl: syncServerUrl,
       vaultDump: vaultDump,
+      vaultApiToken: vaultApiToken,
     );
   }
 
@@ -400,6 +430,7 @@ class IdentityService {
     _vaultId = preview.vaultId;
     _privateKeyMaterial = preview.privateKey;
     _symmetricKeyMaterial = preview.symmetricKey;
+    _vaultApiToken = preview.vaultApiToken;
 
     await secureStorage.write(key: _vaultIdKey, value: _vaultId!);
     await secureStorage.write(key: _privateKeyKey, value: _privateKeyMaterial!);
@@ -407,6 +438,11 @@ class IdentityService {
       key: _symmetricKeyKey,
       value: _symmetricKeyMaterial!,
     );
+    if (_vaultApiToken != null) {
+      await secureStorage.write(key: _vaultApiTokenKey, value: _vaultApiToken!);
+    } else {
+      await secureStorage.write(key: _vaultApiTokenKey, value: '');
+    }
   }
 
   VaultIdentityImportPreview currentImportPreview() {
@@ -414,6 +450,7 @@ class IdentityService {
       vaultId: vaultId,
       privateKey: privateKey,
       symmetricKey: symmetricKey,
+      vaultApiToken: _vaultApiToken,
     );
   }
 
@@ -502,6 +539,13 @@ class IdentityService {
     _vaultId = storedVaultId;
     _privateKeyMaterial = storedPrivateKey;
     _symmetricKeyMaterial = storedSymmetricKey;
+
+    final storedVaultApiToken = await secureStorage.read(
+      key: _vaultApiTokenKey,
+    );
+    if (storedVaultApiToken != null && storedVaultApiToken.isNotEmpty) {
+      _vaultApiToken = storedVaultApiToken;
+    }
   }
 
   Future<void> _generateIdentity() async {

@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
+import 'package:secret_roy/core/app_logger.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
@@ -13,7 +13,9 @@ enum AutoLockDuration {
   oneMinute(Duration(minutes: 1)),
   fiveMinutes(Duration(minutes: 5)),
   tenMinutes(Duration(minutes: 10)),
-  never(Duration(days: 365));
+  never(
+    Duration(days: 999999),
+  ); // Semantically "never" via special-case checks in lock logic.
 
   final Duration duration;
 
@@ -61,6 +63,12 @@ class AutoLockService extends ChangeNotifier {
   AutoLockState _state = AutoLockState.locked;
   AutoLockDuration _duration = AutoLockDuration.oneMinute;
   DateTime? _backgroundTime;
+  bool _disposed = false;
+
+  void _notify() {
+    if (_disposed) return;
+    notifyListeners();
+  }
 
   AutoLockService({
     required EnhancedCryptoService cryptoService,
@@ -78,7 +86,7 @@ class AutoLockService extends ChangeNotifier {
     _state = await _checkNeedsLock()
         ? AutoLockState.locked
         : AutoLockState.unlocked;
-    notifyListeners();
+    _notify();
   }
 
   Future<void> setDuration(AutoLockDuration duration) async {
@@ -87,7 +95,7 @@ class AutoLockService extends ChangeNotifier {
       key: _autoLockDurationKey,
       value: duration.duration.inSeconds.toString(),
     );
-    notifyListeners();
+    _notify();
   }
 
   void onAppLifecycleStateChanged(AppLifecycleState state) {
@@ -111,13 +119,13 @@ class AutoLockService extends ChangeNotifier {
     _cryptoService.logout();
     _state = AutoLockState.locked;
     _backgroundTime = null;
-    notifyListeners();
+    _notify();
   }
 
   void unlock() {
     _state = AutoLockState.unlocked;
     _backgroundTime = null;
-    notifyListeners();
+    _notify();
   }
 
   Future<void> _loadSettings() async {
@@ -128,9 +136,7 @@ class AutoLockService extends ChangeNotifier {
         _duration = AutoLockDuration.fromDuration(Duration(seconds: seconds));
       }
     } catch (e) {
-      if (kDebugMode) {
-        debugPrint('Failed to load auto-lock setting: $e');
-      }
+      AppLogger.d('Failed to load auto-lock setting: $e');
     }
   }
 
@@ -148,7 +154,7 @@ class AutoLockService extends ChangeNotifier {
     if (_duration != AutoLockDuration.never) {
       _state = AutoLockState.backgroundTimer;
       _startBackgroundTimer();
-      notifyListeners();
+      _notify();
     }
   }
 
@@ -163,7 +169,7 @@ class AutoLockService extends ChangeNotifier {
 
     _state = AutoLockState.unlocked;
     _backgroundTime = null;
-    notifyListeners();
+    _notify();
   }
 
   void _onAppDetached() {
@@ -221,6 +227,7 @@ class AutoLockService extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     _cancelBackgroundTimer();
     unawaited(_saveLastActiveTime());
     super.dispose();

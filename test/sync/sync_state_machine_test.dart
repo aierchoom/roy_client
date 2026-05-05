@@ -26,6 +26,11 @@ class _MemorySecureKeyValueStore implements SecureKeyValueStore {
   Future<void> write({required String key, required String value}) async {
     values[key] = value;
   }
+
+  @override
+  Future<void> delete({required String key}) async {
+    values.remove(key);
+  }
 }
 
 class _FakeSecureStorageService extends SecureStorageService {
@@ -441,7 +446,7 @@ void main() {
 
     expect(result.success, isFalse);
     expect(result.error, 'Sync server URL not configured.');
-    expect(syncService.state, SyncState.error);
+    expect(syncService.state, SyncState.networkUnreachable);
     expect(syncService.errorMessage, 'Sync server URL not configured.');
     expect(
       syncService.statusNote,
@@ -466,7 +471,7 @@ void main() {
       final connected = await syncService.connect();
 
       expect(connected, isFalse);
-      expect(syncService.state, SyncState.error);
+      expect(syncService.state, SyncState.networkUnreachable);
       expect(syncService.errorMessage, 'Sync server URL not configured.');
       expect(
         syncService.statusNote,
@@ -494,14 +499,14 @@ void main() {
     final connectFuture = syncService.connect();
     await Future<void>.delayed(const Duration(milliseconds: 50));
 
-    expect(syncService.state, SyncState.syncing);
+    expect(syncService.isSyncing, isTrue);
     expect(syncService.isConnected, isTrue);
 
     gate.complete();
     final connected = await connectFuture;
 
     expect(connected, isTrue);
-    expect(syncService.state, SyncState.synced);
+    expect(syncService.state, SyncState.idle);
     expect(syncService.statusNote, 'Already up to date.');
     expect(server.getCount, greaterThanOrEqualTo(1));
   });
@@ -527,7 +532,7 @@ void main() {
       final connected = await syncService.connect();
 
       expect(connected, isFalse);
-      expect(syncService.state, SyncState.offline);
+      expect(syncService.state, SyncState.networkUnreachable);
       expect(syncService.isConnected, isFalse);
       expect(
         syncService.statusNote,
@@ -561,7 +566,7 @@ void main() {
 
       expect(result.success, isFalse);
       expect(result.error, contains('Vault file is unreadable'));
-      expect(syncService.state, SyncState.error);
+      expect(syncService.state, SyncState.serverError);
       expect(syncService.errorMessage, contains('Pull HTTP 503'));
       expect(result.error, syncService.statusNote);
     },
@@ -594,7 +599,7 @@ void main() {
 
       expect(result.success, isFalse);
       expect(result.error, contains('Failed to persist vault'));
-      expect(syncService.state, SyncState.error);
+      expect(syncService.state, SyncState.serverError);
       expect(syncService.errorMessage, contains('Push HTTP 503'));
       expect(result.error, syncService.statusNote);
       expect(server.postCount, 1);
@@ -631,7 +636,7 @@ void main() {
 
       expect(result.success, isFalse);
       expect(result.error, contains('Invalid encrypted payload envelope'));
-      expect(syncService.state, SyncState.error);
+      expect(syncService.state, SyncState.protocolError);
       expect(syncService.errorMessage, contains('Sync payload rejected'));
       expect(
         syncService.statusNote,
@@ -662,7 +667,7 @@ void main() {
 
     expect(result.success, isFalse);
     expect(result.error, contains('pull response max_version'));
-    expect(syncService.state, SyncState.error);
+    expect(syncService.state, SyncState.protocolError);
     expect(syncService.errorMessage, contains('Sync protocol invalid'));
     expect(server.postCount, 0);
   });
@@ -800,7 +805,7 @@ void main() {
 
     expect(result.success, isTrue);
     expect(result.pushed, isTrue);
-    expect(syncService.state, SyncState.synced);
+    expect(syncService.state, SyncState.idle);
     expect(syncService.statusNote, 'Pushed local changes.');
   });
 

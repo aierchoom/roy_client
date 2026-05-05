@@ -1,7 +1,10 @@
+import 'package:flutter/foundation.dart';
+
 import '../services/totp_service.dart';
 import 'account_item.dart';
 import 'hlc.dart';
 
+@immutable
 class TotpCredential {
   final String id;
   final String label;
@@ -86,8 +89,8 @@ class TotpCredential {
       'configHlc': configHlc.toString(),
       'linksHlc': linksHlc.toString(),
       'serverVersion': serverVersion,
-      'syncStatus': syncStatus.index,
-      'isDeleted': isDeleted ? 1 : 0,
+      'syncStatus': syncStatus.name,
+      'isDeleted': isDeleted,
       'deleteHlc': deleteHlc?.toString(),
     };
   }

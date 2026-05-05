@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
+
 enum LocalSyncEntityType { account, template, totpCredential }
 
 enum LocalSyncAction { create, update, delete }
@@ -38,6 +40,7 @@ LocalSyncStatus localSyncStatusFromString(Object? value) {
   );
 }
 
+@immutable
 class LocalSyncChange {
   final String id;
   final String vaultId;
@@ -101,8 +104,7 @@ class LocalSyncChange {
 
   bool get isAccount => entityType == LocalSyncEntityType.account;
 
-  bool get isTotpCredential =>
-      entityType == LocalSyncEntityType.totpCredential;
+  bool get isTotpCredential => entityType == LocalSyncEntityType.totpCredential;
 
   bool get canPush =>
       status == LocalSyncStatus.pendingReview ||
@@ -149,6 +151,27 @@ class LocalSyncChange {
 
   static String encodeSnapshot(Map<String, dynamic>? snapshot) {
     return jsonEncode(snapshot);
+  }
+
+  Map<String, dynamic> toDatabaseRow() {
+    return {
+      'id': id,
+      'vault_id': vaultId,
+      'entity_type': entityType.name,
+      'entity_id': entityId,
+      'action': action.name,
+      'title': title,
+      'before_json': beforeJson,
+      'after_json': afterJson,
+      'diff_json': diff.isEmpty ? null : jsonEncode(diff),
+      'base_server_version': baseServerVersion,
+      'status': status.name,
+      'created_at': createdAt,
+      'updated_at': updatedAt,
+      'approved_at': approvedAt,
+      'pushed_at': pushedAt,
+      'error_message': errorMessage,
+    };
   }
 }
 

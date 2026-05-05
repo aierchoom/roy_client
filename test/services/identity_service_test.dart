@@ -14,6 +14,11 @@ class _MemorySecureKeyValueStore implements SecureKeyValueStore {
   Future<void> write({required String key, required String value}) async {
     values[key] = value;
   }
+
+  @override
+  Future<void> delete({required String key}) async {
+    values.remove(key);
+  }
 }
 
 const _validDeviceId = 'device_abcdef123456';
@@ -141,5 +146,67 @@ void main() {
         ),
       ),
     );
+  });
+
+  test('setVaultApiToken persists and initialize restores it', () async {
+    final store = _MemorySecureKeyValueStore({
+      'device_id': _validDeviceId,
+      'vault_id': _validVaultId,
+      'private_key': _validPrivateKey,
+      'symmetric_key': _validSymmetricKey,
+    });
+
+    final firstService = IdentityService(secureStorage: store);
+    await firstService.initialize();
+    expect(firstService.vaultApiToken, isNull);
+
+    await firstService.setVaultApiToken('token_abc123');
+    expect(firstService.vaultApiToken, 'token_abc123');
+
+    final secondService = IdentityService(secureStorage: store);
+    await secondService.initialize();
+    expect(secondService.vaultApiToken, 'token_abc123');
+
+    await firstService.setVaultApiToken(null);
+    expect(firstService.vaultApiToken, isNull);
+
+    final thirdService = IdentityService(secureStorage: store);
+    await thirdService.initialize();
+    expect(thirdService.vaultApiToken, isNull);
+  });
+
+  test('exportTransferCode includes vaultApiToken when set', () async {
+    final store = _MemorySecureKeyValueStore({
+      'device_id': _validDeviceId,
+      'vault_id': _validVaultId,
+      'private_key': _validPrivateKey,
+      'symmetric_key': _validSymmetricKey,
+      'vault_api_token': 'token_abc123',
+    });
+
+    final service = IdentityService(secureStorage: store);
+    await service.initialize(allowGenerateVaultIdentity: false);
+
+    final preview = await service.previewTransferCode(
+      service.exportTransferCode(),
+    );
+    expect(preview.vaultApiToken, 'token_abc123');
+  });
+
+  test('exportTransferCode omits vaultApiToken when unset', () async {
+    final store = _MemorySecureKeyValueStore({
+      'device_id': _validDeviceId,
+      'vault_id': _validVaultId,
+      'private_key': _validPrivateKey,
+      'symmetric_key': _validSymmetricKey,
+    });
+
+    final service = IdentityService(secureStorage: store);
+    await service.initialize(allowGenerateVaultIdentity: false);
+
+    final preview = await service.previewTransferCode(
+      service.exportTransferCode(),
+    );
+    expect(preview.vaultApiToken, isNull);
   });
 }

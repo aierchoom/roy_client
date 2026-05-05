@@ -2,13 +2,13 @@
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/enhanced_app_provider.dart';
 import '../services/identity_service.dart';
 import '../services/lan_pairing_service.dart';
 import '../services/service_manager.dart';
+import '../services/sensitive_clipboard_service.dart';
 import '../services/vault_pairing_service.dart';
 import '../sync/sync_service.dart';
 import '../theme/app_design_tokens.dart';
@@ -64,84 +64,93 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
   String _syncStateLabel(SyncState state) {
     return switch (state) {
       SyncState.offline => _text('离线', 'Offline'),
-      SyncState.syncing => _text('同步中', 'Syncing'),
+      SyncState.connecting => _text('连接中', 'Connecting'),
+      SyncState.pulling => _text('拉取中', 'Pulling'),
+      SyncState.pushing => _text('上传中', 'Pushing'),
       SyncState.conflictRecovery => _text('恢复中', 'Recovering'),
-      SyncState.synced => _text('已就绪', 'Ready'),
-      SyncState.error => _text('需要处理', 'Needs attention'),
+      SyncState.idle => _text('已就绪', 'Ready'),
+      SyncState.networkUnreachable => _text('网络不可达', 'Unreachable'),
+      SyncState.serverError => _text('服务器错误', 'Server Error'),
+      SyncState.protocolError => _text('协议错误', 'Protocol Error'),
+      SyncState.authError => _text('认证失败', 'Auth Failed'),
     };
-  }
-
-  bool _isServerPersistenceIssue(String? message) {
-    if (message == null) return false;
-    final normalized = message.toLowerCase();
-    return normalized.contains('vault file is unreadable') ||
-        normalized.contains('failed to persist vault') ||
-        normalized.contains('storage is temporarily unavailable');
   }
 
   ({Color background, Color foreground, IconData icon}) _syncStatusTone(
     BuildContext context,
     SyncState state,
-    String? message,
   ) {
     final theme = Theme.of(context);
-    if (state == SyncState.error) {
-      return (
+    return switch (state) {
+      SyncState.networkUnreachable => (
         background: theme.colorScheme.errorContainer,
         foreground: theme.colorScheme.onErrorContainer,
-        icon: _isServerPersistenceIssue(message)
-            ? Icons.storage_outlined
-            : Icons.error_outline,
-      );
-    }
-    if (state == SyncState.conflictRecovery) {
-      return (
+        icon: Icons.wifi_off_outlined,
+      ),
+      SyncState.serverError => (
+        background: theme.colorScheme.errorContainer,
+        foreground: theme.colorScheme.onErrorContainer,
+        icon: Icons.storage_outlined,
+      ),
+      SyncState.protocolError || SyncState.authError => (
+        background: theme.colorScheme.errorContainer,
+        foreground: theme.colorScheme.onErrorContainer,
+        icon: Icons.error_outline,
+      ),
+      SyncState.conflictRecovery => (
         background: theme.colorScheme.tertiaryContainer,
         foreground: theme.colorScheme.onTertiaryContainer,
         icon: Icons.settings_backup_restore_outlined,
-      );
-    }
-    if (state == SyncState.syncing) {
-      return (
+      ),
+      SyncState.connecting || SyncState.pulling || SyncState.pushing => (
         background: theme.colorScheme.primaryContainer,
         foreground: theme.colorScheme.onPrimaryContainer,
         icon: Icons.sync,
-      );
-    }
-    if (state == SyncState.offline) {
-      return (
+      ),
+      SyncState.offline => (
         background: theme.colorScheme.surfaceContainerHighest,
         foreground: theme.colorScheme.onSurfaceVariant,
         icon: Icons.cloud_off_outlined,
-      );
-    }
-    return (
-      background: theme.colorScheme.secondaryContainer,
-      foreground: theme.colorScheme.onSecondaryContainer,
-      icon: Icons.cloud_done_outlined,
-    );
+      ),
+      SyncState.idle => (
+        background: theme.colorScheme.secondaryContainer,
+        foreground: theme.colorScheme.onSecondaryContainer,
+        icon: Icons.cloud_done_outlined,
+      ),
+    };
   }
 
   String? _syncStatusDescription(
-    SyncState state,
-    String? message, {
+    SyncState state, {
     required bool hasDirtyData,
+    String? statusNote,
   }) {
-    if (state == SyncState.error) {
-      if (_isServerPersistenceIssue(message)) {
-        return _text(
-          '服务器可连接，但同步存储层当前不稳定，请稍后重试或检查服务器数据文件。',
-          'The server is reachable, but its sync storage layer is unhealthy. Retry later or inspect the server vault files.',
-        );
-      }
-      return message;
-    }
     return switch (state) {
+      SyncState.networkUnreachable => _text(
+        '无法连接到同步服务器。请检查服务器地址和网络路径。',
+        'Cannot reach the sync server. Verify the address and network path.',
+      ),
+      SyncState.serverError => _text(
+        '服务器可连接，但同步存储层当前不稳定，请稍后重试或检查服务器数据文件。',
+        'The server is reachable, but its sync storage layer is unhealthy. Retry later or inspect the server vault files.',
+      ),
+      SyncState.protocolError =>
+        statusNote ??
+            _text(
+              '同步协议或数据格式异常。请检查客户端/服务端版本一致性。',
+              'Sync protocol or data format error. Check client/server version compatibility.',
+            ),
+      SyncState.authError =>
+        statusNote ??
+            _text(
+              '身份验证失败。请解锁保险库并确认本地身份。',
+              'Authentication failed. Unlock the vault and verify local identity.',
+            ),
       SyncState.offline => _text(
         '当前未与同步服务器建立连接。',
         'The client is currently not connected to the sync server.',
       ),
-      SyncState.syncing => _text(
+      SyncState.connecting || SyncState.pulling || SyncState.pushing => _text(
         '正在与远程 vault 交换更新。',
         'Changes are currently being exchanged with the remote vault.',
       ),
@@ -149,8 +158,8 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
         '正在处理上一次中断或冲突后的恢复流程。',
         'The client is replaying recovery steps after an interrupted or conflicting sync cycle.',
       ),
-      SyncState.synced =>
-        message ??
+      SyncState.idle =>
+        statusNote ??
             (hasDirtyData
                 ? _text(
                     '本地变更已排队，等待下一次同步上传。',
@@ -160,105 +169,65 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                     '同步状态正常，可随时发起新的同步。',
                     'Sync is healthy and ready for the next exchange.',
                   )),
-      SyncState.error => null,
     };
   }
 
-  String? _syncActionTitle(
-    SyncState state,
-    String? message, {
-    required bool hasDirtyData,
-  }) {
-    if (state == SyncState.error) {
-      if (_isServerPersistenceIssue(message)) {
-        return _text('建议动作', 'Recommended action');
-      }
-      if (message != null &&
-          (message.contains('server address') ||
-              message.contains('LAN IP') ||
-              message.contains('loopback'))) {
-        return _text('先修正地址', 'Fix the server address first');
-      }
-      return _text('建议动作', 'Recommended action');
-    }
-    if (state == SyncState.offline) {
-      return _text('下一步', 'Next step');
-    }
-    if (state == SyncState.conflictRecovery) {
-      return _text('当前策略', 'Current strategy');
-    }
-    if (state == SyncState.synced && hasDirtyData) {
-      return _text('推荐操作', 'Recommended action');
-    }
-    return null;
+  String? _syncActionTitle(SyncState state, {required bool hasDirtyData}) {
+    return switch (state) {
+      SyncState.networkUnreachable ||
+      SyncState.serverError ||
+      SyncState.protocolError ||
+      SyncState.authError => _text('建议动作', 'Recommended action'),
+      SyncState.offline => _text('下一步', 'Next step'),
+      SyncState.conflictRecovery => _text('当前策略', 'Current strategy'),
+      SyncState.idle when hasDirtyData => _text('推荐操作', 'Recommended action'),
+      _ => null,
+    };
   }
 
-  String? _syncActionDetail(
-    SyncState state,
-    String? message, {
-    required bool hasDirtyData,
-  }) {
-    if (state == SyncState.error) {
-      if (_isServerPersistenceIssue(message)) {
-        return _text(
-          '先检查服务端 vault JSON/备份文件是否可读，然后再重试。',
-          'Inspect the server vault JSON and backup files first, then retry sync.',
-        );
-      }
-      if (message != null &&
-          (message.contains('server address') ||
-              message.contains('LAN IP') ||
-              message.contains('loopback'))) {
-        return _text(
-          '打开 Server 设置，改成可达的 URL，手机请使用桌面机 LAN IP。',
-          'Open Server settings and switch to a reachable URL. On phones, use the desktop machine LAN IP.',
-        );
-      }
-      return _text(
+  String? _syncActionDetail(SyncState state, {required bool hasDirtyData}) {
+    return switch (state) {
+      SyncState.networkUnreachable => _text(
+        '打开 Server 设置，改成可达的 URL，手机请使用桌面机 LAN IP。',
+        'Open Server settings and switch to a reachable URL. On phones, use the desktop machine LAN IP.',
+      ),
+      SyncState.serverError => _text(
+        '先检查服务端 vault JSON/备份文件是否可读，然后再重试。',
+        'Inspect the server vault JSON and backup files first, then retry sync.',
+      ),
+      SyncState.protocolError || SyncState.authError => _text(
         '修复提示后再重试 Sync Now，如果重复出现再查看日志。',
         'Retry Sync Now after addressing the issue. If it repeats, inspect the client and server logs.',
-      );
-    }
-    if (state == SyncState.offline) {
-      return _text(
+      ),
+      SyncState.offline => _text(
         '确认服务器地址、网络可达性，然后手动重试一次同步。',
         'Verify the server address and network reachability, then retry one manual sync.',
-      );
-    }
-    if (state == SyncState.conflictRecovery) {
-      return _text(
+      ),
+      SyncState.conflictRecovery => _text(
         '系统会先尝试自动收敛，若仍有冲突，再去冲突收件箱审阅。',
         'Let the automatic recovery finish first. If conflicts remain, review them in the conflict inbox.',
-      );
-    }
-    if (state == SyncState.synced && hasDirtyData) {
-      return _text(
+      ),
+      SyncState.idle when hasDirtyData => _text(
         '本地已有待上传更改，可以现在重试同步或等待下一次自动触发。',
         'There are local changes waiting to upload. Retry sync now or wait for the next automatic run.',
-      );
-    }
-    return null;
+      ),
+      _ => null,
+    };
   }
 
-  bool _showsInlineServerEditAction(SyncState state, String? message) {
-    return state == SyncState.error &&
-        message != null &&
-        (message.contains('server address') ||
-            message.contains('LAN IP') ||
-            message.contains('loopback'));
-  }
+  bool _showsInlineServerEditAction(SyncState state) =>
+      state == SyncState.networkUnreachable;
 
   String _primarySyncActionLabel(
     SyncState state, {
     required bool hasDirtyData,
   }) {
-    if (state == SyncState.error || state == SyncState.offline) {
-      return _text('再试同步', 'Retry Sync');
-    }
-    if (state == SyncState.synced && hasDirtyData) {
-      return _text('立即上传', 'Upload Now');
-    }
-    return _text('立即同步', 'Sync Now');
+    return switch (state) {
+      SyncState.networkUnreachable ||
+      SyncState.offline => _text('再试同步', 'Retry Sync'),
+      SyncState.idle when hasDirtyData => _text('立即上传', 'Upload Now'),
+      _ => _text('立即同步', 'Sync Now'),
+    };
   }
 
   @override
@@ -636,7 +605,10 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
 
     try {
       final session = await _serviceManager.createVaultPairingSession();
-      await Clipboard.setData(ClipboardData(text: session.pairingCode));
+      await SensitiveClipboardService.copy(
+        text: session.pairingCode,
+        level: ClipboardRiskLevel.high,
+      );
       if (!mounted) return;
 
       setState(() {
@@ -931,7 +903,10 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
         password,
         includeData: includeData,
       );
-      await Clipboard.setData(ClipboardData(text: code));
+      await SensitiveClipboardService.copy(
+        text: code,
+        level: ClipboardRiskLevel.high,
+      );
       if (!mounted) return;
 
       messenger.showSnackBar(
@@ -1150,29 +1125,19 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
     final provider = context.read<EnhancedAppProvider>();
     final hasDirtyData = _serviceManager.hasDirtyData;
     final syncState = _serviceManager.syncState;
-    final syncError = _serviceManager.syncErrorMessage;
     final syncNote = _serviceManager.syncStatusNote;
-    final syncMessage = syncNote ?? syncError;
-    final statusTone = _syncStatusTone(context, syncState, syncMessage);
+    final statusTone = _syncStatusTone(context, syncState);
     final statusDescription = _syncStatusDescription(
       syncState,
-      syncMessage,
       hasDirtyData: hasDirtyData,
+      statusNote: syncNote,
     );
-    final actionTitle = _syncActionTitle(
-      syncState,
-      syncMessage,
-      hasDirtyData: hasDirtyData,
-    );
+    final actionTitle = _syncActionTitle(syncState, hasDirtyData: hasDirtyData);
     final actionDetail = _syncActionDetail(
       syncState,
-      syncMessage,
       hasDirtyData: hasDirtyData,
     );
-    final showsInlineServerEditAction = _showsInlineServerEditAction(
-      syncState,
-      syncMessage,
-    );
+    final showsInlineServerEditAction = _showsInlineServerEditAction(syncState);
     final primaryActionLabel = _primarySyncActionLabel(
       syncState,
       hasDirtyData: hasDirtyData,

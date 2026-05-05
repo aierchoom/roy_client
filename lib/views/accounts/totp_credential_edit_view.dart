@@ -13,13 +13,18 @@ import '../../providers/enhanced_app_provider.dart';
 import '../../services/totp_import_service.dart';
 import '../../services/totp_qr_image_import_service.dart';
 import '../../services/totp_service.dart';
+import '../../services/sensitive_clipboard_service.dart';
 import 'totp_qr_scanner_view.dart';
 
 class TotpCredentialEditView extends StatefulWidget {
   final TotpCredential? initial;
   final String? initialAccountId;
 
-  const TotpCredentialEditView({super.key, this.initial, this.initialAccountId});
+  const TotpCredentialEditView({
+    super.key,
+    this.initial,
+    this.initialAccountId,
+  });
 
   @override
   State<TotpCredentialEditView> createState() => _TotpCredentialEditViewState();
@@ -64,9 +69,9 @@ class _TotpCredentialEditViewState extends State<TotpCredentialEditView> {
       setState(() => _configCtrl.text = normalized);
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_totpErrorMessage(error))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_totpErrorMessage(error))));
     }
   }
 
@@ -97,9 +102,9 @@ class _TotpCredentialEditViewState extends State<TotpCredentialEditView> {
       setState(() => _configCtrl.text = normalized);
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_totpErrorMessage(error))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_totpErrorMessage(error))));
     }
   }
 
@@ -127,10 +132,7 @@ class _TotpCredentialEditViewState extends State<TotpCredentialEditView> {
         );
       }
       if (error.message == TotpQrImageImportService.noClipboardImageMessage) {
-        return _text(
-          '剪贴板里没有二维码图片',
-          'There is no QR image on the clipboard.',
-        );
+        return _text('剪贴板里没有二维码图片', 'There is no QR image on the clipboard.');
       }
       if (error.message == TotpQrImageImportService.imageDecodeFailedMessage) {
         return _text('二维码图片无法读取', 'The QR image could not be read.');
@@ -144,11 +146,14 @@ class _TotpCredentialEditViewState extends State<TotpCredentialEditView> {
   }
 
   Future<void> _copyCode(TotpCode code) async {
-    await Clipboard.setData(ClipboardData(text: code.value));
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(_text('验证码已复制', 'Code copied.'))),
+    await SensitiveClipboardService.copy(
+      text: code.value,
+      level: ClipboardRiskLevel.high,
     );
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(_text('验证码已复制', 'Code copied.'))));
   }
 
   void _save() {
@@ -159,9 +164,9 @@ class _TotpCredentialEditViewState extends State<TotpCredentialEditView> {
       );
       config = TotpService.parseConfig(normalized);
     } catch (error) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_totpErrorMessage(error))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_totpErrorMessage(error))));
       return;
     }
 

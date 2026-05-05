@@ -10,7 +10,7 @@ Navigation:
 | Document Type | Project TODO |
 | Scope | Architecture, security, sync, server hardening, testing, documentation, and candidate features |
 | Source Conclusion | [Architecture decision summary](architecture/00-executive-summary.md#decision-summary) |
-| Last Updated | 2026-04-30 |
+| Last Updated | 2026-05-01 |
 
 ## Source Conclusion
 
@@ -44,23 +44,22 @@ Current implemented baseline:
 
 Current code-derived pressure points:
 
-- `SyncService` still exposes broad UI-facing states that mix transport,
-  protocol, persistence, conflict, and recovery meaning.
 - `SecuritySettingsView`, `BiometricAuthService`, and no-password mode still
   need a stronger key-custody design before external security claims.
 - `VaultDumpCoordinator` validates encrypted dumps, but restore confidence,
   test-restore UX, and import sync/outbox semantics need a product-level route.
-- Several sensitive copy paths still use raw `Clipboard.setData`, while TOTP now
-  has a safer service path.
 - Large feature files such as `account_edit_view.dart`, `sync_settings_view.dart`,
   `secure_storage_service.dart`, and `sync_service.dart` remain active
   architecture debt.
 
 Execution queue alignment:
 
-- Near-term execution should continue with `T9` sync status cleanup and `T10`
-  server persistence semantics.
-- New global roadmap items should be tracked as `T12+` in
+- Near-term execution follows stage-based steps in `docs/product/iteration-tasks.md`.
+- Stage 1: T9 sync status cleanup + T12 sensitive clipboard policy.
+- Stage 2: T15 key custody + T16 server auth/diagnostics + T10 server persistence.
+- Stage 3: T14 backup/restore consistency + T13 Vault Health.
+- Stage 4: T17 UI architecture + T18 2FA next phase.
+- New global roadmap items should be tracked as stage steps in
   `docs/product/iteration-tasks.md` rather than scattered in feature notes.
 
 ## Current Product Decision
@@ -213,7 +212,7 @@ Primary outcomes:
   templates, QR export decisions, device time drift hints, and broader
   sensitive clipboard policy after the security and restore roadmap is clear.
 
-## P0 - Security And Correctness
+## P0 - Security And Correctness (Stage 2)
 
 - Add server authentication and authorization for sync and pairing routes before
   any external or public-network Beta claim.
@@ -228,12 +227,16 @@ Primary outcomes:
 - Keep AEAD payload, vault identity, conflict recovery, and two-device baselines
   under regression so these completed foundations do not drift.
 
-## P1 - Runtime Robustness
+## P1 - Runtime Robustness (Stage 1, Stage 3)
 
+### Stage 1 ✅ 已完成
 - Clean up sync status semantics so UI consumes stable states instead of
   inferring internal failures.
-- Strengthen server persistence semantics for validation, atomic writes,
-  duplicate requests, idempotency, and error classification.
+- Extend sensitive clipboard cleanup beyond TOTP codes to generated passwords,
+  account detail copy, pairing codes, and recovery codes where appropriate.
+- 结果：`flutter test` 120 passed / 1 skipped；`dart analyze` 0 issues。
+
+### Stage 3
 - Add structured diagnostics for unlock, encryption, sync, conflict recovery,
   server health, and import/export flows.
 - Build a visible vault health surface for encryption state, backup age,
@@ -244,15 +247,15 @@ Primary outcomes:
 - Rebuild import/outbox semantics so vault dump restore does not silently mark
   unsafe local state as synchronized when the source state should remain
   reviewable.
-- Extend sensitive clipboard cleanup beyond TOTP codes to generated passwords,
-  account detail copy, pairing codes, and recovery codes where appropriate.
+- Strengthen server persistence semantics for validation, atomic writes,
+  duplicate requests, idempotency, and error classification.
+- Add sync server setup guidance in the client: URL validation, health result, data safety notes, and first-sync confirmation.
+- Add server-side diagnostics that are safe to display or copy without leaking vault secrets.
 - Keep reducing oversized service and view files into focused modules where
   responsibility boundaries are clear.
 - Add architecture README files for new subsystem folders when they become canonical extension points.
-- Add sync server setup guidance in the client: URL validation, health result, data safety notes, and first-sync confirmation.
-- Add server-side diagnostics that are safe to display or copy without leaking vault secrets.
 
-## P2 - Product And Feature Evolution
+## P2 - Product And Feature Evolution (Stage 4)
 
 - Add TOTP QR export decisions, recovery-code templates, and device time drift
   hints after the completed manual and QR-import TOTP paths remain stable.

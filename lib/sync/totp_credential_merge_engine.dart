@@ -25,10 +25,7 @@ class TotpCredentialMergeEngine {
     );
   }
 
-  static bool _remoteDeleteWins(
-    TotpCredential local,
-    TotpCredential remote,
-  ) {
+  static bool _remoteDeleteWins(TotpCredential local, TotpCredential remote) {
     final localDelete = local.deleteHlc;
     final remoteDelete = remote.deleteHlc;
     if (remoteDelete == null) return false;

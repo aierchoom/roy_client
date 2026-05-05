@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
+import 'package:secret_roy/core/app_logger.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -17,7 +18,26 @@ import 'crdt_merge_engine.dart';
 import 'sync_payload_codec.dart';
 import 'totp_credential_merge_engine.dart';
 
-enum SyncState { offline, syncing, synced, error, conflictRecovery }
+enum SyncState {
+  offline,
+  connecting,
+  pulling,
+  pushing,
+  idle,
+  conflictRecovery,
+  networkUnreachable,
+  serverError,
+  protocolError,
+  authError,
+}
+
+extension _SyncStateExt on SyncState {
+  bool get isError =>
+      this == SyncState.networkUnreachable ||
+      this == SyncState.serverError ||
+      this == SyncState.protocolError ||
+      this == SyncState.authError;
+}
 
 class SyncConfig {
   final String serverUrl;
@@ -101,6 +121,7 @@ class SyncService extends ChangeNotifier {
   int _queuedConflictCount = 0;
   String? _queuedConflictNotice;
   _SyncRecoveryMarker? _pendingRecovery;
+  bool _disposed = false;
 
   SyncService({
     required SecureStorageService storageService,
@@ -115,11 +136,16 @@ class SyncService extends ChangeNotifier {
   String? get statusNote => _statusNote;
   DateTime? get lastSyncTime => _lastSyncTime;
   bool get isConnected =>
-      _state == SyncState.synced ||
-      _state == SyncState.syncing ||
+      _state == SyncState.idle ||
+      _state == SyncState.connecting ||
+      _state == SyncState.pulling ||
+      _state == SyncState.pushing ||
       _state == SyncState.conflictRecovery;
   bool get isSyncing =>
-      _state == SyncState.syncing || _state == SyncState.conflictRecovery;
+      _state == SyncState.connecting ||
+      _state == SyncState.pulling ||
+      _state == SyncState.pushing ||
+      _state == SyncState.conflictRecovery;
   int get localVersion => _localVersion;
   bool get isDirty => _isDirty;
 
@@ -170,7 +196,7 @@ class SyncService extends ChangeNotifier {
     await _storageService.ensurePendingSyncOutboxEntries(vaultId);
     await _loadRecoveryMarker(vaultId);
 
-    debugPrint('[Sync] Initialized. Vault: $vaultId, Version: $_localVersion');
+    AppLogger.d('[Sync] Initialized. Vault: $vaultId, Version: $_localVersion');
   }
 
   Future<void> markDirty() async {
@@ -228,6 +254,7 @@ class SyncService extends ChangeNotifier {
     final serverUrl = await _getSyncServerUrl();
     if (serverUrl.isEmpty) {
       _setError(
+        SyncState.networkUnreachable,
         'Sync server URL not configured.',
         statusNote: 'Set a sync server address before trying again.',
       );
@@ -235,6 +262,7 @@ class SyncService extends ChangeNotifier {
     }
     if (!_identityService.hasIdentity) {
       _setError(
+        SyncState.authError,
         'Identity not established.',
         statusNote:
             'Unlock the vault and recreate local identity before syncing.',
@@ -243,6 +271,7 @@ class SyncService extends ChangeNotifier {
     }
     if (_isMobileLoopbackUrl(serverUrl)) {
       _setError(
+        SyncState.networkUnreachable,
         'Mobile clients cannot use loopback sync URLs.',
         statusNote:
             'Replace localhost or 127.0.0.1 with the desktop machine LAN IP.',
@@ -283,10 +312,12 @@ class SyncService extends ChangeNotifier {
       var retries = 0;
       while (retries < 3) {
         try {
-          _updateState(SyncState.syncing);
+          _updateState(SyncState.connecting);
           await _writeRecoveryMarker(_SyncRecoveryPhase.pull);
+          _updateState(SyncState.pulling);
           final pullCount = await _runPullPhase(serverUrl);
           await _writeRecoveryMarker(_SyncRecoveryPhase.push);
+          _updateState(SyncState.pushing);
           final pushCount = await _runPushPhase(serverUrl);
 
           await _recordSyncTime();
@@ -310,7 +341,7 @@ class SyncService extends ChangeNotifier {
                   pushed: pushCount > 0,
                   notice: _queuedConflictNotice,
                 );
-          _updateState(SyncState.synced);
+          _updateState(SyncState.idle);
 
           return SyncResult.success(
             pulled: recoveredCount > 0 || pullCount > 0,
@@ -334,6 +365,7 @@ class SyncService extends ChangeNotifier {
       }
 
       _setError(
+        SyncState.protocolError,
         'Max retries exceeded! Last Server Reject: $_lastConflictMsg',
         statusNote:
             'Conflict recovery did not converge automatically. Review the conflict inbox before retrying.',
@@ -348,7 +380,7 @@ class SyncService extends ChangeNotifier {
     if (e is SocketException || e is TimeoutException) {
       _statusNote =
           'Cannot reach the sync server. Verify the address and network path.';
-      _updateState(SyncState.offline);
+      _updateState(SyncState.networkUnreachable);
       return SyncResult.failure('offline');
     }
 
@@ -360,37 +392,56 @@ class SyncService extends ChangeNotifier {
           message.contains('OS Error')) {
         _statusNote =
             'Network unreachable. Sync will retry when connection is restored.';
-        _updateState(SyncState.offline);
+        _updateState(SyncState.networkUnreachable);
         return SyncResult.failure('offline');
       }
 
       if (_looksLikeCleartextBlock(message)) {
         _setError(
+          SyncState.protocolError,
           'Cleartext HTTP blocked: $message',
           statusNote:
               'Use HTTPS or allow local HTTP traffic for this device build.',
         );
         return SyncResult.failure('cleartext_blocked');
       }
-      _setError('Sync failed: $message', statusNote: message);
+      _setError(
+        SyncState.networkUnreachable,
+        'Sync failed: $message',
+        statusNote: message,
+      );
       return SyncResult.failure(message);
     }
 
     if (e is _SyncHttpException) {
       if (e.conflictType == 'invalid_payload') {
         _setError(
+          SyncState.protocolError,
           'Sync payload rejected: ${e.logMessage}',
           statusNote:
               'The sync server rejected a local encrypted payload. Reopen the item and retry; inspect client logs if it repeats.',
         );
         return SyncResult.failure(e.userMessage);
       }
-      _setError('Sync failed: ${e.logMessage}', statusNote: e.userMessage);
+      if (e.statusCode >= 500) {
+        _setError(
+          SyncState.serverError,
+          'Sync failed: ${e.logMessage}',
+          statusNote: e.userMessage,
+        );
+      } else {
+        _setError(
+          SyncState.protocolError,
+          'Sync failed: ${e.logMessage}',
+          statusNote: e.userMessage,
+        );
+      }
       return SyncResult.failure(e.userMessage);
     }
 
     if (e is _SyncProtocolException) {
       _setError(
+        SyncState.protocolError,
         'Sync protocol invalid: ${e.message}',
         statusNote:
             'The sync server returned data this client could not safely process. Check server version and logs.',
@@ -400,6 +451,7 @@ class SyncService extends ChangeNotifier {
 
     if (e is SyncPayloadException) {
       _setError(
+        SyncState.protocolError,
         'Sync payload invalid: ${e.message}',
         statusNote:
             'The remote payload could not be verified. Check key consistency across devices.',
@@ -408,10 +460,9 @@ class SyncService extends ChangeNotifier {
     }
 
     // Default fallback for unexpected errors
-    if (kDebugMode) {
-      debugPrint('Sync loop failed: $e\n$stack');
-    }
+    AppLogger.d('Sync loop failed: $e\n$stack');
     _setError(
+      SyncState.protocolError,
       'Sync failed: $e',
       statusNote:
           'An unexpected sync error occurred. Retry and inspect client/server logs if it repeats.',
@@ -472,27 +523,37 @@ class SyncService extends ChangeNotifier {
   }) async {
     final vaultId = _identityService.vaultId;
     final url = '$serverUrl/vaults/$vaultId/sync?since=$since';
+    final headers = <String, String>{};
+    final token = _identityService.vaultApiToken;
+    if (token != null && token.isNotEmpty) {
+      headers['X-Vault-Token'] = token;
+    }
 
     final response = await http
-        .get(Uri.parse(url))
+        .get(Uri.parse(url), headers: headers)
         .timeout(const Duration(seconds: 10));
     if (response.statusCode == 304) {
       return {'max_version': since, 'items': const <dynamic>[]};
     }
     _throwIfSyncHttpError(response, phase: 'pull');
 
+    final newToken = response.headers['x-vault-token'];
+    if (newToken != null && newToken.isNotEmpty) {
+      await _identityService.setVaultApiToken(newToken);
+    }
+
     return _decodeSyncResponse(response, phase: 'pull');
   }
 
   Future<int> _runPullPhase(String serverUrl) async {
     final vaultId = _identityService.vaultId;
-    debugPrint(
+    AppLogger.d(
       '[Sync] >>> Pull Phase Start (Vault: $vaultId, Since: $_localVersion)',
     );
 
     final data = await _fetchRemoteChanges(serverUrl, since: _localVersion);
     final mergedCount = await _applyRemoteChanges(data);
-    debugPrint(
+    AppLogger.d(
       '[Sync] <<< Pull Phase Completed. Processed: $mergedCount, Version: $_localVersion',
     );
     return mergedCount;
@@ -592,7 +653,7 @@ class SyncService extends ChangeNotifier {
     final itemsList = _readRemoteItems(data);
     final vaultId = _identityService.vaultId;
 
-    debugPrint(
+    AppLogger.d(
       '[Sync] Received ${itemsList.length} items. Server Max Version: $maxVersion',
     );
 
@@ -822,7 +883,7 @@ class SyncService extends ChangeNotifier {
       return 0;
     }
 
-    debugPrint(
+    AppLogger.d(
       '[Sync] Recovering interrupted ${marker.phase.name} phase from version ${marker.localVersion}.',
     );
     final recoveredCount = marker.phase == _SyncRecoveryPhase.pull
@@ -1114,7 +1175,7 @@ class SyncService extends ChangeNotifier {
       if (allPendingAccounts.isNotEmpty ||
           allDirtyTotpCredentials.isNotEmpty ||
           approvedChanges.isNotEmpty) {
-        debugPrint(
+        AppLogger.d(
           '[Sync] Push Phase: local changes exist, but none are approved and pushable.',
         );
       }
@@ -1131,7 +1192,7 @@ class SyncService extends ChangeNotifier {
         .toList(growable: false);
     await _storageService.markLocalSyncChangesPushing(pushingChangeIds);
 
-    debugPrint(
+    AppLogger.d(
       '[Sync] >>> Push Phase Start. Items to push: ${dirtyItems.length}',
     );
     final pushPayloads = await Future.wait(
@@ -1149,10 +1210,16 @@ class SyncService extends ChangeNotifier {
 
     late final Map<String, int> acceptedVersionByItemId;
     try {
+      final headers = <String, String>{'Content-Type': 'application/json'};
+      final token = _identityService.vaultApiToken;
+      if (token != null && token.isNotEmpty) {
+        headers['X-Vault-Token'] = token;
+      }
+
       final response = await http
           .post(
             Uri.parse('$serverUrl/vaults/$vaultId/sync'),
-            headers: {'Content-Type': 'application/json'},
+            headers: headers,
             body: jsonEncode({'pushes': pushPayloads}),
           )
           .timeout(const Duration(seconds: 15));
@@ -1165,6 +1232,11 @@ class SyncService extends ChangeNotifier {
         throw _ConflictException(response.body);
       }
       _throwIfSyncHttpError(response, phase: 'push');
+
+      final newToken = response.headers['x-vault-token'];
+      if (newToken != null && newToken.isNotEmpty) {
+        await _identityService.setVaultApiToken(newToken);
+      }
 
       final respData = _decodeSyncResponse(response, phase: 'push');
       final acceptedVersions = _readAcceptedVersions(respData);
@@ -1205,7 +1277,7 @@ class SyncService extends ChangeNotifier {
       _syncVersionKey(_identityService.vaultId),
       '$_localVersion',
     );
-    debugPrint(
+    AppLogger.d(
       '[Sync] <<< Push Phase Completed. Success items: ${acceptedVersionByItemId.length}',
     );
     return acceptedVersionByItemId.length;
@@ -1469,7 +1541,7 @@ class SyncService extends ChangeNotifier {
       url = url.substring(0, url.length - 1);
     }
     if (!url.startsWith('http')) {
-      url = 'http://$url';
+      url = 'https://$url';
     }
     return url;
   }
@@ -1487,7 +1559,7 @@ class SyncService extends ChangeNotifier {
     final legacyValue = await _storageService.getSetting(legacyKey);
     if (legacyValue != null) {
       await _storageService.setSetting(scopedKey, legacyValue);
-      debugPrint(
+      AppLogger.d(
         '[Sync] Migrated $legacyKey to $scopedKey for vault $vaultId.',
       );
       return legacyValue;
@@ -1570,20 +1642,22 @@ class SyncService extends ChangeNotifier {
 
   void _updateState(SyncState newState) {
     _state = newState;
-    if (newState != SyncState.error) {
+    if (!newState.isError) {
       _errorMessage = null;
     }
-    notifyListeners();
+    if (!_disposed) notifyListeners();
   }
 
-  void _setError(String message, {String? statusNote}) {
+  void _setError(SyncState errorState, String message, {String? statusNote}) {
+    assert(errorState.isError);
     _statusNote = statusNote ?? message;
     _errorMessage = message;
-    _updateState(SyncState.error);
+    _updateState(errorState);
   }
 
   @override
   void dispose() {
+    _disposed = true;
     _stopPeriodicSync();
     super.dispose();
   }

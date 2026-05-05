@@ -75,7 +75,11 @@ void main() {
               ),
             )
             as Map<String, dynamic>;
-    envelope['ciphertext'] = '${envelope['ciphertext']}tampered';
+    final cipherBytes = base64Url.decode(
+      base64Url.normalize(envelope['ciphertext'] as String),
+    );
+    cipherBytes[0] = cipherBytes[0] ^ 0xFF; // Flip all bits of first byte
+    envelope['ciphertext'] = base64UrlEncode(cipherBytes).replaceAll('=', '');
     final tampered =
         '${SyncPayloadCodec.prefix}${base64UrlEncode(utf8.encode(jsonEncode(envelope))).replaceAll('=', '')}';
 

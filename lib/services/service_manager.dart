@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:secret_roy/core/app_logger.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -53,11 +54,17 @@ class ServiceManager extends ChangeNotifier {
   AutoLockObserver? _autoLockObserver;
   VoidCallback? _autoLockListener;
   final Map<String, VaultPairingKeyPair> _vaultPairingJoinKeysByRequestId = {};
+  bool _disposed = false;
+
+  void _notify() {
+    if (_disposed) return;
+    notifyListeners();
+  }
 
   ServiceManager._internal() {
     const secureStorage = FlutterSecureStorage();
     _cryptoService = EnhancedCryptoService(secureStorage: secureStorage);
-    _biometricService = BiometricAuthService(secureStorage: secureStorage);
+    _biometricService = BiometricAuthService();
     _autoLockService = AutoLockService(
       cryptoService: _cryptoService,
       secureStorage: secureStorage,
@@ -174,19 +181,15 @@ class ServiceManager extends ChangeNotifier {
       _updateState(ServiceManagerState.unlocked);
       return UnlockResult.success;
     } on IdentityCorruptedException catch (e, stack) {
-      if (kDebugMode) {
-        debugPrint('Failed to unlock because identity is corrupted: $e');
-        debugPrint(stack.toString());
-      }
+      AppLogger.d('Failed to unlock because identity is corrupted: $e');
+      AppLogger.d(stack.toString());
       _setError(
         'Vault identity is missing or damaged. Use a recovery route or reset the local vault before continuing. $e',
       );
       return UnlockResult.error;
     } catch (e, stack) {
-      if (kDebugMode) {
-        debugPrint('Failed to unlock with password: $e');
-        debugPrint(stack.toString());
-      }
+      AppLogger.d('Failed to unlock with password: $e');
+      AppLogger.d(stack.toString());
       _setError('Unlock failed: $e');
       return UnlockResult.error;
     }
@@ -231,9 +234,7 @@ class ServiceManager extends ChangeNotifier {
     try {
       await _secureStorageService.close();
     } catch (e) {
-      if (kDebugMode) {
-        debugPrint('Failed to close encrypted storage while locking: $e');
-      }
+      AppLogger.d('Failed to close encrypted storage while locking: $e');
     } finally {
       _secureStorageService.clearDatabaseCipher();
     }
@@ -247,6 +248,9 @@ class ServiceManager extends ChangeNotifier {
   Future<void> enableNoPasswordMode() async {
     const secureStorage = FlutterSecureStorage();
     await secureStorage.write(key: 'no_password_mode', value: 'true');
+    // Biometric unlock with an empty password offers no security benefit;
+    // disable it when entering no-password mode.
+    await disableBiometric();
     await unlockWithPassword('');
   }
 
@@ -307,6 +311,9 @@ class ServiceManager extends ChangeNotifier {
   }
 
   Future<BiometricSetupResult> enableBiometric(String currentPassword) async {
+    if (await isNoPasswordMode()) {
+      return BiometricSetupResult.noPasswordMode;
+    }
     final isValidPassword = await _cryptoService.verifyMasterPassword(
       currentPassword,
     );
@@ -979,12 +986,21 @@ class ServiceManager extends ChangeNotifier {
     return ServiceManagerPasswordTools.getPasswordStrengthLevel(score);
   }
 
+  static const int passwordStrengthThresholdVeryStrong =
+      EnhancedCryptoService.strengthThresholdVeryStrong;
+  static const int passwordStrengthThresholdStrong =
+      EnhancedCryptoService.strengthThresholdStrong;
+  static const int passwordStrengthThresholdMedium =
+      EnhancedCryptoService.strengthThresholdMedium;
+  static const int passwordStrengthThresholdWeak =
+      EnhancedCryptoService.strengthThresholdWeak;
+
   void _updateState(ServiceManagerState newState) {
     _state = newState;
     if (newState != ServiceManagerState.error) {
       _errorMessage = null;
     }
-    notifyListeners();
+    _notify();
   }
 
   void _setError(String message) {
@@ -994,6 +1010,7 @@ class ServiceManager extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     disposeLifecycleObserver();
     _autoLockService.dispose();
     _syncService.dispose();

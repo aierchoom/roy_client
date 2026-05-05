@@ -1,6 +1,6 @@
 # SecretRoy Beta 风险清单
 
-> 2026-04-30 delta: Local SQLite at-rest encryption and sync payload AEAD are both implemented. The external security Beta blockers have moved to server authentication/authorization, transport hardening, biometric/no-password key custody, and runtime protection while the vault is unlocked.
+> 2026-05-01 delta: T12 (sensitive clipboard policy) and T9 (sync state machine cleanup) completed. Clipboard now uses risk-level-based cleanup with hash-based protection against overwriting user-subsequent copies. Sync state expanded from 5 ambiguous states to 10 precise states; UI no longer parses error message strings. External security Beta blockers remain server authentication/authorization, transport hardening, biometric/no-password key custody, and runtime protection.
 
 更新日期：2026-04-30
 
@@ -45,6 +45,45 @@
 | P2 | 已缓解 | 密钥恢复入口和文案混用“链接码 / 转移码 / 配对码” | 用户可能误把内部兼容码当作恢复能力，或在错误场景覆盖本地数据 | 已新增恢复路线矩阵，UI 区分面对面链接、远程配对、离线恢复码、内部兼容码 |
 | P2 | 未关闭 | 缺少端到端集成测试 | 回归主要依赖局部单测与静态检查 | 下一轮建议补齐 |
 | P3 | 未关闭 | 服务端仍保留未使用依赖 `sqlite3` / `ws` | 增加维护噪音 | 可后续清理 |
+
+## Stage 1 新增已关闭风险
+
+### T12. 敏感复制策略不一致
+
+位置：
+- `roy_client/lib/services/sensitive_clipboard_service.dart`
+- `roy_client/lib/widgets/password_generator_sheet.dart`
+- `roy_client/lib/views/sync_settings_view.dart`
+- `roy_client/lib/widgets/account_list_tile.dart`
+- `roy_client/lib/views/accounts/account_edit_view.dart`
+- `roy_client/lib/views/accounts/totp_account_list_view.dart`
+- `roy_client/lib/views/accounts/totp_credential_edit_view.dart`
+
+原问题：
+- 只有 TOTP 验证码复制使用自动清理；密码生成器、账号详情复制、配对码、恢复码等仍直接调用 `Clipboard.setData`，敏感内容长期停留在系统剪贴板。
+
+当前处理：
+- `SensitiveClipboardService` 重构为支持 `high`/`medium`/`low` 风险等级。
+- `high` 风险（密码、配对码、恢复码、TOTP）默认 45 秒后自动清理。
+- 新增 SHA-256 hash 比对：清理前检查剪贴板当前内容是否仍为原写入内容，避免误删用户后续复制。
+- 7 个文件中的 10 处 raw `Clipboard.setData` 全部替换为统一策略。
+
+### T9. 同步状态机语义模糊
+
+位置：
+- `roy_client/lib/sync/sync_service.dart`
+- `roy_client/lib/views/sync_settings_view.dart`
+
+原问题：
+- `SyncState` 只有 5 个值，`error` 混合了网络超时、协议解析失败、payload 篡改、服务器 503 等完全不同的失败语义。
+- UI 被迫通过解析 `syncErrorMessage` 字符串（`message.contains('vault file is unreadable')`、`message.contains('server address')` 等）来猜测内部失败原因。
+
+当前处理：
+- `SyncState` 扩展为 10 个精确状态：`offline`, `connecting`, `pulling`, `pushing`, `idle`, `conflictRecovery`, `networkUnreachable`, `serverError`, `protocolError`, `authError`。
+- `_setError` 改为接收 typed `SyncState`，错误分类内聚在状态机。
+- `sync_settings_view.dart` 删除所有 `message.contains(...)` 分支，UI 纯按 `SyncState` exhaustive switch 路由。
+
+---
 
 ## 本次已关闭或显著缓解的风险
 

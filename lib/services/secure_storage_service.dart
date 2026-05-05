@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:secret_roy/core/app_logger.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
@@ -36,7 +37,7 @@ class SecureStorageService {
 
   DatabaseFileCipher? _databaseCipher;
 
-  dynamic _database;
+  Database? _database;
   StreamController<StorageChangeEvent> _changeController =
       StreamController<StorageChangeEvent>.broadcast();
 
@@ -105,9 +106,7 @@ class SecureStorageService {
         _encryptedDatabasePath!,
       );
       await _deleteWorkingDatabase();
-      if (kDebugMode) {
-        debugPrint('Failed to open database safely: $e');
-      }
+      AppLogger.d('Failed to open database safely: $e');
       throw StorageOpenException(
         originalError: e.toString(),
         backupPath: backupPath,
@@ -186,9 +185,9 @@ class SecureStorageService {
       await _deleteCorruptBackups(_encryptedDatabasePath!);
       await _deleteCorruptBackups(_legacyDatabasePath!);
       clearDatabaseCipher();
-      debugPrint('[Storage] Encrypted database files deleted manually.');
+      AppLogger.d('[Storage] Encrypted database files deleted manually.');
     } catch (e) {
-      debugPrint('[Storage] Failed to delete database file: $e');
+      AppLogger.d('[Storage] Failed to delete database file: $e');
     }
   }
 
@@ -208,9 +207,7 @@ class SecureStorageService {
         ),
       );
     } catch (e) {
-      if (kDebugMode) {
-        debugPrint('Failed to clear all data: $e');
-      }
+      AppLogger.d('Failed to clear all data: $e');
       rethrow;
     }
   }
@@ -309,9 +306,7 @@ class SecureStorageService {
       await dbFile.copy(backupPath);
       return backupPath;
     } catch (e) {
-      if (kDebugMode) {
-        debugPrint('Failed to back up unreadable database: $e');
-      }
+      AppLogger.d('Failed to back up unreadable database: $e');
       return null;
     }
   }
@@ -391,9 +386,7 @@ class SecureStorageService {
     try {
       await _database!.execute(sql);
     } catch (e) {
-      if (kDebugMode) {
-        debugPrint('Failed to apply SQLite pragma "$sql": $e');
-      }
+      AppLogger.d('Failed to apply SQLite pragma "$sql": $e');
     }
   }
 
@@ -402,9 +395,7 @@ class SecureStorageService {
     try {
       await _database!.rawQuery('PRAGMA wal_checkpoint(TRUNCATE)');
     } catch (e) {
-      if (kDebugMode) {
-        debugPrint('Failed to checkpoint runtime database: $e');
-      }
+      AppLogger.d('Failed to checkpoint runtime database: $e');
     }
   }
 
@@ -735,10 +726,8 @@ class SecureStorageService {
       );
       return rows.map(_mapToAccountItem).whereType<AccountItem>().toList();
     } catch (e, stack) {
-      if (kDebugMode) {
-        debugPrint('Failed to load accounts: $e');
-        debugPrint(stack.toString());
-      }
+      AppLogger.d('Failed to load accounts: $e');
+      AppLogger.d(stack.toString());
       return [];
     }
   }
@@ -754,9 +743,7 @@ class SecureStorageService {
       );
       return rows.map(_mapToAccountItem).whereType<AccountItem>().toList();
     } catch (e) {
-      if (kDebugMode) {
-        debugPrint('Failed to load pending sync accounts: $e');
-      }
+      AppLogger.d('Failed to load pending sync accounts: $e');
       return [];
     }
   }
@@ -778,9 +765,7 @@ class SecureStorageService {
       }
       return _mapToAccountItem(rows.first);
     } catch (e) {
-      if (kDebugMode) {
-        debugPrint('Failed to load account by id: $e');
-      }
+      AppLogger.d('Failed to load account by id: $e');
       return null;
     }
   }
@@ -917,7 +902,7 @@ class SecureStorageService {
           .whereType<TotpCredential>()
           .toList();
     } catch (e) {
-      if (kDebugMode) debugPrint('Failed to load TOTP credentials: $e');
+      AppLogger.d('Failed to load TOTP credentials: $e');
       return [];
     }
   }
@@ -936,7 +921,7 @@ class SecureStorageService {
           .whereType<TotpCredential>()
           .toList();
     } catch (e) {
-      if (kDebugMode) debugPrint('Failed to load dirty TOTP credentials: $e');
+      AppLogger.d('Failed to load dirty TOTP credentials: $e');
       return [];
     }
   }
@@ -957,7 +942,7 @@ class SecureStorageService {
       if (rows.isEmpty) return null;
       return _mapToTotpCredential(rows.first);
     } catch (e) {
-      if (kDebugMode) debugPrint('Failed to load TOTP credential by id: $e');
+      AppLogger.d('Failed to load TOTP credential by id: $e');
       return null;
     }
   }
@@ -1069,7 +1054,7 @@ class SecureStorageService {
       );
       return Sqflite.firstIntValue(rows) ?? 0;
     } catch (e) {
-      if (kDebugMode) debugPrint('Failed to count accounts by template: $e');
+      AppLogger.d('Failed to count accounts by template: $e');
       return 0;
     }
   }
@@ -1162,7 +1147,7 @@ class SecureStorageService {
             : null,
       );
     } catch (e) {
-      if (kDebugMode) debugPrint('Skipping unreadable account row: $e');
+      AppLogger.d('Skipping unreadable account row: $e');
       return null;
     }
   }
@@ -1204,7 +1189,7 @@ class SecureStorageService {
         'deleteHlc': row['delete_hlc'],
       });
     } catch (e) {
-      if (kDebugMode) debugPrint('Skipping unreadable TOTP credential row: $e');
+      AppLogger.d('Skipping unreadable TOTP credential row: $e');
       return null;
     }
   }
@@ -1232,7 +1217,7 @@ class SecureStorageService {
           .whereType<AccountTemplate>()
           .toList();
     } catch (e) {
-      if (kDebugMode) debugPrint('Failed to load templates: $e');
+      AppLogger.d('Failed to load templates: $e');
       return [];
     }
   }
@@ -1250,7 +1235,7 @@ class SecureStorageService {
           .whereType<AccountTemplate>()
           .toList();
     } catch (e) {
-      if (kDebugMode) debugPrint('Failed to load dirty templates: $e');
+      AppLogger.d('Failed to load dirty templates: $e');
       return [];
     }
   }
@@ -1399,7 +1384,7 @@ class SecureStorageService {
             : null,
       );
     } catch (e) {
-      if (kDebugMode) debugPrint('Skipping unreadable template row: $e');
+      AppLogger.d('Skipping unreadable template row: $e');
       return null;
     }
   }
@@ -1514,9 +1499,7 @@ class SecureStorageService {
         ),
       );
     } catch (e) {
-      if (kDebugMode) {
-        debugPrint('Failed to record local sync change: $e');
-      }
+      AppLogger.d('Failed to record local sync change: $e');
       rethrow;
     }
   }
@@ -1583,9 +1566,7 @@ class SecureStorageService {
         );
       }
     } catch (e) {
-      if (kDebugMode) {
-        debugPrint('Failed to ensure pending sync outbox entries: $e');
-      }
+      AppLogger.d('Failed to ensure pending sync outbox entries: $e');
     }
   }
 
@@ -1634,9 +1615,7 @@ class SecureStorageService {
       );
       return rows.map(LocalSyncChange.fromDatabaseRow).toList();
     } catch (e) {
-      if (kDebugMode) {
-        debugPrint('Failed to load local sync changes: $e');
-      }
+      AppLogger.d('Failed to load local sync changes: $e');
       return [];
     }
   }
@@ -1654,9 +1633,7 @@ class SecureStorageService {
       );
       return rows.map(LocalSyncChange.fromDatabaseRow).toList();
     } catch (e) {
-      if (kDebugMode) {
-        debugPrint('Failed to load approved local sync changes: $e');
-      }
+      AppLogger.d('Failed to load approved local sync changes: $e');
       return [];
     }
   }
@@ -1673,9 +1650,7 @@ class SecureStorageService {
       if (rows.isEmpty) return null;
       return LocalSyncChange.fromDatabaseRow(rows.first);
     } catch (e) {
-      if (kDebugMode) {
-        debugPrint('Failed to load local sync change: $e');
-      }
+      AppLogger.d('Failed to load local sync change: $e');
       return null;
     }
   }

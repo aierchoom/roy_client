@@ -11,11 +11,17 @@ class AppThemeProvider extends ChangeNotifier {
   ThemeMode _themeMode = ThemeMode.system;
   Color _colorSeed = AppBrandColors.defaultSeed;
   bool _trueBlack = false;
+  bool _disposed = false;
 
   final SharedPreferences _prefs;
 
   AppThemeProvider(this._prefs) {
     _loadFromPrefs();
+  }
+
+  void _notify() {
+    if (_disposed) return;
+    notifyListeners();
   }
 
   ThemeMode get themeMode => _themeMode;
@@ -31,27 +37,33 @@ class AppThemeProvider extends ChangeNotifier {
     _colorSeed = Color(colorValue);
 
     _trueBlack = _prefs.getBool(_keyTrueBlack) ?? false;
-    notifyListeners();
+    _notify();
   }
 
   void setThemeMode(ThemeMode mode) {
     if (_themeMode == mode) return;
     _themeMode = mode;
     _prefs.setInt(_keyThemeMode, mode.index);
-    notifyListeners();
+    _notify();
   }
 
   void setColorSeed(Color color) {
     if (_colorSeed.toARGB32() == color.toARGB32()) return;
     _colorSeed = color;
     _prefs.setInt(_keyColorSeed, color.toARGB32());
-    notifyListeners();
+    _notify();
   }
 
   void setTrueBlack(bool value) {
     if (_trueBlack == value) return;
     _trueBlack = value;
     _prefs.setBool(_keyTrueBlack, value);
-    notifyListeners();
+    _notify();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
 }

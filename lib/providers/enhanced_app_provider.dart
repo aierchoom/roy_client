@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:secret_roy/core/app_logger.dart';
 
 import '../models/account_item.dart';
 import '../models/account_template.dart';
@@ -23,10 +24,16 @@ class EnhancedAppProvider extends ChangeNotifier {
   bool _isLoading = false;
   int _conflictCount = 0;
   StreamSubscription<StorageChangeEvent>? _storageSubscription;
+  bool _disposed = false;
 
   EnhancedAppProvider(this._storageService, this._serviceManager) {
     _init();
     _serviceManager.addListener(_onServiceManagerStateChanged);
+  }
+
+  void _notify() {
+    if (_disposed) return;
+    notifyListeners();
   }
 
   List<AccountTemplate> get allTemplates => [
@@ -90,9 +97,7 @@ class EnhancedAppProvider extends ChangeNotifier {
       await _loadData();
       _storageSubscription = _storageService.onChange.listen(_onStorageChange);
     } catch (e) {
-      if (kDebugMode) {
-        debugPrint('Failed to initialize app provider: $e');
-      }
+      AppLogger.d('Failed to initialize app provider: $e');
     } finally {
       _setLoading(false);
     }
@@ -118,7 +123,7 @@ class EnhancedAppProvider extends ChangeNotifier {
       count += logs.length;
     }
     _conflictCount = count;
-    notifyListeners();
+    _notify();
   }
 
   void _onServiceManagerStateChanged() {
@@ -133,7 +138,7 @@ class EnhancedAppProvider extends ChangeNotifier {
     _customTemplates = [];
     _totpCredentials = [];
     _localSyncChanges = [];
-    notifyListeners();
+    _notify();
   }
 
   void _onStorageChange(StorageChangeEvent event) {
@@ -146,7 +151,7 @@ class EnhancedAppProvider extends ChangeNotifier {
     _customTemplates = [];
     _totpCredentials = [];
     _localSyncChanges = [];
-    notifyListeners();
+    _notify();
 
     await _loadData();
     _setLoading(false);
@@ -154,12 +159,12 @@ class EnhancedAppProvider extends ChangeNotifier {
 
   void setSearchQuery(String query) {
     _searchQuery = query;
-    notifyListeners();
+    _notify();
   }
 
   void clearSearch() {
     _searchQuery = '';
-    notifyListeners();
+    _notify();
   }
 
   void toggleTag(String templateId) {
@@ -168,18 +173,18 @@ class EnhancedAppProvider extends ChangeNotifier {
     } else {
       _selectedTags.add(templateId);
     }
-    notifyListeners();
+    _notify();
   }
 
   void setTags(Set<String> tags) {
     _selectedTags = Set<String>.from(tags);
-    notifyListeners();
+    _notify();
   }
 
   void clearFilters() {
     _searchQuery = '';
     _selectedTags.clear();
-    notifyListeners();
+    _notify();
   }
 
   Future<void> addAccount(AccountItem item) async {
@@ -188,7 +193,7 @@ class EnhancedAppProvider extends ChangeNotifier {
     try {
       await _serviceManager.saveAccount(item);
       _accounts.insert(0, item);
-      notifyListeners();
+      _notify();
     } finally {
       _setLoading(false);
     }
@@ -202,7 +207,7 @@ class EnhancedAppProvider extends ChangeNotifier {
       final index = _accounts.indexWhere((account) => account.id == item.id);
       if (index != -1) {
         _accounts[index] = item;
-        notifyListeners();
+        _notify();
       }
     } finally {
       _setLoading(false);
@@ -215,7 +220,7 @@ class EnhancedAppProvider extends ChangeNotifier {
     try {
       await _serviceManager.deleteAccount(id);
       _accounts.removeWhere((account) => account.id == id);
-      notifyListeners();
+      _notify();
     } finally {
       _setLoading(false);
     }
@@ -227,7 +232,7 @@ class EnhancedAppProvider extends ChangeNotifier {
     try {
       await _serviceManager.saveTotpCredential(credential);
       _totpCredentials.insert(0, credential);
-      notifyListeners();
+      _notify();
     } finally {
       _setLoading(false);
     }
@@ -246,7 +251,7 @@ class EnhancedAppProvider extends ChangeNotifier {
       } else {
         _totpCredentials.insert(0, credential);
       }
-      notifyListeners();
+      _notify();
     } finally {
       _setLoading(false);
     }
@@ -258,7 +263,7 @@ class EnhancedAppProvider extends ChangeNotifier {
     try {
       await _serviceManager.deleteTotpCredential(id);
       _totpCredentials.removeWhere((credential) => credential.id == id);
-      notifyListeners();
+      _notify();
     } finally {
       _setLoading(false);
     }
@@ -270,7 +275,7 @@ class EnhancedAppProvider extends ChangeNotifier {
     try {
       await _serviceManager.saveTemplate(template);
       _customTemplates.insert(0, template);
-      notifyListeners();
+      _notify();
     } finally {
       _setLoading(false);
     }
@@ -286,7 +291,7 @@ class EnhancedAppProvider extends ChangeNotifier {
       );
       if (index != -1) {
         _customTemplates[index] = template;
-        notifyListeners();
+        _notify();
       }
     } finally {
       _setLoading(false);
@@ -362,11 +367,12 @@ class EnhancedAppProvider extends ChangeNotifier {
 
   void _setLoading(bool value) {
     _isLoading = value;
-    notifyListeners();
+    _notify();
   }
 
   @override
   void dispose() {
+    _disposed = true;
     _serviceManager.removeListener(_onServiceManagerStateChanged);
     _storageSubscription?.cancel();
     super.dispose();

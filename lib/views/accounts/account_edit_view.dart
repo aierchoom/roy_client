@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -10,6 +9,7 @@ import '../../models/hlc.dart';
 import '../../models/totp_credential.dart';
 import '../../providers/enhanced_app_provider.dart';
 import '../../services/service_manager.dart';
+import '../../services/sensitive_clipboard_service.dart';
 import '../../widgets/adaptive_page.dart';
 import '../../widgets/green_add_button.dart';
 import '../../widgets/password_generator_sheet.dart';
@@ -537,7 +537,10 @@ class _AccountEditViewState extends State<AccountEditView> {
       return;
     }
 
-    await Clipboard.setData(ClipboardData(text: trimmed));
+    await SensitiveClipboardService.copy(
+      text: trimmed,
+      level: ClipboardRiskLevel.high,
+    );
     if (!mounted) return;
     messenger.showSnackBar(
       SnackBar(

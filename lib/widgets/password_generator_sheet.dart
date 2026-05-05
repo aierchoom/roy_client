@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../services/service_manager.dart';
+import '../services/sensitive_clipboard_service.dart';
 
 class PasswordGeneratorResult {
   final String password;
@@ -28,9 +28,7 @@ class PasswordGeneratorOptions {
     required this.includeSpecial,
   });
 
-  factory PasswordGeneratorOptions.defaults({
-    int length = 20,
-  }) {
+  factory PasswordGeneratorOptions.defaults({int length = 20}) {
     return PasswordGeneratorOptions(
       length: length,
       includeUppercase: true,
@@ -160,10 +158,18 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
   String get _strengthLabel {
     final score = _strengthScore;
     if (Localizations.localeOf(context).languageCode == 'zh') {
-      if (score >= 80) return '\u975e\u5e38\u5f3a';
-      if (score >= 60) return '\u5f3a';
-      if (score >= 40) return '\u4e2d\u7b49';
-      if (score >= 20) return '\u5f31';
+      if (score >= ServiceManager.passwordStrengthThresholdVeryStrong) {
+        return '\u975e\u5e38\u5f3a';
+      }
+      if (score >= ServiceManager.passwordStrengthThresholdStrong) {
+        return '\u5f3a';
+      }
+      if (score >= ServiceManager.passwordStrengthThresholdMedium) {
+        return '\u4e2d\u7b49';
+      }
+      if (score >= ServiceManager.passwordStrengthThresholdWeak) {
+        return '\u5f31';
+      }
       return '\u5f88\u5f31';
     }
     return ServiceManager.getPasswordStrengthLevel(score);
@@ -171,10 +177,18 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
 
   Color _strengthColor(ThemeData theme) {
     final score = _strengthScore;
-    if (score >= 80) return Colors.green.shade700;
-    if (score >= 60) return Colors.teal.shade700;
-    if (score >= 40) return Colors.orange.shade700;
-    if (score >= 20) return Colors.deepOrange.shade700;
+    if (score >= ServiceManager.passwordStrengthThresholdVeryStrong) {
+      return Colors.green.shade700;
+    }
+    if (score >= ServiceManager.passwordStrengthThresholdStrong) {
+      return Colors.teal.shade700;
+    }
+    if (score >= ServiceManager.passwordStrengthThresholdMedium) {
+      return Colors.orange.shade700;
+    }
+    if (score >= ServiceManager.passwordStrengthThresholdWeak) {
+      return Colors.deepOrange.shade700;
+    }
     return theme.colorScheme.error;
   }
 
@@ -222,11 +236,16 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
   }
 
   Future<void> _copyPassword() async {
-    await Clipboard.setData(ClipboardData(text: _password));
+    await SensitiveClipboardService.copy(
+      text: _password,
+      level: ClipboardRiskLevel.high,
+    );
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(_text('\u5bc6\u7801\u5df2\u590d\u5236', 'Password copied')),
+        content: Text(
+          _text('\u5bc6\u7801\u5df2\u590d\u5236', 'Password copied'),
+        ),
       ),
     );
   }
@@ -253,7 +272,8 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              widget.title ?? _text('\u5bc6\u7801\u751f\u6210\u5668', 'Password Generator'),
+              widget.title ??
+                  _text('\u5bc6\u7801\u751f\u6210\u5668', 'Password Generator'),
               style: theme.textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.w800,
               ),

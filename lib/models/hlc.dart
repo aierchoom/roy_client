@@ -1,7 +1,10 @@
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
+
 /// 混合逻辑时钟 (Hybrid Logical Clock)
 /// 用于在分布式无强一致性服务器的情况下，为所有记录和字段分配绝对偏序时间戳
+@immutable
 class Hlc implements Comparable<Hlc> {
   final int time;
   final int counter;
@@ -13,15 +16,19 @@ class Hlc implements Comparable<Hlc> {
   factory Hlc.zero(String nodeId) => Hlc(0, 0, nodeId);
 
   /// 当前物理时间快照此时钟，计数器归零
-  factory Hlc.now(String nodeId) => Hlc(DateTime.now().millisecondsSinceEpoch, 0, nodeId);
+  factory Hlc.now(String nodeId) =>
+      Hlc(DateTime.now().millisecondsSinceEpoch, 0, nodeId);
+
+  static const String _corruptedNodeId = '__corrupted__';
 
   /// 从序列化字符串恢复时钟 (支持 nodeId 中含有任意数量的 '-')
+  /// 解析失败时返回带有 [_corruptedNodeId] 的零时钟，调用方可通过 [isCorrupted] 检测。
   factory Hlc.parse(String value) {
     int firstHyphen = value.indexOf('-');
-    if (firstHyphen == -1) return Hlc.zero('fallback'); // 防守级纠错
-    
+    if (firstHyphen == -1) return Hlc.zero(_corruptedNodeId);
+
     int secondHyphen = value.indexOf('-', firstHyphen + 1);
-    if (secondHyphen == -1) return Hlc.zero('fallback');
+    if (secondHyphen == -1) return Hlc.zero(_corruptedNodeId);
 
     try {
       int time = int.parse(value.substring(0, firstHyphen));
@@ -29,9 +36,11 @@ class Hlc implements Comparable<Hlc> {
       String nodeId = value.substring(secondHyphen + 1);
       return Hlc(time, counter, nodeId);
     } catch (_) {
-      return Hlc.zero('fallback');
+      return Hlc.zero(_corruptedNodeId);
     }
   }
+
+  bool get isCorrupted => nodeId == _corruptedNodeId;
 
   @override
   int compareTo(Hlc other) {
@@ -43,10 +52,13 @@ class Hlc implements Comparable<Hlc> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is Hlc && time == other.time && counter == other.counter && nodeId == other.nodeId;
+      other is Hlc &&
+          time == other.time &&
+          counter == other.counter &&
+          nodeId == other.nodeId;
 
   @override
-  int get hashCode => time.hashCode ^ counter.hashCode ^ nodeId.hashCode;
+  int get hashCode => Object.hash(time, counter, nodeId);
 
   @override
   String toString() => '$time-$counter-$nodeId';
@@ -57,7 +69,8 @@ class SyncClock {
   Hlc _current;
   final String _nodeId;
 
-  SyncClock(this._nodeId, {Hlc? initialClock}) : _current = initialClock ?? Hlc.zero(_nodeId);
+  SyncClock(this._nodeId, {Hlc? initialClock})
+    : _current = initialClock ?? Hlc.zero(_nodeId);
 
   Hlc get current => _current;
 
@@ -80,7 +93,11 @@ class SyncClock {
       return;
     }
     if (_current.time == remote.time) {
-      _current = Hlc(_current.time, max(_current.counter, remote.counter) + 1, _nodeId);
+      _current = Hlc(
+        _current.time,
+        max(_current.counter, remote.counter) + 1,
+        _nodeId,
+      );
       return;
     }
     if (_current.time > remote.time) {
@@ -98,24 +115,18 @@ class SyncValue<T> {
 
   const SyncValue(this.value, this.hlc);
 
-  Map<String, dynamic> toJson() => {
-    'v': value,
-    'hlc': hlc.toString(),
-  };
+  Map<String, dynamic> toJson() => {'v': value, 'hlc': hlc.toString()};
 
   /// 适用于泛型的反序列化
-  factory SyncValue.fromJson(Map<String, dynamic> json, T Function(dynamic) fromJsonT) {
-    return SyncValue(
-      fromJsonT(json['v']),
-      Hlc.parse(json['hlc'] as String),
-    );
+  factory SyncValue.fromJson(
+    Map<String, dynamic> json,
+    T Function(dynamic) fromJsonT,
+  ) {
+    return SyncValue(fromJsonT(json['v']), Hlc.parse(json['hlc'] as String));
   }
 
   /// 适用于基本类型(String, int, bool)的暴力强转简化接口
   factory SyncValue.fromPrimitiveJson(Map<String, dynamic> json) {
-    return SyncValue(
-      json['v'] as T,
-      Hlc.parse(json['hlc'] as String),
-    );
+    return SyncValue(json['v'] as T, Hlc.parse(json['hlc'] as String));
   }
 }

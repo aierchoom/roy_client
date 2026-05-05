@@ -9,8 +9,8 @@ import 'database_file_cipher.dart';
 import 'database_file_key_manager.dart';
 
 class EnhancedCryptoService {
-  static const String _masterPasswordKeyV1 = 'master_password_v1';
-  static const String _masterPasswordKeyV2 = 'master_password_v2';
+  static const String _masterPasswordKey = 'master_password';
+  static const String _masterPasswordHashKey = 'master_password_hash';
   static const int _pbkdf2Iterations = 100000;
   static const int _saltLength = 16;
   static const int _hashBits = 256;
@@ -25,9 +25,9 @@ class EnhancedCryptoService {
   bool get hasMasterKey => _isUnlocked;
 
   Future<bool> initMasterKey(String masterPassword) async {
-    final v2Hash = await _readSecureValue(_masterPasswordKeyV2);
-    if (v2Hash != null) {
-      final verified = await _verifyPbkdf2(masterPassword, v2Hash);
+    final storedHash = await _readSecureValue(_masterPasswordHashKey);
+    if (storedHash != null) {
+      final verified = await _verifyPbkdf2(masterPassword, storedHash);
       if (verified) {
         await _unlockWithPassword(masterPassword);
       } else {
@@ -36,14 +36,17 @@ class EnhancedCryptoService {
       return verified;
     }
 
-    final v1Password = await _readSecureValue(_masterPasswordKeyV1);
-    if (v1Password != null) {
-      if (v1Password != masterPassword) {
+    final storedPassword = await _readSecureValue(_masterPasswordKey);
+    if (storedPassword != null) {
+      if (!_constantTimeEquals(
+        utf8.encode(storedPassword),
+        utf8.encode(masterPassword),
+      )) {
         logout();
         return false;
       }
       await _storePbkdf2Hash(masterPassword);
-      await _deleteSecureValue(_masterPasswordKeyV1);
+      await _deleteSecureValue(_masterPasswordKey);
       await _unlockWithPassword(masterPassword);
       return true;
     }
@@ -57,9 +60,9 @@ class EnhancedCryptoService {
     String oldPassword,
     String newPassword,
   ) async {
-    final v2Hash = await _readSecureValue(_masterPasswordKeyV2);
-    if (v2Hash != null) {
-      final verified = await _verifyPbkdf2(oldPassword, v2Hash);
+    final storedHash = await _readSecureValue(_masterPasswordHashKey);
+    if (storedHash != null) {
+      final verified = await _verifyPbkdf2(oldPassword, storedHash);
       if (!verified) return false;
       final databaseKeyBytes = await _unlockDatabaseFileKey(oldPassword);
       await _rotateDatabaseKeyEnvelope(newPassword, databaseKeyBytes);
@@ -68,12 +71,16 @@ class EnhancedCryptoService {
       return true;
     }
 
-    final v1Password = await _readSecureValue(_masterPasswordKeyV1);
-    if (v1Password != null && v1Password == oldPassword) {
+    final storedPassword = await _readSecureValue(_masterPasswordKey);
+    if (storedPassword != null &&
+        _constantTimeEquals(
+          utf8.encode(storedPassword),
+          utf8.encode(oldPassword),
+        )) {
       final databaseKeyBytes = await _unlockDatabaseFileKey(oldPassword);
       await _rotateDatabaseKeyEnvelope(newPassword, databaseKeyBytes);
       await _storePbkdf2Hash(newPassword);
-      await _deleteSecureValue(_masterPasswordKeyV1);
+      await _deleteSecureValue(_masterPasswordKey);
       await _unlockWithPassword(newPassword);
       return true;
     }
@@ -81,12 +88,16 @@ class EnhancedCryptoService {
   }
 
   Future<bool> verifyMasterPassword(String masterPassword) async {
-    final v2Hash = await _readSecureValue(_masterPasswordKeyV2);
-    if (v2Hash != null) {
-      return _verifyPbkdf2(masterPassword, v2Hash);
+    final storedHash = await _readSecureValue(_masterPasswordHashKey);
+    if (storedHash != null) {
+      return _verifyPbkdf2(masterPassword, storedHash);
     }
-    final v1Password = await _readSecureValue(_masterPasswordKeyV1);
-    return v1Password == masterPassword;
+    final storedPassword = await _readSecureValue(_masterPasswordKey);
+    if (storedPassword == null) return false;
+    return _constantTimeEquals(
+      utf8.encode(storedPassword),
+      utf8.encode(masterPassword),
+    );
   }
 
   void logout() {
@@ -124,7 +135,7 @@ class EnhancedCryptoService {
     final hashBytes = await secretKey.extractBytes();
     final encoded =
         'pbkdf2\$$_pbkdf2Iterations\$${base64Encode(salt)}\$${base64Encode(hashBytes)}';
-    await _writeSecureValue(_masterPasswordKeyV2, encoded);
+    await _writeSecureValue(_masterPasswordHashKey, encoded);
   }
 
   Future<bool> _verifyPbkdf2(String password, String encoded) async {
@@ -253,11 +264,16 @@ class EnhancedCryptoService {
     return score.clamp(0, 100);
   }
 
+  static const int strengthThresholdVeryStrong = 80;
+  static const int strengthThresholdStrong = 60;
+  static const int strengthThresholdMedium = 40;
+  static const int strengthThresholdWeak = 20;
+
   static String getPasswordStrengthLevel(int score) {
-    if (score >= 80) return 'Very strong';
-    if (score >= 60) return 'Strong';
-    if (score >= 40) return 'Medium';
-    if (score >= 20) return 'Weak';
+    if (score >= strengthThresholdVeryStrong) return 'Very strong';
+    if (score >= strengthThresholdStrong) return 'Strong';
+    if (score >= strengthThresholdMedium) return 'Medium';
+    if (score >= strengthThresholdWeak) return 'Weak';
     return 'Very weak';
   }
 }

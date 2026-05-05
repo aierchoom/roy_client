@@ -44,6 +44,8 @@
 
 ## 2. 当前执行顺序
 
+已完成基线（T0-T8, T11）：
+
 | 顺序 | 状态 | 任务 | 目标 |
 |---|---|---|---|
 | T0 | 完成 | 本地出站同步审阅收口 | 让本机编辑/删除先进入首页审阅，再由用户确认推送 |
@@ -55,16 +57,23 @@
 | T6 | 完成 | CRDT merge 不变量测试 | 给合并逻辑建立长期回归护栏 |
 | T7 | 完成 | 最小双设备集成测试 | 用自动化场景覆盖多设备新增、编辑、删除、离线恢复 |
 | T8 | 完成 | 崩溃恢复闭环 | pull/push/数据库替换中断后可恢复 |
-| T9 | 未开始 | 同步状态机清理 | 让 UI 消费稳定状态，不猜内部失败 |
-| T10 | 未开始 | 服务端持久化语义加固 | 强化薄后端的校验、幂等、错误分类和半写入恢复 |
 | T11 | 完成 | 2FA/TOTP 动态验证码 | 独立 2FA 凭据、验证码生成、账号关联和密文同步 |
-| T12 | 未开始 | 全局敏感复制策略收敛 | 将 TOTP 已落地的剪贴板清理扩展到密码、配对码、恢复码和复制全部 |
-| T13 | 未开始 | Vault Health 本地体检面板 | 让加密、备份、恢复演练、弱/复用/陈旧凭据和待同步状态可见 |
-| T14 | 未开始 | 备份、恢复和导入一致性 | 建立加密导出、恢复预览、测试恢复和导入后 sync/outbox 语义 |
-| T15 | 未开始 | 解锁与密钥托管安全收敛 | 收敛生物识别、无密码模式、KDF 参数和运行期明文边界 |
-| T16 | 未开始 | 服务端认证、传输和诊断路线 | 为弱服务器补齐认证授权、HTTPS/TLS 指引和客户端健康检查 |
-| T17 | 未开始 | UI 架构与本地化收敛 | 拆分超大视图、统一本地化路径和核心组件规则 |
-| T18 | 进行中 | 2FA 下一阶段能力 | QR 扫码与二维码图片主动粘贴导入已落地，继续推进恢复码模板和 2FA 后续导出策略 |
+
+代码质量基线收敛（quality-pass-1）：
+
+| 顺序 | 状态 | 任务 | 目标 |
+|---|---|---|---|
+| Q1 | 完成 | ChangeNotifier 安全与类型修复 | 添加 _disposed 保护、dynamic→Database?、V1 恒定时间比较、AutoLockDuration.never 语义修复 |
+| Q2 | 完成 | 日志与传输硬化 | debugPrint 全部包裹 kDebugMode、同步 URL 默认 https://、Hlc.parse 去掉 fallback 魔法字符串、StreamSubscription 防泄漏、密码强度阈值共享化 |
+
+后续阶段步骤（按依赖顺序推进，不设固定时长）：
+
+| 阶段 | 包含任务 | 目标 | 准入条件 |
+|---|---|---|---|
+| **阶段1** | T9 同步状态机清理<br>T12 全局敏感复制策略收敛 | 让同步状态可解释、敏感复制行为一致 | 本阶段纯客户端改动，不依赖服务端变更 |
+| **阶段2** | T15 解锁与密钥托管安全收敛<br>T16 服务端认证、传输和诊断路线<br>T10 服务端持久化语义加固 | 让安全文案与真实实现一致、服务器具备最小认证、传输风险可解释 | 阶段1完成后启动；需要同步推进 roy_server |
+| **阶段3** | T14 备份、恢复和导入一致性<br>T13 Vault Health 本地体检面板 | 让恢复可信、备份可演练、本地风险可见 | 阶段2安全边界清晰后启动 |
+| **阶段4** | T17 UI 架构与本地化收敛<br>T18 2FA 下一阶段能力 | 控制架构债务、补全 2FA 恢复码模板与导出策略 | 阶段3稳定后启动；T18 不抢占安全/恢复主线 |
 
 ## 3. T0 本地出站同步审阅收口
 
@@ -381,11 +390,19 @@
 
 任务拆分：
 
-- [ ] 画出当前状态迁移。
-- [ ] 区分网络离线、冲突处理中、协议错误、可恢复失败。
-- [ ] 让 UI 只消费稳定状态。
-- [ ] 清理零散状态推断。
-- [ ] 补状态机测试。
+- [x] 画出当前状态迁移。
+- [x] 区分网络离线、冲突处理中、协议错误、可恢复失败。
+- [x] 让 UI 只消费稳定状态。
+- [x] 清理零散状态推断。
+- [x] 补状态机测试。
+
+完成记录：
+
+- `SyncState` 从 5 个模糊状态扩展为 10 个精确状态：`offline`, `connecting`, `pulling`, `pushing`, `idle`, `conflictRecovery`, `networkUnreachable`, `serverError`, `protocolError`, `authError`。
+- `_setError(String)` 替换为 `_setError(SyncState, String)`，错误分类由状态机内部决定，UI 不再解析字符串。
+- `sync_settings_view.dart` 删除 `_isServerPersistenceIssue` 和所有 `message.contains(...)` 分支，改为基于 `SyncState` 的 exhaustive switch。
+- `isConnected` / `isSyncing` getter 更新为覆盖新的 progress 状态。
+- `dart analyze lib test` 0 issues，`flutter test` 120 passed / 1 skipped。
 
 验收：
 
@@ -470,11 +487,19 @@
 
 任务拆分：
 
-- [ ] 梳理所有 `Clipboard.setData` 调用并按风险分级。
-- [ ] 为生成密码、账号详情复制、复制全部、配对码、离线恢复码制定默认清理时长。
-- [ ] 不清理普通非敏感 UI 文本，避免过度打扰用户。
-- [ ] 补剪贴板不覆盖用户后续复制内容的回归测试。
-- [ ] 更新安全文档和功能文档。
+- [x] 梳理所有 `Clipboard.setData` 调用并按风险分级。
+- [x] 为生成密码、账号详情复制、复制全部、配对码、离线恢复码制定默认清理时长。
+- [x] 不清理普通非敏感 UI 文本，避免过度打扰用户。
+- [x] 补剪贴板不覆盖用户后续复制内容的回归测试。
+- [x] 更新安全文档和功能文档。
+
+完成记录：
+
+- `SensitiveClipboardService` 重构为支持 `ClipboardRiskLevel.high`（45s）、`medium`（30s）、`low`（0s）的单例服务。
+- 新增 SHA-256 hash 比较机制：清理前检查剪贴板当前内容是否仍为原写入内容，避免误删用户后续复制。
+- 替换 7 个文件中的 10 处 raw `Clipboard.setData` 调用：password generator、account list tile、account edit、password tools、sync settings（配对码/恢复码）、TOTP list/edit。
+- 补全 6 个测试用例覆盖高/中/低风险等级、hash 比对防误删、定时清理。
+- `dart analyze lib test` 0 issues，`flutter test` 120 passed / 1 skipped。
 
 验收：
 

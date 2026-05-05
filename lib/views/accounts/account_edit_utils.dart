@@ -76,11 +76,7 @@ class MonthYearInputFormatter extends TextInputFormatter {
 /// Styling utilities for account edit view.
 class AccountEditStyle {
   /// Returns a soft surface color with optional tint.
-  static Color softSurface(
-    ThemeData theme, {
-    Color? tint,
-    int tintAlpha = 18,
-  }) {
+  static Color softSurface(ThemeData theme, {Color? tint, int tintAlpha = 18}) {
     final base = theme.colorScheme.surface;
     if (tint == null) {
       return base;

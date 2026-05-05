@@ -32,6 +32,11 @@ class _MemorySecureKeyValueStore implements SecureKeyValueStore {
   Future<void> write({required String key, required String value}) async {
     values[key] = value;
   }
+
+  @override
+  Future<void> delete({required String key}) async {
+    values.remove(key);
+  }
 }
 
 class _FakeSecureStorageService extends SecureStorageService {

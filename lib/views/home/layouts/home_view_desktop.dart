@@ -193,10 +193,7 @@ class _DesktopDock extends StatelessWidget {
               icon: Icons.verified_user_outlined,
               selectedIcon: Icons.verified_user,
               label: '2FA',
-              description: labelBuilder(
-                '查看动态验证码账户',
-                'Accounts with codes',
-              ),
+              description: labelBuilder('查看动态验证码账户', 'Accounts with codes'),
               isSelected: selectedIndex == 2,
               onTap: () => onDestinationSelected(2),
             ),

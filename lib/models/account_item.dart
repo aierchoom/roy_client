@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import 'hlc.dart';
 
 enum SyncStatus { synchronized, pendingPush, conflict }
@@ -28,6 +30,7 @@ SyncStatus syncStatusFromJson(
   return fallback;
 }
 
+@immutable
 class AccountItem {
   final String id;
   final String name;
@@ -110,8 +113,8 @@ class AccountItem {
       'emailHlc': emailHlc.toString(),
       'dataHlc': dataHlc.map((k, v) => MapEntry(k, v.toString())),
       'serverVersion': serverVersion,
-      'syncStatus': syncStatus.index,
-      'isDeleted': isDeleted ? 1 : 0,
+      'syncStatus': syncStatus.name,
+      'isDeleted': isDeleted,
       'deleteHlc': deleteHlc?.toString(),
     };
   }

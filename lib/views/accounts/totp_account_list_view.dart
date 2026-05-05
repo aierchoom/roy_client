@@ -1,13 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/account_item.dart';
 import '../../models/totp_credential.dart';
 import '../../providers/enhanced_app_provider.dart';
 import '../../services/totp_service.dart';
+import '../../services/sensitive_clipboard_service.dart';
 import '../../theme/app_design_tokens.dart';
 import '../../widgets/adaptive_page.dart';
 import '../../widgets/app_page_header.dart';
@@ -93,7 +93,10 @@ class _TotpAccountListViewState extends State<TotpAccountListView> {
   }
 
   Future<void> _copyCode(BuildContext context, TotpCode code) async {
-    await Clipboard.setData(ClipboardData(text: code.value));
+    await SensitiveClipboardService.copy(
+      text: code.value,
+      level: ClipboardRiskLevel.high,
+    );
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

@@ -62,7 +62,7 @@ class SyncServerUrlStore {
       return '';
     }
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      url = 'http://$url';
+      url = 'https://$url';
     }
     if (url.endsWith('/')) {
       url = url.substring(0, url.length - 1);

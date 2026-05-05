@@ -1,11 +1,10 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-
 import '../theme/app_design_tokens.dart';
 import '../models/account_item.dart';
 import '../models/account_template.dart';
+import '../services/sensitive_clipboard_service.dart';
 
 class AccountFieldDisplayData {
   final String label;
@@ -82,7 +81,10 @@ class _AccountListTileState extends State<AccountListTile> {
       return;
     }
 
-    await Clipboard.setData(ClipboardData(text: trimmed));
+    await SensitiveClipboardService.copy(
+      text: trimmed,
+      level: ClipboardRiskLevel.high,
+    );
     if (!mounted) return;
 
     ScaffoldMessenger.of(this.context).showSnackBar(

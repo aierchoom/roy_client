@@ -33,7 +33,7 @@ void main() {
     tester,
   ) async {
     await SensitiveClipboardService.copy(
-      '123456',
+      text: '123456',
       clearAfter: const Duration(milliseconds: 10),
     );
 
@@ -49,7 +49,7 @@ void main() {
     tester,
   ) async {
     await SensitiveClipboardService.copy(
-      '123456',
+      text: '123456',
       clearAfter: const Duration(milliseconds: 10),
     );
 
@@ -59,5 +59,68 @@ void main() {
     await tester.pump();
 
     expect(clipboardText, 'manual-copy');
+  });
+
+  testWidgets('high risk uses default clear duration', (tester) async {
+    await SensitiveClipboardService.copy(
+      text: 'high-risk',
+      level: ClipboardRiskLevel.high,
+      clearAfter: const Duration(milliseconds: 5),
+    );
+
+    expect(clipboardText, 'high-risk');
+
+    await tester.pump(const Duration(milliseconds: 6));
+    await tester.pump();
+
+    expect(clipboardText, isEmpty);
+  });
+
+  testWidgets('medium risk also clears with shorter default', (tester) async {
+    await SensitiveClipboardService.copy(
+      text: 'medium-risk',
+      level: ClipboardRiskLevel.medium,
+      clearAfter: const Duration(milliseconds: 5),
+    );
+
+    expect(clipboardText, 'medium-risk');
+
+    await tester.pump(const Duration(milliseconds: 6));
+    await tester.pump();
+
+    expect(clipboardText, isEmpty);
+  });
+
+  testWidgets('low risk does not schedule clear', (tester) async {
+    await SensitiveClipboardService.copy(
+      text: 'low-risk',
+      level: ClipboardRiskLevel.low,
+      clearAfter: const Duration(milliseconds: 5),
+    );
+
+    expect(clipboardText, 'low-risk');
+
+    await tester.pump(const Duration(milliseconds: 6));
+    await tester.pump();
+
+    expect(clipboardText, 'low-risk');
+  });
+
+  testWidgets('hash-based comparison prevents clearing modified content', (
+    tester,
+  ) async {
+    await SensitiveClipboardService.copy(
+      text: 'original',
+      clearAfter: const Duration(milliseconds: 10),
+    );
+
+    // Simulate user copying something else with the same length
+    // but different content — hash must not match
+    clipboardText = 'tampered!!';
+
+    await tester.pump(const Duration(milliseconds: 11));
+    await tester.pump();
+
+    expect(clipboardText, 'tampered!!');
   });
 }

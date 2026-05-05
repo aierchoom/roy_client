@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
-import 'package:flutter/foundation.dart';
+import 'package:secret_roy/core/app_logger.dart';
 import 'package:http/http.dart' as http;
 
 import 'vault_pairing_crypto.dart';
@@ -43,6 +43,7 @@ class LanPairingService {
   List<RawDatagramSocket>? _hostSockets;
   Timer? _hostBroadcastTimer;
   Timer? _hostExpiryTimer;
+  StreamSubscription<dynamic>? _hostSubscription;
   String? _hostPairingCode;
   String? _hostTransferCode;
   DateTime? _hostExpiresAt;
@@ -88,7 +89,7 @@ class LanPairingService {
           s.broadcastEnabled = true;
           sockets.add(s);
         } catch (e) {
-          debugPrint('[LAN] Failed to bind to ${addr.address}: $e');
+          AppLogger.d('[LAN] Failed to bind to ${addr.address}: $e');
         }
       }
     }
@@ -104,7 +105,7 @@ class LanPairingService {
         s.broadcastEnabled = true;
         sockets.add(s);
       } catch (e) {
-        debugPrint('[LAN] Failed to bind fallback socket: $e');
+        AppLogger.d('[LAN] Failed to bind fallback socket: $e');
       }
     }
 
@@ -116,7 +117,7 @@ class LanPairingService {
     _hostClaimed = false;
     _hostFailedClaims = 0;
 
-    server.listen(_handleHostRequest);
+    _hostSubscription = server.listen(_handleHostRequest);
 
     final packet = utf8.encode(
       jsonEncode({
@@ -136,7 +137,7 @@ class LanPairingService {
         try {
           s.send(packet, broadcast, _discoveryPort);
         } catch (e) {
-          debugPrint('[LAN] Failed to send broadcast: $e');
+          AppLogger.d('[LAN] Failed to send broadcast: $e');
         }
       }
     }
@@ -171,6 +172,8 @@ class LanPairingService {
       }
     }
 
+    await _hostSubscription?.cancel();
+    _hostSubscription = null;
     final server = _hostServer;
     _hostServer = null;
     if (server != null) {
@@ -503,7 +506,7 @@ class LanPairingService {
         return decoded;
       }
     } catch (e) {
-      debugPrint('[LAN] Failed to decode JSON: $e');
+      AppLogger.d('[LAN] Failed to decode JSON: $e');
     }
     return {};
   }
@@ -532,7 +535,7 @@ class LanPairingService {
         }
       }
     } catch (e) {
-      debugPrint('[LAN] Failed to detect local IPv4: $e');
+      AppLogger.d('[LAN] Failed to detect local IPv4: $e');
     }
     return null;
   }

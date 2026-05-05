@@ -23,6 +23,8 @@ Each report should include:
 
 | Date | Report | Scope |
 |---|---|---|
+| 2026-05-01 | [2026-05-01-sync-state-machine-cleanup.md](2026-05-01-sync-state-machine-cleanup.md) | Sync state machine: 5→10 typed states |
+| 2026-05-01 | [2026-05-01-sensitive-clipboard-policy-convergence.md](2026-05-01-sensitive-clipboard-policy-convergence.md) | Global sensitive clipboard policy with risk levels |
 | 2026-04-30 | [2026-04-30-totp-decoupled-credentials.md](2026-04-30-totp-decoupled-credentials.md) | Independent 2FA credential model |
 | 2026-04-30 | [2026-04-30-totp-account-index.md](2026-04-30-totp-account-index.md) | Dedicated 2FA account page |
 | 2026-04-30 | [2026-04-30-totp-qr-import.md](2026-04-30-totp-qr-import.md) | TOTP QR scan and active paste import |

@@ -12,10 +12,10 @@ typedef SecureStorageWriter =
 typedef SecureStorageDeleter = Future<void> Function({required String key});
 
 class DatabaseFileKeyManager {
-  static const String databaseKeySaltKey = 'database_key_salt_v1';
-  static const String databaseKeyEnvelopeKey = 'database_file_key_envelope_v1';
+  static const String databaseKeySaltKey = 'database_key_salt';
+  static const String databaseKeyEnvelopeKey = 'database_file_key_envelope';
   static const String previousDatabaseKeyEnvelopeKey =
-      'database_file_key_envelope_previous_v1';
+      'database_file_key_envelope_previous';
   static const int defaultPbkdf2Iterations = 100000;
   static const int _saltLength = 16;
   static const int _hashBits = 256;

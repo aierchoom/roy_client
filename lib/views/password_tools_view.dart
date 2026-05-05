@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../services/service_manager.dart';
+import '../services/sensitive_clipboard_service.dart';
 import '../widgets/adaptive_page.dart';
 import '../widgets/password_generator_sheet.dart';
 
@@ -42,12 +42,18 @@ class _PasswordToolsViewState extends State<PasswordToolsView> {
     final password = _lastResult?.password ?? '';
     if (password.isEmpty) return;
 
-    await Clipboard.setData(ClipboardData(text: password));
+    await SensitiveClipboardService.copy(
+      text: password,
+      level: ClipboardRiskLevel.high,
+    );
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          _text('\u5df2\u590d\u5236\u751f\u6210\u7684\u5bc6\u7801', 'Generated password copied'),
+          _text(
+            '\u5df2\u590d\u5236\u751f\u6210\u7684\u5bc6\u7801',
+            'Generated password copied',
+          ),
         ),
       ),
     );
@@ -194,7 +200,10 @@ class _PasswordToolsViewState extends State<PasswordToolsView> {
     if (password == null || password.isEmpty) {
       return _buildSectionCard(
         context: context,
-        title: _text('\u5c1a\u672a\u751f\u6210\u5bc6\u7801', 'No Password Generated Yet'),
+        title: _text(
+          '\u5c1a\u672a\u751f\u6210\u5bc6\u7801',
+          'No Password Generated Yet',
+        ),
         subtitle: _text(
           '\u6253\u5f00\u751f\u6210\u5668\u540e\uff0c\u8fd9\u91cc\u4f1a\u4fdd\u7559\u6700\u8fd1\u4e00\u6b21\u7ed3\u679c\uff0c\u65b9\u4fbf\u4f60\u518d\u6b21\u590d\u5236\u6216\u5bf9\u7167\u3002',
           'Once you open the generator, the latest result stays here for quick copying and review.',
@@ -202,7 +211,9 @@ class _PasswordToolsViewState extends State<PasswordToolsView> {
         child: OutlinedButton.icon(
           onPressed: () => _showPasswordGenerator(context),
           icon: const Icon(Icons.password_outlined),
-          label: Text(_text('\u6253\u5f00\u751f\u6210\u5668', 'Open Generator')),
+          label: Text(
+            _text('\u6253\u5f00\u751f\u6210\u5668', 'Open Generator'),
+          ),
         ),
       );
     }
@@ -236,7 +247,10 @@ class _PasswordToolsViewState extends State<PasswordToolsView> {
           ),
           const SizedBox(height: 12),
           Text(
-            _text('\u5f3a\u5ea6\uff1a$strength / 100', 'Strength: $strength / 100'),
+            _text(
+              '\u5f3a\u5ea6\uff1a$strength / 100',
+              'Strength: $strength / 100',
+            ),
             style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.primary,
               fontWeight: FontWeight.w600,
@@ -257,7 +271,9 @@ class _PasswordToolsViewState extends State<PasswordToolsView> {
                 child: FilledButton.icon(
                   onPressed: () => _showPasswordGenerator(context),
                   icon: const Icon(Icons.refresh_rounded),
-                  label: Text(_text('\u8c03\u6574\u5e76\u91cd\u751f', 'Adjust & Refresh')),
+                  label: Text(
+                    _text('\u8c03\u6574\u5e76\u91cd\u751f', 'Adjust & Refresh'),
+                  ),
                 ),
               ),
             ],
@@ -288,7 +304,10 @@ class _PasswordToolsViewState extends State<PasswordToolsView> {
               ),
               child: _buildActionTile(
                 context: context,
-                title: _text('\u6253\u5f00\u751f\u6210\u5668', 'Open Generator'),
+                title: _text(
+                  '\u6253\u5f00\u751f\u6210\u5668',
+                  'Open Generator',
+                ),
                 subtitle: _text(
                   '\u81ea\u5b9a\u4e49\u957f\u5ea6\u3001\u7ec4\u6210\u548c\u5f3a\u5ea6',
                   'Customize length, composition, and strength',
