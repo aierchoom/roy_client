@@ -58,3 +58,8 @@ app.*.map.json
 .antigravity/
 *.bak
 *.tmp
+
+# Development helper scripts (keep flutter_test.ps1 tracked)
+tool/*.dart
+tool/*.py
+tool/rebase_editor.py

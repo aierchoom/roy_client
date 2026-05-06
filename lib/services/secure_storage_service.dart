@@ -95,6 +95,8 @@ class SecureStorageService {
       return;
     }
 
+    await _cleanupStaleWorkingFiles(temporaryDirectory);
+
     try {
       await _prepareWorkingDatabase();
       await _openAndInitialize(_workingDatabasePath!);
@@ -458,6 +460,24 @@ class SecureStorageService {
     } finally {
       if (tempFile.existsSync()) {
         await tempFile.delete();
+      }
+    }
+  }
+
+  Future<void> _cleanupStaleWorkingFiles(Directory tempDir) async {
+    final secretRoyDir = Directory(join(tempDir.path, 'secret_roy'));
+    if (!secretRoyDir.existsSync()) return;
+    await for (final entity in secretRoyDir.list()) {
+      if (entity is File) {
+        final name = basename(entity.path);
+        if (name.startsWith(_workingDatabaseName)) {
+          try {
+            await entity.delete();
+            AppLogger.d('[Storage] Deleted stale working file: ${entity.path}');
+          } catch (e) {
+            AppLogger.d('[Storage] Failed to delete stale working file: $e');
+          }
+        }
       }
     }
   }
@@ -940,7 +960,9 @@ class SecureStorageService {
         limit: 1,
       );
       if (rows.isEmpty) return null;
-      return _mapToTotpCredential(rows.first);
+      final credential = _mapToTotpCredential(rows.first);
+      if (credential == null) return null;
+      return _cleanupOrphanedLinks(credential);
     } catch (e) {
       AppLogger.d('Failed to load TOTP credential by id: $e');
       return null;
@@ -955,7 +977,9 @@ class SecureStorageService {
 
     TotpCredential itemToSave = credential;
 
-    if (!isSyncMerge) {
+    if (isSyncMerge) {
+      itemToSave = await _cleanupOrphanedLinks(credential);
+    } else {
       final existingRows = await _query(
         'totp_credentials',
         where: 'id = ?',
@@ -1012,6 +1036,39 @@ class SecureStorageService {
         id: itemToSave.id,
       ),
     );
+  }
+
+  Future<TotpCredential> _cleanupOrphanedLinks(TotpCredential credential) async {
+    if (credential.linkedAccountIds.isEmpty) return credential;
+
+    final validIds = <String>[];
+    for (final accountId in credential.linkedAccountIds) {
+      if (await _accountExists(accountId)) {
+        validIds.add(accountId);
+      }
+    }
+
+    if (validIds.length != credential.linkedAccountIds.length) {
+      AppLogger.d(
+        '[Storage] Cleaned up ${credential.linkedAccountIds.length - validIds.length} orphaned link(s) for TOTP ${credential.id}',
+      );
+      return credential.copyWith(linkedAccountIds: validIds);
+    }
+
+    return credential;
+  }
+
+  Future<bool> _accountExists(String id) async {
+    if (!isOpen || _database == null) return false;
+    try {
+      final rows = await _database!.rawQuery(
+        'SELECT 1 FROM accounts WHERE id = ? AND is_deleted = 0 LIMIT 1',
+        [id],
+      );
+      return rows.isNotEmpty;
+    } catch (e) {
+      return false;
+    }
   }
 
   Future<void> deleteTotpCredential(
@@ -1805,6 +1862,59 @@ class SecureStorageService {
         type: StorageItemType.totpCredential,
         action: StorageAction.delete,
         id: id,
+      ),
+    );
+  }
+
+  Future<void> clearLocalSyncChanges(String vaultId) async {
+    if (!isOpen) return;
+    await _database!.delete(
+      'local_sync_changes',
+      where: 'vault_id = ?',
+      whereArgs: [vaultId],
+    );
+    await _persistAfterMutation();
+  }
+
+  Future<void> markAllSynchronizedItemsAsPendingPush() async {
+    if (!isOpen) return;
+    final now = DateTime.now().millisecondsSinceEpoch;
+
+    await _database!.update(
+      'accounts',
+      {
+        'sync_status': SyncStatus.pendingPush.index,
+        'modified_at': now,
+      },
+      where: 'sync_status = ?',
+      whereArgs: [SyncStatus.synchronized.index],
+    );
+
+    await _database!.update(
+      'templates',
+      {
+        'sync_status': SyncStatus.pendingPush.index,
+        'created_at': now,
+      },
+      where: 'sync_status = ? AND is_custom = 1',
+      whereArgs: [SyncStatus.synchronized.index],
+    );
+
+    await _database!.update(
+      'totp_credentials',
+      {
+        'sync_status': SyncStatus.pendingPush.index,
+        'modified_at': now,
+      },
+      where: 'sync_status = ?',
+      whereArgs: [SyncStatus.synchronized.index],
+    );
+
+    await _persistAfterMutation();
+    _notifyChange(
+      StorageChangeEvent(
+        type: StorageItemType.account,
+        action: StorageAction.save,
       ),
     );
   }

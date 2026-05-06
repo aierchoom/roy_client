@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import '../models/hlc.dart';
 import '../models/totp_credential.dart';
 
@@ -21,7 +23,7 @@ class TotpCredentialMergeEngine {
       linksHlc: _max(local.linksHlc, remote.linksHlc),
       isDeleted: deleteWinsRemote ? remote.isDeleted : local.isDeleted,
       deleteHlc: _maxNullable(local.deleteHlc, remote.deleteHlc),
-      serverVersion: remote.serverVersion,
+      serverVersion: max(local.serverVersion, remote.serverVersion),
     );
   }
 

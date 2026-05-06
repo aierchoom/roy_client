@@ -116,6 +116,7 @@ class SyncService extends ChangeNotifier {
   String? _statusNote;
   DateTime? _lastSyncTime;
   int _localVersion = 0;
+  int _serverGeneration = 0;
   bool _isDirty = false;
   String _lastConflictMsg = '';
   int _queuedConflictCount = 0;
@@ -159,6 +160,8 @@ class SyncService extends ChangeNotifier {
 
   String _syncServerUrlKey(String vaultId) => 'sync_server_url_$vaultId';
 
+  String _syncGenerationKey(String vaultId) => 'sync_generation_$vaultId';
+
   @visibleForTesting
   String? get recoveryPhase => _pendingRecovery?.phase.name;
 
@@ -178,6 +181,13 @@ class SyncService extends ChangeNotifier {
       legacyKey: 'sync_version',
     );
     _localVersion = int.tryParse(versionStr ?? '') ?? 0;
+
+    final generationStr = await _readVaultScopedSetting(
+      vaultId: vaultId,
+      scopedKey: _syncGenerationKey(vaultId),
+      legacyKey: 'sync_generation',
+    );
+    _serverGeneration = int.tryParse(generationStr ?? '') ?? 0;
 
     final lastSyncStr = await _readVaultScopedSetting(
       vaultId: vaultId,
@@ -414,6 +424,12 @@ class SyncService extends ChangeNotifier {
     }
 
     if (e is _SyncHttpException) {
+      if (e.conflictType == 'generation_mismatch') {
+        _statusNote =
+            'Server vault has been reset. A full sync will recover your data on the next attempt.';
+        _updateState(SyncState.protocolError);
+        return SyncResult.failure('generation_mismatch');
+      }
       if (e.conflictType == 'invalid_payload') {
         _setError(
           SyncState.protocolError,
@@ -520,10 +536,13 @@ class SyncService extends ChangeNotifier {
   Future<Map<String, dynamic>> _fetchRemoteChanges(
     String serverUrl, {
     required int since,
+    int cursor = 0,
+    int limit = 100,
   }) async {
     final vaultId = _identityService.vaultId;
-    final url = '$serverUrl/vaults/$vaultId/sync?since=$since';
+    final url = '$serverUrl/vaults/$vaultId/sync?since=$since&cursor=$cursor&limit=$limit';
     final headers = <String, String>{};
+    headers['X-Vault-Generation'] = '$_serverGeneration';
     final token = _identityService.vaultApiToken;
     if (token != null && token.isNotEmpty) {
       headers['X-Vault-Token'] = token;
@@ -533,7 +552,13 @@ class SyncService extends ChangeNotifier {
         .get(Uri.parse(url), headers: headers)
         .timeout(const Duration(seconds: 10));
     if (response.statusCode == 304) {
-      return {'max_version': since, 'items': const <dynamic>[]};
+      final generationHeader = response.headers['x-vault-generation'];
+      final generation = generationHeader != null ? int.tryParse(generationHeader) : null;
+      return {
+        'max_version': since,
+        'items': const <dynamic>[],
+        if (generation != null) 'generation': generation,
+      };
     }
     _throwIfSyncHttpError(response, phase: 'pull');
 
@@ -545,13 +570,73 @@ class SyncService extends ChangeNotifier {
     return _decodeSyncResponse(response, phase: 'pull');
   }
 
+  /// Fetches all remote changes paginated, aggregating items across pages.
+  ///
+  /// Transaction principle: all pages are fetched first, then returned as a
+  /// single batch. If any page fails, the exception propagates and no items
+  /// are applied — the caller must not persist partial results.
+  Future<Map<String, dynamic>> _fetchAllRemoteChanges(
+    String serverUrl, {
+    required int since,
+  }) async {
+    final allItems = <dynamic>[];
+    var cursor = 0;
+    const limit = 100;
+    var finalMaxVersion = since;
+    int? finalGeneration;
+    int? totalCount;
+
+    while (true) {
+
+      final data = await _fetchRemoteChanges(
+        serverUrl,
+        since: since,
+        cursor: cursor,
+        limit: limit,
+      );
+      final itemsList = _readRemoteItems(data);
+      allItems.addAll(itemsList);
+      finalMaxVersion = _readOptionalVersion(
+        data,
+        'max_version',
+        fallback: since,
+        label: 'pull response max_version',
+      );
+      finalGeneration = data['generation'] as int?;
+      totalCount ??= data['total_count'] as int?;
+
+      final hasMore = data['has_more'] == true;
+      final nextCursor = data['next_cursor'] as int?;
+
+      if (totalCount != null && totalCount > 0) {
+        final progress =
+            ((cursor + itemsList.length) / totalCount * 100)
+                .clamp(0, 99)
+                .round();
+        if (hasMore) {
+          _statusNote = 'Pulling remote updates ($progress%)...';
+          if (!_disposed) notifyListeners();
+        }
+      }
+
+      if (!hasMore || nextCursor == null) break;
+      cursor = nextCursor;
+    }
+
+    return {
+      'max_version': finalMaxVersion,
+      if (finalGeneration != null) 'generation': finalGeneration,
+      'items': allItems,
+    };
+  }
+
   Future<int> _runPullPhase(String serverUrl) async {
     final vaultId = _identityService.vaultId;
     AppLogger.d(
       '[Sync] >>> Pull Phase Start (Vault: $vaultId, Since: $_localVersion)',
     );
 
-    final data = await _fetchRemoteChanges(serverUrl, since: _localVersion);
+    final data = await _fetchAllRemoteChanges(serverUrl, since: _localVersion);
     final mergedCount = await _applyRemoteChanges(data);
     AppLogger.d(
       '[Sync] <<< Pull Phase Completed. Processed: $mergedCount, Version: $_localVersion',
@@ -631,18 +716,6 @@ class SyncService extends ChangeNotifier {
     return _asStringKeyedMap(value, 'push response accepted_versions');
   }
 
-  int? _acceptedVersionFor(
-    Map<String, dynamic> acceptedVersions,
-    String itemId,
-  ) {
-    final value = acceptedVersions[itemId];
-    if (value == null) return null;
-    if (value is int && value >= 0) return value;
-    throw _SyncProtocolException(
-      'accepted version for $itemId must be a non-negative integer.',
-    );
-  }
-
   Future<int> _applyRemoteChanges(Map<String, dynamic> data) async {
     final maxVersion = _readOptionalVersion(
       data,
@@ -650,8 +723,21 @@ class SyncService extends ChangeNotifier {
       fallback: _localVersion,
       label: 'pull response max_version',
     );
+    final serverGeneration = (data['generation'] as int?) ?? _serverGeneration;
     final itemsList = _readRemoteItems(data);
     final vaultId = _identityService.vaultId;
+
+    if (_serverGeneration != 0 && serverGeneration != _serverGeneration) {
+      AppLogger.d(
+        '[Sync] Server generation changed from $_serverGeneration to $serverGeneration. Triggering reset recovery.',
+      );
+      await _handleServerReset();
+    }
+    _serverGeneration = serverGeneration;
+    await _storageService.setSetting(
+      _syncGenerationKey(vaultId),
+      '$_serverGeneration',
+    );
 
     AppLogger.d(
       '[Sync] Received ${itemsList.length} items. Server Max Version: $maxVersion',
@@ -774,7 +860,7 @@ class SyncService extends ChangeNotifier {
   }
 
   Future<void> _pullLatestSnapshot(String serverUrl) async {
-    final data = await _fetchRemoteChanges(serverUrl, since: 0);
+    final data = await _fetchAllRemoteChanges(serverUrl, since: 0);
     final maxVersion = _readOptionalVersion(
       data,
       'max_version',
@@ -825,7 +911,7 @@ class SyncService extends ChangeNotifier {
   }
 
   Future<int> _pullAndMergeLatestSnapshot(String serverUrl) async {
-    final data = await _fetchRemoteChanges(serverUrl, since: 0);
+    final data = await _fetchAllRemoteChanges(serverUrl, since: 0);
     return _applyRemoteChanges(data);
   }
 
@@ -896,7 +982,7 @@ class SyncService extends ChangeNotifier {
   }
 
   Future<int> _pullFromVersion(String serverUrl, int sinceVersion) async {
-    final data = await _fetchRemoteChanges(serverUrl, since: sinceVersion);
+    final data = await _fetchAllRemoteChanges(serverUrl, since: sinceVersion);
     return _applyRemoteChanges(data);
   }
 
@@ -920,6 +1006,11 @@ class SyncService extends ChangeNotifier {
       );
       if (localCredential != null) {
         await _handleTotpCredentialConflict(serverUrl, conflict);
+        return;
+      }
+      final localTemplate = await _storageService.loadTemplateById(itemId);
+      if (localTemplate != null) {
+        await _handleTemplateRemoteMissingConflict(serverUrl, itemId);
         return;
       }
     }
@@ -999,6 +1090,16 @@ class SyncService extends ChangeNotifier {
         : 'Remote 2FA changes were merged locally.';
   }
 
+  Future<void> _handleServerReset() async {
+    final vaultId = _identityService.vaultId;
+    _localVersion = 0;
+    await _storageService.setSetting(_syncVersionKey(vaultId), '0');
+    await _storageService.clearLocalSyncChanges(vaultId);
+    await _storageService.markAllSynchronizedItemsAsPendingPush();
+    _queuedConflictNotice =
+        'Server vault was reset. All local data will be re-pushed to recover.';
+  }
+
   Future<void> _handleRemoteMissingConflict(
     String serverUrl,
     String itemId,
@@ -1043,6 +1144,40 @@ class SyncService extends ChangeNotifier {
     _queuedConflictCount += 1;
     _queuedConflictNotice =
         'Remote record missing. Review the conflict inbox before overwriting.';
+  }
+
+  Future<void> _handleTemplateRemoteMissingConflict(
+    String serverUrl,
+    String itemId,
+  ) async {
+    await _pullLatestSnapshot(serverUrl);
+
+    final localItem = await _storageService.loadTemplateById(itemId);
+    if (localItem == null) {
+      return;
+    }
+
+    if (localItem.isDeleted) {
+      await _storageService.saveTemplate(
+        localItem.copyWith(
+          syncStatus: SyncStatus.synchronized,
+          serverVersion: 0,
+        ),
+        isSyncMerge: true,
+      );
+      _queuedConflictNotice =
+          'Remote template was already missing. Local delete is marked synchronized.';
+      return;
+    }
+
+    await _storageService.saveTemplate(
+      localItem.copyWith(syncStatus: SyncStatus.synchronized, serverVersion: 0),
+      isSyncMerge: true,
+    );
+
+    _queuedConflictCount += 1;
+    _queuedConflictNotice =
+        'Remote template missing. Review the conflict inbox before overwriting.';
   }
 
   Future<void> _handleStaleBaseConflict(String serverUrl, String itemId) async {
@@ -1209,6 +1344,7 @@ class SyncService extends ChangeNotifier {
     );
 
     late final Map<String, int> acceptedVersionByItemId;
+    late final List<Map<String, dynamic>> conflicts;
     try {
       final headers = <String, String>{'Content-Type': 'application/json'};
       final token = _identityService.vaultApiToken;
@@ -1240,10 +1376,22 @@ class SyncService extends ChangeNotifier {
 
       final respData = _decodeSyncResponse(response, phase: 'push');
       final acceptedVersions = _readAcceptedVersions(respData);
-      acceptedVersionByItemId = _validateAcceptedVersionsForItems(
-        acceptedVersions,
-        dirtyItems,
-      );
+      acceptedVersionByItemId = _extractAcceptedVersions(acceptedVersions);
+      conflicts = _readConflicts(respData);
+
+      // Validate every dirty item is accounted for (accepted or conflicted)
+      final conflictItemIds = conflicts
+          .map((c) => c['item_id'] as String?)
+          .whereType<String>()
+          .toSet();
+      for (final item in dirtyItems) {
+        final itemId = _syncItemId(item);
+        if (acceptedVersionByItemId.containsKey(itemId)) continue;
+        if (conflictItemIds.contains(itemId)) continue;
+        throw _SyncProtocolException(
+          'push response missing accepted version for $itemId',
+        );
+      }
     } catch (e) {
       if (e is! _ConflictException) {
         await _storageService.markLocalSyncChangesFailed(
@@ -1254,10 +1402,12 @@ class SyncService extends ChangeNotifier {
       rethrow;
     }
 
+    // Apply accepted items
     final acceptedChangeIds = <String>[];
     for (final item in dirtyItems) {
       final itemId = _syncItemId(item);
-      final newVersion = acceptedVersionByItemId[itemId]!;
+      final newVersion = acceptedVersionByItemId[itemId];
+      if (newVersion == null) continue;
 
       await _applyAcceptedPushVersion(item, newVersion);
 
@@ -1273,6 +1423,32 @@ class SyncService extends ChangeNotifier {
     }
     await _storageService.markLocalSyncChangesPushed(acceptedChangeIds);
 
+    // Handle partial conflicts
+    if (conflicts.isNotEmpty) {
+      final conflictItemIds = conflicts
+          .map((c) => c['item_id'] as String?)
+          .whereType<String>()
+          .toSet();
+
+      final conflictChangeIds = approvedChanges
+          .where((change) => conflictItemIds.contains(change.entityId))
+          .map((change) => change.id)
+          .toList(growable: false);
+
+      await _storageService.markLocalSyncChangesConflict(
+        conflictChangeIds,
+        jsonEncode({'conflicts': conflicts}),
+      );
+
+      _queuedConflictCount += conflicts.length;
+      _queuedConflictNotice =
+          '${conflicts.length} item(s) conflicted during push. Review the conflict inbox before retrying.';
+
+      // Refresh local state before retry
+      await _pullLatestSnapshot(serverUrl);
+      throw _ConflictException(jsonEncode(conflicts.first));
+    }
+
     await _storageService.setSetting(
       _syncVersionKey(_identityService.vaultId),
       '$_localVersion',
@@ -1283,22 +1459,32 @@ class SyncService extends ChangeNotifier {
     return acceptedVersionByItemId.length;
   }
 
-  Map<String, int> _validateAcceptedVersionsForItems(
-    Map<String, dynamic> acceptedVersions,
-    List<dynamic> dirtyItems,
-  ) {
-    final acceptedVersionByItemId = <String, int>{};
-    for (final item in dirtyItems) {
-      final itemId = _syncItemId(item);
-      final newVersion = _acceptedVersionFor(acceptedVersions, itemId);
-      if (newVersion == null) {
+  Map<String, int> _extractAcceptedVersions(Map<String, dynamic> acceptedVersions) {
+    final result = <String, int>{};
+    for (final entry in acceptedVersions.entries) {
+      final value = entry.value;
+      if (value is int && value >= 0) {
+        result[entry.key] = value;
+      } else {
         throw _SyncProtocolException(
-          'push response missing accepted version for $itemId.',
+          'push response contains invalid accepted version for ${entry.key}: $value',
         );
       }
-      acceptedVersionByItemId[itemId] = newVersion;
     }
-    return acceptedVersionByItemId;
+    return result;
+  }
+
+  List<Map<String, dynamic>> _readConflicts(Map<String, dynamic> response) {
+    final value = response['conflicts'];
+    if (value == null) return const <Map<String, dynamic>>[];
+    if (value is List<dynamic>) {
+      return value
+          .map((item) => _asStringKeyedMap(item, 'push response conflict'))
+          .toList();
+    }
+    throw const _SyncProtocolException(
+      'push response conflicts must be a list.',
+    );
   }
 
   Future<void> _applyAcceptedPushVersion(dynamic item, int newVersion) async {

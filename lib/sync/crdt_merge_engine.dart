@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import '../models/account_item.dart';
 import '../models/account_template.dart';
@@ -64,21 +65,32 @@ class CrdtMergeEngine {
     final localDel = local.deleteHlc;
     final remoteDel = remote.deleteHlc;
 
+    final int unifiedServerVersion = max(local.serverVersion, remote.serverVersion);
+
     if (localDel != null && remoteDel != null) {
       // 双方都删除了
       if (remoteDel.compareTo(localDel) > 0) {
         return MergeResult(
-          remote.copyWith(syncStatus: SyncStatus.synchronized),
+          remote.copyWith(
+            syncStatus: SyncStatus.synchronized,
+            serverVersion: unifiedServerVersion,
+          ),
           [],
         );
       }
-      return MergeResult(local, []);
+      return MergeResult(
+        local.copyWith(serverVersion: unifiedServerVersion),
+        [],
+      );
     } else if (remoteDel != null) {
       // 远端删除了，本地没删。检查本地是否有比删除更晚的修改事实
       if (remoteDel.compareTo(_getMaxHlc(local)) > 0) {
         // 远端的删除确切发生了在本地最后一次修改之后 -> 远端删得对，接受墓碑
         return MergeResult(
-          remote.copyWith(syncStatus: SyncStatus.synchronized),
+          remote.copyWith(
+            syncStatus: SyncStatus.synchronized,
+            serverVersion: unifiedServerVersion,
+          ),
           logs,
         );
       }
@@ -86,7 +98,10 @@ class CrdtMergeEngine {
     } else if (localDel != null) {
       if (localDel.compareTo(_getMaxHlc(remote)) > 0) {
         // 本地的删除权高于远端的最新修改 -> 坚持本地的删除
-        return MergeResult(local, []);
+        return MergeResult(
+          local.copyWith(serverVersion: unifiedServerVersion),
+          [],
+        );
       }
     }
 
@@ -151,7 +166,12 @@ class CrdtMergeEngine {
       }
     }
 
-    final Set<String> allDataKeys = {...local.data.keys, ...remote.data.keys};
+    final Set<String> allDataKeys = {
+      ...local.data.keys,
+      ...remote.data.keys,
+      ...local.dataHlc.keys,
+      ...remote.dataHlc.keys,
+    };
     final Map<String, String> mergedData = {};
     final Map<String, Hlc> mergedDataHlc = {};
 
@@ -162,7 +182,10 @@ class CrdtMergeEngine {
       final rVal = remote.data[key];
 
       if (rHlc.compareTo(lHlc) > 0) {
-        mergedData[key] = rVal!;
+        // Remote wins: keep value only if present (null means remote deleted)
+        if (rVal != null) {
+          mergedData[key] = rVal;
+        }
         mergedDataHlc[key] = rHlc;
         if (lVal != null && lVal != rVal) {
           logs.add(
@@ -175,7 +198,10 @@ class CrdtMergeEngine {
           );
         }
       } else {
-        mergedData[key] = lVal!;
+        // Local wins: keep value only if present (null means local deleted)
+        if (lVal != null) {
+          mergedData[key] = lVal;
+        }
         mergedDataHlc[key] = lHlc;
         if (rVal != null && lVal != rVal && rHlc.time > 0) {
           logs.add(
@@ -233,7 +259,7 @@ class CrdtMergeEngine {
       nameHlc: mergedNameHlc,
       emailHlc: mergedEmailHlc,
       dataHlc: mergedDataHlc,
-      serverVersion: remote.serverVersion, // 必须对齐远端版本号，确保协议一致性
+      serverVersion: unifiedServerVersion, // 统一取最大版本号，避免 Tombstone 后 push 409
       syncStatus: finalStatus,
       isDeleted: false,
     );
