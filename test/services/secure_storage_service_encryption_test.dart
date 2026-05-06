@@ -9,6 +9,7 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 // ignore: depend_on_referenced_packages
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'package:secret_roy/models/account_item.dart';
+import 'package:secret_roy/models/account_template.dart';
 import 'package:secret_roy/models/hlc.dart';
 import 'package:secret_roy/services/database_file_cipher.dart';
 import 'package:secret_roy/services/secure_storage_service.dart';
@@ -155,6 +156,36 @@ void main() {
     expect(tempFile.existsSync(), isFalse);
 
     await reopenedStorage.close(dispose: true);
+  });
+
+  test('round-trips template fieldHlc through encrypted database', () async {
+    final storage = SecureStorageService(databaseCipher: cipher);
+    await storage.initialize(deviceId: 'device_test');
+
+    final template = AccountTemplate(
+      templateId: 'custom_1',
+      title: 'Test',
+      subTitle: '',
+      category: TemplateCategory.custom,
+      fields: [
+        const AccountField(
+          fieldKey: 'url',
+          label: 'URL',
+          attributes: AccountFieldAttributes(type: AccountFieldType.url),
+        ),
+      ],
+      hlc: const Hlc(100, 0, 'device_test'),
+      fieldHlc: const {'url': Hlc(100, 0, 'device_test')},
+      syncStatus: SyncStatus.synchronized,
+    );
+
+    await storage.saveTemplate(template, isSyncMerge: true);
+
+    final loaded = await storage.loadTemplateById('custom_1');
+    expect(loaded, isNotNull);
+    expect(loaded!.fieldHlc['url'], const Hlc(100, 0, 'device_test'));
+
+    await storage.close(dispose: true);
   });
 }
 

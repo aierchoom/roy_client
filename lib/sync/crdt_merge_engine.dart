@@ -172,7 +172,7 @@ class CrdtMergeEngine {
       ...local.dataHlc.keys,
       ...remote.dataHlc.keys,
     };
-    final Map<String, String> mergedData = {};
+    final Map<String, dynamic> mergedData = {};
     final Map<String, Hlc> mergedDataHlc = {};
 
     for (final key in allDataKeys) {
@@ -192,7 +192,7 @@ class CrdtMergeEngine {
             ConflictLog(
               accountId: local.id,
               fieldKey: 'data.$key',
-              fieldValue: lVal,
+              fieldValue: lVal.toString(),
               hlc: lHlc,
             ),
           );
@@ -208,7 +208,7 @@ class CrdtMergeEngine {
             ConflictLog(
               accountId: remote.id,
               fieldKey: 'data.$key',
-              fieldValue: rVal,
+              fieldValue: rVal.toString(),
               hlc: rHlc,
             ),
           );
@@ -310,14 +310,97 @@ class CrdtMergeEngine {
       }
     }
 
-    if ((remote.hlc ?? Hlc.zero('remote')).compareTo(
-          local.hlc ?? Hlc.zero('local'),
-        ) >
-        0) {
-      return remote.copyWith(syncStatus: SyncStatus.synchronized);
-    } else {
-      return _templateWithMaxServerVersion(local, remote);
+    final localHlc = local.hlc ?? Hlc.zero('local');
+    final remoteHlc = remote.hlc ?? Hlc.zero('remote');
+    final bool remoteWinsTopLevel = remoteHlc.compareTo(localHlc) > 0;
+
+    final String mergedTitle = remoteWinsTopLevel ? remote.title : local.title;
+    final String mergedSubTitle =
+        remoteWinsTopLevel ? remote.subTitle : local.subTitle;
+    final int? mergedIconCodePoint = remoteWinsTopLevel ? remote.iconCodePoint : local.iconCodePoint;
+    final TemplateCategory mergedCategory =
+        remoteWinsTopLevel ? remote.category : local.category;
+    final List<AccountField> winnerFields =
+        remoteWinsTopLevel ? remote.fields : local.fields;
+    final List<AccountField> loserFields =
+        remoteWinsTopLevel ? local.fields : remote.fields;
+    final Hlc mergedHlc = remoteWinsTopLevel ? remoteHlc : localHlc;
+
+    final winnerKeys = winnerFields.map((f) => f.fieldKey).toSet();
+    final allFields = [
+      ...winnerFields,
+      ...loserFields.where((f) => !winnerKeys.contains(f.fieldKey)),
+    ];
+
+    final List<AccountField> resolvedFields = [];
+    final Map<String, Hlc> mergedFieldHlc = {};
+
+    for (final field in allFields) {
+      final key = field.fieldKey;
+      final localFieldHlc = local.fieldHlc[key] ?? Hlc.zero('local');
+      final remoteFieldHlc = remote.fieldHlc[key] ?? Hlc.zero('remote');
+
+      final AccountField resolvedField;
+      final Hlc resolvedHlc;
+      if (remoteFieldHlc.compareTo(localFieldHlc) > 0) {
+        resolvedField = remote.fields.cast<AccountField?>().firstWhere(
+                  (f) => f?.fieldKey == key,
+                  orElse: () => null,
+                ) ??
+            field;
+        resolvedHlc = remoteFieldHlc;
+      } else {
+        resolvedField = local.fields.cast<AccountField?>().firstWhere(
+                  (f) => f?.fieldKey == key,
+                  orElse: () => null,
+                ) ??
+            field;
+        resolvedHlc = localFieldHlc;
+      }
+
+      resolvedFields.add(resolvedField);
+      mergedFieldHlc[key] = resolvedHlc;
     }
+
+    bool isPureFastForward = remoteWinsTopLevel;
+    if (isPureFastForward) {
+      for (final key in mergedFieldHlc.keys) {
+        final remoteFH = remote.fieldHlc[key] ?? Hlc.zero('remote');
+        if (mergedFieldHlc[key]!.compareTo(remoteFH) != 0) {
+          isPureFastForward = false;
+          break;
+        }
+      }
+    }
+
+    final SyncStatus finalStatus;
+    if (isPureFastForward) {
+      finalStatus = SyncStatus.synchronized;
+    } else {
+      if (local.syncStatus == SyncStatus.pendingPush) {
+        finalStatus = SyncStatus.conflict;
+      } else {
+        finalStatus = SyncStatus.pendingPush;
+      }
+    }
+
+    return AccountTemplate(
+      templateId: local.templateId,
+      title: mergedTitle,
+      subTitle: mergedSubTitle,
+      iconCodePoint: mergedIconCodePoint,
+      category: mergedCategory,
+      fields: resolvedFields,
+      isCustom: local.isCustom,
+      syncStatus: finalStatus,
+      hlc: mergedHlc,
+      fieldHlc: mergedFieldHlc,
+      serverVersion: local.serverVersion > remote.serverVersion
+          ? local.serverVersion
+          : remote.serverVersion,
+      isDeleted: false,
+      deleteHlc: null,
+    );
   }
 
   static AccountTemplate _templateWithMaxServerVersion(

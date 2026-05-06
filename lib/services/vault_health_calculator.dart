@@ -221,7 +221,7 @@ class VaultHealthCalculator {
     final weakAccounts = <String>[];
     for (final account in accounts) {
       if (account.isDeleted) continue;
-      final password = account.data['password'] ?? '';
+      final password = (account.data['password'] ?? '').toString();
       if (password.isEmpty) continue;
       final strength = EnhancedCryptoService.calculatePasswordStrength(password);
       if (strength < 40) {
@@ -249,7 +249,7 @@ class VaultHealthCalculator {
     final passwordCounts = <String, int>{};
     for (final account in accounts) {
       if (account.isDeleted) continue;
-      final password = account.data['password'] ?? '';
+      final password = (account.data['password'] ?? '').toString();
       if (password.isEmpty) continue;
       passwordCounts[password] = (passwordCounts[password] ?? 0) + 1;
     }
@@ -308,7 +308,7 @@ class VaultHealthCalculator {
     final incompleteAccounts = <String>[];
     for (final account in accounts) {
       if (account.isDeleted) continue;
-      final url = account.data['url'] ?? '';
+      final url = (account.data['url'] ?? '').toString();
       if (url.isEmpty) {
         incompleteAccounts.add(account.name);
       }

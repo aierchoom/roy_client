@@ -36,7 +36,7 @@ class AccountItem {
   final String name;
   final String email;
   final String templateId; // Corresponds to `template` in old code
-  final Map<String, String> data; // Custom fields data
+  final Map<String, dynamic> data; // Custom fields data
   final int createdAt;
 
   // Sync specific fields
@@ -76,10 +76,9 @@ class AccountItem {
       templateId:
           json['template'] as String? ?? json['templateId'] as String? ?? '',
       data:
-          (json['data'] as Map<String, dynamic>?)?.map(
-            (k, v) => MapEntry(k, v?.toString() ?? ''),
-          ) ??
-          {},
+          json['data'] is Map
+              ? Map<String, dynamic>.from(json['data'] as Map)
+              : {},
       createdAt:
           json['createdAt'] as int? ?? DateTime.now().millisecondsSinceEpoch,
       nameHlc: json['nameHlc'] != null ? Hlc.parse(json['nameHlc']) : dummyHlc,
@@ -124,7 +123,7 @@ class AccountItem {
     String? name,
     String? email,
     String? templateId,
-    Map<String, String>? data,
+    Map<String, dynamic>? data,
     int? createdAt,
     Hlc? nameHlc,
     Hlc? emailHlc,

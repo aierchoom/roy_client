@@ -33,7 +33,7 @@ class SecureStorageService {
   static const String _databaseName = 'secret_roy_vault.db';
   static const String _encryptedDatabaseName = 'secret_roy_vault.db.enc';
   static const String _workingDatabaseName = 'secret_roy_vault.runtime.db';
-  static const int _databaseVersion = 6;
+  static const int _databaseVersion = 7;
 
   DatabaseFileCipher? _databaseCipher;
 
@@ -677,6 +677,10 @@ class SecureStorageService {
     if (oldVersion < 6) {
       await _createTotpCredentialsTable(db);
     }
+
+    if (oldVersion < 7) {
+      await db.execute('ALTER TABLE templates ADD COLUMN field_hlc TEXT');
+    }
   }
 
   Future<void> _createTotpCredentialsTable(Database db) async {
@@ -1180,10 +1184,8 @@ class SecureStorageService {
       final dataStr = row['data'] as String;
       final parsedData = jsonDecode(dataStr);
       final mapData = parsedData is Map
-          ? parsedData.map(
-              (k, v) => MapEntry(k.toString(), v?.toString() ?? ''),
-            )
-          : <String, String>{};
+          ? Map<String, dynamic>.from(parsedData)
+          : <String, dynamic>{};
 
       Map<String, dynamic> dataHlcMap = {};
       if (row['data_hlc'] != null && row['data_hlc'].toString().isNotEmpty) {
@@ -1200,7 +1202,7 @@ class SecureStorageService {
         name: row['name'] as String,
         email: row['email'] as String? ?? '',
         templateId: row['template_id'] as String,
-        data: Map<String, String>.from(mapData),
+        data: mapData,
         createdAt: row['created_at'] as int,
         nameHlc: row['name_hlc'] != null
             ? Hlc.parse(row['name_hlc'])
@@ -1372,14 +1374,25 @@ class SecureStorageService {
       Hlc newStamp = Hlc.now(_deviceId);
       final existing = await loadTemplateById(template.templateId);
       if (existing != null) {
+        final newFieldHlc = _computeTemplateFieldHlc(
+          existing,
+          template,
+          newStamp,
+        );
         itemToSave = template.copyWith(
           hlc: newStamp,
+          fieldHlc: newFieldHlc,
           syncStatus: SyncStatus.pendingPush,
           serverVersion: existing.serverVersion,
         );
       } else {
+        final newFieldHlc = {
+          for (final field in template.fields)
+            field.fieldKey: newStamp,
+        };
         itemToSave = template.copyWith(
           hlc: newStamp,
+          fieldHlc: newFieldHlc,
           syncStatus: SyncStatus.pendingPush,
         );
       }
@@ -1395,6 +1408,9 @@ class SecureStorageService {
       'is_custom': itemToSave.isCustom ? 1 : 0,
       'created_at': DateTime.now().millisecondsSinceEpoch,
       'hlc': itemToSave.hlc?.toString(),
+      'field_hlc': jsonEncode(
+        itemToSave.fieldHlc.map((k, v) => MapEntry(k, v.toString())),
+      ),
       'server_version': itemToSave.serverVersion,
       'sync_status': itemToSave.syncStatus.index,
       'is_deleted': itemToSave.isDeleted ? 1 : 0,
@@ -1409,6 +1425,30 @@ class SecureStorageService {
         id: itemToSave.templateId,
       ),
     );
+  }
+
+  Map<String, Hlc> _computeTemplateFieldHlc(
+    AccountTemplate existing,
+    AccountTemplate updated,
+    Hlc stamp,
+  ) {
+    final result = <String, Hlc>{};
+    for (final field in updated.fields) {
+      final existingField = existing.fields
+          .cast<AccountField?>()
+          .firstWhere(
+            (f) => f?.fieldKey == field.fieldKey,
+            orElse: () => null,
+          );
+      if (existingField != null &&
+          jsonEncode(existingField.toJson()) == jsonEncode(field.toJson())) {
+        result[field.fieldKey] =
+            existing.fieldHlc[field.fieldKey] ?? stamp;
+      } else {
+        result[field.fieldKey] = stamp;
+      }
+    }
+    return result;
   }
 
   Future<void> deleteTemplate(
@@ -1459,7 +1499,7 @@ class SecureStorageService {
         templateId: row['id'] as String,
         title: row['title'] as String,
         subTitle: row['subtitle'] as String? ?? '',
-        icon: templateIconFromStorageValue(iconCodePoint),
+        iconCodePoint: iconCodePoint,
         category: templateCategoryFromString(row['category'] as String?),
         fields: (jsonDecode(row['fields'] as String) as List)
             .map(
@@ -1468,6 +1508,7 @@ class SecureStorageService {
             .toList(),
         isCustom: isCustom,
         hlc: row['hlc'] != null ? Hlc.parse(row['hlc'] as String) : null,
+        fieldHlc: AccountTemplate.parseFieldHlc(row['field_hlc']),
         serverVersion: row['server_version'] as int? ?? 0,
         syncStatus: syncStatusFromJson(
           row['sync_status'],

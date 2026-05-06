@@ -162,13 +162,14 @@ class AccountTemplate {
   final String templateId;
   final String title;
   final String subTitle;
-  final IconData? icon;
+  final int? iconCodePoint;
   final TemplateCategory category;
   final List<AccountField> fields;
   final bool isCustom;
 
   final SyncStatus syncStatus;
   final Hlc? hlc;
+  final Map<String, Hlc> fieldHlc;
   final int serverVersion;
   final bool isDeleted;
   final Hlc? deleteHlc;
@@ -177,17 +178,19 @@ class AccountTemplate {
     required this.templateId,
     required this.title,
     required this.subTitle,
-    this.icon,
+    this.iconCodePoint,
     required this.category,
     required this.fields,
     this.isCustom = false,
     this.syncStatus = SyncStatus.pendingPush,
     this.hlc,
+    this.fieldHlc = const {},
     this.serverVersion = 0,
     this.isDeleted = false,
     this.deleteHlc,
   });
 
+  IconData? get icon => templateIconFromStorageValue(iconCodePoint);
   IconData get displayIcon => templateCategoryIcon(category);
   String get badgeText => templateBadgeText(title);
 
@@ -196,7 +199,9 @@ class AccountTemplate {
     bool isCustom = true,
   }) {
     final rawIcon = json['icon'];
-    final icon = templateIconFromStorageValue(rawIcon);
+    final parsedIconCodePoint = rawIcon is int
+        ? rawIcon
+        : (rawIcon is String ? int.tryParse(rawIcon) : null);
 
     return AccountTemplate(
       templateId:
@@ -205,7 +210,7 @@ class AccountTemplate {
       title: json['title'] as String? ?? 'Untitled Template',
       subTitle:
           json['subtitle'] as String? ?? json['subTitle'] as String? ?? '',
-      icon: icon,
+      iconCodePoint: parsedIconCodePoint,
       category: inferTemplateCategory(
         explicitCategory: json['category'] as String?,
         templateId: json['templateId'] as String?,
@@ -215,7 +220,7 @@ class AccountTemplate {
               (field) => AccountField.fromJson(field as Map<String, dynamic>),
             )
             .toList(),
-        icon: icon,
+        iconCodePoint: parsedIconCodePoint,
       ),
       fields: (json['fields'] as List<dynamic>? ?? const [])
           .map((field) => AccountField.fromJson(field as Map<String, dynamic>))
@@ -226,6 +231,7 @@ class AccountTemplate {
         fallback: SyncStatus.synchronized,
       ),
       hlc: json['hlc'] != null ? Hlc.parse(json['hlc'] as String) : null,
+      fieldHlc: AccountTemplate.parseFieldHlc(json['fieldHlc']),
       serverVersion: json['serverVersion'] as int? ?? 0,
       isDeleted: json['isDeleted'] == true,
       deleteHlc: json['deleteHlc'] != null
@@ -234,16 +240,22 @@ class AccountTemplate {
     );
   }
 
+  static Map<String, Hlc> parseFieldHlc(dynamic value) {
+    if (value is! Map<String, dynamic>) return const {};
+    return value.map((k, v) => MapEntry(k, Hlc.parse(v as String)));
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'templateId': templateId,
       'title': title,
       'subtitle': subTitle,
-      'icon': templateIconStorageValue(icon),
+      'icon': iconCodePoint,
       'category': category.name,
       'fields': fields.map((field) => field.toJson()).toList(),
       'syncStatus': syncStatus.name,
       'hlc': hlc?.toString(),
+      'fieldHlc': fieldHlc.map((k, v) => MapEntry(k, v.toString())),
       'serverVersion': serverVersion,
       'isDeleted': isDeleted,
       'deleteHlc': deleteHlc?.toString(),
@@ -253,12 +265,13 @@ class AccountTemplate {
   AccountTemplate copyWith({
     String? title,
     String? subTitle,
-    IconData? icon,
+    int? iconCodePoint,
     TemplateCategory? category,
     List<AccountField>? fields,
     bool? isCustom,
     SyncStatus? syncStatus,
     Hlc? hlc,
+    Map<String, Hlc>? fieldHlc,
     int? serverVersion,
     bool? isDeleted,
     Hlc? deleteHlc,
@@ -267,12 +280,13 @@ class AccountTemplate {
       templateId: templateId,
       title: title ?? this.title,
       subTitle: subTitle ?? this.subTitle,
-      icon: icon ?? this.icon,
+      iconCodePoint: iconCodePoint ?? this.iconCodePoint,
       category: category ?? this.category,
       fields: fields ?? this.fields,
       isCustom: isCustom ?? this.isCustom,
       syncStatus: syncStatus ?? this.syncStatus,
       hlc: hlc ?? this.hlc,
+      fieldHlc: fieldHlc ?? this.fieldHlc,
       serverVersion: serverVersion ?? this.serverVersion,
       isDeleted: isDeleted ?? this.isDeleted,
       deleteHlc: deleteHlc ?? this.deleteHlc,
@@ -280,12 +294,12 @@ class AccountTemplate {
   }
 }
 
-final AccountTemplate websiteTemplate = const AccountTemplate(
+final AccountTemplate websiteTemplate = AccountTemplate(
   templateId: 'generic_info',
   title: '\u7f51\u7ad9\u6a21\u677f',
   subTitle:
       '\u4fdd\u5b58\u7f51\u7ad9\u3001\u767b\u5f55\u8d26\u53f7\u3001\u5bc6\u7801\u548c\u5907\u6ce8',
-  icon: Icons.language_outlined,
+  iconCodePoint: Icons.language_outlined.codePoint,
   category: TemplateCategory.login,
   fields: [
     AccountField(
