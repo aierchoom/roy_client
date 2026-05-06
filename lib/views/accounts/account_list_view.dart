@@ -90,6 +90,96 @@ class _AccountListViewState extends State<AccountListView> {
     }
   }
 
+  Future<void> _pushAllLocalChanges(BuildContext context) async {
+    final provider = context.read<EnhancedAppProvider>();
+    final result = await provider.pushAllLocalSyncChanges();
+    if (!mounted || !context.mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+
+    if (result.success) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            _text(context, '\u63a8\u9001\u6210\u529f', 'Push succeeded'),
+          ),
+        ),
+      );
+    } else if (result.error != null) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            _text(
+              context,
+              '\u63a8\u9001\u5931\u8d25\uff1a${result.error}',
+              'Push failed: ${result.error}',
+            ),
+          ),
+        ),
+      );
+    }
+  }
+
+  Widget _buildSyncPrompt(BuildContext context, EnhancedAppProvider provider) {
+    final changes = provider.localSyncChanges;
+    if (changes.isEmpty) return const SizedBox.shrink();
+
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primaryContainer.withAlpha(80),
+        borderRadius: BorderRadius.circular(AppRadii.panel),
+        border: Border.all(color: theme.colorScheme.primary.withAlpha(60)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.cloud_upload_outlined,
+            size: 20,
+            color: theme.colorScheme.primary,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _text(
+                    context,
+                    '\u5f85\u540c\u6b65\u53d8\u66f4 ${changes.length} \u9879',
+                    '${changes.length} change(s) waiting to sync',
+                  ),
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  _text(
+                    context,
+                    '\u70b9\u51fb\u63a8\u9001\u5c06\u672c\u5730\u4fee\u6539\u540c\u6b65\u5230\u5176\u4ed6\u8bbe\u5907',
+                    'Tap push to sync local changes to your other devices',
+                  ),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          FilledButton.tonalIcon(
+            onPressed: () => _pushAllLocalChanges(context),
+            icon: const Icon(Icons.cloud_upload_outlined, size: 18),
+            label: Text(_text(context, '\u63a8\u9001', 'Push')),
+          ),
+        ],
+      ),
+    );
+  }
+
   List<AccountItem> _filteredAccounts(List<AccountItem> accounts) {
     if (_activeTemplateId == null) return accounts;
     return accounts
@@ -515,6 +605,11 @@ class _AccountListViewState extends State<AccountListView> {
                             child: _buildHeroCard(context, provider),
                           ),
                           const SizedBox(height: AppSpacing.xl),
+                          AdaptiveSection(
+                            maxWidth: AppSectionWidths.panel,
+                            child: _buildSyncPrompt(context, provider),
+                          ),
+                          const SizedBox(height: AppSpacing.md),
                           AdaptiveSection(
                             maxWidth: AppSectionWidths.panel,
                             child: Padding(

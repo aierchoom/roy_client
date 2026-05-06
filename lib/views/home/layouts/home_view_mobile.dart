@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../../providers/enhanced_app_provider.dart';
 import '../../../widgets/app_nav_bar.dart';
 
 class HomeViewMobile extends StatelessWidget {
@@ -21,6 +23,7 @@ class HomeViewMobile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final syncBadgeCount = context.watch<EnhancedAppProvider>().localSyncChanges.length;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -41,6 +44,7 @@ class HomeViewMobile extends StatelessWidget {
             icon: Icons.search_outlined,
             selectedIcon: Icons.search,
             label: _text(context, '\u641c\u7d22', 'Search'),
+            badgeCount: syncBadgeCount,
           ),
           AppNavDestination(
             icon: Icons.verified_user_outlined,

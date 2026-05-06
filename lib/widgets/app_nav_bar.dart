@@ -104,10 +104,10 @@ class _NavItem extends StatelessWidget {
                       : Colors.transparent,
                   borderRadius: BorderRadius.circular(AppRadii.button),
                 ),
-                child: Icon(
-                  selected ? destination.selectedIcon : destination.icon,
+                child: NavBadgeIcon(
+                  icon: selected ? destination.selectedIcon : destination.icon,
                   color: color,
-                  size: 22,
+                  badgeCount: destination.badgeCount,
                 ),
               ),
               const SizedBox(height: 4),

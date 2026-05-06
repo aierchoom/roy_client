@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../../providers/enhanced_app_provider.dart';
 import '../../../theme/app_design_tokens.dart';
 import '../../../widgets/app_nav_rail.dart';
 
@@ -22,6 +24,7 @@ class HomeViewDesktop extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final syncBadgeCount = context.watch<EnhancedAppProvider>().localSyncChanges.length;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -51,6 +54,7 @@ class HomeViewDesktop extends StatelessWidget {
                     selectedIcon: Icons.search,
                     label: _text(context, '\u641c\u7d22', 'Search'),
                     description: _text(context, '\u5feb\u901f\u5b9a\u4f4d\u8d26\u6237', 'Search and jump fast'),
+                    badgeCount: syncBadgeCount,
                   ),
                   AppNavDestination(
                     icon: Icons.verified_user_outlined,

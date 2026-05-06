@@ -8,12 +8,14 @@ class AppNavDestination {
   final IconData selectedIcon;
   final String label;
   final String? description;
+  final int badgeCount;
 
   const AppNavDestination({
     required this.icon,
     required this.selectedIcon,
     required this.label,
     this.description,
+    this.badgeCount = 0,
   });
 }
 
@@ -83,6 +85,62 @@ class AppNavRail extends StatelessWidget {
   }
 }
 
+class NavBadgeIcon extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final int badgeCount;
+
+  const NavBadgeIcon({
+    required this.icon,
+    required this.color,
+    required this.badgeCount,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    Widget iconWidget = Icon(icon, color: color, size: 22);
+
+    if (badgeCount > 0) {
+      iconWidget = Stack(
+        clipBehavior: Clip.none,
+        children: [
+          iconWidget,
+          Positioned(
+            right: -6,
+            top: -6,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.error,
+                borderRadius: BorderRadius.circular(AppRadii.pill),
+                border: Border.all(
+                  color: theme.colorScheme.surface,
+                  width: 1.5,
+                ),
+              ),
+              constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+              child: Text(
+                badgeCount > 9 ? '9+' : '$badgeCount',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onError,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  height: 1,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return iconWidget;
+  }
+}
+
 class _NavItem extends StatelessWidget {
   final AppNavDestination destination;
   final bool selected;
@@ -138,10 +196,10 @@ class _NavItem extends StatelessWidget {
                       : theme.colorScheme.surfaceContainerHighest.withAlpha(72),
                   borderRadius: BorderRadius.circular(AppRadii.button),
                 ),
-                child: Icon(
-                  selected ? destination.selectedIcon : destination.icon,
+                child: NavBadgeIcon(
+                  icon: selected ? destination.selectedIcon : destination.icon,
                   color: accentColor,
-                  size: 22,
+                  badgeCount: destination.badgeCount,
                 ),
               ),
               const SizedBox(width: 12),
