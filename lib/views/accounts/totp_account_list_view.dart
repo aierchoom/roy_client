@@ -9,6 +9,7 @@ import '../../providers/enhanced_app_provider.dart';
 import '../../services/totp_service.dart';
 import '../../services/sensitive_clipboard_service.dart';
 import '../../theme/app_design_tokens.dart';
+import '../../theme/app_layout.dart';
 import '../../widgets/adaptive_page.dart';
 import '../../widgets/app_page_header.dart';
 import 'totp_credential_edit_view.dart';
@@ -120,7 +121,7 @@ class _TotpAccountListViewState extends State<TotpAccountListView> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: theme.colorScheme.primary.withAlpha(18),
+        color: theme.colorScheme.primary.withAlpha(AppAlphas.tint),
         borderRadius: BorderRadius.circular(AppRadii.button),
       ),
       child: Row(
@@ -158,7 +159,7 @@ class _TotpAccountListViewState extends State<TotpAccountListView> {
             size: 44,
             color: theme.colorScheme.outlineVariant,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.lg),
           Text(
             _text(context, '\u6682\u65e0 2FA', 'No 2FA Items'),
             style: theme.textTheme.titleMedium?.copyWith(
@@ -198,12 +199,12 @@ class _TotpAccountListViewState extends State<TotpAccountListView> {
     }
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(AppRadii.panel),
         border: Border.all(
-          color: theme.colorScheme.outlineVariant.withAlpha(90),
+          color: theme.colorScheme.outlineVariant.withAlpha(AppAlphas.strong),
         ),
       ),
       child: Column(
@@ -224,7 +225,7 @@ class _TotpAccountListViewState extends State<TotpAccountListView> {
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: AppSpacing.xs),
                     Text(
                       linkedAccounts.isEmpty
                           ? _text(
@@ -279,11 +280,11 @@ class _TotpAccountListViewState extends State<TotpAccountListView> {
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.sm),
           LinearProgressIndicator(
             value: code.secondsRemaining / code.period,
             minHeight: 5,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(AppRadii.control),
           ),
         ],
       ),
@@ -299,10 +300,30 @@ class _TotpAccountListViewState extends State<TotpAccountListView> {
       return _buildEmptyState(context);
     }
 
+    final layout = AppLayout.of(context);
+    final children = credentials.map((credential) {
+      return _buildCredentialCard(context, provider, credential);
+    }).toList();
+
+    if (layout.isExpanded) {
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final columnWidth = (constraints.maxWidth - AppSpacing.lg) / 2;
+          return Wrap(
+            spacing: AppSpacing.lg,
+            runSpacing: AppSpacing.lg,
+            children: children.map((child) {
+              return SizedBox(width: columnWidth, child: child);
+            }).toList(),
+          );
+        },
+      );
+    }
+
     return Column(
       children: credentials.map((credential) {
         return Padding(
-          padding: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.only(bottom: AppSpacing.md),
           child: _buildCredentialCard(context, provider, credential),
         );
       }).toList(),
@@ -352,7 +373,7 @@ class _TotpAccountListViewState extends State<TotpAccountListView> {
               ],
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: AppSpacing.xl),
           AdaptiveSection(
             maxWidth: AppSectionWidths.panel,
             child: _buildCredentialPanel(context, provider, credentials),

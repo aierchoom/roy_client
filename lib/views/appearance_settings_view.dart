@@ -4,6 +4,9 @@ import 'package:provider/provider.dart';
 import '../providers/theme_provider.dart';
 import '../theme/app_design_tokens.dart';
 import '../widgets/adaptive_page.dart';
+import '../widgets/app_hero_card.dart';
+import '../widgets/app_option_tile.dart';
+import '../widgets/section_card.dart';
 
 class AppearanceSettingsView extends StatelessWidget {
   const AppearanceSettingsView({super.key});
@@ -29,7 +32,8 @@ class AppearanceSettingsView extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
           children: [
-            _AppearanceHeroCard(
+            AppHeroCard(
+              icon: Icons.palette_outlined,
               title: _text(
                 context,
                 '\u89c6\u89c9\u4e2a\u6027\u5316',
@@ -41,8 +45,8 @@ class AppearanceSettingsView extends StatelessWidget {
                 'Shape theme mode, accent color, and dark-mode details in one place.',
               ),
             ),
-            const SizedBox(height: 16),
-            _SectionCard(
+            const SizedBox(height: AppSpacing.lg),
+            SectionCard(
               title: _text(context, '\u4e3b\u9898\u6a21\u5f0f', 'Theme Mode'),
               subtitle: _text(
                 context,
@@ -51,7 +55,7 @@ class AppearanceSettingsView extends StatelessWidget {
               ),
               child: Column(
                 children: [
-                  _ModeOptionTile(
+                  AppOptionTile(
                     title: _text(
                       context,
                       '\u8ddf\u968f\u7cfb\u7edf',
@@ -67,7 +71,7 @@ class AppearanceSettingsView extends StatelessWidget {
                     onTap: () => themeProvider.setThemeMode(ThemeMode.system),
                   ),
                   const Divider(height: 1),
-                  _ModeOptionTile(
+                  AppOptionTile(
                     title: _text(
                       context,
                       '\u6d45\u8272\u6a21\u5f0f',
@@ -83,7 +87,7 @@ class AppearanceSettingsView extends StatelessWidget {
                     onTap: () => themeProvider.setThemeMode(ThemeMode.light),
                   ),
                   const Divider(height: 1),
-                  _ModeOptionTile(
+                  AppOptionTile(
                     title: _text(
                       context,
                       '\u6df1\u8272\u6a21\u5f0f',
@@ -101,9 +105,9 @@ class AppearanceSettingsView extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.lg),
             if (themeProvider.themeMode != ThemeMode.light)
-              _SectionCard(
+              SectionCard(
                 title: _text(
                   context,
                   '\u6df1\u8272\u6a21\u5f0f\u4f18\u5316',
@@ -144,8 +148,8 @@ class AppearanceSettingsView extends StatelessWidget {
                 ),
               ),
             if (themeProvider.themeMode != ThemeMode.light)
-              const SizedBox(height: 16),
-            _SectionCard(
+              const SizedBox(height: AppSpacing.lg),
+            SectionCard(
               title: _text(context, '\u4e3b\u9898\u989c\u8272', 'Accent Color'),
               subtitle: _text(
                 context,
@@ -153,7 +157,7 @@ class AppearanceSettingsView extends StatelessWidget {
                 'Choose the primary color for buttons, navigation, and highlights.',
               ),
               child: Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(AppSpacing.lg),
                 child: Wrap(
                   spacing: 14,
                   runSpacing: 14,
@@ -176,203 +180,7 @@ class AppearanceSettingsView extends StatelessWidget {
   }
 }
 
-class _AppearanceHeroCard extends StatelessWidget {
-  final String title;
-  final String subtitle;
 
-  const _AppearanceHeroCard({required this.title, required this.subtitle});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            theme.colorScheme.primaryContainer,
-            theme.colorScheme.tertiaryContainer,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surface.withAlpha(210),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Icon(
-              Icons.palette_outlined,
-              size: 28,
-              color: theme.colorScheme.primary,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: theme.colorScheme.onPrimaryContainer,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onPrimaryContainer.withAlpha(160),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SectionCard extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final Widget child;
-
-  const _SectionCard({
-    required this.title,
-    required this.subtitle,
-    required this.child,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              subtitle,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 16),
-            child,
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ModeOptionTile extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _ModeOptionTile({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer.withAlpha(90),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(icon, color: theme.colorScheme.primary),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 160),
-                width: 22,
-                height: 22,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: selected
-                      ? theme.colorScheme.primary
-                      : Colors.transparent,
-                  border: Border.all(
-                    color: selected
-                        ? theme.colorScheme.primary
-                        : theme.colorScheme.outline,
-                    width: 2,
-                  ),
-                ),
-                child: selected
-                    ? Icon(
-                        Icons.check,
-                        size: 14,
-                        color: theme.colorScheme.onPrimary,
-                      )
-                    : null,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 class _ColorPresetButton extends StatelessWidget {
   final Color color;
@@ -405,7 +213,7 @@ class _ColorPresetButton extends StatelessWidget {
           boxShadow: selected
               ? [
                   BoxShadow(
-                    color: color.withAlpha(90),
+                    color: color.withAlpha(AppAlphas.strong),
                     blurRadius: 10,
                     spreadRadius: 1,
                   ),

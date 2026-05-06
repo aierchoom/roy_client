@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../services/totp_import_service.dart';
+import '../../theme/app_design_tokens.dart';
 
 class TotpQrScannerView extends StatefulWidget {
   final String title;
@@ -105,7 +106,7 @@ class _TotpQrScannerViewState extends State<TotpQrScannerView> {
                   width: 260,
                   height: 260,
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(24),
+                    borderRadius: BorderRadius.circular(AppRadii.panel),
                     border: Border.all(
                       color: theme.colorScheme.primary,
                       width: 3,
@@ -122,8 +123,8 @@ class _TotpQrScannerViewState extends State<TotpQrScannerView> {
             child: SafeArea(
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.surface.withAlpha(232),
-                  borderRadius: BorderRadius.circular(16),
+                  color: theme.colorScheme.surface.withAlpha(AppAlphas.surface),
+                  borderRadius: BorderRadius.circular(AppRadii.panel),
                   border: Border.all(color: theme.colorScheme.outlineVariant),
                 ),
                 child: Padding(

@@ -9,6 +9,7 @@ import 'providers/enhanced_app_provider.dart';
 import 'providers/theme_provider.dart';
 import 'services/service_manager.dart';
 import 'theme/app_design_tokens.dart';
+import 'theme/app_text_styles.dart';
 import 'views/home/home_view.dart';
 import 'views/password_tools_view.dart';
 import 'views/security_settings_view.dart';
@@ -63,6 +64,7 @@ class _SecretRoyAppState extends State<SecretRoyApp> {
       ],
       child: Consumer2<ServiceManager, AppThemeProvider>(
         builder: (context, serviceManager, themeProvider, _) {
+          final density = AppTextStyles.density(context);
           return MaterialApp(
             title: 'SecretRoy',
             debugShowCheckedModeBanner: false,
@@ -74,10 +76,11 @@ class _SecretRoyAppState extends State<SecretRoyApp> {
             ],
             supportedLocales: const [Locale('zh'), Locale('en')],
             locale: const Locale('zh'),
-            theme: _buildLightTheme(themeProvider.colorSeed),
+            theme: _buildLightTheme(themeProvider.colorSeed, density),
             darkTheme: _buildDarkTheme(
               themeProvider.colorSeed,
               themeProvider.trueBlack,
+              density,
             ),
             themeMode: themeProvider.themeMode,
             home: serviceManager.state == ServiceManagerState.unlocked
@@ -96,23 +99,20 @@ class _SecretRoyAppState extends State<SecretRoyApp> {
     );
   }
 
-  ThemeData _buildLightTheme(Color seed) {
+  ThemeData _buildLightTheme(Color seed, AppTextDensity density) {
     final colorScheme = ColorScheme.fromSeed(
       seedColor: seed,
       brightness: Brightness.light,
     );
     final backgroundColor = AppSurfaces.lightBackground(colorScheme);
+    final baseTextTheme = AppTextStyles.themeForDensity(density);
+    final textTheme = GoogleFonts.notoSansScTextTheme(baseTextTheme);
 
     return ThemeData(
       colorScheme: colorScheme,
       extensions: [AppVisualTokens.fromBrightness(Brightness.light)],
       useMaterial3: true,
-      textTheme: GoogleFonts.notoSansScTextTheme(ThemeData.light().textTheme)
-          .copyWith(
-            titleLarge: GoogleFonts.notoSansSc(fontWeight: FontWeight.w700),
-            titleMedium: GoogleFonts.notoSansSc(fontWeight: FontWeight.w600),
-            titleSmall: GoogleFonts.notoSansSc(fontWeight: FontWeight.w600),
-          ),
+      textTheme: textTheme,
       scaffoldBackgroundColor: backgroundColor,
       canvasColor: backgroundColor,
       pageTransitionsTheme: const PageTransitionsTheme(
@@ -126,9 +126,7 @@ class _SecretRoyAppState extends State<SecretRoyApp> {
         centerTitle: false,
         backgroundColor: Colors.transparent,
         foregroundColor: colorScheme.onSurface,
-        titleTextStyle: GoogleFonts.notoSansSc(
-          fontSize: 20,
-          fontWeight: FontWeight.w700,
+        titleTextStyle: textTheme.titleLarge?.copyWith(
           color: colorScheme.onSurface,
         ),
         elevation: 0,
@@ -148,14 +146,10 @@ class _SecretRoyAppState extends State<SecretRoyApp> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadii.dialog),
         ),
-        titleTextStyle: GoogleFonts.notoSansSc(
-          fontSize: 20,
-          fontWeight: FontWeight.w700,
+        titleTextStyle: textTheme.headlineSmall?.copyWith(
           color: colorScheme.onSurface,
         ),
-        contentTextStyle: GoogleFonts.notoSansSc(
-          fontSize: 14,
-          fontWeight: FontWeight.w500,
+        contentTextStyle: textTheme.bodyMedium?.copyWith(
           color: colorScheme.onSurfaceVariant,
         ),
       ),
@@ -279,7 +273,7 @@ class _SecretRoyAppState extends State<SecretRoyApp> {
     );
   }
 
-  ThemeData _buildDarkTheme(Color seed, bool trueBlack) {
+  ThemeData _buildDarkTheme(Color seed, bool trueBlack, AppTextDensity density) {
     // Boost saturation for blue seeds to avoid 'muddy' dark modes
     Color activeSeed = seed;
     final hsv = HSVColor.fromColor(seed);
@@ -297,17 +291,14 @@ class _SecretRoyAppState extends State<SecretRoyApp> {
     );
     final cardColor = AppSurfaces.darkCard(colorScheme, trueBlack: trueBlack);
     final inputColor = AppSurfaces.darkInput(colorScheme, trueBlack: trueBlack);
+    final baseTextTheme = AppTextStyles.themeForDensity(density);
+    final textTheme = GoogleFonts.notoSansScTextTheme(baseTextTheme);
 
     return ThemeData(
       colorScheme: colorScheme,
       extensions: [AppVisualTokens.fromBrightness(Brightness.dark)],
       useMaterial3: true,
-      textTheme: GoogleFonts.notoSansScTextTheme(ThemeData.dark().textTheme)
-          .copyWith(
-            titleLarge: GoogleFonts.notoSansSc(fontWeight: FontWeight.w700),
-            titleMedium: GoogleFonts.notoSansSc(fontWeight: FontWeight.w600),
-            titleSmall: GoogleFonts.notoSansSc(fontWeight: FontWeight.w600),
-          ),
+      textTheme: textTheme,
       scaffoldBackgroundColor: bgColor,
       canvasColor: bgColor,
       pageTransitionsTheme: const PageTransitionsTheme(
@@ -321,9 +312,7 @@ class _SecretRoyAppState extends State<SecretRoyApp> {
         centerTitle: false,
         backgroundColor: Colors.transparent,
         foregroundColor: colorScheme.onSurface,
-        titleTextStyle: GoogleFonts.notoSansSc(
-          fontSize: 20,
-          fontWeight: FontWeight.w700,
+        titleTextStyle: textTheme.titleLarge?.copyWith(
           color: colorScheme.onSurface,
         ),
         elevation: 0,
@@ -342,14 +331,10 @@ class _SecretRoyAppState extends State<SecretRoyApp> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadii.dialog),
         ),
-        titleTextStyle: GoogleFonts.notoSansSc(
-          fontSize: 20,
-          fontWeight: FontWeight.w700,
+        titleTextStyle: textTheme.headlineSmall?.copyWith(
           color: colorScheme.onSurface,
         ),
-        contentTextStyle: GoogleFonts.notoSansSc(
-          fontSize: 14,
-          fontWeight: FontWeight.w500,
+        contentTextStyle: textTheme.bodyMedium?.copyWith(
           color: colorScheme.onSurfaceVariant,
         ),
       ),

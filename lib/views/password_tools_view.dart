@@ -4,6 +4,7 @@ import '../services/service_manager.dart';
 import '../services/sensitive_clipboard_service.dart';
 import '../widgets/adaptive_page.dart';
 import '../widgets/password_generator_sheet.dart';
+import '../theme/app_design_tokens.dart';
 
 class PasswordToolsView extends StatefulWidget {
   const PasswordToolsView({super.key});
@@ -63,7 +64,7 @@ class _PasswordToolsViewState extends State<PasswordToolsView> {
     final theme = Theme.of(context);
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(AppSpacing.xl),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
@@ -73,15 +74,15 @@ class _PasswordToolsViewState extends State<PasswordToolsView> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(AppRadii.panel),
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(AppSpacing.md),
             decoration: BoxDecoration(
-              color: theme.colorScheme.surface.withAlpha(210),
-              borderRadius: BorderRadius.circular(16),
+              color: theme.colorScheme.surface.withAlpha(AppAlphas.surfaceOverlay),
+              borderRadius: BorderRadius.circular(AppRadii.panel),
             ),
             child: Icon(
               Icons.password_outlined,
@@ -89,7 +90,7 @@ class _PasswordToolsViewState extends State<PasswordToolsView> {
               color: theme.colorScheme.primary,
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: AppSpacing.lg),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -146,7 +147,7 @@ class _PasswordToolsViewState extends State<PasswordToolsView> {
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.lg),
             child,
           ],
         ),
@@ -168,8 +169,8 @@ class _PasswordToolsViewState extends State<PasswordToolsView> {
       leading: Container(
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: theme.colorScheme.primaryContainer.withAlpha(90),
-          borderRadius: BorderRadius.circular(12),
+          color: theme.colorScheme.primaryContainer.withAlpha(AppAlphas.strong),
+          borderRadius: BorderRadius.circular(AppRadii.button),
         ),
         child: Icon(icon, color: theme.colorScheme.primary),
       ),
@@ -232,10 +233,10 @@ class _PasswordToolsViewState extends State<PasswordToolsView> {
         children: [
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(AppSpacing.lg),
             decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest.withAlpha(120),
-              borderRadius: BorderRadius.circular(18),
+              color: theme.colorScheme.surfaceContainerHighest.withAlpha(AppAlphas.outline),
+              borderRadius: BorderRadius.circular(AppRadii.panel),
             ),
             child: SelectableText(
               password,
@@ -245,7 +246,7 @@ class _PasswordToolsViewState extends State<PasswordToolsView> {
               ),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           Text(
             _text(
               '\u5f3a\u5ea6\uff1a$strength / 100',
@@ -256,7 +257,7 @@ class _PasswordToolsViewState extends State<PasswordToolsView> {
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           Row(
             children: [
               Expanded(
@@ -266,7 +267,7 @@ class _PasswordToolsViewState extends State<PasswordToolsView> {
                   label: Text(_text('\u590d\u5236', 'Copy')),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: FilledButton.icon(
                   onPressed: () => _showPasswordGenerator(context),
@@ -294,7 +295,7 @@ class _PasswordToolsViewState extends State<PasswordToolsView> {
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
           children: [
             _buildHeroCard(context),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.lg),
             _buildSectionCard(
               context: context,
               title: _text('\u5bc6\u7801\u751f\u6210', 'Password Generator'),
@@ -316,7 +317,7 @@ class _PasswordToolsViewState extends State<PasswordToolsView> {
                 onTap: () => _showPasswordGenerator(context),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.lg),
             _buildLatestPasswordCard(context),
           ],
         ),

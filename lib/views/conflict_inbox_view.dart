@@ -5,6 +5,7 @@ import '../models/account_item.dart';
 import '../providers/enhanced_app_provider.dart';
 import '../services/service_manager.dart';
 import '../sync/crdt_merge_engine.dart';
+import '../theme/app_design_tokens.dart';
 
 class ConflictInboxView extends StatefulWidget {
   const ConflictInboxView({super.key});
@@ -179,20 +180,20 @@ class _ConflictGroupCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.fromLTRB(18, 16, 18, 12),
               decoration: BoxDecoration(
-                color: theme.colorScheme.errorContainer.withAlpha(60),
+                color: theme.colorScheme.errorContainer.withAlpha(AppAlphas.medium),
                 border: Border(
                   bottom: BorderSide(
-                    color: theme.colorScheme.outlineVariant.withAlpha(80),
+                    color: theme.colorScheme.outlineVariant.withAlpha(AppAlphas.high),
                   ),
                 ),
               ),
               child: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.all(AppSpacing.sm),
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.error.withAlpha(24),
-                      borderRadius: BorderRadius.circular(12),
+                      color: theme.colorScheme.error.withAlpha(AppAlphas.subtle),
+                      borderRadius: BorderRadius.circular(AppRadii.button),
                     ),
                     child: Icon(
                       Icons.merge_type_outlined,
@@ -200,7 +201,7 @@ class _ConflictGroupCard extends StatelessWidget {
                       color: theme.colorScheme.error,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: AppSpacing.md),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -303,7 +304,7 @@ class _ConflictLogRow extends StatelessWidget {
     if (log.fieldKey == 'name') return account.name;
     if (log.fieldKey == 'email') return account.email;
     if (log.fieldKey.startsWith('data.')) {
-      return account.data[log.fieldKey.substring(5)] ?? '';
+      return account.data[log.fieldKey.substring(5)]?.toString() ?? '';
     }
     return '';
   }
@@ -345,7 +346,7 @@ class _ConflictLogRow extends StatelessWidget {
                     ),
                     decoration: BoxDecoration(
                       color: theme.colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(AppRadii.sm),
                     ),
                     child: Text(
                       _fieldLabel,
@@ -364,7 +365,7 @@ class _ConflictLogRow extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.sm),
               Text(
                 '${textBuilder('类型', 'Type')}: $_conflictTypeLabel · '
                 '${textBuilder('来源', 'Source')}: ${log.hlc.nodeId} · '
@@ -373,24 +374,24 @@ class _ConflictLogRow extends StatelessWidget {
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.md),
               _ValueChip(
                 label: _isRemoteMissingConflict
                     ? textBuilder('本地保留版本', 'Local Version')
                     : textBuilder('当前值（采纳方）', 'Current (Winner)'),
                 value: winnerValue,
                 color: theme.colorScheme.primary,
-                bgColor: theme.colorScheme.primaryContainer.withAlpha(60),
+                bgColor: theme.colorScheme.primaryContainer.withAlpha(AppAlphas.medium),
                 icon: Icons.check_circle_outline,
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.sm),
               _ValueChip(
                 label: _isRemoteMissingConflict
                     ? textBuilder('远端状态', 'Remote State')
                     : textBuilder('被覆盖值（冲突方）', 'Overwritten (Conflict)'),
                 value: loserValue,
                 color: theme.colorScheme.error,
-                bgColor: theme.colorScheme.errorContainer.withAlpha(60),
+                bgColor: theme.colorScheme.errorContainer.withAlpha(AppAlphas.medium),
                 icon: Icons.cancel_outlined,
               ),
               const SizedBox(height: 14),
@@ -410,7 +411,7 @@ class _ConflictLogRow extends StatelessWidget {
                       onPressed: onDismiss,
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: FilledButton.icon(
                       icon: Icon(
@@ -438,7 +439,7 @@ class _ConflictLogRow extends StatelessWidget {
         ),
         Divider(
           height: 1,
-          color: theme.colorScheme.outlineVariant.withAlpha(80),
+          color: theme.colorScheme.outlineVariant.withAlpha(AppAlphas.high),
         ),
       ],
     );
@@ -470,10 +471,10 @@ class _ValueChip extends StatelessWidget {
     final theme = Theme.of(context);
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadii.button),
         border: Border.all(color: color.withAlpha(50)),
       ),
       child: Column(
@@ -482,7 +483,7 @@ class _ValueChip extends StatelessWidget {
           Row(
             children: [
               Icon(icon, size: 13, color: color),
-              const SizedBox(width: 4),
+              const SizedBox(width: AppSpacing.xs),
               Text(
                 label,
                 style: theme.textTheme.labelSmall?.copyWith(
@@ -492,7 +493,7 @@ class _ValueChip extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: AppSpacing.xs),
           SelectableText(
             value.isEmpty
                 ? textBuilderFallback(context, '（空）', '(empty)')
@@ -527,9 +528,9 @@ class _EmptyState extends StatelessWidget {
           Icon(
             Icons.check_circle_outline,
             size: 64,
-            color: theme.colorScheme.primary.withAlpha(100),
+            color: theme.colorScheme.primary.withAlpha(AppAlphas.divider),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.lg),
           Text(
             text,
             style: theme.textTheme.bodyLarge?.copyWith(

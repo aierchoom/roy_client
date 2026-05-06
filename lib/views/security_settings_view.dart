@@ -4,6 +4,7 @@ import '../services/auto_lock_service.dart';
 import '../services/biometric_auth_service.dart';
 import '../services/service_manager.dart';
 import '../widgets/adaptive_page.dart';
+import '../theme/app_design_tokens.dart';
 
 class SecuritySettingsView extends StatefulWidget {
   const SecuritySettingsView({super.key});
@@ -197,7 +198,7 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
                 'Enter your master password to enable $_biometricName unlock.',
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.lg),
             TextField(
               controller: controller,
               obscureText: true,
@@ -240,7 +241,7 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
     final theme = Theme.of(context);
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(AppSpacing.xl),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
@@ -250,15 +251,15 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(AppRadii.panel),
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(AppSpacing.md),
             decoration: BoxDecoration(
-              color: theme.colorScheme.surface.withAlpha(210),
-              borderRadius: BorderRadius.circular(16),
+              color: theme.colorScheme.surface.withAlpha(AppAlphas.surfaceOverlay),
+              borderRadius: BorderRadius.circular(AppRadii.panel),
             ),
             child: Icon(
               Icons.shield_outlined,
@@ -266,7 +267,7 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
               color: theme.colorScheme.primary,
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: AppSpacing.lg),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -323,7 +324,7 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.lg),
             child,
           ],
         ),
@@ -345,7 +346,7 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadii.panel),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
           child: Row(
@@ -353,8 +354,8 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer.withAlpha(90),
-                  borderRadius: BorderRadius.circular(12),
+                  color: theme.colorScheme.primaryContainer.withAlpha(AppAlphas.strong),
+                  borderRadius: BorderRadius.circular(AppRadii.button),
                 ),
                 child: Icon(icon, color: theme.colorScheme.primary),
               ),
@@ -379,7 +380,7 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
                   ],
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: AppSpacing.md),
               AnimatedContainer(
                 duration: const Duration(milliseconds: 160),
                 width: 22,
@@ -604,7 +605,7 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
                 children: [
                   _buildHeroCard(context),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppSpacing.lg),
                   _buildSectionCard(
                     context: context,
                     title: _text(
@@ -622,7 +623,7 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
                           ),
                     child: _buildPasswordManagementTile(context),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppSpacing.lg),
                   _buildSectionCard(
                     context: context,
                     title: _text('\u81ea\u52a8\u9501\u5b9a', 'Auto Lock'),
@@ -657,7 +658,7 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppSpacing.lg),
                   _buildSectionCard(
                     context: context,
                     title: _text('生物识别', 'Biometrics'),
@@ -679,11 +680,11 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
     final theme = Theme.of(context);
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(AppSpacing.xl),
       decoration: BoxDecoration(
-        color: theme.colorScheme.errorContainer.withAlpha(40),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: theme.colorScheme.error.withAlpha(60)),
+        color: theme.colorScheme.errorContainer.withAlpha(AppAlphas.low),
+        borderRadius: BorderRadius.circular(AppRadii.panel),
+        border: Border.all(color: theme.colorScheme.error.withAlpha(AppAlphas.medium)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -705,7 +706,7 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           Text(
             _text(
               '删除当前保险库的所有数据并重置应用。此操作不可撤销，请确保您已有备份。',
@@ -715,7 +716,7 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
               color: theme.colorScheme.onErrorContainer.withAlpha(200),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.lg),
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
@@ -723,7 +724,7 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
                 backgroundColor: theme.colorScheme.error,
                 foregroundColor: theme.colorScheme.onError,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(AppRadii.panel),
                 ),
               ),
               onPressed: _showFactoryResetDialog,

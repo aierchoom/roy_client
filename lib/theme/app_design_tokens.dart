@@ -19,6 +19,8 @@ abstract final class AppBrandColors {
 }
 
 abstract final class AppRadii {
+  static const double chip = 6;
+  static const double sm = 8;
   static const double control = 10;
   static const double button = 12;
   static const double card = 12;
@@ -26,6 +28,9 @@ abstract final class AppRadii {
   static const double dialog = 20;
   static const double sheet = 20;
   static const double nav = 20;
+  static const double xl = 24;
+  static const double xxl = 28;
+  static const double pill = 999;
 }
 
 abstract final class AppSpacing {
@@ -63,6 +68,58 @@ abstract final class AppSurfaces {
     if (trueBlack) return const Color(0xFF0D1012);
     return colors.surface;
   }
+
+  /// 柔和的 Surface 色调混合。
+  ///
+  /// 在浅色模式下将 [tint] 以 [tintAlpha] 的不透明度混合到 surface 上；
+  /// 在深色模式下回退到 [surfaceContainerHigh]，避免过亮。
+  static Color soft(ColorScheme colors, {Color? tint, int tintAlpha = 18}) {
+    final base = colors.surface;
+    if (tint == null) return base;
+    if (colors.brightness == Brightness.dark) {
+      return colors.surfaceContainerHigh;
+    }
+    return Color.alphaBlend(tint.withAlpha(tintAlpha), base);
+  }
+}
+
+abstract final class AppAlphas {
+  static const int tint = 18;
+  static const int subtle = 24;
+  static const int low = 40;
+  static const int medium = 60;
+  static const int high = 80;
+  static const int strong = 90;
+  static const int divider = 100;
+  static const int outline = 120;
+  static const int surfaceOverlay = 210;
+  static const int surface = 232;
+}
+
+abstract final class AppBorders {
+  static BorderSide subtle(BuildContext context) {
+    final color = Theme.of(context).colorScheme.outlineVariant;
+    return BorderSide(color: color.withAlpha(80));
+  }
+
+  static BorderSide medium(BuildContext context) {
+    final color = Theme.of(context).colorScheme.outlineVariant;
+    return BorderSide(color: color.withAlpha(120));
+  }
+
+  static BorderSide strong(BuildContext context) {
+    final color = Theme.of(context).colorScheme.outlineVariant;
+    return BorderSide(color: color.withAlpha(160));
+  }
+
+  static BorderSide primary(BuildContext context, {int alpha = 48}) {
+    final color = Theme.of(context).colorScheme.primary;
+    return BorderSide(color: color.withAlpha(alpha));
+  }
+
+  static BorderSide tint(Color color, {int alpha = 48}) {
+    return BorderSide(color: color.withAlpha(alpha));
+  }
 }
 
 abstract final class AppShadows {
@@ -76,6 +133,33 @@ abstract final class AppShadows {
       ),
     ];
   }
+
+  /// 柔和的卡片阴影，仅在浅色模式下生效。
+  ///
+  /// [depth] 控制阴影深度，1.0 为标准卡片，0.45 为轻量内嵌元素。
+  static List<BoxShadow> card(ThemeData theme, {double depth = 1.0}) {
+    if (theme.brightness != Brightness.light) return const [];
+    return [
+      BoxShadow(
+        color: theme.colorScheme.shadow.withAlpha(
+          (10 * depth).round().clamp(0, 255),
+        ),
+        blurRadius: 28 * depth,
+        offset: Offset(0, 16 * depth),
+      ),
+      BoxShadow(
+        color: theme.colorScheme.primary.withAlpha(
+          (6 * depth).round().clamp(0, 255),
+        ),
+        blurRadius: 12 * depth,
+        offset: Offset(0, 6 * depth),
+      ),
+    ];
+  }
+
+  /// Hero 区域专用阴影，默认深度略大于普通卡片。
+  static List<BoxShadow> hero(ThemeData theme, {double depth = 1.15}) =>
+      card(theme, depth: depth);
 }
 
 @immutable

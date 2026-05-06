@@ -6,21 +6,13 @@ import '../../models/account_template.dart';
 import '../../providers/enhanced_app_provider.dart';
 import '../../services/service_manager.dart';
 import '../../theme/app_design_tokens.dart';
+import '../../theme/app_layout.dart';
 import '../../widgets/adaptive_page.dart';
 import '../../widgets/app_page_header.dart';
+import '../../widgets/app_selectable_scrollable.dart';
 import '../../widgets/green_add_button.dart';
 import 'template_edit_view.dart';
 
-Color _softSurface(ThemeData theme, {Color? tint, int tintAlpha = 18}) {
-  final base = theme.colorScheme.surface;
-  if (tint == null) {
-    return base;
-  }
-  if (theme.brightness != Brightness.light) {
-    return theme.colorScheme.surfaceContainerHigh;
-  }
-  return Color.alphaBlend(tint.withAlpha(tintAlpha), base);
-}
 
 class TemplateListView extends StatelessWidget {
   const TemplateListView({super.key});
@@ -66,9 +58,9 @@ class TemplateListView extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
-        color: _softSurface(theme, tint: accent, tintAlpha: 16),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: accent.withAlpha(48)),
+        color: AppSurfaces.soft(theme.colorScheme, tint: accent, tintAlpha: 16),
+        borderRadius: BorderRadius.circular(AppRadii.pill),
+        border: Border.all(color: accent.withAlpha(AppAlphas.low)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -152,7 +144,7 @@ class TemplateListView extends StatelessWidget {
     required String subtitle,
   }) {
     final theme = Theme.of(context);
-    final isDesktop = AppBreakpoints.isDesktop(context);
+    final isDesktop = AppLayout.isExpanded(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -246,14 +238,14 @@ class TemplateListView extends StatelessWidget {
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: _softSurface(theme, tint: accent, tintAlpha: 14),
+                color: AppSurfaces.soft(theme.colorScheme, tint: accent, tintAlpha: 14),
                 borderRadius: BorderRadius.circular(AppRadii.button),
                 border: Border.all(color: accent.withAlpha(44)),
               ),
               alignment: Alignment.center,
               child: Icon(Icons.layers_clear_outlined, size: 24, color: accent),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.md),
             Text(
               isCustomSection
                   ? '\u8fd8\u6ca1\u6709\u81ea\u5b9a\u4e49\u6a21\u677f'
@@ -279,38 +271,58 @@ class TemplateListView extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
+        final layout = AppLayout.of(context);
+        final crossAxisCount =
+            layout.isCompact ? 1 : (layout.isMedium ? 2 : 3);
+
+        final cards = [
+          for (final template in templates)
+            _TemplateCard(
+              template: template,
+              usageCount: _usageCount(provider, template),
+              onOpen: template.isCustom
+                  ? () => _openEditor(context, initial: template)
+                  : null,
+              onDelete: template.isCustom
+                  ? () => _deleteTemplate(context, template)
+                  : null,
+            ),
+        ];
+
         return Container(
           decoration: BoxDecoration(
             color: theme.colorScheme.surface,
             borderRadius: BorderRadius.circular(AppRadii.panel),
             border: Border.all(
-              color: theme.colorScheme.outlineVariant.withAlpha(120),
+              color: theme.colorScheme.outlineVariant.withAlpha(AppAlphas.outline),
             ),
           ),
-          child: Column(
-            children: [
-              for (var index = 0; index < templates.length; index++) ...[
-                _TemplateCard(
-                  template: templates[index],
-                  usageCount: _usageCount(provider, templates[index]),
-                  onOpen: templates[index].isCustom
-                      ? () => _openEditor(context, initial: templates[index])
-                      : null,
-                  onDelete: templates[index].isCustom
-                      ? () => _deleteTemplate(context, templates[index])
-                      : null,
+          child: crossAxisCount == 1
+              ? Column(
+                  children: [
+                    for (var i = 0; i < cards.length; i++) ...[
+                      cards[i],
+                      if (i < cards.length - 1)
+                        Divider(
+                          height: 1,
+                          thickness: 0.5,
+                          indent: AppSpacing.lg,
+                          endIndent: AppSpacing.lg,
+                          color: theme.colorScheme.outlineVariant.withAlpha(AppAlphas.divider),
+                        ),
+                    ],
+                  ],
+                )
+              : GridView.count(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  crossAxisCount: crossAxisCount,
+                  childAspectRatio: 3.0,
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  crossAxisSpacing: AppSpacing.lg,
+                  mainAxisSpacing: AppSpacing.lg,
+                  children: cards,
                 ),
-                if (index < templates.length - 1)
-                  Divider(
-                    height: 1,
-                    thickness: 0.5,
-                    indent: AppSpacing.lg,
-                    endIndent: AppSpacing.lg,
-                    color: theme.colorScheme.outlineVariant.withAlpha(100),
-                  ),
-              ],
-            ],
-          ),
         );
       },
     );
@@ -329,9 +341,10 @@ class TemplateListView extends StatelessWidget {
       appBar: AppBar(title: Text(l10n.templatesTitle)),
       body: AdaptivePage(
         desktopMaxWidth: 1320,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(0, 16, 0, 120),
-          children: [
+        child: AppSelectableScrollable(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(0, 16, 0, 120),
+            children: [
             _buildHeroCard(context, provider),
             const SizedBox(height: 22),
             Column(
@@ -351,7 +364,7 @@ class TemplateListView extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: AppSpacing.xl),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -371,6 +384,7 @@ class TemplateListView extends StatelessWidget {
             ),
           ],
         ),
+      ),
       ),
       floatingActionButton: GreenAddButton(
         heroTag: 'add-template-fab',
@@ -568,9 +582,9 @@ class _TemplateBadge extends StatelessWidget {
       height: 44,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: _softSurface(theme, tint: accent, tintAlpha: 12),
+        color: AppSurfaces.soft(theme.colorScheme, tint: accent, tintAlpha: 12),
         borderRadius: BorderRadius.circular(AppRadii.button),
-        border: Border.all(color: accent.withAlpha(48)),
+        border: Border.all(color: accent.withAlpha(AppAlphas.low)),
       ),
       child: Text(
         template.badgeText,
@@ -628,7 +642,7 @@ class _FieldPreviewTags extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: _softSurface(theme, tint: accent, tintAlpha: 10),
+              color: AppSurfaces.soft(theme.colorScheme, tint: accent, tintAlpha: 10),
               borderRadius: BorderRadius.circular(AppRadii.control),
               border: Border.all(color: accent.withAlpha(28)),
             ),
@@ -664,8 +678,8 @@ class _InfoChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: _softSurface(theme, tint: tint, tintAlpha: 12),
-        borderRadius: BorderRadius.circular(14),
+        color: AppSurfaces.soft(theme.colorScheme, tint: tint, tintAlpha: 12),
+        borderRadius: BorderRadius.circular(AppRadii.panel),
         border: Border.all(color: tint.withAlpha(34)),
       ),
       child: Row(

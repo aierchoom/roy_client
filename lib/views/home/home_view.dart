@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../widgets/platform_builder.dart';
+import '../../widgets/app_layout_builder.dart';
 import '../accounts/account_list_view.dart';
 import '../accounts/totp_account_list_view.dart';
 import '../settings_view.dart';
@@ -31,13 +31,18 @@ class _HomeViewState extends State<HomeView> {
 
   @override
   Widget build(BuildContext context) {
-    return PlatformBuilder(
-      desktopBuilder: (context) => HomeViewDesktop(
+    return AppLayoutBuilder(
+      compactBuilder: (context) => HomeViewMobile(
         selectedIndex: _selectedIndex,
         onDestinationSelected: _onItemTapped,
         pages: _pages,
       ),
-      mobileBuilder: (context) => HomeViewMobile(
+      mediumBuilder: (context) => HomeViewDesktop(
+        selectedIndex: _selectedIndex,
+        onDestinationSelected: _onItemTapped,
+        pages: _pages,
+      ),
+      expandedBuilder: (context) => HomeViewDesktop(
         selectedIndex: _selectedIndex,
         onDestinationSelected: _onItemTapped,
         pages: _pages,

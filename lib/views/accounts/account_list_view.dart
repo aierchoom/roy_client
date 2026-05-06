@@ -5,6 +5,7 @@ import '../../models/account_item.dart';
 import '../../models/account_template.dart';
 import '../../providers/enhanced_app_provider.dart';
 import '../../theme/app_design_tokens.dart';
+import '../../theme/app_layout.dart';
 import '../../widgets/adaptive_page.dart';
 import '../../widgets/app_page_header.dart';
 import '../../widgets/green_add_button.dart';
@@ -182,14 +183,14 @@ class _AccountListViewState extends State<AccountListView> {
             size: 44,
             color: theme.colorScheme.outlineVariant,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.lg),
           Text(
             _text(context, '\u6682\u65e0\u8d26\u6237', 'No Accounts'),
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.sm),
           Text(
             _text(
               context,
@@ -228,21 +229,21 @@ class _AccountListViewState extends State<AccountListView> {
           EdgeInsets.symmetric(vertical: 8),
         ),
         shape: WidgetStatePropertyAll(
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.xl)),
         ),
       ),
       builder: (context, controller, child) {
         return InkWell(
           onTap: () =>
               controller.isOpen ? controller.close() : controller.open(),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadii.card),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: theme.colorScheme.primaryContainer.withAlpha(80),
-              borderRadius: BorderRadius.circular(12),
+              color: theme.colorScheme.primaryContainer.withAlpha(AppAlphas.high),
+              borderRadius: BorderRadius.circular(AppRadii.card),
               border: Border.all(
-                color: theme.colorScheme.primary.withAlpha(40),
+                color: theme.colorScheme.primary.withAlpha(AppAlphas.low),
                 width: 0.5,
               ),
             ),
@@ -250,7 +251,7 @@ class _AccountListViewState extends State<AccountListView> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(icon, size: 18, color: theme.colorScheme.primary),
-                const SizedBox(width: 8),
+                const SizedBox(width: AppSpacing.sm),
                 Text(
                   label,
                   style: theme.textTheme.labelLarge?.copyWith(
@@ -258,7 +259,7 @@ class _AccountListViewState extends State<AccountListView> {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(width: 4),
+                const SizedBox(width: AppSpacing.xs),
                 if (_activeTemplateId != null)
                   Padding(
                     padding: const EdgeInsets.only(left: 4),
@@ -319,7 +320,7 @@ class _AccountListViewState extends State<AccountListView> {
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
                 color: theme.colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(AppRadii.control),
               ),
               child: Text(
                 '$count',
@@ -342,115 +343,143 @@ class _AccountListViewState extends State<AccountListView> {
     );
   }
 
+  Widget _buildGroupSection(
+    BuildContext context,
+    EnhancedAppProvider provider,
+    _AccountGroup group,
+    List<_AccountGroup> allGroups,
+  ) {
+    final theme = Theme.of(context);
+    final template = group.template;
+    final title = template?.title ?? _text(context, '其它', 'Other');
+    final subtitle = template?.subTitle.trim() ?? '';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    title,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  _GroupCountChip(count: group.accounts.length),
+                ],
+              ),
+              if (subtitle.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        Container(
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface.withAlpha(
+              theme.brightness == Brightness.light ? 230 : 90,
+            ),
+            borderRadius: BorderRadius.circular(AppRadii.panel),
+            border: Border.all(
+              color: theme.colorScheme.outlineVariant.withAlpha(
+                theme.brightness == Brightness.light ? 60 : 40,
+              ),
+            ),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            children: group.accounts.asMap().entries.map((entry) {
+              final index = entry.key;
+              final account = entry.value;
+              final accountTemplate = provider.getTemplate(
+                account.templateId,
+              );
+              final legacyFieldCount = _legacyFieldCount(
+                account,
+                accountTemplate,
+              );
+              return Column(
+                children: [
+                  AccountListTile(
+                    account: account,
+                    template: accountTemplate,
+                    hasMissingTemplate: accountTemplate == null,
+                    legacyFieldCount: legacyFieldCount,
+                    linkedTotpCredentialCount: provider
+                        .totpCredentialsForAccount(account.id)
+                        .length,
+                    onEdit: () => _openEditor(context, initial: account),
+                    onDelete: () => _deleteAccount(context, account),
+                    localeText: _text,
+                  ),
+                  if (index < group.accounts.length - 1)
+                    Divider(
+                      height: 1,
+                      thickness: 0.5,
+                      color: theme.colorScheme.outlineVariant.withAlpha(50),
+                      indent: 16,
+                      endIndent: 16,
+                    ),
+                ],
+              );
+            }).toList(),
+          ),
+        ),
+        SizedBox(
+          height: allGroups.indexOf(group) < allGroups.length - 1 ? 18 : 24,
+        ),
+      ],
+    );
+  }
+
   Widget _buildAccountPanel(
     BuildContext context,
     EnhancedAppProvider provider,
   ) {
-    final theme = Theme.of(context);
     final groups = _buildGroups(provider);
+    final layout = AppLayout.of(context);
 
     if (groups.isEmpty) {
       return _buildEmptyState(context);
     }
 
+    if (layout.isExpanded) {
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final columnWidth = (constraints.maxWidth - AppSpacing.lg) / 2;
+          return Wrap(
+            spacing: AppSpacing.lg,
+            runSpacing: AppSpacing.lg,
+            children: groups.map((group) {
+              return SizedBox(
+                width: columnWidth,
+                child: _buildGroupSection(context, provider, group, groups),
+              );
+            }).toList(),
+          );
+        },
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: groups.map((group) {
-        final template = group.template;
-        final title = template?.title ?? _text(context, '其它', 'Other');
-        final subtitle = template?.subTitle.trim() ?? '';
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 2),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        title,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      _GroupCountChip(count: group.accounts.length),
-                    ],
-                  ),
-                  if (subtitle.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(height: 10),
-            Container(
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surface.withAlpha(
-                  theme.brightness == Brightness.light ? 230 : 90,
-                ),
-                borderRadius: BorderRadius.circular(AppRadii.panel),
-                border: Border.all(
-                  color: theme.colorScheme.outlineVariant.withAlpha(
-                    theme.brightness == Brightness.light ? 60 : 40,
-                  ),
-                ),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: Column(
-                children: group.accounts.asMap().entries.map((entry) {
-                  final index = entry.key;
-                  final account = entry.value;
-                  final accountTemplate = provider.getTemplate(
-                    account.templateId,
-                  );
-                  final legacyFieldCount = _legacyFieldCount(
-                    account,
-                    accountTemplate,
-                  );
-                  return Column(
-                    children: [
-                      AccountListTile(
-                        account: account,
-                        template: accountTemplate,
-                        hasMissingTemplate: accountTemplate == null,
-                        legacyFieldCount: legacyFieldCount,
-                        linkedTotpCredentialCount: provider
-                            .totpCredentialsForAccount(account.id)
-                            .length,
-                        onEdit: () => _openEditor(context, initial: account),
-                        onDelete: () => _deleteAccount(context, account),
-                        localeText: _text,
-                      ),
-                      if (index < group.accounts.length - 1)
-                        Divider(
-                          height: 1,
-                          thickness: 0.5,
-                          color: theme.colorScheme.outlineVariant.withAlpha(50),
-                          indent: 16,
-                          endIndent: 16,
-                        ),
-                    ],
-                  );
-                }).toList(),
-              ),
-            ),
-            SizedBox(
-              height: groups.indexOf(group) < groups.length - 1 ? 18 : 24,
-            ),
-          ],
-        );
+        return _buildGroupSection(context, provider, group, groups);
       }).toList(),
     );
   }
@@ -458,7 +487,7 @@ class _AccountListViewState extends State<AccountListView> {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<EnhancedAppProvider>();
-    final isDesktop = AppBreakpoints.isDesktop(context);
+    final isDesktop = AppLayout.isExpanded(context);
     final fabBottomOffset = isDesktop ? 24.0 : 28.0;
     final theme = Theme.of(context);
 
@@ -480,12 +509,12 @@ class _AccountListViewState extends State<AccountListView> {
                       color: Colors.transparent,
                       child: Column(
                         children: [
-                          const SizedBox(height: 16),
+                          const SizedBox(height: AppSpacing.lg),
                           AdaptiveSection(
                             maxWidth: AppSectionWidths.panel,
                             child: _buildHeroCard(context, provider),
                           ),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: AppSpacing.xl),
                           AdaptiveSection(
                             maxWidth: AppSectionWidths.panel,
                             child: Padding(
@@ -623,8 +652,8 @@ class _StatChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: onColor.withAlpha(18),
-        borderRadius: BorderRadius.circular(14),
+        color: onColor.withAlpha(AppAlphas.tint),
+        borderRadius: BorderRadius.circular(AppRadii.panel),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -664,8 +693,8 @@ class _GroupCountChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withAlpha(120),
-        borderRadius: BorderRadius.circular(999),
+        color: theme.colorScheme.surfaceContainerHighest.withAlpha(AppAlphas.outline),
+        borderRadius: BorderRadius.circular(AppRadii.pill),
       ),
       child: Text(
         '\u5171 $count \u6761',

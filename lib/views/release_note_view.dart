@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../widgets/adaptive_page.dart';
+import '../theme/app_design_tokens.dart';
 
 class ReleaseNoteView extends StatelessWidget {
   const ReleaseNoteView({super.key});
@@ -74,7 +75,7 @@ class ReleaseNoteView extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: AppSpacing.xxl),
             _buildFeatureCategory(
               context,
               title: _text(context, '安全与隐私防护', 'Security & Privacy'),
@@ -138,7 +139,7 @@ class ReleaseNoteView extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: AppSpacing.xxl),
             _buildFeatureCategory(
               context,
               title: _text(context, '账号资产管理', 'Account Management'),
@@ -186,7 +187,7 @@ class ReleaseNoteView extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: AppSpacing.xxl),
             _buildFeatureCategory(
               context,
               title: _text(context, '设计美学与交互', 'Design & Experience'),
@@ -245,11 +246,11 @@ class ReleaseNoteView extends StatelessWidget {
             gradient: LinearGradient(
               colors: [theme.colorScheme.primary, theme.colorScheme.tertiary],
             ),
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(AppRadii.panel),
           ),
           child: const Icon(Icons.rocket_launch, color: Colors.white, size: 40),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: AppSpacing.lg),
         Text(
           'SecretRoy',
           style: theme.textTheme.headlineMedium?.copyWith(
@@ -264,7 +265,7 @@ class ReleaseNoteView extends StatelessWidget {
             letterSpacing: 1.2,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: AppSpacing.sm),
         Text(
           _text(context, '重新定义您的数字凭证主权', 'Redefining your digital sovereignty'),
           style: theme.textTheme.bodySmall?.copyWith(
@@ -288,7 +289,7 @@ class ReleaseNoteView extends StatelessWidget {
         Row(
           children: [
             Icon(icon, size: 18, color: theme.colorScheme.primary),
-            const SizedBox(width: 8),
+            const SizedBox(width: AppSpacing.sm),
             Text(
               title,
               style: theme.textTheme.titleSmall?.copyWith(
@@ -298,7 +299,7 @@ class ReleaseNoteView extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.md),
         ...features.map((f) => _buildFeatureItem(context, f)),
       ],
     );
@@ -310,12 +311,12 @@ class ReleaseNoteView extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 12),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpacing.lg),
         decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest.withAlpha(80),
-          borderRadius: BorderRadius.circular(16),
+          color: theme.colorScheme.surfaceContainerHighest.withAlpha(AppAlphas.high),
+          borderRadius: BorderRadius.circular(AppRadii.panel),
           border: Border.all(
-            color: theme.colorScheme.outlineVariant.withAlpha(60),
+            color: theme.colorScheme.outlineVariant.withAlpha(AppAlphas.medium),
             width: 1,
           ),
         ),
@@ -347,8 +348,8 @@ class ReleaseNoteView extends StatelessWidget {
     return Center(
       child: Column(
         children: [
-          Divider(color: theme.colorScheme.outlineVariant.withAlpha(100)),
-          const SizedBox(height: 16),
+          Divider(color: theme.colorScheme.outlineVariant.withAlpha(AppAlphas.divider)),
+          const SizedBox(height: AppSpacing.lg),
           Text(
             _text(
               context,

@@ -3,6 +3,8 @@ import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 
+import '../../theme/app_design_tokens.dart';
+
 import '../../models/account_item.dart';
 import '../../models/account_template.dart';
 import '../../models/hlc.dart';
@@ -52,7 +54,8 @@ class _AccountEditViewState extends State<AccountEditView> {
   }
 
   bool _isTotpField(AccountField field) {
-    return field.attributes.type == AccountFieldType.totp;
+    return field.attributes.type == AccountFieldType.custom &&
+        field.attributes.isReference;
   }
 
   DateTime? _tryParseDateTime(String raw, TimeFieldFormat format) {
@@ -214,7 +217,10 @@ class _AccountEditViewState extends State<AccountEditView> {
     _accountId =
         widget.initial?.id ?? DateTime.now().millisecondsSinceEpoch.toString();
     _isEditing = widget.initial == null;
-    _draftData.addAll(widget.initial?.data ?? const <String, String>{});
+    _draftData.addAll(
+      (widget.initial?.data ?? const <String, dynamic>{})
+          .map((k, v) => MapEntry(k, v?.toString() ?? '')),
+    );
     if (widget.initial != null) {
       _nameCtrl.text = widget.initial!.name;
       _emailCtrl.text = widget.initial!.email;
@@ -704,40 +710,6 @@ class _AccountEditViewState extends State<AccountEditView> {
     );
   }
 
-  List<BoxShadow> _softCardShadows(ThemeData theme, {double depth = 1}) {
-    if (theme.brightness != Brightness.light) {
-      return const [];
-    }
-
-    return [
-      BoxShadow(
-        color: theme.colorScheme.shadow.withAlpha(
-          (10 * depth).round().clamp(0, 255),
-        ),
-        blurRadius: 28 * depth,
-        offset: Offset(0, 16 * depth),
-      ),
-      BoxShadow(
-        color: theme.colorScheme.primary.withAlpha(
-          (6 * depth).round().clamp(0, 255),
-        ),
-        blurRadius: 12 * depth,
-        offset: Offset(0, 6 * depth),
-      ),
-    ];
-  }
-
-  Color _softSurface(ThemeData theme, {Color? tint, int tintAlpha = 18}) {
-    final base = theme.colorScheme.surface;
-    if (tint == null) {
-      return base;
-    }
-    if (theme.brightness != Brightness.light) {
-      return theme.colorScheme.surfaceContainerHigh;
-    }
-    return Color.alphaBlend(tint.withAlpha(tintAlpha), base);
-  }
-
   Color _fieldAccentColor(ThemeData theme, AccountField field) {
     if (field.attributes.isSecret) {
       return theme.colorScheme.tertiary;
@@ -754,8 +726,8 @@ class _AccountEditViewState extends State<AccountEditView> {
   Widget _buildOverviewCard(BuildContext context) {
     final theme = Theme.of(context);
     final selectedTemplate = _currentTemplate;
-    final heroBase = _softSurface(
-      theme,
+    final heroBase = AppSurfaces.soft(
+      theme.colorScheme,
       tint: theme.colorScheme.primary,
       tintAlpha: 28,
     );
@@ -780,7 +752,7 @@ class _AccountEditViewState extends State<AccountEditView> {
         ),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: heroEdge),
-        boxShadow: _softCardShadows(theme, depth: 1.15),
+        boxShadow: AppShadows.card(theme, depth: 1.15),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -795,7 +767,7 @@ class _AccountEditViewState extends State<AccountEditView> {
                   decoration: BoxDecoration(
                     color: theme.colorScheme.surface.withAlpha(232),
                     borderRadius: BorderRadius.circular(18),
-                    boxShadow: _softCardShadows(theme, depth: 0.45),
+                    boxShadow: AppShadows.card(theme, depth: 0.45),
                   ),
                   alignment: Alignment.center,
                   child: Text(
@@ -952,12 +924,12 @@ class _AccountEditViewState extends State<AccountEditView> {
     final showMissingTemplateWarning = _hasMissingTemplate;
     final selectedTemplateAccent = selectedTemplate == null
         ? theme.colorScheme.primary
-        : _softSurface(theme, tint: theme.colorScheme.primary, tintAlpha: 18);
+        : AppSurfaces.soft(theme.colorScheme, tint: theme.colorScheme.primary, tintAlpha: 18);
 
     return Container(
       decoration: BoxDecoration(
-        color: _softSurface(
-          theme,
+        color: AppSurfaces.soft(
+          theme.colorScheme,
           tint: theme.colorScheme.primary,
           tintAlpha: 8,
         ),
@@ -965,7 +937,7 @@ class _AccountEditViewState extends State<AccountEditView> {
         border: Border.all(
           color: theme.colorScheme.outlineVariant.withAlpha(88),
         ),
-        boxShadow: _softCardShadows(theme, depth: 0.82),
+        boxShadow: AppShadows.card(theme, depth: 0.82),
       ),
       child: Padding(
         padding: const EdgeInsets.all(18),
@@ -1232,7 +1204,7 @@ class _AccountEditViewState extends State<AccountEditView> {
     final theme = Theme.of(context);
     final controller = _fieldCtrls[field.fieldKey];
     final accent = _fieldAccentColor(theme, field);
-    final previewSurface = _softSurface(theme, tint: accent, tintAlpha: 10);
+    final previewSurface = AppSurfaces.soft(theme.colorScheme, tint: accent, tintAlpha: 10);
     final canPickInlineTime =
         controller != null &&
         _isTimeField(field) &&
@@ -1242,10 +1214,10 @@ class _AccountEditViewState extends State<AccountEditView> {
 
     return Container(
       decoration: BoxDecoration(
-        color: _softSurface(theme, tint: accent, tintAlpha: 5),
+        color: AppSurfaces.soft(theme.colorScheme, tint: accent, tintAlpha: 5),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: accent.withAlpha(38)),
-        boxShadow: _softCardShadows(theme, depth: 0.7),
+        boxShadow: AppShadows.card(theme, depth: 0.7),
       ),
       child: Padding(
         padding: const EdgeInsets.all(18),
@@ -1259,7 +1231,7 @@ class _AccountEditViewState extends State<AccountEditView> {
                   width: 46,
                   height: 46,
                   decoration: BoxDecoration(
-                    color: _softSurface(theme, tint: accent, tintAlpha: 18),
+                    color: AppSurfaces.soft(theme.colorScheme, tint: accent, tintAlpha: 18),
                     borderRadius: BorderRadius.circular(15),
                   ),
                   child: Icon(
@@ -1544,8 +1516,8 @@ class _AccountEditViewState extends State<AccountEditView> {
 
     return Container(
       decoration: BoxDecoration(
-        color: _softSurface(
-          theme,
+        color: AppSurfaces.soft(
+          theme.colorScheme,
           tint: theme.colorScheme.primary,
           tintAlpha: 10,
         ),
@@ -1553,7 +1525,7 @@ class _AccountEditViewState extends State<AccountEditView> {
         border: Border.all(
           color: theme.colorScheme.outlineVariant.withAlpha(88),
         ),
-        boxShadow: _softCardShadows(theme, depth: 0.55),
+        boxShadow: AppShadows.card(theme, depth: 0.55),
       ),
       child: Padding(
         padding: const EdgeInsets.all(18),
@@ -1664,8 +1636,8 @@ class _AccountEditViewState extends State<AccountEditView> {
 
     return Container(
       decoration: BoxDecoration(
-        color: _softSurface(
-          theme,
+        color: AppSurfaces.soft(
+          theme.colorScheme,
           tint: theme.colorScheme.secondary,
           tintAlpha: 10,
         ),
@@ -1673,7 +1645,7 @@ class _AccountEditViewState extends State<AccountEditView> {
         border: Border.all(
           color: theme.colorScheme.outlineVariant.withAlpha(88),
         ),
-        boxShadow: _softCardShadows(theme, depth: 0.62),
+        boxShadow: AppShadows.card(theme, depth: 0.62),
       ),
       child: Padding(
         padding: const EdgeInsets.all(18),
@@ -1761,8 +1733,8 @@ class _AccountEditViewState extends State<AccountEditView> {
 
     return Container(
       decoration: BoxDecoration(
-        color: _softSurface(
-          theme,
+        color: AppSurfaces.soft(
+          theme.colorScheme,
           tint: theme.colorScheme.secondary,
           tintAlpha: 12,
         ),
@@ -1770,7 +1742,7 @@ class _AccountEditViewState extends State<AccountEditView> {
         border: Border.all(
           color: theme.colorScheme.outlineVariant.withAlpha(90),
         ),
-        boxShadow: _softCardShadows(theme, depth: 0.55),
+        boxShadow: AppShadows.card(theme, depth: 0.55),
       ),
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -2036,14 +2008,14 @@ class _AccountEditViewState extends State<AccountEditView> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              _softSurface(
-                theme,
+              AppSurfaces.soft(
+                theme.colorScheme,
                 tint: theme.colorScheme.primary,
                 tintAlpha: 16,
               ),
               theme.scaffoldBackgroundColor,
-              _softSurface(
-                theme,
+              AppSurfaces.soft(
+                theme.colorScheme,
                 tint: theme.colorScheme.tertiary,
                 tintAlpha: 8,
               ),

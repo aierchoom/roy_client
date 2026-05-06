@@ -5,6 +5,8 @@ import 'package:secret_roy/l10n/app_localizations.dart';
 import '../providers/enhanced_app_provider.dart';
 import '../widgets/adaptive_page.dart';
 import '../widgets/app_page_header.dart';
+import '../widgets/app_settings_group.dart';
+import '../widgets/app_settings_tile.dart';
 import 'appearance_settings_view.dart';
 import 'password_tools_view.dart';
 import 'security_settings_view.dart';
@@ -12,6 +14,7 @@ import 'settings/vault_health_view.dart';
 import 'sync_settings_view.dart';
 import 'templates/template_list_view.dart';
 import 'release_note_view.dart';
+import '../theme/app_design_tokens.dart';
 
 class SettingsView extends StatelessWidget {
   const SettingsView({super.key});
@@ -49,151 +52,112 @@ class SettingsView extends StatelessWidget {
             maxWidth: AppSectionWidths.hero,
             child: _buildHeroCard(context),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.lg),
           AdaptiveSection(
             maxWidth: AppSectionWidths.panel,
-            child: Card(
-              margin: EdgeInsets.zero,
-              child: Column(
-                children: [
-                  _SettingsTile(
-                    icon: Icons.palette_outlined,
-                    title: _text(context, '个性化与外观', 'Appearance'),
-                    subtitle: _text(
-                      context,
-                      '设置主题颜色、暗黑模式及视觉风格',
-                      'Theme colors, dark mode, and visual style',
-                    ),
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => const AppearanceSettingsView(),
-                        ),
-                      );
-                    },
+            child: AppSettingsGroup(
+              children: [
+                AppSettingsTile(
+                  icon: Icons.palette_outlined,
+                  title: _text(context, '个性化与外观', 'Appearance'),
+                  subtitle: _text(
+                    context,
+                    '设置主题颜色、暗黑模式及视觉风格',
+                    'Theme colors, dark mode, and visual style',
                   ),
-                  const Divider(
-                    height: 1,
-                    indent: 16,
-                    endIndent: 16,
-                    thickness: 0.5,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const AppearanceSettingsView(),
+                      ),
+                    );
+                  },
+                ),
+                AppSettingsTile(
+                  icon: Icons.security_outlined,
+                  title: l10n.securitySettingsTitle,
+                  subtitle: l10n.securitySettingsSubtitle,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const SecuritySettingsView(),
+                      ),
+                    );
+                  },
+                ),
+                AppSettingsTile(
+                  icon: Icons.health_and_safety_outlined,
+                  title: _text(context, 'Vault 体检', 'Vault Health'),
+                  subtitle: _text(
+                    context,
+                    '检查保险库安全状态和账号风险',
+                    'Check vault security status and account risks',
                   ),
-                  _SettingsTile(
-                    icon: Icons.security_outlined,
-                    title: l10n.securitySettingsTitle,
-                    subtitle: l10n.securitySettingsSubtitle,
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => const SecuritySettingsView(),
-                        ),
-                      );
-                    },
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const VaultHealthView(),
+                      ),
+                    );
+                  },
+                ),
+                AppSettingsTile(
+                  icon: Icons.sync_outlined,
+                  title: l10n.dataSyncTitle,
+                  subtitle: l10n.dataSyncSubtitle,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const SyncSettingsView(),
+                      ),
+                    );
+                  },
+                ),
+                AppSettingsTile(
+                  icon: Icons.password_outlined,
+                  title: _text(context, '密码工具', 'Password Tools'),
+                  subtitle: _text(
+                    context,
+                    '生成高强度密码',
+                    'Generate strong passwords',
                   ),
-                  const Divider(
-                    height: 1,
-                    indent: 16,
-                    endIndent: 16,
-                    thickness: 0.5,
-                  ),
-                  _SettingsTile(
-                    icon: Icons.health_and_safety_outlined,
-                    title: _text(context, 'Vault 体检', 'Vault Health'),
-                    subtitle: _text(
-                      context,
-                      '检查保险库安全状态和账号风险',
-                      'Check vault security status and account risks',
-                    ),
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => const VaultHealthView(),
-                        ),
-                      );
-                    },
-                  ),
-                  const Divider(
-                    height: 1,
-                    indent: 16,
-                    endIndent: 16,
-                    thickness: 0.5,
-                  ),
-                  _SettingsTile(
-                    icon: Icons.sync_outlined,
-                    title: l10n.dataSyncTitle,
-                    subtitle: l10n.dataSyncSubtitle,
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => const SyncSettingsView(),
-                        ),
-                      );
-                    },
-                  ),
-                  const Divider(
-                    height: 1,
-                    indent: 16,
-                    endIndent: 16,
-                    thickness: 0.5,
-                  ),
-                  _SettingsTile(
-                    icon: Icons.password_outlined,
-                    title: _text(context, '密码工具', 'Password Tools'),
-                    subtitle: _text(
-                      context,
-                      '生成高强度密码',
-                      'Generate strong passwords',
-                    ),
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => const PasswordToolsView(),
-                        ),
-                      );
-                    },
-                  ),
-                  const Divider(
-                    height: 1,
-                    indent: 16,
-                    endIndent: 16,
-                    thickness: 0.5,
-                  ),
-                  _SettingsTile(
-                    icon: Icons.view_list_outlined,
-                    title: l10n.templatesTitle,
-                    subtitle: customTemplateCount == 0
-                        ? '管理自定义模板和字段'
-                        : '已创建 $customTemplateCount 个自定义模板',
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => const TemplateListView(),
-                        ),
-                      );
-                    },
-                  ),
-                  const Divider(
-                    height: 1,
-                    indent: 16,
-                    endIndent: 16,
-                    thickness: 0.5,
-                  ),
-                  _SettingsTile(
-                    icon: Icons.info_outline,
-                    title: l10n.aboutSecretRoy,
-                    subtitle:
-                        '${l10n.versionNumber} · ${_text(context, '同步与安全增强更新', 'Enhanced Sync & Security')}',
-                    showChevron: false,
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => const ReleaseNoteView(),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const PasswordToolsView(),
+                      ),
+                    );
+                  },
+                ),
+                AppSettingsTile(
+                  icon: Icons.view_list_outlined,
+                  title: l10n.templatesTitle,
+                  subtitle: customTemplateCount == 0
+                      ? '管理自定义模板和字段'
+                      : '已创建 $customTemplateCount 个自定义模板',
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const TemplateListView(),
+                      ),
+                    );
+                  },
+                ),
+                AppSettingsTile(
+                  icon: Icons.info_outline,
+                  title: l10n.aboutSecretRoy,
+                  subtitle:
+                      '${l10n.versionNumber} · ${_text(context, '同步与安全增强更新', 'Enhanced Sync & Security')}',
+                  showChevron: false,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const ReleaseNoteView(),
+                      ),
+                    );
+                  },
+                ),
+              ],
             ),
           ),
         ],
@@ -202,54 +166,4 @@ class SettingsView extends StatelessWidget {
   }
 }
 
-class _SettingsTile extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
-  final bool showChevron;
 
-  const _SettingsTile({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-    this.showChevron = true,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return ListTile(
-      leading: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.primaryContainer.withAlpha(100),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(icon, color: theme.colorScheme.primary),
-      ),
-      title: Text(
-        title,
-        style: theme.textTheme.titleSmall?.copyWith(
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-      subtitle: Text(
-        subtitle,
-        style: theme.textTheme.bodySmall?.copyWith(
-          color: theme.colorScheme.onSurfaceVariant,
-        ),
-      ),
-      trailing: showChevron
-          ? Icon(
-              Icons.chevron_right,
-              size: 20,
-              color: theme.colorScheme.onSurfaceVariant,
-            )
-          : null,
-      onTap: onTap,
-    );
-  }
-}

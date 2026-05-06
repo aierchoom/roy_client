@@ -177,7 +177,7 @@ class _AccountListTileState extends State<AccountListTile> {
         usedKeys.add(field.fieldKey);
         addField(
           field.label,
-          widget.account.data[field.fieldKey] ?? '',
+          widget.account.data[field.fieldKey]?.toString() ?? '',
           isSecret: field.attributes.isSecret,
           key: field.fieldKey,
           type: field.attributes.type,
@@ -188,7 +188,7 @@ class _AccountListTileState extends State<AccountListTile> {
 
     for (final entry in widget.account.data.entries) {
       if (usedKeys.contains(entry.key)) continue;
-      addField(_formatKeyLabel(entry.key), entry.value, key: entry.key);
+      addField(_formatKeyLabel(entry.key), entry.value?.toString() ?? '', key: entry.key);
     }
 
     return fields;
@@ -321,7 +321,7 @@ class _AccountListTileState extends State<AccountListTile> {
       for (final field in primaryFields) {
         addSegment(
           field.label,
-          widget.account.data[field.fieldKey] ?? '',
+          widget.account.data[field.fieldKey]?.toString() ?? '',
           isSecret: field.attributes.isSecret,
         );
         if (segments.length >= 2) break;
@@ -341,7 +341,7 @@ class _AccountListTileState extends State<AccountListTile> {
         if (field.attributes.isPrimary) continue;
         addSegment(
           field.label,
-          widget.account.data[field.fieldKey] ?? '',
+          widget.account.data[field.fieldKey]?.toString() ?? '',
           isSecret: field.attributes.isSecret,
         );
         if (segments.length >= 2) break;

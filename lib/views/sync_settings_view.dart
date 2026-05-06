@@ -275,7 +275,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
           mainAxisSize: MainAxisSize.min,
           children: [
             const CircularProgressIndicator(),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.lg),
             Text(_text('正在同步数据...', 'Syncing data...')),
           ],
         ),
@@ -1033,21 +1033,21 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                         backgroundColor: Colors.orange.shade50,
                       ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.md),
               _buildPreviewRow(
                 context,
                 Icons.account_circle_outlined,
                 _text('账号数量', 'Accounts'),
                 '${preview.accountCount}',
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.md),
               _buildPreviewRow(
                 context,
                 Icons.view_list_outlined,
                 _text('模板数量', 'Templates'),
                 '${preview.templateCount}',
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.md),
               _buildPreviewRow(
                 context,
                 Icons.storage_outlined,
@@ -1057,13 +1057,13 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                     : _text('仅密钥，无数据', 'Keys only, no data'),
               ),
               if (preview.hasLocalData) ...[
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.lg),
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(AppSpacing.md),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.errorContainer.withAlpha(80),
-                    borderRadius: BorderRadius.circular(12),
+                    color: theme.colorScheme.errorContainer.withAlpha(AppAlphas.high),
+                    borderRadius: BorderRadius.circular(AppRadii.button),
                   ),
                   child: Row(
                     children: [
@@ -1071,7 +1071,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                         Icons.warning_outlined,
                         color: theme.colorScheme.error,
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: AppSpacing.sm),
                       Expanded(
                         child: Text(
                           _text(
@@ -1121,7 +1121,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
     return Row(
       children: [
         Icon(icon, size: 20, color: theme.colorScheme.onSurfaceVariant),
-        const SizedBox(width: 12),
+        const SizedBox(width: AppSpacing.md),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1159,7 +1159,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(subtitle),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.lg),
             TextField(
               controller: controller,
               obscureText: true,
@@ -1204,7 +1204,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(subtitle),
-              const SizedBox(height: 24),
+              const SizedBox(height: AppSpacing.xxl),
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 24,
@@ -1212,7 +1212,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                 ),
                 decoration: BoxDecoration(
                   color: theme.colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(AppRadii.panel),
                 ),
                 child: Text(
                   code,
@@ -1224,7 +1224,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                 ),
               ),
               if (showCopyNotice) ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.md),
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -1246,7 +1246,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                   ],
                 ),
               ] else ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.md),
                 Text(
                   _text(
                     '保持此窗口打开，完成后密钥包会自动销毁。',
@@ -1301,8 +1301,8 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerHighest.withAlpha(80),
-            borderRadius: BorderRadius.circular(16),
+            color: theme.colorScheme.surfaceContainerHighest.withAlpha(AppAlphas.high),
+            borderRadius: BorderRadius.circular(AppRadii.panel),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1320,7 +1320,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                   color: theme.colorScheme.onSurface,
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.md),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -1340,13 +1340,13 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                 ],
               ),
               if (statusDescription != null) ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.md),
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(AppSpacing.md),
                   decoration: BoxDecoration(
                     color: statusTone.background,
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(AppRadii.panel),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1372,7 +1372,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                 ),
               ],
               if (actionTitle != null && actionDetail != null) ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.md),
                 Text(
                   actionTitle,
                   style: theme.textTheme.labelLarge?.copyWith(
@@ -1414,7 +1414,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: AppSpacing.lg),
         Row(
           children: [
             Expanded(
@@ -1430,7 +1430,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                 label: Text(_text('服务器', 'Server')),
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: AppSpacing.md),
             Expanded(
               child: FilledButton.icon(
                 onPressed: _serviceManager.syncService.isSyncing
@@ -1470,7 +1470,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(AppRadii.panel),
         border: Border.all(
-          color: theme.colorScheme.outlineVariant.withAlpha(80),
+          color: theme.colorScheme.outlineVariant.withAlpha(AppAlphas.high),
         ),
       ),
       child: Padding(
@@ -1492,7 +1492,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                         ),
                       ),
                       if (subtitle.isNotEmpty) ...[
-                        const SizedBox(height: 4),
+                        const SizedBox(height: AppSpacing.xs),
                         Text(
                           subtitle,
                           style: theme.textTheme.bodySmall?.copyWith(
@@ -1506,7 +1506,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                 ),
               ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: AppSpacing.xl),
             child,
           ],
         ),
@@ -1556,7 +1556,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(AppRadii.panel),
         border: Border.all(
-          color: theme.colorScheme.outlineVariant.withAlpha(100),
+          color: theme.colorScheme.outlineVariant.withAlpha(AppAlphas.divider),
         ),
       ),
       child: Wrap(
@@ -1590,12 +1590,12 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
           ),
           decoration: BoxDecoration(
             color: selected
-                ? theme.colorScheme.primary.withAlpha(18)
+                ? theme.colorScheme.primary.withAlpha(AppAlphas.tint)
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(AppRadii.button),
             border: Border.all(
               color: selected
-                  ? theme.colorScheme.primary.withAlpha(48)
+                  ? theme.colorScheme.primary.withAlpha(AppAlphas.low)
                   : Colors.transparent,
             ),
           ),
@@ -1630,7 +1630,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
       _SyncSettingsSection.diagnostics => Column(
         children: [
           _buildDiagnosticSection(context),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.lg),
           _buildTechnicalInsights(context),
         ],
       ),
@@ -1656,9 +1656,9 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                     padding: const EdgeInsets.fromLTRB(0, 16, 0, 120),
                     children: [
                       _buildHeroCard(context),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: AppSpacing.lg),
                       _buildSectionSelector(context),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: AppSpacing.lg),
                       _buildActiveSection(context),
                       const SizedBox(height: 48),
                     ],
@@ -1729,10 +1729,10 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
           const SizedBox(height: 14),
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(AppSpacing.md),
             decoration: BoxDecoration(
               color: theme.colorScheme.primaryContainer.withAlpha(70),
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(AppRadii.panel),
             ),
             child: Text(
               _text(
@@ -1756,7 +1756,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
               'The key bundle can be claimed only while the 8-character code window is open.',
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           Row(
             children: [
               Expanded(
@@ -1772,7 +1772,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                   label: Text(_text('显示临时码', 'Show Code')),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: _isLanPairingBusy
@@ -1784,7 +1784,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.sm),
           Text(
             _text(
               '关闭配对码窗口、领取成功或超时后，本机都会立即销毁本次密钥包。',
@@ -1797,7 +1797,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
           ),
           const SizedBox(height: 14),
           Divider(color: theme.colorScheme.outlineVariant.withAlpha(140)),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.sm),
           _buildActionHeader(
             context,
             Icons.admin_panel_settings_outlined,
@@ -1807,7 +1807,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
               'Use when devices are not on the same LAN. The server relays requests and ciphertext, and an existing device must approve.',
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           Row(
             children: [
               Expanded(
@@ -1823,7 +1823,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                   label: Text(_text('创建', 'Create')),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: _isPairingBusy ? null : _showJoinPairingCodeDialog,
@@ -1834,13 +1834,13 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
             ],
           ),
           if (hostSession != null) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.md),
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(AppSpacing.md),
               decoration: BoxDecoration(
                 color: theme.colorScheme.surfaceContainerHighest.withAlpha(95),
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(AppRadii.panel),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1858,7 +1858,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: AppSpacing.xs),
                   Text(
                     '${_text('会话 ID', 'Session')}: ${hostSession.sessionId}',
                     style: theme.textTheme.bodySmall?.copyWith(
@@ -1871,7 +1871,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppSpacing.sm),
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton.icon(
@@ -1890,10 +1890,10 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
             const SizedBox(height: 10),
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(AppSpacing.md),
               decoration: BoxDecoration(
-                color: theme.colorScheme.secondaryContainer.withAlpha(120),
-                borderRadius: BorderRadius.circular(14),
+                color: theme.colorScheme.secondaryContainer.withAlpha(AppAlphas.outline),
+                borderRadius: BorderRadius.circular(AppRadii.panel),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1909,7 +1909,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                     '${_text('请求节点 ID', 'Requester Node')}: ${hostPendingRequest.requesterDeviceId}',
                     style: theme.textTheme.bodySmall,
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppSpacing.sm),
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton.icon(
@@ -1928,10 +1928,10 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
             const SizedBox(height: 10),
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(AppSpacing.md),
               decoration: BoxDecoration(
                 color: theme.colorScheme.tertiaryContainer.withAlpha(110),
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(AppRadii.panel),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1951,7 +1951,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                     '${_text('请求 ID', 'Request')}: ${joinResult.requestId}',
                     style: theme.textTheme.bodySmall,
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppSpacing.sm),
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton.icon(
@@ -1973,7 +1973,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
           ],
           const SizedBox(height: 14),
           Divider(color: theme.colorScheme.outlineVariant.withAlpha(140)),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.sm),
           ExpansionTile(
             tilePadding: EdgeInsets.zero,
             childrenPadding: EdgeInsets.zero,
@@ -2017,7 +2017,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                       label: Text(_text('导出恢复码', 'Export recovery code')),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: TextButton.icon(
                       onPressed: _importSecureVaultLinkCode,
@@ -2086,7 +2086,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
               'All data is encrypted by your "Vault Master Key" before leaving the device.',
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.lg),
           _buildInsightItem(
             context,
             Icons.merge_type,
@@ -2113,7 +2113,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
             'Use an 8-character temporary code on a trusted LAN; closing the window stops claims.',
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: AppSpacing.sm),
         _buildRouteGuideItem(
           context,
           Icons.admin_panel_settings_outlined,
@@ -2123,7 +2123,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
             'Relay pairing requests through the server; an existing device must approve.',
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: AppSpacing.sm),
         _buildRouteGuideItem(
           context,
           Icons.vpn_key_outlined,
@@ -2133,7 +2133,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
             'A manually saved encrypted recovery code for key or snapshot recovery when pairing is unavailable.',
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: AppSpacing.sm),
         _buildRouteGuideItem(
           context,
           Icons.integration_instructions_outlined,
@@ -2195,14 +2195,14 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(AppSpacing.sm),
           decoration: BoxDecoration(
             color: theme.colorScheme.primary.withAlpha(16),
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(AppRadii.control),
           ),
           child: Icon(icon, size: 18, color: theme.colorScheme.primary),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: AppSpacing.md),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -2239,7 +2239,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
     return Row(
       children: [
         Icon(icon, size: 20, color: theme.colorScheme.primary),
-        const SizedBox(width: 12),
+        const SizedBox(width: AppSpacing.md),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -2275,10 +2275,10 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(AppSpacing.sm),
           decoration: BoxDecoration(
             color: theme.colorScheme.primary.withAlpha(20),
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(AppRadii.sm),
           ),
           child: Icon(icon, size: 18, color: theme.colorScheme.primary),
         ),

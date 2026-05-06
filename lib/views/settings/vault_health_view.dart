@@ -3,6 +3,7 @@ import '../../models/vault_health_report.dart';
 import '../../services/service_manager.dart';
 import '../../services/vault_health_calculator.dart';
 import '../../widgets/adaptive_page.dart';
+import '../../theme/app_design_tokens.dart';
 
 class VaultHealthView extends StatefulWidget {
   const VaultHealthView({super.key});
@@ -110,12 +111,12 @@ class _VaultHealthViewState extends State<VaultHealthView> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           const Icon(Icons.health_and_safety_outlined, size: 64, color: Colors.grey),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.lg),
           Text(
             '无法计算体检报告',
             style: Theme.of(context).textTheme.titleMedium,
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.sm),
           Text(
             '请确保保险库已解锁',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -129,31 +130,31 @@ class _VaultHealthViewState extends State<VaultHealthView> {
 
   Widget _buildReport(VaultHealthReport report) {
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppSpacing.lg),
       children: [
         _buildScoreCard(report),
-        const SizedBox(height: 24),
+        const SizedBox(height: AppSpacing.xxl),
         if (report.highRiskItems.isNotEmpty) ...[
           _buildSectionTitle('高风险项'),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.sm),
           ...report.highRiskItems.map((item) => _buildItemCard(item)),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.lg),
         ],
         if (report.mediumRiskItems.isNotEmpty) ...[
           _buildSectionTitle('中风险项'),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.sm),
           ...report.mediumRiskItems.map((item) => _buildItemCard(item)),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.lg),
         ],
         if (report.lowRiskItems.isNotEmpty) ...[
           _buildSectionTitle('低风险项'),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.sm),
           ...report.lowRiskItems.map((item) => _buildItemCard(item)),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.lg),
         ],
         if (report.failedItems.isEmpty)
           _buildAllPassBanner(),
-        const SizedBox(height: 16),
+        const SizedBox(height: AppSpacing.lg),
         Center(
           child: Text(
             '体检时间: ${_formatTime(report.calculatedAt)}',
@@ -171,7 +172,7 @@ class _VaultHealthViewState extends State<VaultHealthView> {
 
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(AppSpacing.xxl),
         child: Column(
           children: [
             Stack(
@@ -207,7 +208,7 @@ class _VaultHealthViewState extends State<VaultHealthView> {
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.lg),
             Text(
               report.failedItems.isEmpty
                   ? '你的保险库状态良好'
@@ -259,11 +260,11 @@ class _VaultHealthViewState extends State<VaultHealthView> {
     return Card(
       color: Colors.green.shade50,
       child: const Padding(
-        padding: EdgeInsets.all(16),
+        padding: EdgeInsets.all(AppSpacing.lg),
         child: Row(
           children: [
             Icon(Icons.verified, color: Colors.green),
-            SizedBox(width: 12),
+            SizedBox(width: AppSpacing.md),
             Expanded(
               child: Text(
                 '所有体检项均已通过，继续保持！',

@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../services/biometric_auth_service.dart';
 import '../services/service_manager.dart';
 import '../widgets/adaptive_page.dart';
+import '../theme/app_design_tokens.dart';
+import '../theme/app_layout.dart';
 
 class UnlockView extends StatefulWidget {
   const UnlockView({super.key});
@@ -243,14 +245,14 @@ class _UnlockViewState extends State<UnlockView> {
     final colorScheme = theme.colorScheme;
 
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(AppSpacing.xxl),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [colorScheme.primaryContainer, colorScheme.tertiaryContainer],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(AppRadii.xxl),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -259,8 +261,8 @@ class _UnlockViewState extends State<UnlockView> {
             width: 88,
             height: 88,
             decoration: BoxDecoration(
-              color: colorScheme.surface.withAlpha(210),
-              borderRadius: BorderRadius.circular(24),
+              color: colorScheme.surface.withAlpha(AppAlphas.surfaceOverlay),
+              borderRadius: BorderRadius.circular(AppRadii.panel),
             ),
             child: Icon(
               Icons.lock_outline,
@@ -268,7 +270,7 @@ class _UnlockViewState extends State<UnlockView> {
               color: colorScheme.primary,
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: AppSpacing.xxl),
           Text(
             'SecretRoy',
             style: theme.textTheme.headlineMedium?.copyWith(
@@ -276,7 +278,7 @@ class _UnlockViewState extends State<UnlockView> {
               color: colorScheme.onPrimaryContainer,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.sm),
           Text(
             _text(
               '\u4e00\u4e2a\u540c\u65f6\u7167\u987e\u624b\u673a\u4e0e\u684c\u9762\u7aef\u4f53\u9a8c\u7684\u5b89\u5168\u5e93\u3002',
@@ -331,7 +333,7 @@ class _UnlockViewState extends State<UnlockView> {
                 fontWeight: FontWeight.w700,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.sm),
             Text(
               _isFirstRun
                   ? _text(
@@ -346,7 +348,7 @@ class _UnlockViewState extends State<UnlockView> {
                 color: colorScheme.onSurfaceVariant,
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: AppSpacing.xxl),
             TextField(
               controller: _passwordController,
               obscureText: _obscurePassword,
@@ -385,12 +387,12 @@ class _UnlockViewState extends State<UnlockView> {
               ),
             ),
             if (_errorMessage != null) ...[
-              const SizedBox(height: 16),
+              const SizedBox(height: AppSpacing.lg),
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(AppSpacing.md),
                 decoration: BoxDecoration(
                   color: colorScheme.errorContainer,
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(AppRadii.panel),
                 ),
                 child: Row(
                   children: [
@@ -399,7 +401,7 @@ class _UnlockViewState extends State<UnlockView> {
                       color: colorScheme.error,
                       size: 20,
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: Text(
                         _errorMessage!,
@@ -410,7 +412,7 @@ class _UnlockViewState extends State<UnlockView> {
                 ),
               ),
             ],
-            const SizedBox(height: 24),
+            const SizedBox(height: AppSpacing.xxl),
             SizedBox(
               width: double.infinity,
               height: 48,
@@ -443,7 +445,7 @@ class _UnlockViewState extends State<UnlockView> {
               ),
             ),
             if (_isFirstRun) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.md),
               SizedBox(
                 width: double.infinity,
                 height: 48,
@@ -461,7 +463,7 @@ class _UnlockViewState extends State<UnlockView> {
             ],
             if (_biometricStatus == BiometricAuthStatus.enabled &&
                 !_isFirstRun) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.md),
               SizedBox(
                 width: double.infinity,
                 height: 48,
@@ -478,7 +480,7 @@ class _UnlockViewState extends State<UnlockView> {
               ),
             ],
             if (!_isFirstRun) ...[
-              const SizedBox(height: 20),
+              const SizedBox(height: AppSpacing.xl),
               TextButton(
                 onPressed: _isLoading ? null : _resetApp,
                 child: Text(
@@ -498,7 +500,7 @@ class _UnlockViewState extends State<UnlockView> {
 
   @override
   Widget build(BuildContext context) {
-    final isDesktop = AppBreakpoints.isDesktop(context);
+    final isDesktop = AppLayout.isExpanded(context);
 
     return Scaffold(
       body: SafeArea(
@@ -526,7 +528,7 @@ class _UnlockViewState extends State<UnlockView> {
                           ],
                         )
                       : SingleChildScrollView(
-                          padding: const EdgeInsets.symmetric(vertical: 24),
+                          padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxl),
                           child: Column(
                             children: [
                               _buildBrandPanel(context),
@@ -559,8 +561,8 @@ class _HeroBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: onColor.withAlpha(18),
-        borderRadius: BorderRadius.circular(14),
+        color: onColor.withAlpha(AppAlphas.tint),
+        borderRadius: BorderRadius.circular(AppRadii.panel),
       ),
       child: Text(
         label,

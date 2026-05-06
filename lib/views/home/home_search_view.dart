@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/account_item.dart';
@@ -7,10 +8,20 @@ import '../../models/local_sync_change.dart';
 import '../../providers/enhanced_app_provider.dart';
 import '../../sync/sync_service.dart';
 import '../../theme/app_design_tokens.dart';
+import '../../theme/app_layout.dart';
 import '../../widgets/adaptive_page.dart';
 import '../accounts/account_edit_view.dart';
 import '../../widgets/account_list_tile.dart';
+import '../../widgets/app_selectable_scrollable.dart';
 import '../conflict_inbox_view.dart';
+
+class _FocusSearchIntent extends Intent {
+  const _FocusSearchIntent();
+}
+
+class _ClearSearchIntent extends Intent {
+  const _ClearSearchIntent();
+}
 
 class HomeSearchView extends StatefulWidget {
   const HomeSearchView({super.key});
@@ -21,6 +32,7 @@ class HomeSearchView extends StatefulWidget {
 
 class _HomeSearchViewState extends State<HomeSearchView> {
   final SearchController _searchController = SearchController();
+  final FocusNode _searchFocusNode = FocusNode();
   final Set<String> _selectedTemplateIds = {};
 
   String get _query => _searchController.text.trim().toLowerCase();
@@ -186,14 +198,14 @@ class _HomeSearchViewState extends State<HomeSearchView> {
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: AppSpacing.sm),
                 Text(
                   '${_localChangeActionLabel(change.action)} · ${_localChangeEntityLabel(change.entityType)}',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.lg),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
@@ -218,7 +230,7 @@ class _HomeSearchViewState extends State<HomeSearchView> {
                     ),
                   ),
                 ],
-                const SizedBox(height: 20),
+                const SizedBox(height: AppSpacing.xl),
                 Row(
                   children: [
                     Expanded(
@@ -230,7 +242,7 @@ class _HomeSearchViewState extends State<HomeSearchView> {
                         child: Text(_text('撤销', 'Discard')),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: AppSpacing.md),
                     Expanded(
                       child: FilledButton(
                         onPressed: () {
@@ -352,7 +364,7 @@ class _HomeSearchViewState extends State<HomeSearchView> {
         backgroundColor: WidgetStatePropertyAll(theme.colorScheme.surface),
         elevation: const WidgetStatePropertyAll(6),
         shape: WidgetStatePropertyAll(
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.dialog)),
         ),
       ),
       builder: (context, controller, child) {
@@ -367,7 +379,7 @@ class _HomeSearchViewState extends State<HomeSearchView> {
           style: OutlinedButton.styleFrom(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(AppRadii.panel),
             ),
             side: BorderSide.none,
             backgroundColor: theme.colorScheme.surface.withAlpha(180),
@@ -378,7 +390,7 @@ class _HomeSearchViewState extends State<HomeSearchView> {
           child: Row(
             children: [
               const Icon(Icons.filter_list_rounded, size: 20),
-              const SizedBox(width: 12),
+              const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Text(
                   label,
@@ -393,7 +405,7 @@ class _HomeSearchViewState extends State<HomeSearchView> {
                   child: MouseRegion(
                     cursor: SystemMouseCursors.click,
                     child: Padding(
-                      padding: const EdgeInsets.all(4),
+                      padding: const EdgeInsets.all(AppSpacing.xs),
                       child: Icon(
                         Icons.close_rounded,
                         size: 18,
@@ -445,13 +457,13 @@ class _HomeSearchViewState extends State<HomeSearchView> {
             child: Row(
               children: [
                 Icon(t.icon, size: 18),
-                const SizedBox(width: 12),
+                const SizedBox(width: AppSpacing.md),
                 Text(t.title),
               ],
             ),
           );
         }),
-        const SizedBox(height: 8),
+        const SizedBox(height: AppSpacing.sm),
       ],
     );
   }
@@ -499,7 +511,7 @@ class _HomeSearchViewState extends State<HomeSearchView> {
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.sm),
           Text(
             _text(
               '本机编辑和删除会先停在这里，确认后才会同步给其他可信设备。',
@@ -509,7 +521,7 @@ class _HomeSearchViewState extends State<HomeSearchView> {
               color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           ...previewChanges.map(
             (change) => _LocalSyncChangeRow(
               change: change,
@@ -553,7 +565,7 @@ class _HomeSearchViewState extends State<HomeSearchView> {
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(AppRadii.panel),
         border: Border.all(
-          color: theme.colorScheme.outlineVariant.withAlpha(90),
+          color: theme.colorScheme.outlineVariant.withAlpha(AppAlphas.strong),
         ),
       ),
       child: Column(
@@ -573,7 +585,7 @@ class _HomeSearchViewState extends State<HomeSearchView> {
                   color: theme.colorScheme.primary,
                 ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: AppSpacing.lg),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -585,7 +597,7 @@ class _HomeSearchViewState extends State<HomeSearchView> {
                         color: theme.colorScheme.onSurface,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: AppSpacing.xs),
                     Text(
                       _text(
                         '\u4ece\u8fd9\u91cc\u6309\u5173\u952e\u5b57\u548c\u6a21\u677f\u76f4\u63a5\u5b9a\u4f4d\u8d26\u6237\u3002',
@@ -641,8 +653,9 @@ class _HomeSearchViewState extends State<HomeSearchView> {
               const SizedBox(height: 14),
               SearchBar(
                 controller: _searchController,
+                focusNode: _searchFocusNode,
                 padding: const WidgetStatePropertyAll<EdgeInsets>(
-                  EdgeInsets.symmetric(horizontal: 16),
+                  EdgeInsets.symmetric(horizontal: AppSpacing.lg),
                 ),
                 onChanged: (_) => setState(() {}),
                 leading: const Icon(Icons.search),
@@ -656,7 +669,7 @@ class _HomeSearchViewState extends State<HomeSearchView> {
                 ),
                 shape: WidgetStatePropertyAll<OutlinedBorder>(
                   RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(AppRadii.panel),
                   ),
                 ),
                 trailing: [
@@ -690,7 +703,7 @@ class _HomeSearchViewState extends State<HomeSearchView> {
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(AppRadii.panel),
         border: Border.all(
-          color: theme.colorScheme.outlineVariant.withAlpha(90),
+          color: theme.colorScheme.outlineVariant.withAlpha(AppAlphas.strong),
         ),
       ),
       child: Padding(
@@ -719,7 +732,7 @@ class _HomeSearchViewState extends State<HomeSearchView> {
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.lg),
             Expanded(
               child: results.isEmpty
                   ? _SearchEmptyState(
@@ -732,32 +745,34 @@ class _HomeSearchViewState extends State<HomeSearchView> {
                         'Try another template or keyword.',
                       ),
                     )
-                  : ListView.separated(
-                      itemCount: results.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 10),
-                      itemBuilder: (context, index) {
-                        final account = results[index];
-                        final template = provider.getTemplate(
-                          account.templateId,
-                        );
-                        final legacyFieldCount = _legacyFieldCount(
-                          account,
-                          template,
-                        );
-                        return AccountListTile(
-                          account: account,
-                          template: template,
-                          hasMissingTemplate: template == null,
-                          legacyFieldCount: legacyFieldCount,
-                          linkedTotpCredentialCount: provider
-                              .totpCredentialsForAccount(account.id)
-                              .length,
-                          density: AccountListTileDensity.search,
-                          onEdit: () => _openAccount(context, account),
-                          onDelete: () => _deleteAccount(context, account),
-                          localeText: (ctx, zh, en) => _text(zh, en),
-                        );
-                      },
+                  : AppSelectableScrollable(
+                      child: ListView.separated(
+                        itemCount: results.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 10),
+                        itemBuilder: (context, index) {
+                          final account = results[index];
+                          final template = provider.getTemplate(
+                            account.templateId,
+                          );
+                          final legacyFieldCount = _legacyFieldCount(
+                            account,
+                            template,
+                          );
+                          return AccountListTile(
+                            account: account,
+                            template: template,
+                            hasMissingTemplate: template == null,
+                            legacyFieldCount: legacyFieldCount,
+                            linkedTotpCredentialCount: provider
+                                .totpCredentialsForAccount(account.id)
+                                .length,
+                            density: AccountListTileDensity.search,
+                            onEdit: () => _openAccount(context, account),
+                            onDelete: () => _deleteAccount(context, account),
+                            localeText: (ctx, zh, en) => _text(zh, en),
+                          );
+                        },
+                      ),
                     ),
             ),
           ],
@@ -773,36 +788,64 @@ class _HomeSearchViewState extends State<HomeSearchView> {
     _pruneUnavailableTemplateFilters(provider.allTemplates);
     final results = _buildResults(accounts, provider);
 
-    return AdaptivePage(
-      desktopMaxWidth: 1200,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          return Column(
-            children: [
-              SizedBox(height: constraints.maxHeight * 0.03),
-              AdaptiveSection(
-                maxWidth: AppSectionWidths.hero,
-                alignment: Alignment.center,
-                child: _buildHeroCard(context, provider, results, () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const ConflictInboxView(),
-                    ),
-                  );
-                }),
-              ),
-              const SizedBox(height: 18),
-              if (_query.isNotEmpty)
-                Expanded(
-                  child: AdaptiveSection(
-                    maxWidth: AppSectionWidths.panel,
-                    child: _buildSearchPanel(context, results, provider),
-                  ),
-                ),
-            ],
-          );
+    final isPointer = AppLayout.isPointerDeviceOf(context);
+    return Shortcuts(
+      shortcuts: isPointer
+          ? {
+              const SingleActivator(LogicalKeyboardKey.keyF, control: true):
+                  const _FocusSearchIntent(),
+              const SingleActivator(LogicalKeyboardKey.escape):
+                  const _ClearSearchIntent(),
+            }
+          : const {},
+      child: Actions(
+        actions: {
+          _FocusSearchIntent: CallbackAction<_FocusSearchIntent>(
+            onInvoke: (_) {
+              _searchFocusNode.requestFocus();
+              return null;
+            },
+          ),
+          _ClearSearchIntent: CallbackAction<_ClearSearchIntent>(
+            onInvoke: (_) {
+              _searchController.clear();
+              setState(() {});
+              return null;
+            },
+          ),
         },
+        child: AdaptivePage(
+          desktopMaxWidth: 1200,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return Column(
+                children: [
+                  SizedBox(height: constraints.maxHeight * 0.03),
+                  AdaptiveSection(
+                    maxWidth: AppSectionWidths.hero,
+                    alignment: Alignment.center,
+                    child: _buildHeroCard(context, provider, results, () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const ConflictInboxView(),
+                        ),
+                      );
+                    }),
+                  ),
+                  const SizedBox(height: 18),
+                  if (_query.isNotEmpty)
+                    Expanded(
+                      child: AdaptiveSection(
+                        maxWidth: AppSectionWidths.panel,
+                        child: _buildSearchPanel(context, results, provider),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+        ),
       ),
     );
   }
@@ -810,6 +853,7 @@ class _HomeSearchViewState extends State<HomeSearchView> {
   @override
   void dispose() {
     _searchController.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
   }
 }
@@ -826,8 +870,8 @@ class _QuickBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: theme.colorScheme.onPrimaryContainer.withAlpha(18),
-        borderRadius: BorderRadius.circular(14),
+        color: theme.colorScheme.onPrimaryContainer.withAlpha(AppAlphas.tint),
+        borderRadius: BorderRadius.circular(AppRadii.panel),
       ),
       child: Text(
         label,
@@ -868,7 +912,7 @@ class _LocalSyncChangeRow extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(top: 8),
       child: Material(
-        color: theme.colorScheme.surface.withAlpha(210),
+        color: theme.colorScheme.surface.withAlpha(AppAlphas.surfaceOverlay),
         borderRadius: BorderRadius.circular(AppRadii.control),
         child: InkWell(
           onTap: onTap,
@@ -947,22 +991,22 @@ class _ConflictAlertBanner extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(AppRadii.panel),
         child: Ink(
           decoration: BoxDecoration(
             color: theme.colorScheme.errorContainer,
             borderRadius: BorderRadius.circular(AppRadii.panel),
-            border: Border.all(color: theme.colorScheme.error.withAlpha(80)),
+            border: Border.all(color: theme.colorScheme.error.withAlpha(AppAlphas.high)),
           ),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(AppSpacing.sm),
                   decoration: BoxDecoration(
-                    color: Colors.white.withAlpha(40),
-                    borderRadius: BorderRadius.circular(12),
+                    color: Colors.white.withAlpha(AppAlphas.low),
+                    borderRadius: BorderRadius.circular(AppRadii.button),
                   ),
                   child: Badge(
                     label: Text('$count'),
@@ -1030,7 +1074,7 @@ class _SearchEmptyState extends StatelessWidget {
 
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(AppSpacing.xxl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [

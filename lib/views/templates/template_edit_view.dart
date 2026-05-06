@@ -67,7 +67,7 @@ class _TemplateEditViewState extends State<TemplateEditView> {
           'custom_${DateTime.now().millisecondsSinceEpoch}',
       title: title,
       subTitle: _subtitleCtrl.text.trim(),
-      icon: null,
+      iconCodePoint: null,
       category: inferTemplateCategory(title: title, fields: _fields),
       fields: List<AccountField>.of(_fields),
       isCustom: true,
@@ -170,40 +170,6 @@ class _TemplateEditViewState extends State<TemplateEditView> {
     }
   }
 
-  List<BoxShadow> _softCardShadows(ThemeData theme, {double depth = 1}) {
-    if (theme.brightness != Brightness.light) {
-      return const [];
-    }
-
-    return [
-      BoxShadow(
-        color: theme.colorScheme.shadow.withAlpha(
-          (10 * depth).round().clamp(0, 255),
-        ),
-        blurRadius: 28 * depth,
-        offset: Offset(0, 16 * depth),
-      ),
-      BoxShadow(
-        color: theme.colorScheme.primary.withAlpha(
-          (6 * depth).round().clamp(0, 255),
-        ),
-        blurRadius: 12 * depth,
-        offset: Offset(0, 6 * depth),
-      ),
-    ];
-  }
-
-  Color _softSurface(ThemeData theme, {Color? tint, int tintAlpha = 18}) {
-    final base = theme.colorScheme.surface;
-    if (tint == null) {
-      return base;
-    }
-    if (theme.brightness != Brightness.light) {
-      return theme.colorScheme.surfaceContainerHigh;
-    }
-    return Color.alphaBlend(tint.withAlpha(tintAlpha), base);
-  }
-
   Widget _buildToneChip(
     BuildContext context, {
     required IconData icon,
@@ -216,7 +182,7 @@ class _TemplateEditViewState extends State<TemplateEditView> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
-        color: _softSurface(theme, tint: accent, tintAlpha: 16),
+        color: AppSurfaces.soft(theme.colorScheme, tint: accent, tintAlpha: 16),
         borderRadius: BorderRadius.circular(AppRadii.pill),
         border: Border.all(color: accent.withAlpha(AppAlphas.low)),
       ),
@@ -353,7 +319,7 @@ class _TemplateEditViewState extends State<TemplateEditView> {
         ),
         borderRadius: BorderRadius.circular(AppRadii.panel),
         border: Border.all(color: heroEdge),
-        boxShadow: _softCardShadows(theme, depth: 1.1),
+        boxShadow: AppShadows.card(theme, depth: 1.1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -366,7 +332,7 @@ class _TemplateEditViewState extends State<TemplateEditView> {
                 decoration: BoxDecoration(
                   color: theme.colorScheme.surface.withAlpha(AppAlphas.surface),
                   borderRadius: BorderRadius.circular(AppRadii.panel),
-                  boxShadow: _softCardShadows(theme, depth: 0.45),
+                  boxShadow: AppShadows.card(theme, depth: 0.45),
                 ),
                 alignment: Alignment.center,
                 child: Text(
@@ -463,8 +429,8 @@ class _TemplateEditViewState extends State<TemplateEditView> {
             width: double.infinity,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: _softSurface(
-                theme,
+              color: AppSurfaces.soft(
+                theme.colorScheme,
                 tint: theme.colorScheme.primary,
                 tintAlpha: 22,
               ),
@@ -513,8 +479,8 @@ class _TemplateEditViewState extends State<TemplateEditView> {
 
     return Container(
       decoration: BoxDecoration(
-        color: _softSurface(
-          theme,
+        color: AppSurfaces.soft(
+          theme.colorScheme,
           tint: theme.colorScheme.primary,
           tintAlpha: 8,
         ),
@@ -522,7 +488,7 @@ class _TemplateEditViewState extends State<TemplateEditView> {
         border: Border.all(
           color: theme.colorScheme.outlineVariant.withAlpha(AppAlphas.high),
         ),
-        boxShadow: _softCardShadows(theme, depth: 0.82),
+        boxShadow: AppShadows.card(theme, depth: 0.82),
       ),
       child: Padding(
         padding: const EdgeInsets.all(18),
@@ -566,8 +532,8 @@ class _TemplateEditViewState extends State<TemplateEditView> {
               width: double.infinity,
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: _softSurface(
-                  theme,
+                color: AppSurfaces.soft(
+                  theme.colorScheme,
                   tint: theme.colorScheme.primary,
                   tintAlpha: 14,
                 ),
@@ -662,10 +628,10 @@ class _TemplateEditViewState extends State<TemplateEditView> {
 
     return Container(
       decoration: BoxDecoration(
-        color: _softSurface(theme, tint: accent, tintAlpha: 6),
+        color: AppSurfaces.soft(theme.colorScheme, tint: accent, tintAlpha: 6),
         borderRadius: BorderRadius.circular(AppRadii.panel),
         border: Border.all(color: accent.withAlpha(36)),
-        boxShadow: _softCardShadows(theme, depth: 0.72),
+        boxShadow: AppShadows.card(theme, depth: 0.72),
       ),
       child: Padding(
         padding: const EdgeInsets.all(18),
@@ -693,7 +659,7 @@ class _TemplateEditViewState extends State<TemplateEditView> {
                       width: 50,
                       height: 50,
                       decoration: BoxDecoration(
-                        color: _softSurface(theme, tint: accent, tintAlpha: 24),
+                        color: AppSurfaces.soft(theme.colorScheme, tint: accent, tintAlpha: 24),
                         borderRadius: BorderRadius.circular(AppRadii.panel),
                       ),
                       child: Icon(
@@ -861,7 +827,7 @@ class _TemplateEditViewState extends State<TemplateEditView> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: _softSurface(theme, tint: accent, tintAlpha: 10),
+                    color: AppSurfaces.soft(theme.colorScheme, tint: accent, tintAlpha: 10),
                     borderRadius: BorderRadius.circular(AppRadii.panel),
                     border: Border.all(color: accent.withAlpha(34)),
                   ),
@@ -949,8 +915,8 @@ class _TemplateEditViewState extends State<TemplateEditView> {
 
     return Container(
       decoration: BoxDecoration(
-        color: _softSurface(
-          theme,
+        color: AppSurfaces.soft(
+          theme.colorScheme,
           tint: theme.colorScheme.secondary,
           tintAlpha: 10,
         ),
@@ -958,7 +924,7 @@ class _TemplateEditViewState extends State<TemplateEditView> {
         border: Border.all(
           color: theme.colorScheme.outlineVariant.withAlpha(AppAlphas.high),
         ),
-        boxShadow: _softCardShadows(theme, depth: 0.62),
+        boxShadow: AppShadows.card(theme, depth: 0.62),
       ),
       child: Padding(
         padding: const EdgeInsets.all(18),
@@ -1084,14 +1050,14 @@ class _TemplateEditViewState extends State<TemplateEditView> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              _softSurface(
-                theme,
+              AppSurfaces.soft(
+                theme.colorScheme,
                 tint: theme.colorScheme.primary,
                 tintAlpha: 16,
               ),
               theme.scaffoldBackgroundColor,
-              _softSurface(
-                theme,
+              AppSurfaces.soft(
+                theme.colorScheme,
                 tint: theme.colorScheme.tertiary,
                 tintAlpha: 8,
               ),
@@ -1112,14 +1078,14 @@ class _TemplateEditViewState extends State<TemplateEditView> {
                 Container(
                   padding: const EdgeInsets.all(AppSpacing.xxl),
                   decoration: BoxDecoration(
-                    color: _softSurface(
-                      theme,
+                    color: AppSurfaces.soft(
+                      theme.colorScheme,
                       tint: theme.colorScheme.secondary,
                       tintAlpha: 12,
                     ),
                     borderRadius: BorderRadius.circular(AppRadii.dialog),
                     border: Border.all(color: theme.colorScheme.outlineVariant),
-                    boxShadow: _softCardShadows(theme, depth: 0.55),
+                    boxShadow: AppShadows.card(theme, depth: 0.55),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,

@@ -47,6 +47,9 @@ jobs:
       - name: Analyze
         run: dart analyze lib test
 
+      - name: Style Token Check
+        run: python3 tool/check_style_tokens.py
+
       - name: Test
         run: flutter test
 

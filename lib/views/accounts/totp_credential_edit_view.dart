@@ -15,6 +15,7 @@ import '../../services/totp_qr_image_import_service.dart';
 import '../../services/totp_service.dart';
 import '../../services/sensitive_clipboard_service.dart';
 import 'totp_qr_scanner_view.dart';
+import '../../theme/app_design_tokens.dart';
 
 class TotpCredentialEditView extends StatefulWidget {
   final TotpCredential? initial;
@@ -202,10 +203,10 @@ class _TotpCredentialEditViewState extends State<TotpCredentialEditView> {
       final code = const TotpService().generate(config);
       return Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpacing.lg),
         decoration: BoxDecoration(
           color: theme.colorScheme.primaryContainer.withAlpha(70),
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(AppRadii.panel),
           border: Border.all(color: theme.colorScheme.primary.withAlpha(50)),
         ),
         child: Column(
@@ -229,13 +230,13 @@ class _TotpCredentialEditViewState extends State<TotpCredentialEditView> {
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.sm),
             LinearProgressIndicator(
               value: code.secondsRemaining / code.period,
               minHeight: 5,
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(AppRadii.control),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.sm),
             Text(
               '${TotpService.algorithmName(config.algorithm)} · ${config.digits} digits · ${config.period}s',
               style: theme.textTheme.bodySmall?.copyWith(
@@ -333,7 +334,7 @@ class _TotpCredentialEditViewState extends State<TotpCredentialEditView> {
               prefixIcon: const Icon(Icons.key_outlined),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -353,14 +354,14 @@ class _TotpCredentialEditViewState extends State<TotpCredentialEditView> {
           ),
           const SizedBox(height: 18),
           _buildPreview(context),
-          const SizedBox(height: 24),
+          const SizedBox(height: AppSpacing.xxl),
           Text(
             _text('关联账号', 'Linked Accounts'),
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w800,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.sm),
           _buildAccountSelector(context, accounts),
         ],
       ),
