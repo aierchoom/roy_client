@@ -4,6 +4,7 @@ import 'package:secret_roy/l10n/app_localizations.dart';
 
 import '../../models/account_template.dart';
 import '../../providers/enhanced_app_provider.dart';
+import '../../utils/field_presets.dart';
 import '../../widgets/adaptive_page.dart';
 import '../../widgets/green_add_button.dart';
 import '../../widgets/template_edit_widgets.dart';
@@ -100,52 +101,6 @@ class _TemplateEditViewState extends State<TemplateEditView> {
     return candidate;
   }
 
-  String _fieldTypeLabel(AccountFieldType type) {
-    switch (type) {
-      case AccountFieldType.text:
-        return '\u6587\u672c';
-      case AccountFieldType.password:
-        return '\u5bc6\u7801';
-      case AccountFieldType.number:
-        return '\u6570\u5b57';
-      case AccountFieldType.email:
-        return '\u90ae\u7bb1';
-      case AccountFieldType.phone:
-        return '\u7535\u8bdd';
-      case AccountFieldType.url:
-        return '\u7f51\u5740';
-      case AccountFieldType.time:
-        return '\u65f6\u95f4';
-      case AccountFieldType.custom:
-        return '\u81ea\u5b9a\u4e49';
-      case AccountFieldType.unknown:
-        return '\u672a\u77e5';
-    }
-  }
-
-  IconData _fieldTypeIcon(AccountFieldType type) {
-    switch (type) {
-      case AccountFieldType.text:
-        return Icons.notes_outlined;
-      case AccountFieldType.password:
-        return Icons.password_outlined;
-      case AccountFieldType.number:
-        return Icons.pin_outlined;
-      case AccountFieldType.email:
-        return Icons.email_outlined;
-      case AccountFieldType.phone:
-        return Icons.phone_outlined;
-      case AccountFieldType.url:
-        return Icons.link_outlined;
-      case AccountFieldType.time:
-        return Icons.schedule_outlined;
-      case AccountFieldType.custom:
-        return Icons.extension_outlined;
-      case AccountFieldType.unknown:
-        return Icons.help_outline_outlined;
-    }
-  }
-
   String _sampleValueForField(AccountField field) {
     if (field.attributes.isSecret) return '••••••••';
     if (field.attributes.isReference) return '关联 2FA';
@@ -216,7 +171,7 @@ class _TemplateEditViewState extends State<TemplateEditView> {
       builder: (dialogContext) => FieldEditorDialog(
         initial: initial,
         originallyPersisted: originallyPersisted,
-        fieldTypeLabelBuilder: _fieldTypeLabel,
+        fieldTypeLabelBuilder: fieldTypeLabel,
       ),
     );
 
@@ -643,7 +598,7 @@ class _TemplateEditViewState extends State<TemplateEditView> {
               child: Opacity(
                 opacity: 0.05,
                 child: Icon(
-                  _fieldTypeIcon(field.attributes.type),
+                  fieldTypeIcon(field.attributes.type),
                   size: 100,
                   color: accent,
                 ),
@@ -663,7 +618,7 @@ class _TemplateEditViewState extends State<TemplateEditView> {
                         borderRadius: BorderRadius.circular(AppRadii.panel),
                       ),
                       child: Icon(
-                        _fieldTypeIcon(field.attributes.type),
+                        fieldTypeIcon(field.attributes.type),
                         color: accent,
                         size: 26,
                       ),
@@ -781,8 +736,8 @@ class _TemplateEditViewState extends State<TemplateEditView> {
                   children: [
                     _buildToneChip(
                       context,
-                      icon: _fieldTypeIcon(field.attributes.type),
-                      label: _fieldTypeLabel(field.attributes.type),
+                      icon: fieldTypeIcon(field.attributes.type),
+                      label: fieldTypeLabel(field.attributes.type),
                       tint: accent,
                     ),
                     if (field.attributes.isRequired)
@@ -854,7 +809,7 @@ class _TemplateEditViewState extends State<TemplateEditView> {
                                 : null,
                             helperMaxLines: 2,
                             prefixIcon: Icon(
-                              _fieldTypeIcon(field.attributes.type),
+                              fieldTypeIcon(field.attributes.type)
                             ),
                             suffixIcon: field.attributes.isSecret
                                 ? const Icon(Icons.visibility_off_outlined)
@@ -1007,6 +962,80 @@ class _TemplateEditViewState extends State<TemplateEditView> {
     );
   }
 
+  Future<void> _applyFieldPreset(FieldPreset preset) async {
+    final selectedIndices = await showDialog<List<int>>(
+      context: context,
+      builder: (_) => FieldPresetPreviewDialog(preset: preset),
+    );
+    if (selectedIndices == null || selectedIndices.isEmpty) return;
+    if (!mounted) return;
+
+    final existingKeys = _fields.map((f) => f.fieldKey).toSet();
+    final keysSoFar = <String>{};
+    final newFields = <AccountField>[];
+
+    for (final index in selectedIndices) {
+      final field = preset.fields[index];
+      final uniqueKey = generateUniqueFieldKey(
+        field.fieldKey,
+        {...existingKeys, ...keysSoFar},
+      );
+      keysSoFar.add(uniqueKey);
+      newFields.add(
+        AccountField(
+          fieldKey: uniqueKey,
+          label: field.label,
+          description: field.description,
+          attributes: field.attributes,
+        ),
+      );
+    }
+
+    setState(() => _fields.addAll(newFields));
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '\u5df2\u6dfb\u52a0 ${preset.name} \u5b57\u6bb5\u7ec4\uff0c\u5171 ${newFields.length} \u4e2a\u5b57\u6bb5',
+        ),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  Widget _buildFieldPresetBar(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Wrap(
+      spacing: AppSpacing.sm,
+      runSpacing: AppSpacing.sm,
+      children: [
+        for (final preset in kFieldPresets)
+          ActionChip(
+            avatar: Icon(preset.icon, size: 18, color: theme.colorScheme.primary),
+            label: Text(preset.name),
+            labelStyle: theme.textTheme.labelMedium?.copyWith(
+              color: theme.colorScheme.primary,
+              fontWeight: FontWeight.w600,
+            ),
+            backgroundColor: AppSurfaces.soft(
+              theme.colorScheme,
+              tint: theme.colorScheme.primary,
+              tintAlpha: AppAlphas.tint,
+            ),
+            side: BorderSide(
+              color: theme.colorScheme.primary.withAlpha(AppAlphas.low),
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppRadii.pill),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+            onPressed: () => _applyFieldPreset(preset),
+          ),
+      ],
+    );
+  }
+
   Widget _buildFieldGrid(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -1073,6 +1102,8 @@ class _TemplateEditViewState extends State<TemplateEditView> {
               _buildTopSection(context),
               const SizedBox(height: AppSpacing.xxl),
               _buildFieldSectionHeader(context),
+              const SizedBox(height: AppSpacing.md),
+              _buildFieldPresetBar(context),
               const SizedBox(height: AppSpacing.md),
               if (_fields.isEmpty)
                 Container(

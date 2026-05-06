@@ -2,6 +2,55 @@ import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
 import '../models/account_template.dart';
+import '../utils/field_presets.dart';
+
+/// Maps [AccountFieldType] to a human-readable label.
+String fieldTypeLabel(AccountFieldType type) {
+  switch (type) {
+    case AccountFieldType.text:
+      return '\u6587\u672c';
+    case AccountFieldType.password:
+      return '\u5bc6\u7801';
+    case AccountFieldType.number:
+      return '\u6570\u5b57';
+    case AccountFieldType.email:
+      return '\u90ae\u7bb1';
+    case AccountFieldType.phone:
+      return '\u7535\u8bdd';
+    case AccountFieldType.url:
+      return '\u7f51\u5740';
+    case AccountFieldType.time:
+      return '\u65f6\u95f4';
+    case AccountFieldType.custom:
+      return '\u81ea\u5b9a\u4e49';
+    case AccountFieldType.unknown:
+      return '\u672a\u77e5';
+  }
+}
+
+/// Maps [AccountFieldType] to a representative icon.
+IconData fieldTypeIcon(AccountFieldType type) {
+  switch (type) {
+    case AccountFieldType.text:
+      return Icons.notes_outlined;
+    case AccountFieldType.password:
+      return Icons.password_outlined;
+    case AccountFieldType.number:
+      return Icons.pin_outlined;
+    case AccountFieldType.email:
+      return Icons.email_outlined;
+    case AccountFieldType.phone:
+      return Icons.phone_outlined;
+    case AccountFieldType.url:
+      return Icons.link_outlined;
+    case AccountFieldType.time:
+      return Icons.schedule_outlined;
+    case AccountFieldType.custom:
+      return Icons.extension_outlined;
+    case AccountFieldType.unknown:
+      return Icons.help_outline_outlined;
+  }
+}
 
 /// A metric display widget for template editor.
 class EditorMetric extends StatelessWidget {
@@ -306,6 +355,157 @@ class _FieldEditorDialogState extends State<FieldEditorDialog> {
           child: Text(AppLocalizations.of(context)!.cancel),
         ),
         FilledButton(onPressed: _submit, child: const Text('保存字段')),
+      ],
+    );
+  }
+}
+
+/// A dialog for previewing and selecting fields from a [FieldPreset]
+/// before inserting them into a template.
+class FieldPresetPreviewDialog extends StatefulWidget {
+  final FieldPreset preset;
+
+  const FieldPresetPreviewDialog({super.key, required this.preset});
+
+  @override
+  State<FieldPresetPreviewDialog> createState() =>
+      _FieldPresetPreviewDialogState();
+}
+
+class _FieldPresetPreviewDialogState extends State<FieldPresetPreviewDialog> {
+  late final Set<int> _selectedIndices;
+
+  String _text(String zh, String en) {
+    return Localizations.localeOf(context).languageCode == 'zh' ? zh : en;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedIndices = {
+      for (var i = 0; i < widget.preset.fields.length; i++) i,
+    };
+  }
+
+  void _toggleAll(bool select) {
+    setState(() {
+      if (select) {
+        _selectedIndices.addAll(
+          List.generate(widget.preset.fields.length, (i) => i),
+        );
+      } else {
+        _selectedIndices.clear();
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final allSelected = _selectedIndices.length == widget.preset.fields.length;
+
+    return AlertDialog(
+      title: Row(
+        children: [
+          Icon(widget.preset.icon, color: theme.colorScheme.primary),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              _text(
+                '\u63d2\u5165\u300c${widget.preset.name}\u300d\u5b57\u6bb5\u7ec4',
+                'Insert "${widget.preset.name}" fields',
+              ),
+            ),
+          ),
+        ],
+      ),
+      content: SizedBox(
+        width: 380,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextButton.icon(
+              onPressed: () => _toggleAll(!allSelected),
+              icon: Icon(
+                allSelected
+                    ? Icons.check_box_outlined
+                    : Icons.check_box_outline_blank,
+                size: 18,
+              ),
+              label: Text(
+                allSelected
+                    ? _text('\u53d6\u6d88\u5168\u9009', 'Deselect all')
+                    : _text('\u5168\u9009', 'Select all'),
+              ),
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.zero,
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Flexible(
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (var i = 0; i < widget.preset.fields.length; i++)
+                      CheckboxListTile(
+                        value: _selectedIndices.contains(i),
+                        onChanged: (checked) {
+                          setState(() {
+                            if (checked == true) {
+                              _selectedIndices.add(i);
+                            } else {
+                              _selectedIndices.remove(i);
+                            }
+                          });
+                        },
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        controlAffinity: ListTileControlAffinity.leading,
+                        secondary: Icon(
+                          fieldTypeIcon(widget.preset.fields[i].attributes.type),
+                          size: 18,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                        title: Text(widget.preset.fields[i].label),
+                        subtitle: Text(
+                          fieldTypeLabel(
+                            widget.preset.fields[i].attributes.type,
+                          ),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(AppLocalizations.of(context)!.cancel),
+        ),
+        FilledButton(
+          onPressed: _selectedIndices.isEmpty
+              ? null
+              : () => Navigator.pop(
+                    context,
+                    _selectedIndices.toList()..sort(),
+                  ),
+          child: Text(
+            _text(
+              '\u63d2\u5165 ${_selectedIndices.length} \u4e2a\u5b57\u6bb5',
+              'Insert ${_selectedIndices.length} fields',
+            ),
+          ),
+        ),
       ],
     );
   }
