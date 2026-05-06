@@ -349,7 +349,177 @@ flowchart TD
 
 ---
 
-## 5. 通用业务规则
+## 5. 迭代执行计划
+
+本计划按功能依赖关系分为三个阶段，每个阶段完成后可独立提交和验证。
+
+### 5.1 阶段一：Vault Health 体检面板（F1）
+
+**目标**: 首页或设置页可见的只读安全体检面板。
+**预估工期**: 3-4 天。
+**前置依赖**: 无。
+**准入条件**: `flutter test` 120 passed / 1 skipped；`dart analyze` 0 issues。
+
+#### 任务拆分
+
+| # | 任务 | 状态 | 验收标准 |
+|---|---|---|---|
+| F1.1 | 定义 `VaultHealthReport` 只读数据模型 | ⬜ | 模型包含评分、指标列表、风险项；不依赖 UI |
+| F1.2 | 实现 `VaultHealthCalculator` 计算服务 | ⬜ | 覆盖全部 13 项指标；1000 账号内 <100ms；纯 Dart，无平台调用 |
+| F1.3 | 实现 `vault_health_view.dart` 页面 | ⬜ | 评分圆环、风险卡片列表、可点击跳转；支持深色模式 |
+| F1.4 | 在 `SettingsView` 或 `HomeSearchView` 增加入口 | ⬜ | 低噪音入口，不干扰主流程 |
+| F1.5 | 补 `vault_health_calculator_test.dart` | ⬜ | 覆盖所有指标分支、评分边界（0/50/70/90/100） |
+| F1.6 | 更新 `application-characteristics.md` 全局功能地图 | ⬜ | 标记 Vault Health 为已实现 |
+| F1.7 | 创建执行报告 `docs/reports/execution/2026-05-xx-vault-health.md` | ⬜ | 记录实现决策、性能数据、残留风险 |
+
+#### 验收命令
+
+```bash
+flutter analyze --no-pub                  # 0 issues
+flutter test test/vault/                  # 新增测试全绿
+flutter test                              # 总基线不回归
+```
+
+#### 风险与回滚
+
+| 风险 | 影响 | 缓解 |
+|---|---|---|
+| 大账号库计算超时 | 体检页面卡顿 | 添加计算超时保护（>500ms 时中断并提示"账号过多，建议分批体检"） |
+| 评分算法争议 | 用户不理解分数 | 评分仅作参考，不阻塞功能；每个扣分项都有明确解释 |
+| 与现有首页布局冲突 | UI 回归 | 入口放在设置页优先，首页入口作为可选配置 |
+
+**回滚方式**: 该功能纯客户端、纯只读，若验收失败可直接 revert 提交，不影响任何用户数据。
+
+---
+
+### 5.2 阶段二：一键导入向导（F2）
+
+**目标**: 支持 Chrome/Edge/Firefox CSV、Bitwarden JSON、Generic CSV 的一站式导入。
+**预估工期**: 5-7 天。
+**前置依赖**: 阶段一完成（或并行，但建议串行以减少回归面）。
+**准入条件**: 阶段一已合并到 main；`flutter test` 基线稳定。
+
+#### 任务拆分
+
+| # | 任务 | 状态 | 验收标准 |
+|---|---|---|---|
+| F2.1 | 定义 `ImportSource` 枚举和 `ImportPreview` 模型 | ⬜ | 支持 csvChrome、csvFirefox、jsonBitwarden、csvGeneric |
+| F2.2 | 实现 CSV 解析器（`CsvAccountImporter`） | ⬜ | 支持 UTF-8/BOM；容错空行、引号、换行；人类可读错误 |
+| F2.3 | 实现 Bitwarden JSON 解析器（`BitwardenJsonImporter`） | ⬜ | 解析 `items` / `login` / `uris` / `fields`；忽略 notes/cards |
+| F2.4 | 实现重复检测（名称 + URL 域名匹配） | ⬜ | 预览阶段标记重复；默认不勾选 |
+| F2.5 | 实现模板自动映射（域名 -> 内置模板） | ⬜ | 常见域名准确率 >80%；未知域名 fallback 到网站通用模板 |
+| F2.6 | 实现 `import_wizard_view.dart`（三步向导） | ⬜ | 步骤1: 选择来源和上传；步骤2: 预览和勾选；步骤3: 确认导入 |
+| F2.7 | 导入后生成 `LocalSyncChange` outbox 记录 | ⬜ | 状态为 `pendingReview`；不自动推送 |
+| F2.8 | 补 `import_service_test.dart` | ⬜ | 覆盖解析正确性、重复检测、错误处理、大文件性能 |
+| F2.9 | 补 widget test：`import_wizard_view_test.dart` | ⬜ | 覆盖三步流程、全选/取消、错误状态展示 |
+| F2.10 | 更新 `application-characteristics.md` | ⬜ | 标记导入向导为已实现 |
+| F2.11 | 创建执行报告 | ⬜ | 记录支持的格式、已知限制（如 KeePass/1Password 暂不支持） |
+
+#### 验收命令
+
+```bash
+flutter analyze --no-pub                  # 0 issues
+flutter test test/import/                 # 新增测试全绿
+flutter test                              # 总基线不回归
+```
+
+#### 风险与回滚
+
+| 风险 | 影响 | 缓解 |
+|---|---|---|
+| CSV 编码/格式千奇百怪 | 解析失败率高 | 先支持 UTF-8 标准导出；错误时提示"请用标准格式重新导出" |
+| 大文件导入阻塞 UI | 应用假死 | 使用 `compute()` 或 isolate 解析；显示进度条 |
+| 误导入导致大量垃圾数据 | 用户需要手动删除 | 导入后进入 outbox，用户可批量撤销；不直接写入 synchronized |
+| Bitwarden JSON 结构变更 | 解析失败 | 添加版本检测；若结构不匹配，提示"版本不兼容，请导出为标准 CSV" |
+
+**回滚方式**: 导入功能独立，若验收失败可 revert。已导入的数据若已进入 outbox，用户可手动撤销；若已 approved，走正常删除流程即可。
+
+---
+
+### 5.3 阶段三：安全大笔记模板（F3）
+
+**目标**: 扩展模板系统支持 `note` 大文本字段，内置"安全笔记"模板。
+**预估工期**: 3-4 天。
+**前置依赖**: 阶段一或阶段二完成。
+**准入条件**: 阶段二已合并或并行开发时基线稳定。
+
+#### 任务拆分
+
+| # | 任务 | 状态 | 验收标准 |
+|---|---|---|---|
+| F3.1 | 在 `AccountFieldType` 增加 `note` | ⬜ | 枚举扩展；现有测试不失败 |
+| F3.2 | 实现 `NoteFieldWidget`（多行输入 + 显示） | ⬜ | 最小 4 行，最大 20 行；默认隐藏；支持代码块样式 |
+| F3.3 | 在 `AccountEditView` 中适配 `note` 类型 | ⬜ | 编辑、保存、加载与现有字段一致 |
+| F3.4 | 内置"安全笔记"模板（`secureNoteTemplate`） | ⬜ | 含标题（text）、内容（note）、标签（text）、过期提醒（time） |
+| F3.5 | 搜索排除 `note` 内容索引 | ⬜ | 搜索只命中标题和标签；`note` 内容不进入搜索索引 |
+| F3.6 | 复制按钮走 `SensitiveClipboardService` | ⬜ | 高风险 45 秒清理；显示 Toast 提示 |
+| F3.7 | 补 `note_field_widget_test.dart` | ⬜ | 覆盖显示/隐藏、复制、编辑保存 |
+| F3.8 | 更新 `application-characteristics.md` | ⬜ | 标记安全笔记为已实现 |
+| F3.9 | 创建执行报告 | ⬜ | 记录字段类型扩展决策和模板设计 |
+
+#### 验收命令
+
+```bash
+flutter analyze --no-pub                  # 0 issues
+flutter test test/widgets/                # widget 测试全绿
+flutter test                              # 总基线不回归
+```
+
+#### 风险与回滚
+
+| 风险 | 影响 | 缓解 |
+|---|---|---|
+| `note` 内容过大导致 DB 性能下降 | 加载卡顿 | 限制单条 note 最大 1MB；超出时提示"内容过长，建议拆分为多条笔记" |
+| 与现有模板编辑器冲突 | 模板编辑页崩溃 | `note` 类型在模板编辑器中仅提供行数配置，不提供复杂选项 |
+| 同步时大文本 payload 过大 | 同步失败或超时 | 走现有 SyncPayloadCodec，但添加单条 payload 大小检查（>500KB 时提示"笔记过大，可能影响同步"） |
+
+**回滚方式**: `note` 字段类型是枚举扩展，回滚时只需移除枚举值和模板；已保存的 `note` 数据在 DB 中存为普通 `data` 字段，回滚后显示为原始文本，不丢失数据。
+
+---
+
+### 5.4 跨阶段依赖与里程碑
+
+```mermaid
+flowchart LR
+    subgraph 阶段一
+        A1[F1.1 数据模型] --> A2[F1.2 计算器]
+        A2 --> A3[F1.3 UI]
+        A3 --> A4[F1.4 入口]
+        A4 --> A5[F1.5 测试]
+    end
+
+    subgraph 阶段二
+        B1[F2.1 模型] --> B2[F2.2-2.3 解析器]
+        B2 --> B3[F2.4 重复检测]
+        B3 --> B4[F2.5 模板映射]
+        B4 --> B5[F2.6 UI 向导]
+        B5 --> B6[F2.7 outbox]
+        B6 --> B7[F2.8-2.9 测试]
+    end
+
+    subgraph 阶段三
+        C1[F3.1 note 枚举] --> C2[F3.2-3.4 UI+模板]
+        C2 --> C3[F3.5 搜索排除]
+        C3 --> C4[F3.6 剪贴板]
+        C4 --> C5[F3.7 测试]
+    end
+
+    A5 -->|建议串行| B1
+    B7 -->|可串行或并行| C1
+```
+
+**里程碑定义**:
+
+| 里程碑 | 完成标志 | 预计日期 |
+|---|---|---|
+| M1 | 阶段一完成：Vault Health 页面可访问，评分计算正确，测试通过 | Day 4 |
+| M2 | 阶段二完成：导入向导支持 CSV/JSON，导入后进入 outbox，测试通过 | Day 10 |
+| M3 | 阶段三完成：安全笔记模板可用，note 字段正常同步，测试通过 | Day 14 |
+| M4 | 全量回归：三个阶段合并后，`flutter test` 基线不回归 | Day 15 |
+
+---
+
+## 6. 通用业务规则
 
 三个功能都遵循以下通用规则：
 
