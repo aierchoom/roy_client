@@ -1,6 +1,6 @@
 # SecretRoy 迭代任务清单
 
-**最后更新**: 2026-04-30
+**最后更新**: 2026-05-06
 **文档定位**: 当前阶段逐项执行的产品/工程任务列表
 **执行原则**: 一次只推进一个主任务，完成验收和文档同步后再进入下一项
 
@@ -534,17 +534,28 @@
 
 任务拆分：
 
-- [ ] 定义只读 health model，不直接修改账号数据。
-- [ ] 建立账号安全体检规则：弱、复用、陈旧、不完整、缺少恢复数据。
-- [ ] 建立 vault 运行体检规则：加密、备份、导入、同步、冲突。
-- [ ] 在首页或设置页增加低噪音入口。
-- [ ] 补本地 health service 单测。
+- [x] 定义只读 health model，不直接修改账号数据。
+- [x] 建立账号安全体检规则：弱、复用、陈旧、不完整、缺少 2FA。
+- [x] 建立 vault 运行体检规则：加密、备份、同步、身份、冲突、待同步变更。
+- [x] 在设置页增加低噪音入口（位于安全设置与数据同步之间）。
+- [x] 补本地 health service 单测（29 项）。
 
 验收：
 
 - 离线状态下也能完成本地体检。
 - 体检结果不上传、不泄露 secret。
 - 每个风险项都能指向一个可执行下一步。
+
+完成记录（2026-05-06）：
+
+- 新增 `VaultHealthReport` / `VaultHealthItem` / `VaultHealthGrade` / `VaultHealthRiskLevel` / `VaultHealthAction` 数据模型。
+- 新增 `VaultHealthCalculator` 计算服务，含 13 项指标与评分算法。
+- 新增 `VaultHealthView` 体检面板 UI（评分圆环、风险卡片、分级展示、刷新按钮）。
+- 设置页 `settings_view.dart` 已插入 Vault Health 入口。
+- 单元测试 `vault_health_calculator_test.dart` 29 项全部通过。
+- `flutter analyze lib test` 0 issues；`flutter test` 187 passed, 1 skipped。
+- 执行报告：`docs/reports/execution/2026-05-06-vault-health.md`。
+- `application-characteristics.md` 全局功能地图已同步更新。
 
 ## 17. T14 备份、恢复和导入一致性
 

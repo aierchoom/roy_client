@@ -8,6 +8,7 @@ import '../widgets/app_page_header.dart';
 import 'appearance_settings_view.dart';
 import 'password_tools_view.dart';
 import 'security_settings_view.dart';
+import 'settings/vault_health_view.dart';
 import 'sync_settings_view.dart';
 import 'templates/template_list_view.dart';
 import 'release_note_view.dart';
@@ -85,6 +86,28 @@ class SettingsView extends StatelessWidget {
                       Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (context) => const SecuritySettingsView(),
+                        ),
+                      );
+                    },
+                  ),
+                  const Divider(
+                    height: 1,
+                    indent: 16,
+                    endIndent: 16,
+                    thickness: 0.5,
+                  ),
+                  _SettingsTile(
+                    icon: Icons.health_and_safety_outlined,
+                    title: _text(context, 'Vault 体检', 'Vault Health'),
+                    subtitle: _text(
+                      context,
+                      '检查保险库安全状态和账号风险',
+                      'Check vault security status and account risks',
+                    ),
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => const VaultHealthView(),
                         ),
                       );
                     },
