@@ -1,6 +1,6 @@
 # 架构概览
 
-**最后更新**: 2026-04-28
+**最后更新**: 2026-05-01
 
 本文描述当前 `roy_client` 的实现结构。SecretRoy 客户端是本地优先的 Flutter
 保险库应用，同步服务端是可选的同级 `../roy_server/` 项目。
@@ -116,11 +116,13 @@ MultiProvider(
 | `SecureStorageService` | 加密数据库打开、CRUD、变更事件 |
 | `EnhancedCryptoService` | 主密码验证、数据库文件密钥解封 |
 | `IdentityService` | 设备/保险库身份、内部兼容码和离线恢复码 |
-| `SyncService` | pull/push、同步状态、冲突恢复 |
+| `SyncService` | pull/push、同步状态（10 状态机）、冲突恢复 |
 | `CrdtMergeEngine` | 多设备并发修改合并 |
+| `TotpCredentialMergeEngine` | TOTP 凭据字段级合并 |
 | `VaultPairingService` | 经同步服务端的保险库配对 |
 | `LanPairingService` | 面对面链接和 8 位临时码领取 |
 | `AutoLockService` | 自动锁定和应用生命周期联动 |
+| `SensitiveClipboardService` | 分级敏感剪贴板自动清理 |
 
 ### 3.4 数据层
 
@@ -270,8 +272,8 @@ PBKDF2-HMAC-SHA256 校验
 仍需注意：
 
 - 解锁期间存在临时 runtime DB。
-- 生物识别回填依赖 `FlutterSecureStorage` 保存口令材料。
-- 同步服务端部署仍需要可信网络或 HTTPS。
+- 同步服务端部署仍需要可信网络或 HTTPS；vault-level token（`X-Vault-Token`）已提供最小认证边界。
+- 敏感剪贴板按 high/medium/low 风险等级自动清理，避免密码/配对码长期停留系统剪贴板。
 
 ## 6. 同步架构
 

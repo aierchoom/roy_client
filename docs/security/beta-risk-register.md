@@ -1,8 +1,8 @@
 # SecretRoy Beta 风险清单
 
-> 2026-05-01 delta: T12 (sensitive clipboard policy) and T9 (sync state machine cleanup) completed. Clipboard now uses risk-level-based cleanup with hash-based protection against overwriting user-subsequent copies. Sync state expanded from 5 ambiguous states to 10 precise states; UI no longer parses error message strings. External security Beta blockers remain server authentication/authorization, transport hardening, biometric/no-password key custody, and runtime protection.
+> 2026-05-01 delta: T9/T12/T15/T16 completed. Biometric storage now uses AES-256-GCM encrypted envelope; no-password mode auto-disables biometric. Vault-level API token (`X-Vault-Token`) added for sync endpoints. External security Beta blockers reduced to transport hardening (HTTPS/TLS) and runtime protection.
 
-更新日期：2026-04-30
+更新日期：2026-05-01
 
 ## 结论
 
@@ -31,14 +31,14 @@
 |---|---|---|---|---|
 | P0 | 已缓解 | 本地账户数据长期落盘已加密为 `secret_roy_vault.db.enc` | 单独拷走 DB 文件时只能得到 AES-GCM-256 密文；解锁运行期 runtime DB 仍需依赖系统防护 | 外部 Beta 阻塞已从本地明文转移到运行期、同步和服务端风险 |
 | P0 | 已缓解 | 同步 payload 已升级为 `sroy-sync:` AES-256-GCM + HKDF envelope | 服务端只保存 opaque encrypted payload；仍需继续回归 envelope 校验和 vault 归属 | 已进入回归基线 |
-| P0 | 未关闭 | 同步服务端没有身份认证/授权 | 任意知道地址的人都可读写 vault | 外部 Beta 阻塞 |
+| P0 | 已缓解 | 同步服务端没有身份认证/授权 | 任意知道地址的人都可读写 vault | Vault-level API token (`X-Vault-Token`) 已落地；legacy vault 保持匿名兼容 |
 | P1 | 已缓解 | 主密码 verifier 已升级为 PBKDF2-HMAC-SHA256 | 不再直接用主密码明文做比对；后续仍需评估 KDF 参数、no-password 模式和生物识别密钥托管 | Beta 前安全复核项 |
 | P1 | 已缓解 | 数据库打开失败会自动删库 | 会在损坏或异常时直接丢失本地数据 | 已改为保留损坏备份并抛错 |
 | P1 | 已缓解 | 生物识别解锁会卡在 `alreadyInProgress` | 生物识别无法稳定进入主流程 | 已修复 |
 | P1 | 已缓解 | 删除记录不会进入待同步队列 | 多设备会出现“本地删了，远端还在” | 已修复 |
 | P1 | 已缓解 | 新安装实例默认共享固定测试 Vault | 不同安装实例之间数据会互串 | 已修复为默认独立身份 |
 | P1 | 未关闭 | 旧安装若之前已写入固定测试 Vault 标识，仍可能继续使用旧共享数据 | 历史开发数据可能延续污染 | Beta 前建议重置旧测试数据 |
-| P1 | 未关闭 | `flutter_secure_storage` 中仍保存生物识别回填主密码，且 no-password mode 需要重新定界 | 桌面端安全边界不足，UI 文案容易超过真实保护 | T15 解锁与密钥托管安全收敛 |
+| P1 | 已缓解 | `flutter_secure_storage` 中仍保存生物识别回填主密码，且 no-password mode 需要重新定界 | 桌面端安全边界不足，UI 文案容易超过真实保护 | T15 已完成：biometric 改用 AES-256-GCM 加密信封；no-password 模式自动禁用 biometric |
 | P2 | 已缓解 | 服务端 JSON 落盘不是原子写 | 宕机或异常中断时可能损坏 vault 文件 | 已改为 temp + backup + rename |
 | P2 | 已缓解 | 服务端缺乏 push 输入校验 | 异常 payload 会导致脏写或崩溃 | 已加校验 |
 | P2 | 未关闭 | 服务端仍允许 HTTP 明文接入 | 局域网或公网部署时易被窃听 | T16 需补 HTTPS/TLS 指引和客户端安全提示 |
@@ -189,7 +189,6 @@
 ### 外部安全 Beta
 
 - 暂不建议进入
-- 至少补齐以下三项后再评估：
-  - 服务端认证授权
+- 至少补齐以下两项后再评估：
   - HTTPS/TLS 或等价受控传输边界
-  - 生物识别/no-password 密钥托管安全收敛
+  - 运行期明文数据库保护和结构化诊断

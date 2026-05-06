@@ -16,93 +16,9 @@ import '../services/secure_storage_service.dart';
 import '../models/local_sync_change.dart';
 import 'crdt_merge_engine.dart';
 import 'sync_payload_codec.dart';
+export 'sync_service_types.dart';
+import 'sync_service_types.dart';
 import 'totp_credential_merge_engine.dart';
-
-enum SyncState {
-  offline,
-  connecting,
-  pulling,
-  pushing,
-  idle,
-  conflictRecovery,
-  networkUnreachable,
-  serverError,
-  protocolError,
-  authError,
-}
-
-extension _SyncStateExt on SyncState {
-  bool get isError =>
-      this == SyncState.networkUnreachable ||
-      this == SyncState.serverError ||
-      this == SyncState.protocolError ||
-      this == SyncState.authError;
-}
-
-class SyncConfig {
-  final String serverUrl;
-  final Duration syncInterval;
-
-  const SyncConfig({
-    required this.serverUrl,
-    this.syncInterval = const Duration(minutes: 5),
-  });
-}
-
-enum _SyncRecoveryPhase { pull, push, conflictRecovery }
-
-class _SyncRecoveryMarker {
-  final _SyncRecoveryPhase phase;
-  final int localVersion;
-  final DateTime startedAt;
-  final String? itemId;
-  final String? conflictType;
-
-  const _SyncRecoveryMarker({
-    required this.phase,
-    required this.localVersion,
-    required this.startedAt,
-    this.itemId,
-    this.conflictType,
-  });
-
-  Map<String, dynamic> toJson() {
-    return {
-      'phase': phase.name,
-      'local_version': localVersion,
-      'started_at': startedAt.toIso8601String(),
-      'item_id': itemId,
-      'conflict_type': conflictType,
-    };
-  }
-
-  factory _SyncRecoveryMarker.fromJson(Map<String, dynamic> json) {
-    final phaseName = json['phase'] as String?;
-    final phase = _SyncRecoveryPhase.values.firstWhere(
-      (candidate) => candidate.name == phaseName,
-      orElse: () => _SyncRecoveryPhase.pull,
-    );
-
-    return _SyncRecoveryMarker(
-      phase: phase,
-      localVersion: json['local_version'] as int? ?? 0,
-      startedAt:
-          DateTime.tryParse(json['started_at'] as String? ?? '') ??
-          DateTime.fromMillisecondsSinceEpoch(0),
-      itemId: json['item_id'] as String?,
-      conflictType: json['conflict_type'] as String?,
-    );
-  }
-}
-
-class _SyncProtocolException implements Exception {
-  final String message;
-
-  const _SyncProtocolException(this.message);
-
-  @override
-  String toString() => 'SyncProtocolException($message)';
-}
 
 class SyncService extends ChangeNotifier {
   final SecureStorageService _storageService;
@@ -121,7 +37,7 @@ class SyncService extends ChangeNotifier {
   String _lastConflictMsg = '';
   int _queuedConflictCount = 0;
   String? _queuedConflictNotice;
-  _SyncRecoveryMarker? _pendingRecovery;
+  SyncRecoveryMarker? _pendingRecovery;
   bool _disposed = false;
 
   SyncService({
@@ -323,10 +239,10 @@ class SyncService extends ChangeNotifier {
       while (retries < 3) {
         try {
           _updateState(SyncState.connecting);
-          await _writeRecoveryMarker(_SyncRecoveryPhase.pull);
+          await _writeRecoveryMarker(SyncRecoveryPhase.pull);
           _updateState(SyncState.pulling);
           final pullCount = await _runPullPhase(serverUrl);
-          await _writeRecoveryMarker(_SyncRecoveryPhase.push);
+          await _writeRecoveryMarker(SyncRecoveryPhase.push);
           _updateState(SyncState.pushing);
           final pushCount = await _runPushPhase(serverUrl);
 
@@ -360,10 +276,10 @@ class SyncService extends ChangeNotifier {
             conflictCount: _queuedConflictCount,
             notice: _queuedConflictNotice,
           );
-        } on _ConflictException catch (ce) {
+        } on ConflictException catch (ce) {
           _lastConflictMsg = ce.serverResponse;
           await _writeRecoveryMarker(
-            _SyncRecoveryPhase.conflictRecovery,
+            SyncRecoveryPhase.conflictRecovery,
             itemId: ce.itemId,
             conflictType: ce.conflictType,
           );
@@ -423,7 +339,7 @@ class SyncService extends ChangeNotifier {
       return SyncResult.failure(message);
     }
 
-    if (e is _SyncHttpException) {
+    if (e is SyncHttpException) {
       if (e.conflictType == 'generation_mismatch') {
         _statusNote =
             'Server vault has been reset. A full sync will recover your data on the next attempt.';
@@ -455,7 +371,7 @@ class SyncService extends ChangeNotifier {
       return SyncResult.failure(e.userMessage);
     }
 
-    if (e is _SyncProtocolException) {
+    if (e is SyncProtocolException) {
       _setError(
         SyncState.protocolError,
         'Sync protocol invalid: ${e.message}',
@@ -651,10 +567,10 @@ class SyncService extends ChangeNotifier {
     try {
       final decoded = jsonDecode(response.body);
       return _asStringKeyedMap(decoded, '$phase response');
-    } on _SyncProtocolException {
+    } on SyncProtocolException {
       rethrow;
     } catch (_) {
-      throw _SyncProtocolException('$phase response is not valid JSON.');
+      throw SyncProtocolException('$phase response is not valid JSON.');
     }
   }
 
@@ -667,7 +583,7 @@ class SyncService extends ChangeNotifier {
         // Fall through to the typed protocol error below.
       }
     }
-    throw _SyncProtocolException('$label must be a JSON object.');
+    throw SyncProtocolException('$label must be a JSON object.');
   }
 
   int _readOptionalVersion(
@@ -679,7 +595,7 @@ class SyncService extends ChangeNotifier {
     final value = data[key];
     if (value == null) return fallback;
     if (value is int && value >= 0) return value;
-    throw _SyncProtocolException('$label must be a non-negative integer.');
+    throw SyncProtocolException('$label must be a non-negative integer.');
   }
 
   List<dynamic> _readRemoteItems(Map<String, dynamic> data) {
@@ -687,7 +603,7 @@ class SyncService extends ChangeNotifier {
     if (value == null) return const <dynamic>[];
     if (value is List<dynamic>) return value;
     if (value is List) return List<dynamic>.from(value);
-    throw const _SyncProtocolException('pull response items must be a list.');
+    throw const SyncProtocolException('pull response items must be a list.');
   }
 
   Map<String, dynamic> _readRemoteRecord(Object? value) {
@@ -697,7 +613,7 @@ class SyncService extends ChangeNotifier {
   int _readRemoteVersion(Map<String, dynamic> remoteRecord) {
     final value = remoteRecord['version'];
     if (value is int && value >= 0) return value;
-    throw const _SyncProtocolException(
+    throw const SyncProtocolException(
       'remote sync item version must be a non-negative integer.',
     );
   }
@@ -705,7 +621,7 @@ class SyncService extends ChangeNotifier {
   String _readEncryptedPayload(Map<String, dynamic> remoteRecord) {
     final value = remoteRecord['encrypted_signed_payload'];
     if (value is String && value.isNotEmpty) return value;
-    throw const _SyncProtocolException(
+    throw const SyncProtocolException(
       'remote sync item encrypted payload is missing.',
     );
   }
@@ -927,7 +843,7 @@ class SyncService extends ChangeNotifier {
     }
 
     try {
-      _pendingRecovery = _SyncRecoveryMarker.fromJson(
+      _pendingRecovery = SyncRecoveryMarker.fromJson(
         jsonDecode(raw) as Map<String, dynamic>,
       );
     } catch (_) {
@@ -937,11 +853,11 @@ class SyncService extends ChangeNotifier {
   }
 
   Future<void> _writeRecoveryMarker(
-    _SyncRecoveryPhase phase, {
+    SyncRecoveryPhase phase, {
     String? itemId,
     String? conflictType,
   }) async {
-    final marker = _SyncRecoveryMarker(
+    final marker = SyncRecoveryMarker(
       phase: phase,
       localVersion: _localVersion,
       startedAt: DateTime.now(),
@@ -972,7 +888,7 @@ class SyncService extends ChangeNotifier {
     AppLogger.d(
       '[Sync] Recovering interrupted ${marker.phase.name} phase from version ${marker.localVersion}.',
     );
-    final recoveredCount = marker.phase == _SyncRecoveryPhase.pull
+    final recoveredCount = marker.phase == SyncRecoveryPhase.pull
         ? await _pullFromVersion(serverUrl, marker.localVersion)
         : await _pullAndMergeLatestSnapshot(serverUrl);
     _queuedConflictNotice ??=
@@ -988,7 +904,7 @@ class SyncService extends ChangeNotifier {
 
   Future<void> _handleConflict(
     String serverUrl,
-    _ConflictException conflict,
+    ConflictException conflict,
   ) async {
     final itemId = conflict.itemId;
     if (itemId == null) {
@@ -1049,7 +965,7 @@ class SyncService extends ChangeNotifier {
 
   Future<void> _handleTotpCredentialConflict(
     String serverUrl,
-    _ConflictException conflict,
+    ConflictException conflict,
   ) async {
     final itemId = conflict.itemId;
     if (itemId == null) return;
@@ -1365,7 +1281,7 @@ class SyncService extends ChangeNotifier {
           pushingChangeIds,
           response.body,
         );
-        throw _ConflictException(response.body);
+        throw ConflictException(response.body);
       }
       _throwIfSyncHttpError(response, phase: 'push');
 
@@ -1388,12 +1304,12 @@ class SyncService extends ChangeNotifier {
         final itemId = _syncItemId(item);
         if (acceptedVersionByItemId.containsKey(itemId)) continue;
         if (conflictItemIds.contains(itemId)) continue;
-        throw _SyncProtocolException(
+        throw SyncProtocolException(
           'push response missing accepted version for $itemId',
         );
       }
     } catch (e) {
-      if (e is! _ConflictException) {
+      if (e is! ConflictException) {
         await _storageService.markLocalSyncChangesFailed(
           pushingChangeIds,
           e.toString(),
@@ -1446,7 +1362,7 @@ class SyncService extends ChangeNotifier {
 
       // Refresh local state before retry
       await _pullLatestSnapshot(serverUrl);
-      throw _ConflictException(jsonEncode(conflicts.first));
+      throw ConflictException(jsonEncode(conflicts.first));
     }
 
     await _storageService.setSetting(
@@ -1466,7 +1382,7 @@ class SyncService extends ChangeNotifier {
       if (value is int && value >= 0) {
         result[entry.key] = value;
       } else {
-        throw _SyncProtocolException(
+        throw SyncProtocolException(
           'push response contains invalid accepted version for ${entry.key}: $value',
         );
       }
@@ -1482,7 +1398,7 @@ class SyncService extends ChangeNotifier {
           .map((item) => _asStringKeyedMap(item, 'push response conflict'))
           .toList();
     }
-    throw const _SyncProtocolException(
+    throw const SyncProtocolException(
       'push response conflicts must be a list.',
     );
   }
@@ -1782,7 +1698,7 @@ class SyncService extends ChangeNotifier {
     }
 
     final serverError = _extractServerErrorPayload(response.body);
-    throw _SyncHttpException(
+    throw SyncHttpException(
       phase: phase,
       statusCode: response.statusCode,
       serverMessage: serverError.message,
@@ -1791,9 +1707,9 @@ class SyncService extends ChangeNotifier {
     );
   }
 
-  _SyncServerErrorPayload _extractServerErrorPayload(String body) {
+  SyncServerErrorPayload _extractServerErrorPayload(String body) {
     if (body.isEmpty) {
-      return const _SyncServerErrorPayload();
+      return const SyncServerErrorPayload();
     }
 
     try {
@@ -1802,7 +1718,7 @@ class SyncService extends ChangeNotifier {
         final error = decoded['error'];
         final conflictType = decoded['conflict_type'];
         final itemId = decoded['item_id'];
-        return _SyncServerErrorPayload(
+        return SyncServerErrorPayload(
           message: error is String && error.isNotEmpty ? error : null,
           conflictType: conflictType is String ? conflictType : null,
           itemId: itemId is String ? itemId : null,
@@ -1812,7 +1728,7 @@ class SyncService extends ChangeNotifier {
       // Ignore non-JSON error bodies and fall back to generic status text.
     }
 
-    return const _SyncServerErrorPayload();
+    return const SyncServerErrorPayload();
   }
 
   void _startPeriodicSync() {
@@ -1849,121 +1765,3 @@ class SyncService extends ChangeNotifier {
   }
 }
 
-class _ConflictException implements Exception {
-  final String serverResponse;
-  final String? conflictType;
-  final String? itemId;
-  final int? yourBase;
-  final int? serverActual;
-  final bool? serverIsDeleted;
-
-  _ConflictException._(
-    this.serverResponse, {
-    this.conflictType,
-    this.itemId,
-    this.yourBase,
-    this.serverActual,
-    this.serverIsDeleted,
-  });
-
-  factory _ConflictException(String serverResponse) {
-    try {
-      final json = jsonDecode(serverResponse) as Map<String, dynamic>;
-      return _ConflictException._(
-        serverResponse,
-        conflictType: json['conflict_type'] as String?,
-        itemId: json['item_id'] as String?,
-        yourBase: json['your_base'] as int?,
-        serverActual: json['server_actual'] as int?,
-        serverIsDeleted: json['server_is_deleted'] as bool?,
-      );
-    } catch (_) {
-      return _ConflictException._(serverResponse);
-    }
-  }
-}
-
-class _SyncServerErrorPayload {
-  final String? message;
-  final String? conflictType;
-  final String? itemId;
-
-  const _SyncServerErrorPayload({this.message, this.conflictType, this.itemId});
-}
-
-class _SyncHttpException implements Exception {
-  final String phase;
-  final int statusCode;
-  final String? serverMessage;
-  final String? conflictType;
-  final String? itemId;
-
-  const _SyncHttpException({
-    required this.phase,
-    required this.statusCode,
-    this.serverMessage,
-    this.conflictType,
-    this.itemId,
-  });
-
-  String get userMessage {
-    if (statusCode == 503) {
-      return serverMessage ??
-          'Sync server storage is temporarily unavailable. Retry later.';
-    }
-    if (serverMessage != null && serverMessage!.isNotEmpty) {
-      return serverMessage!;
-    }
-    return '${phase[0].toUpperCase()}${phase.substring(1)} HTTP $statusCode';
-  }
-
-  String get logMessage {
-    final prefix =
-        '${phase[0].toUpperCase()}${phase.substring(1)} HTTP $statusCode';
-    if (serverMessage == null || serverMessage!.isEmpty) {
-      return prefix;
-    }
-    return '$prefix: $serverMessage';
-  }
-}
-
-class SyncResult {
-  final bool success;
-  final bool pushed;
-  final bool pulled;
-  final String? error;
-  final int version;
-  final int conflictCount;
-  final String? notice;
-
-  SyncResult._({
-    required this.success,
-    this.pushed = false,
-    this.pulled = false,
-    this.error,
-    this.version = 0,
-    this.conflictCount = 0,
-    this.notice,
-  });
-
-  factory SyncResult.success({
-    bool pushed = false,
-    bool pulled = false,
-    int version = 0,
-    int conflictCount = 0,
-    String? notice,
-  }) {
-    return SyncResult._(
-      success: true,
-      pushed: pushed,
-      pulled: pulled,
-      version: version,
-      conflictCount: conflictCount,
-      notice: notice,
-    );
-  }
-
-  factory SyncResult.failure(String error) {
-    return SyncResult._(success: false, error: error);
-  }
-}

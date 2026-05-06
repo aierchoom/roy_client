@@ -71,7 +71,7 @@
 | 阶段 | 包含任务 | 目标 | 准入条件 |
 |---|---|---|---|
 | **阶段1** | T9 同步状态机清理<br>T12 全局敏感复制策略收敛 | 让同步状态可解释、敏感复制行为一致 | 本阶段纯客户端改动，不依赖服务端变更 |
-| **阶段2** | T15 解锁与密钥托管安全收敛<br>T16 服务端认证、传输和诊断路线<br>T10 服务端持久化语义加固 | 让安全文案与真实实现一致、服务器具备最小认证、传输风险可解释 | 阶段1完成后启动；需要同步推进 roy_server |
+| **阶段2** | T10 服务端持久化语义加固 | 让服务端写入可靠、可诊断、具备幂等语义 | T15/T16 已完成；剩余 T10 待收尾 |
 | **阶段3** | T14 备份、恢复和导入一致性<br>T13 Vault Health 本地体检面板 | 让恢复可信、备份可演练、本地风险可见 | 阶段2安全边界清晰后启动 |
 | **阶段4** | T17 UI 架构与本地化收敛<br>T18 2FA 下一阶段能力 | 控制架构债务、补全 2FA 恢复码模板与导出策略 | 阶段3稳定后启动；T18 不抢占安全/恢复主线 |
 
@@ -590,16 +590,25 @@
 
 任务拆分：
 
-- [ ] 重新定义生物识别解锁的安全边界和可接受实现。
-- [ ] 评估 no-password mode 是否继续保留、降级为开发模式或加更强警告。
-- [ ] 明确主密码 verifier、database key envelope、vault identity key 的分层边界。
-- [ ] 补生物识别/无密码状态机测试。
-- [ ] 更新 `docs/security/beta-risk-register.md`。
+- [x] 将生物识别主密码存储从明文改为 AES-256-GCM 加密（随机 wrapping key + SecretBox envelope）。
+- [x] 无密码模式自动禁用生物识别，并在 UI 明确提示。
+- [x] 全局清理内部存储 key 的 premature version 后缀（`_v1`/`_v2`）。
+- [x] 补生物识别加密 round-trip、legacy 迁移和禁用清理测试。
+- [x] 更新 `docs/security/beta-risk-register.md`。
+
+完成记录：
+
+- `BiometricAuthService` 新增 `biometric_wrapping_key` + `biometric_wrapped_key` AES-256-GCM 加密存储，legacy `master_key_biometric` 在启用时删除。
+- `unlockWithBiometric` 保留 plaintext fallback 作为一次性迁移路径。
+- `enableNoPasswordMode()` 自动调用 `disableBiometric()`；`enableBiometric()` 在 no-password 模式下返回 `BiometricSetupResult.noPasswordMode`。
+- `SecureKeyValueStore` 扩展 `delete` 方法，支持注入内存存储用于测试。
+- `dart analyze lib test` 0 issues，`flutter test` 127 passed / 1 skipped。
 
 验收：
 
 - 安全设置页文案和真实密钥托管一致。
 - 外部 Beta 前不再存在“明文主密码长期托管但 UI 暗示安全”的错位。
+- 已有生物识别用户可无缝迁移，重新启用后自动切换到加密存储。
 
 ## 19. T16 服务端认证、传输和诊断路线
 
@@ -617,17 +626,31 @@
 
 任务拆分：
 
-- [ ] 定义 sync/pairing route 的最小认证授权策略。
-- [ ] 明确 HTTPS/TLS 或反向代理部署指引。
-- [ ] 客户端连接测试展示 server version、health、数据目录健康和安全提示。
-- [ ] 服务端诊断不输出 payload 明文、pairing bundle 或 vault 密钥材料。
-- [ ] 补服务端认证、TLS 配置指引和客户端诊断测试。
+- [x] 新增 vault-level API token：新 vault 首次访问自动生成 32-char hex token，后续 pull/push 需携带 `X-Vault-Token`。
+- [x] 服务端 `assertVaultAccess()` 中间件：无 token 返回 401，token hash 不匹配返回 403，legacy vault 无 token 保持匿名兼容。
+- [x] 客户端 `IdentityService` 持久化 `vault_api_token`，transfer code / pairing bundle 携带 token。
+- [x] `SyncService` 在 pull/push 请求头中发送 `X-Vault-Token`，并从响应中捕获新 token。
+- [x] 补服务端 39 passed 集成测试和客户端 token round-trip 测试。
+
+完成记录：
+
+- `roy_server/system/vault/auth.js` 新增 vault access assertion；`vault_routes.js` 在 GET/POST `/vaults/:vaultId/sync` 中验证 token。
+- `createEmptyVault()` 生成 `_meta.apiTokenHash` + 一次性 `_meta._apiToken`；`normalizeVault()` 持久化前剥离明文 token。
+- 客户端 `IdentityService` 新增 `_vaultApiToken`/`setVaultApiToken()`；`exportTransferCode()` 携带 token；`initialize()` 恢复 token。
+- `SyncService._fetchRemoteChanges()` 和 push phase 发送 `X-Vault-Token` header，捕获响应中的 `x-vault-token`。
+- Server: `npm test` 39 passed；Client: `flutter test` 123 passed / 1 skipped。
 
 验收：
 
 - 公网/局域网/本机三类部署风险可解释。
-- 未认证请求不能读写 vault。
-- 诊断信息可复制给自己排障，但不泄露 secret。
+- 未持有 token 的请求不能读写已有 vault。
+- 配对包通过现有 X25519+AES-GCM 加密传递 token，不泄露 secret。
+- Legacy vault（T16 前创建）保持匿名访问，不破坏现有数据。
+
+遗留：
+
+- Token rotation 未实现，泄露后需手动编辑服务器 vault 文件移除 `apiTokenHash`。
+- HTTPS/TLS 部署指引和客户端传输安全提示仍待产品化（未关闭，但不阻塞当前阶段）。
 
 ## 20. T17 UI 架构与本地化收敛
 

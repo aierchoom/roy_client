@@ -1720,9 +1720,9 @@ Provider 没有直接写同步逻辑，而是把同步委托给 `ServiceManager`
 - `utf8`
 - `base64Encode`
 
-这不是安全加密。
+> 历史说明：早期版本使用 base64 占位，但当前已升级为 `sroy-sync:` AES-256-GCM + HKDF 标准 AEAD envelope。
 
-也就是说，当前同步层的“加密”是占位实现。
+也就是说，当前同步层使用标准 AEAD 加密，但学习者仍应理解协议结构而非盲目信任。
 
 教学上要学的是：
 
@@ -2812,14 +2812,17 @@ Provider 会把它们合成 `allTemplates`。
 
 ### 20.2 当前技术债与原型特征
 
-#### 1. 安全实现是占位级
+#### 1. 安全实现已升级但仍需理解边界
 
-- 主密码存储方式不是真正密码学方案
-- 同步 payload 只是 base64
+- 主密码使用 PBKDF2-HMAC-SHA256 verifier，数据库文件使用 AES-GCM-256 信封加密
+- 同步 payload 已升级为 `sroy-sync:` AES-256-GCM + HKDF 标准 AEAD
+- 生物识别主密码存储已改为 AES-256-GCM 加密信封（不再是 plaintext）
+- 但运行时 SQLite 工作库仍为临时明文文件，这是已知限制
 
-#### 2. 身份体系未完成
+#### 2. 身份体系已收敛但仍可优化
 
-- `IdentityService` 仍有明显 mock 痕迹
+- `IdentityService` 已去掉固定测试 vaultId，新安装生成独立身份
+- vault/device 身份分离已实现，但正式 key hierarchy（EdDSA/XChaCha20-Poly1305 等）仍在演进
 
 #### 3. `ServiceManager` 略偏大
 

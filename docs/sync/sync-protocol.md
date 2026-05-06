@@ -110,7 +110,26 @@ AccountItem performMerge(AccountItem local, AccountItem remote) {
 
 ---
 
-## 3. 同步工作流状态推演 (The Pull / Merge / Push Triad)
+## 3. 同步状态机
+
+客户端同步状态由 `SyncService` 维护，当前为 10 状态精确模型：
+
+| 状态 | 语义 | UI 建议 |
+|------|------|---------|
+| `offline` | 未配置服务器或用户手动断开 | 显示“未连接” |
+| `connecting` | 正在连接/握手 | 显示连接进度 |
+| `pulling` | 正在拉取远端更新 | 显示拉取进度 |
+| `pushing` | 正在推送已批准的本地变更 | 显示推送进度 |
+| `idle` | 同步完成，本地与远端一致 | 显示“已同步” |
+| `conflictRecovery` | 冲突恢复中（由用户操作驱动） | 引导用户进入冲突箱 |
+| `networkUnreachable` | 网络不可达（可自动恢复） | 提示检查网络 |
+| `serverError` | 服务端返回 5xx 或存储不可用 | 提示服务端暂时不可用 |
+| `authError` | 服务端拒绝认证/授权（401/403） | 提示检查 vault token 或重新配对 |
+| `protocolError` | 协议解析失败或 payload 校验失败 | 提示数据异常，建议排查 |
+
+UI 层**禁止**通过解析 `errorMessage` 字符串来推断状态，必须直接消费 `SyncState` 枚举。
+
+## 4. 同步工作流状态推演 (The Pull / Merge / Push Triad)
 
 这是一个典型的“非阻塞乐观并发控制” (OCC-based PMP Flow)。
 
@@ -119,6 +138,12 @@ AccountItem performMerge(AccountItem local, AccountItem remote) {
 弱服务器直接抛出比这个版本号更新的所有密文 Block。
 如果返回包是空的（Http 304 Not Modified），说明当前服务端没变化，且本地如果没有 `PendingPush`，结束流程。
 
+**认证**：首次访问新 vault 无需认证，服务端会返回 `X-Vault-Token` 响应头。后续请求必须在请求头中携带：
+
+```text
+X-Vault-Token: <32-char-hex-token>
+```
+
 ### 阶段二：REBASE / MERGE (本地解决内政)
 客户端利用对称主密钥解开所有 Block（即远端的真实被修改的 Item）。
 客户端遍历这些 Item 进行检查：
@@ -126,9 +151,15 @@ AccountItem performMerge(AccountItem local, AccountItem remote) {
 2. **合并机制 (Merge)**：如果本地也是 `PendingPush` 状态，触发上文的 `performMerge` 算法。提取最优秀的基因组合后，打入 `PendingPush` 队列池。
 
 ### 阶段三：PUSH (定序与乐观锁)
-1. 客户端从 SQLite 读取所有处于 `PendingPush` 状态的行。
-2. 裹好数字签名，携带预期的 `expected_base_server_version`，提交向 `POST` 接口。
-3. **退避回路 (The Retry Loop)**：如果服务端返回 409 Conflict（意味着在阶段一和阶段三这零点几秒的缝隙里，另一个设备居然抢发了更新），客户端立刻放弃任何争论。立刻切回阶段一的 FETCH 重做一遍拉取 - 合并 - 推送，直到拿到 Http 200 OK 为止。
+1. 客户端从 SQLite 读取所有处于 `PendingPush` 状态的行（含经用户批准的 outbox 和自动合并产物）。
+2. `SyncPayloadCodec` 将明文记录编码为 `sroy-sync:` AES-256-GCM + HKDF envelope。
+3. 携带预期的 `expected_base_server_version` 和 `X-Vault-Token` 请求头，提交 `POST` 接口。
+4. **退避回路 (The Retry Loop)**：如果服务端返回 409 Conflict（意味着在阶段一和阶段三这零点几秒的缝隙里，另一个设备居然抢发了更新），客户端立刻放弃任何争论。立刻切回阶段一的 FETCH 重做一遍拉取 - 合并 - 推送，直到拿到 Http 200 OK 为止。
+
+服务端在收到 push 请求时：
+- 校验 `X-Vault-Token`（若 vault 已设置 `apiTokenHash`）。
+- 校验 payload 最低协议形态（`sroy-sync:` 前缀、合法 JSON envelope）。
+- 不解密、不理解账号内容；只负责版本推进和原子持久化。
 
 ---
 
@@ -136,3 +167,9 @@ AccountItem performMerge(AccountItem local, AccountItem remote) {
 
 在这套 CRDT 与 OCC 组合拳的架构下：服务器成了一个绝对无状态的管道，而客户端变身为高精度解决内政合并的“微机房”。
 即使有一万个客户端同时向主服务器提交对“同一条账号记录下不同备注与密码字段”的新增修改，在 HLC 严格排序下，网络收敛后，所有的一万个客户端的数据库最终字节表现形式将**100%分毫不差、数据毫无遗漏**。
+
+补充契约（2026-05-01 更新）：
+
+- **同步状态机**从 5 个模糊状态收敛为 10 个精确状态，UI 层禁止通过字符串解析推断错误原因，必须直接消费 `SyncState` 枚举。
+- **Vault-level 认证**：新 vault 首次访问由服务端签发 32-char hex API token，后续 pull/push 需携带 `X-Vault-Token` 请求头。token 通过加密配对包（`sroy-pairing:`）安全传递，服务端不保存明文 token，只保存 SHA256 hash。
+- **Payload 加密**：同步 payload 使用 `sroy-sync:` AES-256-GCM + HKDF-SHA256 标准 AEAD envelope，旧版 base64 明文 JSON payload 不再兼容。

@@ -1,6 +1,6 @@
 # API 参考
 
-**最后更新**: 2026-04-28
+**最后更新**: 2026-05-01
 
 本文只记录当前 `roy_client` 中真实存在、被页面或测试直接使用的主要 API。同步服务端作为同级
 `../roy_server/` 项目存在，客户端通过 `SyncService` 使用 HTTP 协议与其通信。
@@ -181,16 +181,20 @@ class StorageChangeEvent {
 ```dart
 enum SyncState {
   offline,
-  syncing,
-  synced,
-  error,
+  connecting,
+  pulling,
+  pushing,
+  idle,
   conflictRecovery,
+  networkUnreachable,
+  serverError,
+  protocolError,
+  authError,
 }
 
 class SyncService extends ChangeNotifier {
   SyncState get state;
-  String? get errorMessage;
-  String? get statusNote;
+  String? get statusLabel;
   DateTime? get lastSyncTime;
   bool get isConnected;
   bool get isSyncing;
@@ -227,6 +231,12 @@ GET  /vaults/{vaultId}/sync?since={version}
 POST /vaults/{vaultId}/sync
 ```
 
+认证请求头（vault-level token）：
+
+```text
+X-Vault-Token: {vaultApiToken}
+```
+
 配对请求由 `ServiceManager` 通过 `VaultPairingService` / `LanPairingService` 发起。
 
 ## 5. IdentityService
@@ -240,9 +250,11 @@ class IdentityService {
   bool get hasIdentity;
   String get privateKey;
   String get symmetricKey;
+  String? get vaultApiToken;
 
   Future<bool> checkIdentityExists();
   Future<void> initialize();
+  Future<void> setVaultApiToken(String? token);
 
   String exportTransferCode({String? syncServerUrl, String? vaultDump});
   Future<Map<String, String?>> importTransferCode(String rawCode);

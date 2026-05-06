@@ -1,19 +1,19 @@
 # 测试指南
 
-**最后更新**: 2026-04-28
+**最后更新**: 2026-05-01
 
 本文记录当前 `roy_client/test/` 中真实存在的测试结构和常用运行方式。
 
 ## 1. 测试概览
 
-当前客户端测试集中在模型、加密存储、身份、同步、CRDT 和配对逻辑。
+当前客户端测试集中在模型、加密存储、身份、同步、CRDT、配对、TOTP 和敏感剪贴板逻辑。
 
 | 指标 | 当前值 |
 |---|---|
-| 测试文件数 | 15 |
-| 测试用例数 | 54 |
-| Widget 测试 | 暂无 |
-| 主要覆盖 | models、services、sync |
+| 测试文件数 | 24 |
+| 测试用例数 | 120+ |
+| Widget 测试 | 1（account_list_tile_test.dart） |
+| 主要覆盖 | models、services、sync、widgets |
 
 目录结构：
 
@@ -21,22 +21,33 @@
 test/
 ├── models/
 │   ├── account_item_test.dart
-│   └── account_template_test.dart
+│   ├── account_template_test.dart
+│   ├── hlc_test.dart
+│   ├── local_sync_change_test.dart
+│   └── totp_credential_test.dart
 ├── services/
+│   ├── biometric_auth_service_test.dart
 │   ├── database_file_cipher_test.dart
 │   ├── database_file_key_manager_test.dart
 │   ├── identity_service_test.dart
-│   └── secure_storage_service_encryption_test.dart
-└── sync/
-    ├── crdt_merge_engine_test.dart
-    ├── crdt_merge_invariants_test.dart
-    ├── lan_pairing_service_test.dart
-    ├── multi_device_sync_test.dart
-    ├── sync_conflict_recovery_test.dart
-    ├── sync_payload_codec_test.dart
-    ├── sync_recovery_loop_test.dart
-    ├── sync_service_identity_test.dart
-    └── sync_state_machine_test.dart
+│   ├── secure_storage_service_encryption_test.dart
+│   ├── secure_storage_service_sync_outbox_test.dart
+│   ├── totp_import_service_test.dart
+│   ├── totp_qr_image_import_service_test.dart
+│   ├── totp_service_test.dart
+│   └── vault_pairing_crypto_test.dart
+├── sync/
+│   ├── crdt_merge_engine_test.dart
+│   ├── crdt_merge_invariants_test.dart
+│   ├── lan_pairing_service_test.dart
+│   ├── multi_device_sync_test.dart
+│   ├── sync_conflict_recovery_test.dart
+│   ├── sync_payload_codec_test.dart
+│   ├── sync_recovery_loop_test.dart
+│   ├── sync_service_identity_test.dart
+│   └── sync_state_machine_test.dart
+└── widgets/
+    └── account_list_tile_test.dart
 ```
 
 ## 2. 运行测试
@@ -81,7 +92,7 @@ node --test
   - 校验网站模板默认隐藏密码字段。
   - 校验模板同步状态解析 fallback。
 
-### 3.2 加密和存储测试
+### 3.2 加密、身份和存储测试
 
 - `test/services/database_file_cipher_test.dart`
   - 数据库字节流加密/解密。
@@ -93,10 +104,21 @@ node --test
 - `test/services/secure_storage_service_encryption_test.dart`
   - 本地数据库长期落盘为加密文件。
   - 遗留明文数据库不会被自动导入。
+  - 中断恢复（`.bak`/`.tmp` 残留处理）。
+
+- `test/services/secure_storage_service_sync_outbox_test.dart`
+  - 本地同步变更记录（outbox）写入、合并、状态流转。
+  - create→update→delete 合并规则守卫。
 
 - `test/services/identity_service_test.dart`
   - 本机身份初始化和复用。
   - 部分损坏的身份状态会被拒绝。
+  - `vault_api_token` 持久化和 transfer code 携带。
+
+- `test/services/biometric_auth_service_test.dart`
+  - AES-256-GCM 加密存储 round-trip。
+  - Legacy plaintext 迁移路径。
+  - 禁用后完整清理。
 
 ### 3.3 同步和 CRDT 测试
 
@@ -137,6 +159,27 @@ node --test
   - 8 位面对面临时码。
   - 非法字符拒绝。
   - 主机创建、领取、停止流程。
+
+### 3.4 TOTP 与敏感剪贴板测试
+
+- `test/services/totp_service_test.dart`
+  - RFC 6238 标准向量验证。
+  - SHA1/SHA256/SHA512、时间窗口、Base32 解析。
+
+- `test/services/totp_import_service_test.dart`
+  - `otpauth://` URI、文本、标签化密钥提取与规范化。
+
+- `test/services/totp_qr_image_import_service_test.dart`
+  - 剪贴板二维码图片解码与导入。
+
+- `test/services/sensitive_clipboard_service_test.dart`
+  - 高/中/低风险等级定时清理。
+  - SHA-256 hash 比对防误删。
+
+### 3.5 Widget 测试
+
+- `test/widgets/account_list_tile_test.dart`
+  - 账号列表项风险标签展示。
 
 ## 4. 常见测试模式
 
@@ -214,10 +257,10 @@ node --test
 
 当前主要缺口：
 
-- 没有稳定的 Widget 测试目录。
-- 缺少端到端 UI 流程测试。
+- Widget 测试仅覆盖 `account_list_tile`，缺少端到端 UI 流程测试。
 - 缺少真实网络环境下的客户端/服务端联合测试。
 - 安全设置、同步设置、模板编辑页仍主要依赖手动验证。
+- 缺少 TOTP 关联面板、冲突箱、同步设置等页面的 widget 测试。
 
 新增 UI 测试时建议创建明确目录，例如：
 

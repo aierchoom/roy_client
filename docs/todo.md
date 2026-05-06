@@ -10,7 +10,7 @@ Navigation:
 | Document Type | Project TODO |
 | Scope | Architecture, security, sync, server hardening, testing, documentation, and candidate features |
 | Source Conclusion | [Architecture decision summary](architecture/00-executive-summary.md#decision-summary) |
-| Last Updated | 2026-05-01 |
+| Last Updated | 2026-05-06 |
 
 ## Source Conclusion
 
@@ -56,7 +56,7 @@ Execution queue alignment:
 
 - Near-term execution follows stage-based steps in `docs/product/iteration-tasks.md`.
 - Stage 1: T9 sync status cleanup + T12 sensitive clipboard policy.
-- Stage 2: T15 key custody + T16 server auth/diagnostics + T10 server persistence.
+- Stage 2: T15 key custody ✅ + T16 server auth ✅ + T10 server persistence.
 - Stage 3: T14 backup/restore consistency + T13 Vault Health.
 - Stage 4: T17 UI architecture + T18 2FA next phase.
 - New global roadmap items should be tracked as stage steps in
@@ -214,12 +214,14 @@ Primary outcomes:
 
 ## P0 - Security And Correctness (Stage 2)
 
-- Add server authentication and authorization for sync and pairing routes before
-  any external or public-network Beta claim.
+- ~~Replace biometric/no-password plaintext master-password storage with a
+  stronger key-custody strategy.~~ ✅ Completed 2026-05-01: biometric storage now
+  uses AES-256-GCM encrypted envelope; no-password mode auto-disables biometric.
+- ~~Add server authentication and authorization for sync routes.~~ ✅ Completed
+  2026-05-01: vault-level API token (`X-Vault-Token`) now required for
+  pull/push on existing vaults; legacy vaults remain compatible.
 - Define transport hardening expectations: HTTPS/TLS setup, local-network
   warnings, and client diagnostics for insecure or unreachable endpoints.
-- Replace biometric/no-password plaintext master-password storage with a
-  stronger key-custody strategy or clearly gate it as non-production.
 - Keep improving local database encryption around unlock order, runtime
   plaintext lifetime, corruption checks, backup, and recovery.
 - Preserve local-only operation while refactoring security, sync, and service
