@@ -214,6 +214,12 @@ class SecureStorageService {
     }
   }
 
+  /// 导入覆盖：用传入数据整体替换本地库。
+  ///
+  /// T14 状态重建规则：
+  /// - 保留源 syncStatus，不再强制覆盖为 synchronized。
+  /// - 清空 accounts / templates / totp_credentials / conflict_logs / local_sync_changes。
+  /// - 调用方应在导入后重置 SyncService 状态（version / dirty 由 initialize 重新读取）。
   Future<void> replaceAllDataForImport({
     required List<AccountTemplate> templates,
     required List<AccountItem> accounts,
@@ -249,34 +255,30 @@ class SecureStorageService {
     }
 
     for (final account in accounts) {
-      final itemToSave = account.copyWith(syncStatus: SyncStatus.synchronized);
       batch.insert('accounts', {
-        'id': itemToSave.id,
-        'name': itemToSave.name,
-        'email': itemToSave.email,
-        'template_id': itemToSave.templateId,
-        'data': jsonEncode(itemToSave.data),
-        'created_at': itemToSave.createdAt,
+        'id': account.id,
+        'name': account.name,
+        'email': account.email,
+        'template_id': account.templateId,
+        'data': jsonEncode(account.data),
+        'created_at': account.createdAt,
         'modified_at': DateTime.now().millisecondsSinceEpoch,
-        'name_hlc': itemToSave.nameHlc.toString(),
-        'email_hlc': itemToSave.emailHlc.toString(),
+        'name_hlc': account.nameHlc.toString(),
+        'email_hlc': account.emailHlc.toString(),
         'data_hlc': jsonEncode(
-          itemToSave.dataHlc.map((k, v) => MapEntry(k, v.toString())),
+          account.dataHlc.map((k, v) => MapEntry(k, v.toString())),
         ),
-        'server_version': itemToSave.serverVersion,
-        'sync_status': itemToSave.syncStatus.index,
-        'is_deleted': itemToSave.isDeleted ? 1 : 0,
-        'delete_hlc': itemToSave.deleteHlc?.toString(),
+        'server_version': account.serverVersion,
+        'sync_status': account.syncStatus.index,
+        'is_deleted': account.isDeleted ? 1 : 0,
+        'delete_hlc': account.deleteHlc?.toString(),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
 
     for (final credential in totpCredentials) {
-      final itemToSave = credential.copyWith(
-        syncStatus: SyncStatus.synchronized,
-      );
       batch.insert(
         'totp_credentials',
-        _totpCredentialRow(itemToSave),
+        _totpCredentialRow(credential),
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
     }

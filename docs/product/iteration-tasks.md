@@ -573,11 +573,27 @@
 
 任务拆分：
 
-- [ ] 定义 encrypted backup package 与 pairing dump 的边界。
-- [ ] 增加恢复预览：账号数、模板数、vaultId、是否覆盖当前本地数据。
-- [ ] 增加测试恢复流程，不真正切换当前 vault。
-- [ ] 明确导入后 `syncStatus`、outbox、conflict log 和本地 dirty 的重建规则。
-- [ ] 补导入失败回滚、半导入恢复和 sync/outbox 语义测试。
+- [x] 定义 encrypted backup package 与 pairing dump 的边界。
+- [x] 增加恢复预览：账号数、模板数、vaultId、是否覆盖当前本地数据。
+- [x] 增加测试恢复流程，不真正切换当前 vault。
+- [x] 明确导入后 `syncStatus`、outbox、conflict log 和本地 dirty 的重建规则。
+- [x] 补导入失败回滚、半导入恢复和 sync/outbox 语义测试。
+
+完成记录（2026-05-06）：
+
+- `VaultDumpCoordinator.validateEncryptedVaultDump` 不再强制覆盖账号 syncStatus 为 `synchronized`。
+- `SecureStorageService.replaceAllDataForImport` 不再强制覆盖账号和 TOTP credential 的 syncStatus。
+- 新增 `VaultImportPreviewSummary` 与 `previewVaultImport` / `previewSecureVaultLinkCode` 方法，导入前展示 vaultId 匹配、账号/模板数、数据快照覆盖警告。
+- `sync_settings_view.dart` 已增加预览对话框，安全链接码导入前强制预览。
+- 新增 `VaultBackupTestResult` 与 `exportBackupPackage()` / `testRecoverBackupPackage()` 方法，区分独立备份包与配对转存边界：
+  - 备份包为独立加密快照，不含身份密钥，可长期离线保存；
+  - 配对转存为配对码内的可选 payload，依附于身份传输链路；
+  - 两者共用同一 AEAD 格式，但生命周期和暴露方式不同。
+- `VaultDumpCoordinator` 类注释已说明备份包与配对转存的边界。
+- 新增 `test/system/vault_dump_coordinator_test.dart`：10 项测试覆盖 export/validate round-trip、validate 不修改 coordinator 身份、validate 不写入 storage、replaceAllDataForImport 的 syncStatus 保留、outbox/conflict_log 清空、导入后 outbox 重建语义、同步设置保留。
+- 新增 `test/system/vault_import_rollback_test.dart`：2 项测试覆盖 dump 写入失败时身份回滚、异常错误时身份回滚。
+- 代码注释已说明当前状态重建规则：保留源 syncStatus；清空 outbox/conflict_log；dirty/version 由 SyncService.initialize 重新读取。
+- `dart analyze lib test` 0 issues（2 项 pre-existing error 位于 `app_nav_bar.dart`，与 T14 无关），`flutter test` 197 passed / 1 skipped。
 
 验收：
 

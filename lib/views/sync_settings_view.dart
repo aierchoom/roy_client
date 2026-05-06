@@ -923,9 +923,6 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
   }
 
   Future<void> _importSecureVaultLinkCode() async {
-    final forceOverwrite = _hasLocalVaultData();
-    if (forceOverwrite && !await _confirmOverwriteLocalData()) return;
-
     final code = await showDialog<String>(
       context: context,
       builder: (dialogContext) => VaultLinkCodeDialog(
@@ -955,10 +952,21 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
 
     try {
       setState(() => _isPairingBusy = true);
+
+      final preview = await _serviceManager.previewSecureVaultLinkCode(
+        code,
+        password,
+      );
+      if (!mounted) return;
+
+      final confirmed = await _showVaultImportPreviewDialog(preview);
+      if (confirmed != true) return;
+
+      if (!mounted) return;
       await _serviceManager.importSecureVaultLinkCode(
         code,
         password,
-        forceOverwrite: forceOverwrite,
+        forceOverwrite: preview.hasLocalData,
       );
       if (!mounted) return;
 
@@ -992,6 +1000,150 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
         setState(() => _isPairingBusy = false);
       }
     }
+  }
+
+  Future<bool?> _showVaultImportPreviewDialog(
+    VaultImportPreviewSummary preview,
+  ) async {
+    final theme = Theme.of(context);
+    return showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(
+            _text('恢复预览', 'Restore Preview'),
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildPreviewRow(
+                context,
+                Icons.hub_outlined,
+                _text('保险库 ID', 'Vault ID'),
+                preview.vaultId,
+                trailing: preview.vaultIdMatchesCurrent
+                    ? Chip(
+                        label: Text(_text('与当前匹配', 'Matches current')),
+                        backgroundColor: Colors.green.shade50,
+                      )
+                    : Chip(
+                        label: Text(_text('与当前不同', 'Different')),
+                        backgroundColor: Colors.orange.shade50,
+                      ),
+              ),
+              const SizedBox(height: 12),
+              _buildPreviewRow(
+                context,
+                Icons.account_circle_outlined,
+                _text('账号数量', 'Accounts'),
+                '${preview.accountCount}',
+              ),
+              const SizedBox(height: 12),
+              _buildPreviewRow(
+                context,
+                Icons.view_list_outlined,
+                _text('模板数量', 'Templates'),
+                '${preview.templateCount}',
+              ),
+              const SizedBox(height: 12),
+              _buildPreviewRow(
+                context,
+                Icons.storage_outlined,
+                _text('数据快照', 'Data Snapshot'),
+                preview.includesDataSnapshot
+                    ? _text('包含全量数据', 'Includes full data')
+                    : _text('仅密钥，无数据', 'Keys only, no data'),
+              ),
+              if (preview.hasLocalData) ...[
+                const SizedBox(height: 16),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.errorContainer.withAlpha(80),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.warning_outlined,
+                        color: theme.colorScheme.error,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _text(
+                            '当前设备已有本地数据，导入将覆盖全部现有账号和模板。',
+                            'This device already has local data. Importing will overwrite all existing accounts and templates.',
+                          ),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onErrorContainer,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text(_text('取消', 'Cancel')),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: preview.hasLocalData
+                    ? theme.colorScheme.error
+                    : theme.colorScheme.primary,
+              ),
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text(_text('确认导入', 'Confirm Import')),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildPreviewRow(
+    BuildContext context,
+    IconData icon,
+    String label,
+    String value, {
+    Widget? trailing,
+  }) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: theme.colorScheme.onSurfaceVariant),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              Text(
+                value,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (trailing != null) trailing,
+      ],
+    );
   }
 
   Future<String?> _showPasswordInputDialog({

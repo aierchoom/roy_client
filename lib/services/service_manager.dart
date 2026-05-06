@@ -26,6 +26,39 @@ import 'vault_pairing_service.dart';
 
 enum ServiceManagerState { uninitialized, locked, unlocking, unlocked, error }
 
+class VaultImportPreviewSummary {
+  final String vaultId;
+  final bool vaultIdMatchesCurrent;
+  final int accountCount;
+  final int templateCount;
+  final bool hasLocalData;
+  final bool includesDataSnapshot;
+
+  const VaultImportPreviewSummary({
+    required this.vaultId,
+    required this.vaultIdMatchesCurrent,
+    required this.accountCount,
+    required this.templateCount,
+    required this.hasLocalData,
+    required this.includesDataSnapshot,
+  });
+}
+
+/// 独立备份包的验证结果，不暴露解析后的原始对象。
+class VaultBackupTestResult {
+  final bool valid;
+  final String? errorMessage;
+  final int accountCount;
+  final int templateCount;
+
+  const VaultBackupTestResult({
+    required this.valid,
+    this.errorMessage,
+    required this.accountCount,
+    required this.templateCount,
+  });
+}
+
 class ServiceManager extends ChangeNotifier {
   static ServiceManager? _instance;
 
@@ -626,6 +659,49 @@ class ServiceManager extends ChangeNotifier {
     return _vaultDumpCoordinator.exportEncryptedVaultDump();
   }
 
+  /// 导出独立备份包（不包含身份密钥的加密数据快照）。
+  ///
+  /// 与配对码不同，备份包仅返回密文字符串，适合离线保存到文件或剪贴板。
+  /// 恢复时必须提供同一 vault 的 vaultId + privateKey + symmetricKey。
+  Future<String?> exportBackupPackage() async {
+    if (!isUnlocked) {
+      throw StateError('Vault is locked.');
+    }
+    return await _exportEncryptedVaultDump();
+  }
+
+  /// 测试恢复独立备份包，验证其能否被正确解密和解析。
+  ///
+  /// 本方法**不会**修改当前 vault 身份、不会写入本地数据库、不会切换 vault。
+  /// 失败时返回 [VaultBackupTestResult.valid] == false 并附带错误信息。
+  Future<VaultBackupTestResult> testRecoverBackupPackage(
+    String vaultDumpJson, {
+    required String vaultId,
+    required String privateKey,
+    required String symmetricKey,
+  }) async {
+    try {
+      final plan = await _vaultDumpCoordinator.validateEncryptedVaultDump(
+        vaultDumpJson: vaultDumpJson,
+        vaultId: vaultId,
+        privateKey: privateKey,
+        symmetricKey: symmetricKey,
+      );
+      return VaultBackupTestResult(
+        valid: true,
+        accountCount: plan.accounts.length,
+        templateCount: plan.templates.length,
+      );
+    } on VaultDumpImportException catch (error) {
+      return VaultBackupTestResult(
+        valid: false,
+        errorMessage: error.message,
+        accountCount: 0,
+        templateCount: 0,
+      );
+    }
+  }
+
   Future<String> exportVaultLinkCode() async {
     final serverUrl = await _resolveSyncServerUrl(allowEmpty: true);
     final vaultDump = await _exportEncryptedVaultDump();
@@ -646,6 +722,49 @@ class ServiceManager extends ChangeNotifier {
       syncServerUrl: serverUrl.isEmpty ? null : serverUrl,
       vaultDump: vaultDump,
     );
+  }
+
+  Future<VaultImportPreviewSummary> previewVaultImport(
+    VaultIdentityImportPreview preview,
+  ) async {
+    if (!isUnlocked) {
+      throw StateError('Vault is locked.');
+    }
+
+    final VaultDumpImportPlan? dumpPlan;
+    try {
+      dumpPlan = await _validateIncomingVaultDump(preview);
+    } on VaultDumpImportException catch (error) {
+      throw VaultImportException(error.message);
+    }
+
+    final hasLocalData = await _hasLocalVaultDataForImport();
+    final currentVaultId = _identityService.hasIdentity
+        ? _identityService.vaultId
+        : null;
+
+    return VaultImportPreviewSummary(
+      vaultId: preview.vaultId,
+      vaultIdMatchesCurrent: currentVaultId == preview.vaultId,
+      accountCount: dumpPlan?.accounts.length ?? 0,
+      templateCount: dumpPlan?.templates.length ?? 0,
+      hasLocalData: hasLocalData,
+      includesDataSnapshot: dumpPlan != null && dumpPlan.hasData,
+    );
+  }
+
+  Future<VaultImportPreviewSummary> previewSecureVaultLinkCode(
+    String secureCode,
+    String password,
+  ) async {
+    if (!isUnlocked) {
+      throw StateError('Vault is locked.');
+    }
+    final preview = await _identityService.previewSecureLinkCode(
+      secureCode,
+      password,
+    );
+    return previewVaultImport(preview);
   }
 
   Future<void> importVaultLinkCode(
@@ -673,6 +792,26 @@ class ServiceManager extends ChangeNotifier {
       secureCode,
       password,
     );
+    await _importVaultIdentityPreview(preview, forceOverwrite: forceOverwrite);
+  }
+
+  Future<void> importVaultLinkCodeWithPreview(
+    VaultIdentityImportPreview preview, {
+    bool forceOverwrite = false,
+  }) async {
+    if (!isUnlocked) {
+      throw StateError('Vault is locked.');
+    }
+    await _importVaultIdentityPreview(preview, forceOverwrite: forceOverwrite);
+  }
+
+  Future<void> importSecureVaultLinkCodeWithPreview(
+    VaultIdentityImportPreview preview, {
+    bool forceOverwrite = false,
+  }) async {
+    if (!isUnlocked) {
+      throw StateError('Vault is locked.');
+    }
     await _importVaultIdentityPreview(preview, forceOverwrite: forceOverwrite);
   }
 
