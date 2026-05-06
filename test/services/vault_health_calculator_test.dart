@@ -321,7 +321,7 @@ void main() {
         const AccountField(
           fieldKey: 'totp',
           label: '2FA',
-          attributes: AccountFieldAttributes(type: AccountFieldType.totp),
+          attributes: AccountFieldAttributes(type: AccountFieldType.custom, isReference: true),
         ),
       ],
     );

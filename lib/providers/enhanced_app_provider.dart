@@ -36,10 +36,7 @@ class EnhancedAppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  List<AccountTemplate> get allTemplates => [
-    ...basicAccountTemplates,
-    ..._customTemplates,
-  ];
+  List<AccountTemplate> get allTemplates => _customTemplates;
   List<AccountItem> get allAccounts => _accounts;
   List<TotpCredential> get totpCredentials => _totpCredentials;
   List<AccountTemplate> get customTemplates => _customTemplates;
@@ -111,7 +108,7 @@ class EnhancedAppProvider extends ChangeNotifier {
       await _storageService.loadTotpCredentials(),
     );
     _customTemplates = List<AccountTemplate>.of(
-      await _storageService.loadCustomTemplates(),
+      await _storageService.loadAllTemplates(),
     );
     _localSyncChanges = List<LocalSyncChange>.of(
       await _serviceManager.loadOpenLocalSyncChanges(),

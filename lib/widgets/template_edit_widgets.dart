@@ -88,6 +88,7 @@ class _FieldEditorDialogState extends State<FieldEditorDialog> {
   late bool _isSearchable;
   late bool _isCopyable;
   late bool _isPrimary;
+  late bool _isReference;
   late TimeFieldFormat _timeFormat;
 
   String _text(String zh, String en) {
@@ -110,6 +111,7 @@ class _FieldEditorDialogState extends State<FieldEditorDialog> {
     _isSearchable = initial?.attributes.isSearchable ?? false;
     _isCopyable = initial?.attributes.isCopyable ?? true;
     _isPrimary = initial?.attributes.isPrimary ?? false;
+    _isReference = initial?.attributes.isReference ?? false;
     _timeFormat = initial?.attributes.timeFormat ?? TimeFieldFormat.full;
   }
 
@@ -122,7 +124,6 @@ class _FieldEditorDialogState extends State<FieldEditorDialog> {
       return;
     }
 
-    final isTotp = _type == AccountFieldType.totp;
     Navigator.pop(
       context,
       FieldEditorResult(
@@ -135,18 +136,15 @@ class _FieldEditorDialogState extends State<FieldEditorDialog> {
             : _descriptionCtrl.text.trim(),
         attributes: AccountFieldAttributes(
           type: _type,
-          isPrimary: isTotp ? false : _isPrimary,
+          isPrimary: _isReference ? false : _isPrimary,
           isRequired: _isRequired,
-          isSecret: isTotp ? false : _isSecret,
-          isEditable: isTotp ? true : _isEditable,
-          isSearchable: isTotp ? false : _isSearchable,
-          isCopyable: isTotp ? false : _isCopyable,
+          isSecret: _isReference ? false : _isSecret,
+          isEditable: _isReference ? true : _isEditable,
+          isSearchable: _isReference ? false : _isSearchable,
+          isCopyable: _isReference ? false : _isCopyable,
+          isReference: _isReference,
           timeFormat: _timeFormat,
-          hint: isTotp
-              ? (_hintCtrl.text.trim().isEmpty
-                    ? '\u9009\u62e9\u6216\u65b0\u5efa 2FA'
-                    : _hintCtrl.text.trim())
-              : (_hintCtrl.text.trim().isEmpty ? null : _hintCtrl.text.trim()),
+          hint: _hintCtrl.text.trim().isEmpty ? null : _hintCtrl.text.trim(),
         ),
       ),
     );
@@ -155,25 +153,6 @@ class _FieldEditorDialogState extends State<FieldEditorDialog> {
   void _setFieldType(AccountFieldType value) {
     setState(() {
       _type = value;
-      if (value == AccountFieldType.totp) {
-        if (!widget.originallyPersisted && _labelCtrl.text.trim().isEmpty) {
-          _labelCtrl.text = '2FA';
-        }
-        if (!widget.originallyPersisted && _keyCtrl.text.trim().isEmpty) {
-          _keyCtrl.text = 'totp';
-        }
-        if (_hintCtrl.text.trim().isEmpty) {
-          _hintCtrl.text = '\u9009\u62e9\u6216\u65b0\u5efa 2FA';
-        }
-        if (_descriptionCtrl.text.trim().isEmpty) {
-          _descriptionCtrl.text =
-              '\u5173\u8054\u72ec\u7acb 2FA \u51ed\u636e\uff0c\u4e0d\u5728\u8d26\u6237\u5b57\u6bb5\u91cc\u4fdd\u5b58\u5bc6\u94a5\u3002';
-        }
-        _isSecret = false;
-        _isSearchable = false;
-        _isCopyable = false;
-        _isPrimary = false;
-      }
     });
   }
 
@@ -259,30 +238,12 @@ class _FieldEditorDialogState extends State<FieldEditorDialog> {
                   },
                 ),
               ],
-              if (_type == AccountFieldType.totp) ...[
-                const SizedBox(height: 12),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.primaryContainer.withAlpha(90),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    '2FA 字段只作为账号页的快捷关联入口；验证码密钥仍保存在独立 2FA 模块中。',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ),
-              ] else ...[
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _hintCtrl,
-                  textInputAction: TextInputAction.next,
-                  decoration: const InputDecoration(labelText: '提示文本'),
-                ),
-              ],
+              const SizedBox(height: 12),
+              TextField(
+                controller: _hintCtrl,
+                textInputAction: TextInputAction.next,
+                decoration: const InputDecoration(labelText: '提示文本'),
+              ),
               const SizedBox(height: 12),
               TextField(
                 controller: _descriptionCtrl,
@@ -291,12 +252,19 @@ class _FieldEditorDialogState extends State<FieldEditorDialog> {
               ),
               const SizedBox(height: 8),
               SwitchListTile(
+                value: _isReference,
+                contentPadding: EdgeInsets.zero,
+                title: const Text('关联字段'),
+                subtitle: const Text('不保存数据，仅作为关联入口'),
+                onChanged: (value) => setState(() => _isReference = value),
+              ),
+              SwitchListTile(
                 value: _isRequired,
                 contentPadding: EdgeInsets.zero,
                 title: const Text('必填'),
                 onChanged: (value) => setState(() => _isRequired = value),
               ),
-              if (_type != AccountFieldType.totp) ...[
+              if (!_isReference) ...[
                 SwitchListTile(
                   value: _isSecret,
                   contentPadding: EdgeInsets.zero,

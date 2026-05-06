@@ -54,7 +54,7 @@ class VaultDumpCoordinator {
     final accountsList = await storageService.loadAccounts(
       includeDeleted: true,
     );
-    final templatesList = await storageService.loadCustomTemplates();
+    final templatesList = await storageService.loadAllTemplates();
 
     final payloadJson = {
       'accounts': accountsList.map((account) => account.toJson()).toList(),

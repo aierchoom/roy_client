@@ -139,6 +139,7 @@ class _AccountListTileState extends State<AccountListTile> {
       bool isSecret = false,
       String? key,
       AccountFieldType? type,
+      bool isReference = false,
     }) {
       final trimmed = value.trim();
       if (trimmed.isEmpty) return;
@@ -158,6 +159,7 @@ class _AccountListTileState extends State<AccountListTile> {
             key: key,
             type: type,
             isSecret: isSecret,
+            isReference: isReference,
           ),
         ),
       );
@@ -179,6 +181,7 @@ class _AccountListTileState extends State<AccountListTile> {
           isSecret: field.attributes.isSecret,
           key: field.fieldKey,
           type: field.attributes.type,
+          isReference: field.attributes.isReference,
         );
       }
     }
@@ -226,8 +229,10 @@ class _AccountListTileState extends State<AccountListTile> {
     String? key,
     AccountFieldType? type,
     required bool isSecret,
+    bool isReference = false,
   }) {
     if (isSecret) return Icons.lock_outline_rounded;
+    if (isReference) return Icons.verified_user_outlined;
 
     final composite = '${key ?? ''} $label';
     if (_looksLikeDateField(composite)) {
@@ -249,10 +254,10 @@ class _AccountListTileState extends State<AccountListTile> {
         return Icons.link_outlined;
       case AccountFieldType.time:
         return Icons.schedule_outlined;
-      case AccountFieldType.totp:
-        return Icons.verified_user_outlined;
       case AccountFieldType.custom:
         return Icons.extension_outlined;
+      case AccountFieldType.unknown:
+        return Icons.help_outline_outlined;
       case null:
         final lower = composite.toLowerCase();
         if (lower.contains('email') || composite.contains('\u90ae\u7bb1')) {

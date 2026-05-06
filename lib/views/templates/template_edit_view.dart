@@ -7,6 +7,8 @@ import '../../providers/enhanced_app_provider.dart';
 import '../../widgets/adaptive_page.dart';
 import '../../widgets/green_add_button.dart';
 import '../../widgets/template_edit_widgets.dart';
+import '../../theme/app_design_tokens.dart';
+import '../../theme/app_layout.dart';
 
 class TemplateEditView extends StatefulWidget {
   final AccountTemplate? initial;
@@ -114,10 +116,10 @@ class _TemplateEditViewState extends State<TemplateEditView> {
         return '\u7f51\u5740';
       case AccountFieldType.time:
         return '\u65f6\u95f4';
-      case AccountFieldType.totp:
-        return '2FA';
       case AccountFieldType.custom:
         return '\u81ea\u5b9a\u4e49';
+      case AccountFieldType.unknown:
+        return '\u672a\u77e5';
     }
   }
 
@@ -137,15 +139,16 @@ class _TemplateEditViewState extends State<TemplateEditView> {
         return Icons.link_outlined;
       case AccountFieldType.time:
         return Icons.schedule_outlined;
-      case AccountFieldType.totp:
-        return Icons.password_outlined;
       case AccountFieldType.custom:
         return Icons.extension_outlined;
+      case AccountFieldType.unknown:
+        return Icons.help_outline_outlined;
     }
   }
 
   String _sampleValueForField(AccountField field) {
     if (field.attributes.isSecret) return '••••••••';
+    if (field.attributes.isReference) return '关联 2FA';
 
     switch (field.attributes.type) {
       case AccountFieldType.email:
@@ -158,12 +161,11 @@ class _TemplateEditViewState extends State<TemplateEditView> {
         return '123456';
       case AccountFieldType.time:
         return 'YYYY-MM-DD HH:mm';
-      case AccountFieldType.totp:
-        return '\u5173\u8054 2FA';
       case AccountFieldType.password:
         return '••••••••';
       case AccountFieldType.text:
       case AccountFieldType.custom:
+      case AccountFieldType.unknown:
         return field.attributes.hint ?? '';
     }
   }
@@ -215,8 +217,8 @@ class _TemplateEditViewState extends State<TemplateEditView> {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
         color: _softSurface(theme, tint: accent, tintAlpha: 16),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: accent.withAlpha(48)),
+        borderRadius: BorderRadius.circular(AppRadii.pill),
+        border: Border.all(color: accent.withAlpha(AppAlphas.low)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -333,23 +335,23 @@ class _TemplateEditViewState extends State<TemplateEditView> {
     final heroEdge = theme.colorScheme.primary.withAlpha(42);
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(AppSpacing.xl),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
             Color.alphaBlend(
-              theme.colorScheme.primary.withAlpha(24),
+              theme.colorScheme.primary.withAlpha(AppAlphas.subtle),
               theme.colorScheme.primaryContainer,
             ),
             Color.alphaBlend(
-              theme.colorScheme.tertiary.withAlpha(18),
+              theme.colorScheme.tertiary.withAlpha(AppAlphas.tint),
               theme.colorScheme.tertiaryContainer,
             ),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(AppRadii.panel),
         border: Border.all(color: heroEdge),
         boxShadow: _softCardShadows(theme, depth: 1.1),
       ),
@@ -362,8 +364,8 @@ class _TemplateEditViewState extends State<TemplateEditView> {
                 width: 58,
                 height: 58,
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.surface.withAlpha(232),
-                  borderRadius: BorderRadius.circular(18),
+                  color: theme.colorScheme.surface.withAlpha(AppAlphas.surface),
+                  borderRadius: BorderRadius.circular(AppRadii.panel),
                   boxShadow: _softCardShadows(theme, depth: 0.45),
                 ),
                 alignment: Alignment.center,
@@ -399,7 +401,7 @@ class _TemplateEditViewState extends State<TemplateEditView> {
                         color: theme.colorScheme.onPrimaryContainer,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: AppSpacing.xs),
                     Text(
                       '模板描述：${_subtitleCtrl.text.trim().isEmpty ? '先把字段结构设计清楚，后续录入和维护都会轻松很多。' : _subtitleCtrl.text.trim()}',
                       style: theme.textTheme.bodyMedium?.copyWith(
@@ -409,7 +411,7 @@ class _TemplateEditViewState extends State<TemplateEditView> {
                         height: 1.3,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: AppSpacing.sm),
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 10,
@@ -419,7 +421,7 @@ class _TemplateEditViewState extends State<TemplateEditView> {
                         color: theme.colorScheme.onPrimaryContainer.withAlpha(
                           18,
                         ),
-                        borderRadius: BorderRadius.circular(999),
+                        borderRadius: BorderRadius.circular(AppRadii.pill),
                       ),
                       child: Text(
                         _text(
@@ -466,8 +468,8 @@ class _TemplateEditViewState extends State<TemplateEditView> {
                 tint: theme.colorScheme.primary,
                 tintAlpha: 22,
               ),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: heroEdge.withAlpha(90)),
+              borderRadius: BorderRadius.circular(AppRadii.panel),
+              border: Border.all(color: heroEdge.withAlpha(AppAlphas.strong)),
             ),
             child: Text(
               _text(
@@ -516,9 +518,9 @@ class _TemplateEditViewState extends State<TemplateEditView> {
           tint: theme.colorScheme.primary,
           tintAlpha: 8,
         ),
-        borderRadius: BorderRadius.circular(26),
+        borderRadius: BorderRadius.circular(AppRadii.panel),
         border: Border.all(
-          color: theme.colorScheme.outlineVariant.withAlpha(88),
+          color: theme.colorScheme.outlineVariant.withAlpha(AppAlphas.high),
         ),
         boxShadow: _softCardShadows(theme, depth: 0.82),
       ),
@@ -550,7 +552,7 @@ class _TemplateEditViewState extends State<TemplateEditView> {
                 prefixIcon: const Icon(Icons.title_outlined),
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.md),
             TextField(
               controller: _subtitleCtrl,
               onChanged: (_) => setState(() {}),
@@ -569,9 +571,9 @@ class _TemplateEditViewState extends State<TemplateEditView> {
                   tint: theme.colorScheme.primary,
                   tintAlpha: 14,
                 ),
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(AppRadii.panel),
                 border: Border.all(
-                  color: theme.colorScheme.primary.withAlpha(40),
+                  color: theme.colorScheme.primary.withAlpha(AppAlphas.low),
                 ),
               ),
               child: Row(
@@ -581,8 +583,8 @@ class _TemplateEditViewState extends State<TemplateEditView> {
                     width: 56,
                     height: 56,
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.surface.withAlpha(232),
-                      borderRadius: BorderRadius.circular(18),
+                      color: theme.colorScheme.surface.withAlpha(AppAlphas.surface),
+                      borderRadius: BorderRadius.circular(AppRadii.panel),
                     ),
                     alignment: Alignment.center,
                     child: Text(
@@ -610,7 +612,7 @@ class _TemplateEditViewState extends State<TemplateEditView> {
                             fontWeight: FontWeight.w700,
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: AppSpacing.xs),
                         Text(
                           _subtitleCtrl.text.trim().isEmpty
                               ? '\u8fd9\u4e2a\u6a21\u677f\u4f1a\u7528\u6765\u7ec4\u7ec7\u8d26\u6237\u5b57\u6bb5\u3002'
@@ -661,7 +663,7 @@ class _TemplateEditViewState extends State<TemplateEditView> {
     return Container(
       decoration: BoxDecoration(
         color: _softSurface(theme, tint: accent, tintAlpha: 6),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(AppRadii.panel),
         border: Border.all(color: accent.withAlpha(36)),
         boxShadow: _softCardShadows(theme, depth: 0.72),
       ),
@@ -692,7 +694,7 @@ class _TemplateEditViewState extends State<TemplateEditView> {
                       height: 50,
                       decoration: BoxDecoration(
                         color: _softSurface(theme, tint: accent, tintAlpha: 24),
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(AppRadii.panel),
                       ),
                       child: Icon(
                         _fieldTypeIcon(field.attributes.type),
@@ -739,10 +741,10 @@ class _TemplateEditViewState extends State<TemplateEditView> {
                                   color: theme.colorScheme.onSurface.withAlpha(
                                     12,
                                   ),
-                                  borderRadius: BorderRadius.circular(6),
+                                  borderRadius: BorderRadius.circular(AppRadii.chip),
                                   border: Border.all(
                                     color: theme.colorScheme.onSurface
-                                        .withAlpha(24),
+                                        .withAlpha(AppAlphas.subtle),
                                   ),
                                 ),
                                 child: Text(
@@ -773,7 +775,7 @@ class _TemplateEditViewState extends State<TemplateEditView> {
                               style: theme.textTheme.bodySmall?.copyWith(
                                 fontStyle: FontStyle.italic,
                                 color: theme.colorScheme.onSurfaceVariant
-                                    .withAlpha(120),
+                                    .withAlpha(AppAlphas.outline),
                               ),
                             ),
                           ],
@@ -788,7 +790,7 @@ class _TemplateEditViewState extends State<TemplateEditView> {
                                     160,
                                   ),
                                 ),
-                                const SizedBox(width: 4),
+                                const SizedBox(width: AppSpacing.xs),
                                 Expanded(
                                   child: Text(
                                     '提示：${field.attributes.hint!}',
@@ -860,7 +862,7 @@ class _TemplateEditViewState extends State<TemplateEditView> {
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
                     color: _softSurface(theme, tint: accent, tintAlpha: 10),
-                    borderRadius: BorderRadius.circular(18),
+                    borderRadius: BorderRadius.circular(AppRadii.panel),
                     border: Border.all(color: accent.withAlpha(34)),
                   ),
                   child: Column(
@@ -952,9 +954,9 @@ class _TemplateEditViewState extends State<TemplateEditView> {
           tint: theme.colorScheme.secondary,
           tintAlpha: 10,
         ),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(AppRadii.panel),
         border: Border.all(
-          color: theme.colorScheme.outlineVariant.withAlpha(88),
+          color: theme.colorScheme.outlineVariant.withAlpha(AppAlphas.high),
         ),
         boxShadow: _softCardShadows(theme, depth: 0.62),
       ),
@@ -981,7 +983,7 @@ class _TemplateEditViewState extends State<TemplateEditView> {
                       height: 1.35,
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppSpacing.md),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
@@ -1001,7 +1003,7 @@ class _TemplateEditViewState extends State<TemplateEditView> {
                 ],
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: AppSpacing.md),
             GreenAddButton(
               heroTag: 'add-template-field-fab',
               small: true,
@@ -1023,7 +1025,7 @@ class _TemplateEditViewState extends State<TemplateEditView> {
         final isWide = constraints.maxWidth >= 980;
         if (!isWide) {
           return Column(
-            children: [overview, const SizedBox(height: 24), details],
+            children: [overview, const SizedBox(height: AppSpacing.xxl), details],
           );
         }
 
@@ -1068,7 +1070,7 @@ class _TemplateEditViewState extends State<TemplateEditView> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
-    final fabBottomOffset = AppBreakpoints.isDesktop(context) ? 24.0 : 20.0;
+    final fabBottomOffset = AppLayout.isExpanded(context) ? 24.0 : 20.0;
 
     return Scaffold(
       appBar: AppBar(
@@ -1103,19 +1105,19 @@ class _TemplateEditViewState extends State<TemplateEditView> {
             padding: const EdgeInsets.fromLTRB(0, 16, 0, 120),
             children: [
               _buildTopSection(context),
-              const SizedBox(height: 24),
+              const SizedBox(height: AppSpacing.xxl),
               _buildFieldSectionHeader(context),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.md),
               if (_fields.isEmpty)
                 Container(
-                  padding: const EdgeInsets.all(24),
+                  padding: const EdgeInsets.all(AppSpacing.xxl),
                   decoration: BoxDecoration(
                     color: _softSurface(
                       theme,
                       tint: theme.colorScheme.secondary,
                       tintAlpha: 12,
                     ),
-                    borderRadius: BorderRadius.circular(22),
+                    borderRadius: BorderRadius.circular(AppRadii.dialog),
                     border: Border.all(color: theme.colorScheme.outlineVariant),
                     boxShadow: _softCardShadows(theme, depth: 0.55),
                   ),
@@ -1126,8 +1128,8 @@ class _TemplateEditViewState extends State<TemplateEditView> {
                         width: 52,
                         height: 52,
                         decoration: BoxDecoration(
-                          color: theme.colorScheme.surface.withAlpha(232),
-                          borderRadius: BorderRadius.circular(16),
+                          color: theme.colorScheme.surface.withAlpha(AppAlphas.surface),
+                          borderRadius: BorderRadius.circular(AppRadii.panel),
                         ),
                         alignment: Alignment.center,
                         child: Icon(

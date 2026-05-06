@@ -100,6 +100,7 @@ class SecureStorageService {
     try {
       await _prepareWorkingDatabase();
       await _openAndInitialize(_workingDatabasePath!);
+      await _ensureBuiltinTemplates();
       await _setRuntimePragmas();
       await _persistEncryptedDatabase();
       await _deleteLegacyPlaintextDatabase();
@@ -137,6 +138,16 @@ class SecureStorageService {
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
+  }
+
+  Future<void> _ensureBuiltinTemplates() async {
+    if (!isOpen) return;
+    for (final template in basicAccountTemplates) {
+      final existing = await loadTemplateById(template.templateId);
+      if (existing == null) {
+        await saveTemplate(template, isSyncMerge: true);
+      }
+    }
   }
 
   Future<void> close({bool dispose = false}) async {
@@ -1277,6 +1288,31 @@ class SecureStorageService {
           .toList();
     } catch (e) {
       AppLogger.d('Failed to load templates: $e');
+      return [];
+    }
+  }
+
+  Future<List<AccountTemplate>> loadAllTemplates({
+    bool includeDeleted = false,
+  }) async {
+    if (!isOpen) return [];
+    try {
+      final rows = await _query(
+        'templates',
+        where: includeDeleted ? null : 'is_deleted = 0',
+        orderBy: 'is_custom DESC, created_at DESC',
+      );
+      return rows
+          .map(
+            (row) => _mapToAccountTemplate(
+              row,
+              isCustom: row['is_custom'] == 1,
+            ),
+          )
+          .whereType<AccountTemplate>()
+          .toList();
+    } catch (e) {
+      AppLogger.d('Failed to load all templates: $e');
       return [];
     }
   }

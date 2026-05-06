@@ -30,11 +30,7 @@ class VaultHealthCalculator {
 
     // B. 账号安全体检
     final accounts = await _storage.loadAccounts();
-    final templates = await _storage.loadCustomTemplates();
-    final allTemplates = <AccountTemplate>[
-      ...basicAccountTemplates,
-      ...templates,
-    ];
+    final allTemplates = await _storage.loadAllTemplates();
     final totpCredentials = await _storage.loadTotpCredentials();
 
     items.add(VaultHealthCalculator.checkWeakPasswords(accounts));
@@ -350,7 +346,7 @@ class VaultHealthCalculator {
       if (template == null) continue;
       // Check if template has a totp field
       final hasTotpField = template.fields.any(
-        (f) => f.attributes.type == AccountFieldType.totp,
+        (f) => f.attributes.isReference,
       );
       if (!hasTotpField) continue;
       // Check if account has linked TOTP

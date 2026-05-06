@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../theme/template_theme.dart';
+import '../utils/template_icons.dart';
 import 'account_item.dart';
 import 'hlc.dart';
 
-export '../theme/template_theme.dart'
+export '../utils/template_icons.dart'
     show
         kTemplateIconOptions,
         templateIconFromStorageValue,
@@ -22,8 +22,8 @@ enum AccountFieldType {
   phone,
   url,
   time,
-  totp,
   custom,
+  unknown,
 }
 
 enum TimeFieldFormat { full, date, monthYear, time }
@@ -42,7 +42,7 @@ enum TemplateCategory {
 AccountFieldType fieldTypeFromString(String value) {
   return AccountFieldType.values.firstWhere(
     (type) => type.name == value,
-    orElse: () => AccountFieldType.text,
+    orElse: () => AccountFieldType.unknown,
   );
 }
 
@@ -65,6 +65,7 @@ class AccountFieldAttributes {
   final int? minLength;
   final String? regex;
   final String? hint;
+  final bool isReference;
   final TimeFieldFormat timeFormat;
 
   const AccountFieldAttributes({
@@ -75,6 +76,7 @@ class AccountFieldAttributes {
     this.isEditable = true,
     this.isSearchable = false,
     this.isCopyable = true,
+    this.isReference = false,
     this.maxLength,
     this.minLength,
     this.regex,
@@ -91,6 +93,7 @@ class AccountFieldAttributes {
       isEditable: json['isEditable'] != false,
       isSearchable: json['isSearchable'] == true,
       isCopyable: json['isCopyable'] != false,
+      isReference: json['isReference'] == true,
       maxLength: json['maxLength'] as int?,
       minLength: json['minLength'] as int?,
       regex: json['regex'] as String?,
@@ -111,6 +114,7 @@ class AccountFieldAttributes {
       'isEditable': isEditable,
       'isSearchable': isSearchable,
       'isCopyable': isCopyable,
+      'isReference': isReference,
       'maxLength': maxLength,
       'minLength': minLength,
       'regex': regex,
@@ -327,7 +331,8 @@ final AccountTemplate websiteTemplate = const AccountTemplate(
       description:
           '\u5173\u8054\u72ec\u7acb\u7684 2FA/TOTP \u51ed\u636e\uff0c\u4e0d\u5728\u8d26\u6237\u5b57\u6bb5\u4e2d\u4fdd\u5b58\u52a8\u6001\u7801\u5bc6\u94a5\u3002',
       attributes: AccountFieldAttributes(
-        type: AccountFieldType.totp,
+        type: AccountFieldType.custom,
+        isReference: true,
         isCopyable: false,
         hint: '\u9009\u62e9\u6216\u65b0\u5efa 2FA',
       ),

@@ -30,7 +30,8 @@ void main() {
       expect(passwordField.attributes.isSecret, isTrue);
       expect(passwordField.attributes.isRequired, isTrue);
       expect(passwordField.attributes.type, AccountFieldType.password);
-      expect(totpField.attributes.type, AccountFieldType.totp);
+      expect(totpField.attributes.type, AccountFieldType.custom);
+      expect(totpField.attributes.isReference, isTrue);
       expect(totpField.attributes.isSecret, isFalse);
       expect(totpField.attributes.isCopyable, isFalse);
       expect(
