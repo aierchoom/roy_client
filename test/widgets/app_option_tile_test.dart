@@ -69,7 +69,9 @@ void main() {
       expect(tapped, isTrue);
     });
 
-    testWidgets('InkWell is present for tap and focus handling', (tester) async {
+    testWidgets('InkWell is present for tap and focus handling', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(

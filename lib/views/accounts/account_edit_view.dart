@@ -1263,6 +1263,12 @@ class _AccountEditViewState extends State<AccountEditView> {
     if (_isAccountLinkField(field)) {
       return _buildAccountLinkSection(context, field);
     }
+    if (field.attributes.type == AccountFieldType.longText) {
+      return _buildLongTextFieldCard(context, field);
+    }
+    if (field.attributes.type == AccountFieldType.list) {
+      return _buildListFieldCard(context, field);
+    }
 
     final theme = Theme.of(context);
     final controller = _fieldCtrls[field.fieldKey];
@@ -1462,6 +1468,207 @@ class _AccountEditViewState extends State<AccountEditView> {
                   ),
                 ],
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLongTextFieldCard(BuildContext context, AccountField field) {
+    final theme = Theme.of(context);
+    final controller = _fieldCtrls[field.fieldKey];
+    final accent = _fieldAccentColor(theme, field);
+    final isSecret = field.attributes.isSecret;
+    final isVisible = !isSecret || (_fieldVisibility[field.fieldKey] ?? false);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppSurfaces.soft(theme.colorScheme, tint: accent, tintAlpha: 5),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: accent.withAlpha(38)),
+        boxShadow: AppShadows.card(theme, depth: 0.7),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: AppSurfaces.soft(
+                      theme.colorScheme,
+                      tint: accent,
+                      tintAlpha: 18,
+                    ),
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  child: Icon(
+                    isSecret ? Icons.key_outlined : Icons.notes_outlined,
+                    color: accent,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        field.label,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        field.fieldKey,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            if (isSecret && !isVisible)
+              InkWell(
+                onTap: () =>
+                    setState(() => _fieldVisibility[field.fieldKey] = true),
+                borderRadius: BorderRadius.circular(18),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: AppSurfaces.soft(
+                      theme.colorScheme,
+                      tint: accent,
+                      tintAlpha: 5,
+                    ),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: accent.withAlpha(34)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.visibility_off_outlined,
+                        color: accent,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        _text(
+                          '\u70b9\u51fb\u5c55\u5f00\u7f16\u8f91\u5185\u5bb9',
+                          'Tap to reveal and edit',
+                        ),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: accent,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            else
+              TextField(
+                controller: controller,
+                maxLines: null,
+                keyboardType: TextInputType.multiline,
+                style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+                readOnly: !_isEditing || !field.attributes.isEditable,
+                decoration: InputDecoration(
+                  labelText: field.label,
+                  hintText: field.attributes.hint,
+                  prefixIcon: const Icon(Icons.notes_outlined),
+                  suffixIcon: isSecret
+                      ? IconButton(
+                          icon: const Icon(Icons.visibility_off_outlined),
+                          onPressed: () => setState(
+                            () => _fieldVisibility[field.fieldKey] = false,
+                          ),
+                        )
+                      : null,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildListFieldCard(BuildContext context, AccountField field) {
+    final theme = Theme.of(context);
+    final controller = _fieldCtrls[field.fieldKey];
+    final accent = _fieldAccentColor(theme, field);
+    final isMnemonic = field.fieldKey == 'mnemonic_words';
+
+    if (controller == null) return const SizedBox.shrink();
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppSurfaces.soft(theme.colorScheme, tint: accent, tintAlpha: 5),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: accent.withAlpha(38)),
+        boxShadow: AppShadows.card(theme, depth: 0.7),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: AppSurfaces.soft(
+                      theme.colorScheme,
+                      tint: accent,
+                      tintAlpha: 18,
+                    ),
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  child: Icon(
+                    isMnemonic ? Icons.vpn_key_outlined : Icons.list_outlined,
+                    color: accent,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        field.label,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        field.fieldKey,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            _ListFieldEditor(
+              controller: controller,
+              isMnemonic: isMnemonic,
+              readOnly: !_isEditing || !field.attributes.isEditable,
+              hint: field.attributes.hint,
             ),
           ],
         ),
@@ -2484,6 +2691,243 @@ class _AccountEditViewState extends State<AccountEditView> {
           ),
         );
       },
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// List Field Editor — used by AccountFieldType.list
+// ---------------------------------------------------------------------------
+
+class _ListFieldEditor extends StatefulWidget {
+  final TextEditingController controller;
+  final bool isMnemonic;
+  final bool readOnly;
+  final String? hint;
+
+  const _ListFieldEditor({
+    required this.controller,
+    this.isMnemonic = false,
+    this.readOnly = false,
+    this.hint,
+  });
+
+  @override
+  State<_ListFieldEditor> createState() => _ListFieldEditorState();
+}
+
+class _ListFieldEditorState extends State<_ListFieldEditor> {
+  late List<String> _items;
+
+  @override
+  void initState() {
+    super.initState();
+    _items = _parseItems(widget.controller.text);
+  }
+
+  @override
+  void didUpdateWidget(_ListFieldEditor oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      _items = _parseItems(widget.controller.text);
+    }
+  }
+
+  List<String> _parseItems(String text) {
+    if (text.trim().isEmpty) return [];
+    return text.split('\n').where((s) => s.isNotEmpty).toList();
+  }
+
+  void _updateController() {
+    final newText = _items.join('\n');
+    if (widget.controller.text != newText) {
+      widget.controller.text = newText;
+    }
+  }
+
+  void _addItem() {
+    setState(() => _items.add(''));
+    _updateController();
+  }
+
+  void _removeItem(int index) {
+    setState(() => _items.removeAt(index));
+    _updateController();
+  }
+
+  void _updateItem(int index, String value) {
+    if (index >= 0 && index < _items.length) {
+      _items[index] = value;
+      _updateController();
+    }
+  }
+
+  void _handlePaste(String pasted) {
+    final words = pasted.trim().split(RegExp(r'\s+'));
+    final filtered = words.where((w) => w.isNotEmpty).toList();
+    if (filtered.isEmpty) return;
+    setState(() => _items = filtered);
+    _updateController();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    if (widget.isMnemonic) {
+      return _buildMnemonicEditor(theme);
+    }
+    return _buildGenericListEditor(theme);
+  }
+
+  Widget _buildMnemonicEditor(ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (!widget.readOnly)
+          TextField(
+            decoration: InputDecoration(
+              hintText:
+                  widget.hint ??
+                  '\u7c98\u8d34 12 \u6216 24 \u4e2a\u5355\u8bcd\uff0c\u81ea\u52a8\u5206\u8bcd',
+              prefixIcon: const Icon(Icons.paste_outlined),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            onSubmitted: _handlePaste,
+          ),
+        if (!widget.readOnly) const SizedBox(height: 12),
+        if (_items.isEmpty)
+          Text(
+            '\u8fd8\u672a\u8f93\u5165\u52a9\u8bb0\u8bcd',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          )
+        else
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _items.asMap().entries.map((entry) {
+              final index = entry.key;
+              final value = entry.value;
+              return SizedBox(
+                width: 90,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(AppRadii.control),
+                    border: Border.all(
+                      color: theme.colorScheme.outlineVariant.withAlpha(AppAlphas.medium),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Text(
+                        '${index + 1}.',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: TextField(
+                          controller: TextEditingController(text: value),
+                          onChanged: (v) => _updateItem(index, v),
+                          readOnly: widget.readOnly,
+                          style: const TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 12,
+                          ),
+                          decoration: const InputDecoration(
+                            isDense: true,
+                            contentPadding: EdgeInsets.zero,
+                            border: InputBorder.none,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        if (!widget.readOnly && _items.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            children: [
+              TextButton.icon(
+                onPressed: _items.length < 24 ? _addItem : null,
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('\u6dfb\u52a0\u5355\u8bcd'),
+              ),
+              TextButton.icon(
+                onPressed: _items.isNotEmpty
+                    ? () => _removeItem(_items.length - 1)
+                    : null,
+                icon: const Icon(Icons.remove, size: 18),
+                label: const Text('\u5220\u9664\u672b\u5c3e'),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildGenericListEditor(ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ..._items.asMap().entries.map((entry) {
+          final index = entry.key;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: TextEditingController(text: entry.value),
+                    onChanged: (v) => _updateItem(index, v),
+                    readOnly: widget.readOnly,
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 13,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: '${index + 1}',
+                      prefixIcon: const Icon(Icons.short_text_outlined),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppRadii.control),
+                      ),
+                    ),
+                  ),
+                ),
+                if (!widget.readOnly)
+                  IconButton(
+                    icon: Icon(
+                      Icons.remove_circle_outline,
+                      color: theme.colorScheme.error.withAlpha(AppAlphas.emphasis),
+                    ),
+                    onPressed: () => _removeItem(index),
+                  ),
+              ],
+            ),
+          );
+        }),
+        if (!widget.readOnly)
+          TextButton.icon(
+            onPressed: _addItem,
+            icon: const Icon(Icons.add),
+            label: const Text('\u6dfb\u52a0\u9879'),
+          ),
+      ],
     );
   }
 }

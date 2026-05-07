@@ -1062,7 +1062,9 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(AppSpacing.md),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.errorContainer.withAlpha(AppAlphas.high),
+                    color: theme.colorScheme.errorContainer.withAlpha(
+                      AppAlphas.high,
+                    ),
                     borderRadius: BorderRadius.circular(AppRadii.button),
                   ),
                   child: Row(
@@ -1301,7 +1303,9 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerHighest.withAlpha(AppAlphas.high),
+            color: theme.colorScheme.surfaceContainerHighest.withAlpha(
+              AppAlphas.high,
+            ),
             borderRadius: BorderRadius.circular(AppRadii.panel),
           ),
           child: Column(
@@ -1892,7 +1896,9 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
               width: double.infinity,
               padding: const EdgeInsets.all(AppSpacing.md),
               decoration: BoxDecoration(
-                color: theme.colorScheme.secondaryContainer.withAlpha(AppAlphas.outline),
+                color: theme.colorScheme.secondaryContainer.withAlpha(
+                  AppAlphas.outline,
+                ),
                 borderRadius: BorderRadius.circular(AppRadii.panel),
               ),
               child: Column(

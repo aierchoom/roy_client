@@ -30,14 +30,18 @@ void main() {
     testWidgets('adapts padding for compact layout', (tester) async {
       await tester.pumpWidget(buildCard(width: 600));
       await tester.pumpAndSettle();
-      final layout = AppLayout.isCompact(tester.element(find.byType(AppHeroCard)));
+      final layout = AppLayout.isCompact(
+        tester.element(find.byType(AppHeroCard)),
+      );
       expect(layout, isTrue);
     });
 
     testWidgets('adapts padding for expanded layout', (tester) async {
       await tester.pumpWidget(buildCard(width: 1200));
       await tester.pumpAndSettle();
-      final layout = AppLayout.isExpanded(tester.element(find.byType(AppHeroCard)));
+      final layout = AppLayout.isExpanded(
+        tester.element(find.byType(AppHeroCard)),
+      );
       expect(layout, isTrue);
     });
 

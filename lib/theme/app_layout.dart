@@ -100,13 +100,15 @@ abstract final class AppLayout {
   /// Windows、macOS、Linux 返回 false。
   static bool get _isTouchDevice {
     return switch (defaultTargetPlatform) {
-      TargetPlatform.android || TargetPlatform.iOS || TargetPlatform.fuchsia =>
-        true,
+      TargetPlatform.android ||
+      TargetPlatform.iOS ||
+      TargetPlatform.fuchsia => true,
       _ => false,
     };
   }
 
-  static bool isTouchDeviceOf(BuildContext context) => of(context).isTouchDevice;
+  static bool isTouchDeviceOf(BuildContext context) =>
+      of(context).isTouchDevice;
 
   static bool isPointerDeviceOf(BuildContext context) =>
       !of(context).isTouchDevice;

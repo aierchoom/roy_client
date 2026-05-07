@@ -20,6 +20,68 @@ class FieldPreset {
 /// Built-in field presets for common account types.
 const List<FieldPreset> kFieldPresets = [
   FieldPreset(
+    id: 'secure_note',
+    name: '\u5b89\u5168\u7b14\u8bb0',
+    icon: Icons.note_outlined,
+    fields: [
+      AccountField(
+        fieldKey: 'content',
+        label: '\u5185\u5bb9',
+        attributes: AccountFieldAttributes(
+          type: AccountFieldType.longText,
+          isRequired: true,
+          isSecret: true,
+          hint: '\u7c98\u8d34\u6216\u8f93\u5165\u654f\u611f\u5185\u5bb9...',
+        ),
+      ),
+    ],
+  ),
+  FieldPreset(
+    id: 'mnemonic',
+    name: '\u52a9\u8bb0\u8bcd',
+    icon: Icons.vpn_key_outlined,
+    fields: [
+      AccountField(
+        fieldKey: 'mnemonic_words',
+        label: '\u52a9\u8bb0\u8bcd',
+        attributes: AccountFieldAttributes(
+          type: AccountFieldType.list,
+          isRequired: true,
+          isSecret: true,
+          hint:
+              'abandon ability able about above absent absorb abstract absurd abuse access accident',
+        ),
+      ),
+    ],
+  ),
+  FieldPreset(
+    id: 'api_keys',
+    name: 'API Key',
+    icon: Icons.code_outlined,
+    fields: [
+      AccountField(
+        fieldKey: 'service_name',
+        label: '\u670d\u52a1\u540d\u79f0',
+        attributes: AccountFieldAttributes(
+          type: AccountFieldType.text,
+          isPrimary: true,
+          isRequired: true,
+          isSearchable: true,
+          hint: 'OpenAI / Stripe / AWS',
+        ),
+      ),
+      AccountField(
+        fieldKey: 'api_keys',
+        label: 'API Key',
+        attributes: AccountFieldAttributes(
+          type: AccountFieldType.list,
+          isSecret: true,
+          hint: 'sk-proj-xxxxx',
+        ),
+      ),
+    ],
+  ),
+  FieldPreset(
     id: 'bank_card',
     name: '\u94f6\u884c\u5361',
     icon: Icons.credit_card_outlined,
@@ -274,7 +336,10 @@ List<AccountField> instantiatePresetFields(
   final keysSoFar = <String>{};
 
   for (final field in preset.fields) {
-    final uniqueKey = generateUniqueFieldKey(field.fieldKey, {...existingKeys, ...keysSoFar});
+    final uniqueKey = generateUniqueFieldKey(field.fieldKey, {
+      ...existingKeys,
+      ...keysSoFar,
+    });
     keysSoFar.add(uniqueKey);
     result.add(
       AccountField(

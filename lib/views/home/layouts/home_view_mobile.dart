@@ -23,7 +23,10 @@ class HomeViewMobile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final syncBadgeCount = context.watch<EnhancedAppProvider>().localSyncChanges.length;
+    final syncBadgeCount = context
+        .watch<EnhancedAppProvider>()
+        .localSyncChanges
+        .length;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,

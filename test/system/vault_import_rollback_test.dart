@@ -71,9 +71,7 @@ void main() {
   late DatabaseFileCipher cipher;
 
   setUp(() {
-    rootDirectory = Directory.systemTemp.createTempSync(
-      'secret_roy_rollback_',
-    );
+    rootDirectory = Directory.systemTemp.createTempSync('secret_roy_rollback_');
     documentsDirectory = Directory(p.join(rootDirectory.path, 'documents'))
       ..createSync(recursive: true);
     temporaryDirectory = Directory(p.join(rootDirectory.path, 'temp'))
@@ -95,113 +93,113 @@ void main() {
 
   group('Vault import rollback', () {
     test(
-        'restores previous identity when dump write fails; old data remains readable',
-        () async {
-      // Set up initial identity (vault A)
-      final identityA = IdentityService(
-        secureStorage: _MemorySecureKeyValueStore()
-          ..values.addAll({
-            'device_id': 'device_abcdef123456',
-            'vault_id': 'vault_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-            'private_key':
-                'priv_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-            'symmetric_key':
-                'sym_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-            'vault_api_token': 'token_a',
-          }),
-      );
-      await identityA.initialize();
+      'restores previous identity when dump write fails; old data remains readable',
+      () async {
+        // Set up initial identity (vault A)
+        final identityA = IdentityService(
+          secureStorage: _MemorySecureKeyValueStore()
+            ..values.addAll({
+              'device_id': 'device_abcdef123456',
+              'vault_id': 'vault_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+              'private_key':
+                  'priv_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+              'symmetric_key':
+                  'sym_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+              'vault_api_token': 'token_a',
+            }),
+        );
+        await identityA.initialize();
 
-      // Set up storage that will fail during import
-      final storage = _FailingStorageService(databaseCipher: cipher);
-      await storage.initialize(deviceId: 'device_test');
-      addTearDown(() => storage.close(dispose: true));
+        // Set up storage that will fail during import
+        final storage = _FailingStorageService(databaseCipher: cipher);
+        await storage.initialize(deviceId: 'device_test');
+        addTearDown(() => storage.close(dispose: true));
 
-      // Store original data under identity A
-      final originalAccount = AccountItem(
-        id: 'account_original',
-        name: 'Original Account',
-        email: '',
-        templateId: 'generic_info',
-        data: const {},
-        createdAt: DateTime.now().millisecondsSinceEpoch,
-        nameHlc: Hlc.zero('test'),
-        emailHlc: Hlc.zero('test'),
-        dataHlc: const {},
-        syncStatus: SyncStatus.synchronized,
-      );
-      await storage.saveAccount(originalAccount, isSyncMerge: true);
+        // Store original data under identity A
+        final originalAccount = AccountItem(
+          id: 'account_original',
+          name: 'Original Account',
+          email: '',
+          templateId: 'generic_info',
+          data: const {},
+          createdAt: DateTime.now().millisecondsSinceEpoch,
+          nameHlc: Hlc.zero('test'),
+          emailHlc: Hlc.zero('test'),
+          dataHlc: const {},
+          syncStatus: SyncStatus.synchronized,
+        );
+        await storage.saveAccount(originalAccount, isSyncMerge: true);
 
-      final coordinator = VaultDumpCoordinator(
-        identityService: identityA,
-        storageService: storage,
-      );
+        final coordinator = VaultDumpCoordinator(
+          identityService: identityA,
+          storageService: storage,
+        );
 
-      // Prepare a dump plan (simulating data from vault B)
-      final dumpPlan = VaultDumpImportPlan(
-        templates: const [],
-        accounts: [
-          AccountItem(
-            id: 'account_new',
-            name: 'New Account',
-            email: '',
-            templateId: 'generic_info',
-            data: const {},
-            createdAt: DateTime.now().millisecondsSinceEpoch,
-            nameHlc: Hlc.zero('test'),
-            emailHlc: Hlc.zero('test'),
-            dataHlc: const {},
-            syncStatus: SyncStatus.pendingPush,
-          ),
-        ],
-      );
+        // Prepare a dump plan (simulating data from vault B)
+        final dumpPlan = VaultDumpImportPlan(
+          templates: const [],
+          accounts: [
+            AccountItem(
+              id: 'account_new',
+              name: 'New Account',
+              email: '',
+              templateId: 'generic_info',
+              data: const {},
+              createdAt: DateTime.now().millisecondsSinceEpoch,
+              nameHlc: Hlc.zero('test'),
+              emailHlc: Hlc.zero('test'),
+              dataHlc: const {},
+              syncStatus: SyncStatus.pendingPush,
+            ),
+          ],
+        );
 
-      // Capture previous identity for rollback
-      final previousIdentity = identityA.currentImportPreview();
+        // Capture previous identity for rollback
+        final previousIdentity = identityA.currentImportPreview();
 
-      // Prepare new identity (vault B)
-      final identityB = IdentityService(
-        secureStorage: _MemorySecureKeyValueStore()
-          ..values.addAll({
-            'device_id': 'device_abcdef123456',
-            'vault_id': 'vault_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-            'private_key':
-                'priv_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-            'symmetric_key':
-                'sym_cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
-          }),
-      );
-      await identityB.initialize();
-      final newPreview = identityB.currentImportPreview();
+        // Prepare new identity (vault B)
+        final identityB = IdentityService(
+          secureStorage: _MemorySecureKeyValueStore()
+            ..values.addAll({
+              'device_id': 'device_abcdef123456',
+              'vault_id': 'vault_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+              'private_key':
+                  'priv_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+              'symmetric_key':
+                  'sym_cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
+            }),
+        );
+        await identityB.initialize();
+        final newPreview = identityB.currentImportPreview();
 
-      // Simulate ServiceManager._importVaultIdentityPreview rollback path
-      var identityApplied = false;
-      try {
-        await identityA.applyImportPreview(newPreview);
-        identityApplied = true;
-        await coordinator.importValidatedVaultDump(dumpPlan);
-        fail('Expected VaultDumpImportException');
-      } on VaultDumpImportException {
-        // Expected
-        if (identityApplied) {
-          await identityA.applyImportPreview(previousIdentity);
+        // Simulate ServiceManager._importVaultIdentityPreview rollback path
+        var identityApplied = false;
+        try {
+          await identityA.applyImportPreview(newPreview);
+          identityApplied = true;
+          await coordinator.importValidatedVaultDump(dumpPlan);
+          fail('Expected VaultDumpImportException');
+        } on VaultDumpImportException {
+          // Expected
+          if (identityApplied) {
+            await identityA.applyImportPreview(previousIdentity);
+          }
         }
-      }
 
-      // Verify previous identity is restored
-      expect(identityA.vaultId, previousIdentity.vaultId);
-      expect(identityA.privateKey, previousIdentity.privateKey);
-      expect(identityA.symmetricKey, previousIdentity.symmetricKey);
+        // Verify previous identity is restored
+        expect(identityA.vaultId, previousIdentity.vaultId);
+        expect(identityA.privateKey, previousIdentity.privateKey);
+        expect(identityA.symmetricKey, previousIdentity.symmetricKey);
 
-      // Verify old data is still readable
-      final loadedAccounts = await storage.loadAccounts();
-      expect(loadedAccounts.length, 1);
-      expect(loadedAccounts.single.id, 'account_original');
-      expect(loadedAccounts.single.name, 'Original Account');
-    });
+        // Verify old data is still readable
+        final loadedAccounts = await storage.loadAccounts();
+        expect(loadedAccounts.length, 1);
+        expect(loadedAccounts.single.id, 'account_original');
+        expect(loadedAccounts.single.name, 'Original Account');
+      },
+    );
 
-    test('rolls back identity even for unexpected errors during import',
-        () async {
+    test('rolls back identity even for unexpected errors during import', () async {
       // Set up initial identity
       final identity = IdentityService(
         secureStorage: _MemorySecureKeyValueStore()

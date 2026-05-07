@@ -144,12 +144,10 @@ abstract final class AppTextStyles {
   static TextStyle? titleSmall(BuildContext context) =>
       theme(context).titleSmall;
 
-  static TextStyle? bodyLarge(BuildContext context) =>
-      theme(context).bodyLarge;
+  static TextStyle? bodyLarge(BuildContext context) => theme(context).bodyLarge;
   static TextStyle? bodyMedium(BuildContext context) =>
       theme(context).bodyMedium;
-  static TextStyle? bodySmall(BuildContext context) =>
-      theme(context).bodySmall;
+  static TextStyle? bodySmall(BuildContext context) => theme(context).bodySmall;
 
   static TextStyle? labelLarge(BuildContext context) =>
       theme(context).labelLarge;

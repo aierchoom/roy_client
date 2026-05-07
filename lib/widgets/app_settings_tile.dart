@@ -47,7 +47,9 @@ class _AppSettingsTileState extends State<AppSettingsTile> {
       ),
       title: Text(
         widget.title,
-        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+        style: theme.textTheme.titleSmall?.copyWith(
+          fontWeight: FontWeight.w600,
+        ),
       ),
       subtitle: widget.subtitle != null
           ? Text(
@@ -57,7 +59,8 @@ class _AppSettingsTileState extends State<AppSettingsTile> {
               ),
             )
           : null,
-      trailing: widget.trailing ??
+      trailing:
+          widget.trailing ??
           (widget.showChevron
               ? Icon(
                   Icons.chevron_right,

@@ -4,10 +4,13 @@ import 'package:secret_roy/models/account_template.dart';
 
 void main() {
   group('built-in account templates', () {
-    test('keeps website as the only built-in template', () {
-      expect(basicAccountTemplates.map((template) => template.templateId), [
-        'generic_info',
-      ]);
+    test('includes website and secure note built-in templates', () {
+      final ids = basicAccountTemplates.map((t) => t.templateId).toList();
+      expect(ids, contains('builtin_generic_info'));
+      expect(ids, contains('builtin_secure_note'));
+      expect(ids, contains('builtin_mnemonic'));
+      expect(ids, contains('builtin_api_service'));
+      expect(ids.length, 4);
     });
 
     test('website template uses a 2FA link field without storing secrets', () {
@@ -37,6 +40,25 @@ void main() {
       expect(
         websiteTemplate.fields.any((field) => field.fieldKey == 'totp_secret'),
         isFalse,
+      );
+    });
+
+    test('secure note templates use longText and list field types', () {
+      final secureNote = secureNoteGenericTemplate;
+      final mnemonic = secureNoteMnemonicTemplate;
+      final apiService = apiServiceTemplate;
+
+      expect(secureNote.category, TemplateCategory.note);
+      expect(
+        secureNote.fields.first.attributes.type,
+        AccountFieldType.longText,
+      );
+      expect(mnemonic.fields.first.attributes.type, AccountFieldType.list);
+      expect(
+        apiService.fields.any(
+          (f) => f.attributes.type == AccountFieldType.list,
+        ),
+        isTrue,
       );
     });
 

@@ -124,6 +124,10 @@ class _TemplateEditViewState extends State<TemplateEditView> {
         return field.attributes.hint ?? '';
       case AccountFieldType.accountLink:
         return '\u5173\u8054\u8d26\u6237';
+      case AccountFieldType.longText:
+        return '\u591a\u884c\u6587\u672c';
+      case AccountFieldType.list:
+        return '\u5217\u8868';
     }
   }
 
@@ -506,7 +510,9 @@ class _TemplateEditViewState extends State<TemplateEditView> {
                     width: 56,
                     height: 56,
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.surface.withAlpha(AppAlphas.surface),
+                      color: theme.colorScheme.surface.withAlpha(
+                        AppAlphas.surface,
+                      ),
                       borderRadius: BorderRadius.circular(AppRadii.panel),
                     ),
                     alignment: Alignment.center,
@@ -616,7 +622,11 @@ class _TemplateEditViewState extends State<TemplateEditView> {
                       width: 50,
                       height: 50,
                       decoration: BoxDecoration(
-                        color: AppSurfaces.soft(theme.colorScheme, tint: accent, tintAlpha: 24),
+                        color: AppSurfaces.soft(
+                          theme.colorScheme,
+                          tint: accent,
+                          tintAlpha: 24,
+                        ),
                         borderRadius: BorderRadius.circular(AppRadii.panel),
                       ),
                       child: Icon(
@@ -664,7 +674,9 @@ class _TemplateEditViewState extends State<TemplateEditView> {
                                   color: theme.colorScheme.onSurface.withAlpha(
                                     12,
                                   ),
-                                  borderRadius: BorderRadius.circular(AppRadii.chip),
+                                  borderRadius: BorderRadius.circular(
+                                    AppRadii.chip,
+                                  ),
                                   border: Border.all(
                                     color: theme.colorScheme.onSurface
                                         .withAlpha(AppAlphas.subtle),
@@ -784,7 +796,11 @@ class _TemplateEditViewState extends State<TemplateEditView> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: AppSurfaces.soft(theme.colorScheme, tint: accent, tintAlpha: 10),
+                    color: AppSurfaces.soft(
+                      theme.colorScheme,
+                      tint: accent,
+                      tintAlpha: 10,
+                    ),
                     borderRadius: BorderRadius.circular(AppRadii.panel),
                     border: Border.all(color: accent.withAlpha(34)),
                   ),
@@ -811,7 +827,7 @@ class _TemplateEditViewState extends State<TemplateEditView> {
                                 : null,
                             helperMaxLines: 2,
                             prefixIcon: Icon(
-                              fieldTypeIcon(field.attributes.type)
+                              fieldTypeIcon(field.attributes.type),
                             ),
                             suffixIcon: field.attributes.isSecret
                                 ? const Icon(Icons.visibility_off_outlined)
@@ -948,7 +964,11 @@ class _TemplateEditViewState extends State<TemplateEditView> {
         final isWide = constraints.maxWidth >= 980;
         if (!isWide) {
           return Column(
-            children: [overview, const SizedBox(height: AppSpacing.xxl), details],
+            children: [
+              overview,
+              const SizedBox(height: AppSpacing.xxl),
+              details,
+            ],
           );
         }
 
@@ -978,10 +998,10 @@ class _TemplateEditViewState extends State<TemplateEditView> {
 
     for (final index in selectedIndices) {
       final field = preset.fields[index];
-      final uniqueKey = generateUniqueFieldKey(
-        field.fieldKey,
-        {...existingKeys, ...keysSoFar},
-      );
+      final uniqueKey = generateUniqueFieldKey(field.fieldKey, {
+        ...existingKeys,
+        ...keysSoFar,
+      });
       keysSoFar.add(uniqueKey);
       newFields.add(
         AccountField(
@@ -1014,7 +1034,11 @@ class _TemplateEditViewState extends State<TemplateEditView> {
       children: [
         for (final preset in kFieldPresets)
           ActionChip(
-            avatar: Icon(preset.icon, size: 18, color: theme.colorScheme.primary),
+            avatar: Icon(
+              preset.icon,
+              size: 18,
+              color: theme.colorScheme.primary,
+            ),
             label: Text(preset.name),
             labelStyle: theme.textTheme.labelMedium?.copyWith(
               color: theme.colorScheme.primary,
@@ -1127,7 +1151,9 @@ class _TemplateEditViewState extends State<TemplateEditView> {
                         width: 52,
                         height: 52,
                         decoration: BoxDecoration(
-                          color: theme.colorScheme.surface.withAlpha(AppAlphas.surface),
+                          color: theme.colorScheme.surface.withAlpha(
+                            AppAlphas.surface,
+                          ),
                           borderRadius: BorderRadius.circular(AppRadii.panel),
                         ),
                         alignment: Alignment.center,

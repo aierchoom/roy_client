@@ -63,6 +63,7 @@ extension SyncServiceConflict on SyncService {
         return;
     }
   }
+
   Future<void> _handleTotpCredentialConflict(
     String serverUrl,
     ConflictException conflict,
@@ -105,6 +106,7 @@ extension SyncServiceConflict on SyncService {
         ? 'Remote 2FA changes were merged locally. Sync will retry with the reconciled item.'
         : 'Remote 2FA changes were merged locally.';
   }
+
   Future<void> _handleServerReset() async {
     final vaultId = _identityService.vaultId;
     _localVersion = 0;
@@ -114,6 +116,7 @@ extension SyncServiceConflict on SyncService {
     _queuedConflictNotice =
         'Server vault was reset. All local data will be re-pushed to recover.';
   }
+
   Future<void> _handleRemoteMissingConflict(
     String serverUrl,
     String itemId,
@@ -159,6 +162,7 @@ extension SyncServiceConflict on SyncService {
     _queuedConflictNotice =
         'Remote record missing. Review the conflict inbox before overwriting.';
   }
+
   Future<void> _handleTemplateRemoteMissingConflict(
     String serverUrl,
     String itemId,
@@ -192,6 +196,7 @@ extension SyncServiceConflict on SyncService {
     _queuedConflictNotice =
         'Remote template missing. Review the conflict inbox before overwriting.';
   }
+
   Future<void> _handleStaleBaseConflict(String serverUrl, String itemId) async {
     await _handleVersionConflict(
       serverUrl,
@@ -201,6 +206,7 @@ extension SyncServiceConflict on SyncService {
           'Remote changes were merged locally after a stale-base conflict.',
     );
   }
+
   Future<void> _handleConcurrentEditConflict(
     String serverUrl,
     String itemId,
@@ -213,6 +219,7 @@ extension SyncServiceConflict on SyncService {
           'Concurrent remote edits were merged locally. Review the conflict inbox before overwriting.',
     );
   }
+
   Future<void> _handleConcurrentDeleteConflict(
     String serverUrl,
     String itemId,
@@ -225,6 +232,7 @@ extension SyncServiceConflict on SyncService {
           'Remote delete was accepted for this item. Restore from history only if this was unexpected.',
     );
   }
+
   Future<void> _handleVersionConflict(
     String serverUrl,
     String itemId,

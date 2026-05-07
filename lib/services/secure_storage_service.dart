@@ -13,6 +13,7 @@ import '../models/account_item.dart';
 import '../models/account_template.dart';
 import '../models/hlc.dart';
 import '../models/local_sync_change.dart';
+import '../models/template_conflict_log.dart';
 import '../models/totp_credential.dart';
 import '../sync/crdt_merge_engine.dart';
 import 'database_file_cipher.dart';
@@ -33,7 +34,7 @@ class SecureStorageService {
   static const String _databaseName = 'secret_roy_vault.db';
   static const String _encryptedDatabaseName = 'secret_roy_vault.db.enc';
   static const String _workingDatabaseName = 'secret_roy_vault.runtime.db';
-  static const int _databaseVersion = 7;
+  static const int _databaseVersion = 8;
 
   DatabaseFileCipher? _databaseCipher;
 
@@ -116,7 +117,6 @@ class SecureStorageService {
     try {
       await _prepareWorkingDatabase();
       await _openAndInitialize(_workingDatabasePath!);
-      await _ensureBuiltinTemplates();
       await _setRuntimePragmas();
       await _persistEncryptedDatabase();
       await _deleteLegacyPlaintextDatabase();
@@ -169,16 +169,6 @@ class SecureStorageService {
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
-  }
-
-  Future<void> _ensureBuiltinTemplates() async {
-    if (!isOpen) return;
-    for (final template in basicAccountTemplates) {
-      final existing = await loadTemplateById(template.templateId);
-      if (existing == null) {
-        await saveTemplate(template, isSyncMerge: true);
-      }
-    }
   }
 
   Future<void> close({bool dispose = false}) async {
@@ -604,7 +594,9 @@ class SecureStorageService {
         name TEXT NOT NULL,
         email TEXT,
         template_id TEXT NOT NULL,
+        template_version INTEGER DEFAULT 0,
         data TEXT NOT NULL,
+        field_meta TEXT,
         created_at INTEGER NOT NULL,
         modified_at INTEGER NOT NULL,
         name_hlc TEXT,
@@ -639,11 +631,25 @@ class SecureStorageService {
         is_custom INTEGER DEFAULT 1,
         created_at INTEGER NOT NULL,
         hlc TEXT,
-        field_hlc TEXT,
+        version INTEGER DEFAULT 1,
         server_version INTEGER DEFAULT 0,
         sync_status INTEGER DEFAULT 1,
         is_deleted INTEGER DEFAULT 0,
         delete_hlc TEXT
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE template_conflict_logs (
+        id TEXT PRIMARY KEY,
+        template_id TEXT NOT NULL,
+        field_key TEXT NOT NULL,
+        attribute_name TEXT NOT NULL,
+        local_value TEXT NOT NULL,
+        remote_value TEXT NOT NULL,
+        local_hlc TEXT NOT NULL,
+        remote_hlc TEXT NOT NULL,
+        saved_at INTEGER NOT NULL
       )
     ''');
 
@@ -732,6 +738,29 @@ class SecureStorageService {
 
     if (oldVersion < 7) {
       await db.execute('ALTER TABLE templates ADD COLUMN field_hlc TEXT');
+    }
+
+    if (oldVersion < 8) {
+      await db.execute(
+        'ALTER TABLE templates ADD COLUMN version INTEGER DEFAULT 1',
+      );
+      await db.execute(
+        'ALTER TABLE accounts ADD COLUMN template_version INTEGER DEFAULT 0',
+      );
+      await db.execute('ALTER TABLE accounts ADD COLUMN field_meta TEXT');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS template_conflict_logs (
+          id TEXT PRIMARY KEY,
+          template_id TEXT NOT NULL,
+          field_key TEXT NOT NULL,
+          attribute_name TEXT NOT NULL,
+          local_value TEXT NOT NULL,
+          remote_value TEXT NOT NULL,
+          local_hlc TEXT NOT NULL,
+          remote_hlc TEXT NOT NULL,
+          saved_at INTEGER NOT NULL
+        )
+      ''');
     }
   }
 
@@ -874,7 +903,25 @@ class SecureStorageService {
         where: 'id = ?',
         whereArgs: [account.id],
       );
-      Hlc newStamp = Hlc.now(_deviceId);
+      final newStamp = Hlc.now(_deviceId);
+
+      final template = await loadTemplateById(account.templateId);
+      final Map<String, AccountFieldMeta> newFieldMeta = Map.from(
+        account.fieldMeta,
+      );
+      if (template != null) {
+        for (final field in template.fields) {
+          if (account.data.containsKey(field.fieldKey)) {
+            newFieldMeta[field.fieldKey] = AccountFieldMeta(
+              type: field.attributes.type.name,
+              label: field.label,
+              sourceTemplateId: template.templateId,
+              sourceTemplateVersion: template.version,
+            );
+          }
+        }
+      }
+      final newTemplateVersion = template?.version ?? account.templateVersion;
 
       if (existingRows.isNotEmpty) {
         final old = _mapToAccountItem(existingRows.first);
@@ -882,7 +929,7 @@ class SecureStorageService {
           final nHlc = account.name != old.name ? newStamp : old.nameHlc;
           final eHlc = account.email != old.email ? newStamp : old.emailHlc;
 
-          Map<String, Hlc> dHlc = Map.from(old.dataHlc);
+          final Map<String, Hlc> dHlc = Map.from(old.dataHlc);
           account.data.forEach((k, v) {
             if (old.data[k] != v) {
               dHlc[k] = newStamp;
@@ -893,6 +940,8 @@ class SecureStorageService {
             nameHlc: nHlc,
             emailHlc: eHlc,
             dataHlc: dHlc,
+            fieldMeta: newFieldMeta,
+            templateVersion: newTemplateVersion,
             syncStatus: SyncStatus.pendingPush,
             isDeleted: false,
             serverVersion: old.serverVersion,
@@ -900,7 +949,7 @@ class SecureStorageService {
         }
       } else {
         // Completely new account being saved
-        Map<String, Hlc> dHlc = {};
+        final Map<String, Hlc> dHlc = {};
         account.data.forEach((k, v) {
           dHlc[k] = newStamp;
         });
@@ -908,6 +957,8 @@ class SecureStorageService {
           nameHlc: newStamp,
           emailHlc: newStamp,
           dataHlc: dHlc,
+          fieldMeta: newFieldMeta,
+          templateVersion: newTemplateVersion,
           syncStatus: SyncStatus.pendingPush,
           isDeleted: false,
         );
@@ -919,7 +970,11 @@ class SecureStorageService {
       'name': itemToSave.name,
       'email': itemToSave.email,
       'template_id': itemToSave.templateId,
+      'template_version': itemToSave.templateVersion,
       'data': jsonEncode(itemToSave.data),
+      'field_meta': jsonEncode(
+        itemToSave.fieldMeta.map((k, v) => MapEntry(k, v.toJson())),
+      ),
       'created_at': itemToSave.createdAt,
       'modified_at': DateTime.now().millisecondsSinceEpoch,
       'name_hlc': itemToSave.nameHlc.toString(),
@@ -1233,6 +1288,37 @@ class SecureStorageService {
     await _persistAfterMutation();
   }
 
+  Future<void> saveTemplateConflictLogs(List<TemplateConflictLog> logs) async {
+    if (!isOpen || logs.isEmpty) return;
+    final batch = _database!.batch();
+    for (final log in logs) {
+      batch.insert(
+        'template_conflict_logs',
+        log.toJson(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+    await batch.commit(noResult: true);
+    await _persistAfterMutation();
+  }
+
+  Future<List<TemplateConflictLog>> getTemplateConflictLogs(
+    String templateId,
+  ) async {
+    if (!isOpen) return [];
+    try {
+      final rows = await _query(
+        'template_conflict_logs',
+        where: 'template_id = ?',
+        whereArgs: [templateId],
+        orderBy: 'saved_at DESC',
+      );
+      return rows.map((r) => TemplateConflictLog.fromJson(r)).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
   AccountItem? _mapToAccountItem(Map<String, dynamic> row) {
     try {
       final dataStr = row['data'] as String;
@@ -1249,6 +1335,20 @@ class SecureStorageService {
         }
       }
 
+      Map<String, AccountFieldMeta> fieldMeta = {};
+      if (row['field_meta'] != null &&
+          row['field_meta'].toString().isNotEmpty) {
+        final parsedMeta = jsonDecode(row['field_meta'] as String);
+        if (parsedMeta is Map) {
+          fieldMeta = parsedMeta.map(
+            (k, v) => MapEntry(
+              k as String,
+              AccountFieldMeta.fromJson(Map<String, dynamic>.from(v as Map)),
+            ),
+          );
+        }
+      }
+
       final dummyHlc = Hlc.zero('local');
 
       return AccountItem(
@@ -1256,7 +1356,9 @@ class SecureStorageService {
         name: row['name'] as String,
         email: row['email'] as String? ?? '',
         templateId: row['template_id'] as String,
+        templateVersion: row['template_version'] as int? ?? 0,
         data: mapData,
+        fieldMeta: fieldMeta,
         createdAt: row['created_at'] as int,
         nameHlc: row['name_hlc'] != null
             ? Hlc.parse(row['name_hlc'])
@@ -1389,12 +1491,16 @@ class SecureStorageService {
     }
   }
 
-  Future<AccountTemplate?> loadTemplateById(String id) async {
+  Future<AccountTemplate?> loadTemplateById(
+    String id, {
+    bool includeDeleted = false,
+  }) async {
     if (!isOpen) return null;
     try {
+      final where = includeDeleted ? 'id = ?' : 'id = ? AND is_deleted = 0';
       final rows = await _query(
         'templates',
-        where: 'id = ?',
+        where: where,
         whereArgs: [id],
         limit: 1,
       );
@@ -1415,35 +1521,43 @@ class SecureStorageService {
     if (!isOpen) return;
 
     AccountTemplate itemToSave;
+    List<TemplateConflictLog> conflictLogs = [];
+
     if (isSyncMerge) {
-      final existing = await loadTemplateById(template.templateId);
+      final existing = await loadTemplateById(
+        template.templateId,
+        includeDeleted: true,
+      );
       if (existing != null) {
-        itemToSave = CrdtMergeEngine.mergeTemplate(existing, template);
+        final mergeResult = CrdtMergeEngine.mergeTemplate(existing, template);
+        itemToSave = mergeResult.template;
+        conflictLogs = mergeResult.conflictLogs;
       } else {
         itemToSave = template;
       }
     } else {
-      Hlc newStamp = Hlc.now(_deviceId);
+      final newStamp = Hlc.now(_deviceId);
       final existing = await loadTemplateById(template.templateId);
       if (existing != null) {
-        final newFieldHlc = _computeTemplateFieldHlc(
-          existing,
-          template,
-          newStamp,
-        );
-        itemToSave = template.copyWith(
-          hlc: newStamp,
-          fieldHlc: newFieldHlc,
-          syncStatus: SyncStatus.pendingPush,
-          serverVersion: existing.serverVersion,
-        );
+        if (existing.hlc != null &&
+            template.hlc != null &&
+            existing.hlc!.compareTo(template.hlc!) > 0) {
+          throw TemplateStaleException();
+        }
+        itemToSave = _stampTemplateChanges(existing, template, newStamp);
       } else {
-        final newFieldHlc = {
-          for (final field in template.fields) field.fieldKey: newStamp,
-        };
         itemToSave = template.copyWith(
           hlc: newStamp,
-          fieldHlc: newFieldHlc,
+          fields: template.fields
+              .map(
+                (f) => f.copyWith(
+                  labelHlc: newStamp,
+                  descriptionHlc: newStamp,
+                  attributesHlc: newStamp,
+                  orderHlc: newStamp,
+                ),
+              )
+              .toList(),
           syncStatus: SyncStatus.pendingPush,
         );
       }
@@ -1459,14 +1573,16 @@ class SecureStorageService {
       'is_custom': itemToSave.isCustom ? 1 : 0,
       'created_at': DateTime.now().millisecondsSinceEpoch,
       'hlc': itemToSave.hlc?.toString(),
-      'field_hlc': jsonEncode(
-        itemToSave.fieldHlc.map((k, v) => MapEntry(k, v.toString())),
-      ),
+      'version': itemToSave.version,
       'server_version': itemToSave.serverVersion,
       'sync_status': itemToSave.syncStatus.index,
       'is_deleted': itemToSave.isDeleted ? 1 : 0,
       'delete_hlc': itemToSave.deleteHlc?.toString(),
     }, conflictAlgorithm: ConflictAlgorithm.replace);
+
+    if (conflictLogs.isNotEmpty) {
+      await saveTemplateConflictLogs(conflictLogs);
+    }
 
     await _persistAfterMutation();
     _notifyChange(
@@ -1478,25 +1594,50 @@ class SecureStorageService {
     );
   }
 
-  Map<String, Hlc> _computeTemplateFieldHlc(
+  AccountTemplate _stampTemplateChanges(
     AccountTemplate existing,
     AccountTemplate updated,
     Hlc stamp,
   ) {
-    final result = <String, Hlc>{};
+    final newFields = <AccountField>[];
     for (final field in updated.fields) {
-      final existingField = existing.fields.cast<AccountField?>().firstWhere(
+      final oldField = existing.fields.cast<AccountField?>().firstWhere(
         (f) => f?.fieldKey == field.fieldKey,
         orElse: () => null,
       );
-      if (existingField != null &&
-          jsonEncode(existingField.toJson()) == jsonEncode(field.toJson())) {
-        result[field.fieldKey] = existing.fieldHlc[field.fieldKey] ?? stamp;
+      if (oldField == null) {
+        newFields.add(
+          field.copyWith(
+            labelHlc: stamp,
+            descriptionHlc: stamp,
+            attributesHlc: stamp,
+            orderHlc: stamp,
+          ),
+        );
       } else {
-        result[field.fieldKey] = stamp;
+        newFields.add(
+          field.copyWith(
+            labelHlc: field.label != oldField.label ? stamp : oldField.labelHlc,
+            descriptionHlc: field.description != oldField.description
+                ? stamp
+                : oldField.descriptionHlc,
+            attributesHlc:
+                jsonEncode(field.attributes.toJson()) !=
+                    jsonEncode(oldField.attributes.toJson())
+                ? stamp
+                : oldField.attributesHlc,
+            orderHlc: field.order != oldField.order ? stamp : oldField.orderHlc,
+          ),
+        );
       }
     }
-    return result;
+    return updated.copyWith(
+      version: existing.version + 1,
+      hlc: stamp,
+      fields: newFields,
+      syncStatus: SyncStatus.pendingPush,
+      serverVersion: existing.serverVersion,
+    );
   }
 
   Future<void> deleteTemplate(
@@ -1545,6 +1686,7 @@ class SecureStorageService {
       final iconCodePoint = row['icon_code_point'] as int?;
       return AccountTemplate(
         templateId: row['id'] as String,
+        version: row['version'] as int? ?? 1,
         title: row['title'] as String,
         subTitle: row['subtitle'] as String? ?? '',
         iconCodePoint: iconCodePoint,
@@ -1556,7 +1698,6 @@ class SecureStorageService {
             .toList(),
         isCustom: isCustom,
         hlc: row['hlc'] != null ? Hlc.parse(row['hlc'] as String) : null,
-        fieldHlc: AccountTemplate.parseFieldHlc(row['field_hlc']),
         serverVersion: row['server_version'] as int? ?? 0,
         syncStatus: syncStatusFromJson(
           row['sync_status'],
@@ -2272,4 +2413,12 @@ class TemplateInUseException implements Exception {
   @override
   String toString() =>
       'TemplateInUseException(templateId: $templateId, usageCount: $usageCount)';
+}
+
+class TemplateStaleException implements Exception {
+  const TemplateStaleException();
+
+  @override
+  String toString() =>
+      'TemplateStaleException: Template has been updated by sync. Please reload and retry.';
 }

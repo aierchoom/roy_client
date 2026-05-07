@@ -19,8 +19,11 @@ class AccountListView extends StatefulWidget {
   State<AccountListView> createState() => _AccountListViewState();
 }
 
+enum _VaultCategoryFilter { all, accounts, secureNotes }
+
 class _AccountListViewState extends State<AccountListView> {
   String? _activeTemplateId;
+  _VaultCategoryFilter _categoryFilter = _VaultCategoryFilter.all;
 
   String _text(BuildContext context, String zh, String en) {
     return Localizations.localeOf(context).languageCode == 'zh' ? zh : en;
@@ -196,8 +199,32 @@ class _AccountListViewState extends State<AccountListView> {
     }).length;
   }
 
+  List<AccountItem> _categoryFilteredAccounts(EnhancedAppProvider provider) {
+    final base = _filteredAccounts(provider.allAccounts);
+    switch (_categoryFilter) {
+      case _VaultCategoryFilter.accounts:
+        return base
+            .where(
+              (a) =>
+                  provider.getTemplate(a.templateId)?.category !=
+                  TemplateCategory.note,
+            )
+            .toList();
+      case _VaultCategoryFilter.secureNotes:
+        return base
+            .where(
+              (a) =>
+                  provider.getTemplate(a.templateId)?.category ==
+                  TemplateCategory.note,
+            )
+            .toList();
+      case _VaultCategoryFilter.all:
+        return base;
+    }
+  }
+
   List<_AccountGroup> _buildGroups(EnhancedAppProvider provider) {
-    final filtered = _filteredAccounts(provider.allAccounts);
+    final filtered = _categoryFilteredAccounts(provider);
     final templates = provider.allTemplates;
     final groups = <_AccountGroup>[];
 
@@ -221,29 +248,52 @@ class _AccountListViewState extends State<AccountListView> {
 
   Widget _buildHeroCard(BuildContext context, EnhancedAppProvider provider) {
     final theme = Theme.of(context);
-    final totalAccounts = provider.allAccounts.length;
-    final usedTemplates = provider.allAccounts
-        .map((item) => item.templateId)
-        .toSet()
-        .length;
-    final customAccounts = provider.allAccounts
-        .where(
-          (item) => provider.getTemplate(item.templateId)?.isCustom ?? false,
-        )
-        .length;
+    final items = _categoryFilteredAccounts(provider);
+    final totalItems = items.length;
+    final usedTemplates = items.map((item) => item.templateId).toSet().length;
+    final secretItems = items.where((item) {
+      final template = provider.getTemplate(item.templateId);
+      return template?.fields.any((f) => f.attributes.isSecret) ?? false;
+    }).length;
+
+    String title;
+    String subtitle;
+    String countLabel;
+    switch (_categoryFilter) {
+      case _VaultCategoryFilter.accounts:
+        title = _text(context, '\u8d26\u53f7\u4e2d\u5fc3', 'Account Hub');
+        subtitle = _text(
+          context,
+          '\u4f60\u7684\u767b\u5f55\u51ed\u8bc1\u548c\u7f51\u7ad9\u8d26\u53f7',
+          'Your login credentials',
+        );
+        countLabel = _text(context, '\u4e2a\u8d26\u53f7', 'Accounts');
+      case _VaultCategoryFilter.secureNotes:
+        title = _text(context, '\u5b89\u5168\u7b14\u8bb0', 'Secure Notes');
+        subtitle = _text(
+          context,
+          '\u52a0\u5bc6\u5b58\u50a8\u7684\u654f\u611f\u6587\u672c\u548c\u5bc6\u94a5',
+          'Encrypted sensitive text and keys',
+        );
+        countLabel = _text(context, '\u4e2a\u7b14\u8bb0', 'Notes');
+      case _VaultCategoryFilter.all:
+        title = _text(context, '\u4fdd\u9669\u5e93', 'Vault');
+        subtitle = _text(
+          context,
+          '\u4f60\u7684\u52a0\u5bc6\u4fe1\u606f\u5e93',
+          'Your encrypted vault',
+        );
+        countLabel = _text(context, '\u4e2a\u6761\u76ee', 'Items');
+    }
 
     return AppPageHeader(
       icon: Icons.shield_outlined,
-      title: _text(context, '\u8d26\u6237\u4e2d\u5fc3', 'Account Hub'),
-      subtitle: _text(
-        context,
-        '\u4f60\u7684\u52a0\u5bc6\u4fe1\u606f\u5e93',
-        'Your encrypted vault',
-      ),
+      title: title,
+      subtitle: subtitle,
       metrics: [
         _StatChip(
-          value: '$totalAccounts',
-          label: _text(context, '\u4e2a\u8d26\u6237', 'Accounts'),
+          value: '$totalItems',
+          label: countLabel,
           onColor: theme.colorScheme.primary,
         ),
         _StatChip(
@@ -252,8 +302,8 @@ class _AccountListViewState extends State<AccountListView> {
           onColor: theme.colorScheme.primary,
         ),
         _StatChip(
-          value: '$customAccounts',
-          label: _text(context, '\u4e2a\u81ea\u5b9a\u4e49', 'Custom'),
+          value: '$secretItems',
+          label: _text(context, '\u4e2a\u4fdd\u5bc6', 'Secrets'),
           onColor: theme.colorScheme.primary,
         ),
       ],
@@ -262,6 +312,35 @@ class _AccountListViewState extends State<AccountListView> {
 
   Widget _buildEmptyState(BuildContext context) {
     final theme = Theme.of(context);
+    String title;
+    String message;
+    switch (_categoryFilter) {
+      case _VaultCategoryFilter.secureNotes:
+        title = _text(
+          context,
+          '\u6682\u65e0\u5b89\u5168\u7b14\u8bb0',
+          'No Secure Notes',
+        );
+        message = _text(
+          context,
+          '\u5c1a\u672a\u521b\u5efa\u4efb\u4f55\u5b89\u5168\u7b14\u8bb0\uff0c\u70b9\u51fb\u53f3\u4e0b\u89d2\u6309\u94ae\u65b0\u5efa\u3002',
+          'No secure notes yet. Tap the button to create one.',
+        );
+      case _VaultCategoryFilter.accounts:
+        title = _text(context, '\u6682\u65e0\u8d26\u53f7', 'No Accounts');
+        message = _text(
+          context,
+          '\u5f53\u524d\u6a21\u677f\u7b5b\u9009\u4e0b\u6ca1\u6709\u53ef\u663e\u793a\u7684\u8d26\u53f7\uff0c\u53ef\u4ee5\u5207\u6362\u6a21\u677f\u6216\u65b0\u5efa\u8d26\u53f7\u3002',
+          'No accounts are available under the current template filter.',
+        );
+      case _VaultCategoryFilter.all:
+        title = _text(context, '\u6682\u65e0\u6761\u76ee', 'No Items');
+        message = _text(
+          context,
+          '\u4fdd\u9669\u5e93\u4e2d\u8fd8\u6ca1\u6709\u4efb\u4f55\u5185\u5bb9\uff0c\u70b9\u51fb\u53f3\u4e0b\u89d2\u6309\u94ae\u5f00\u59cb\u6dfb\u52a0\u3002',
+          'Your vault is empty. Tap the button to add items.',
+        );
+    }
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(2, 12, 2, 4),
@@ -275,18 +354,14 @@ class _AccountListViewState extends State<AccountListView> {
           ),
           const SizedBox(height: AppSpacing.lg),
           Text(
-            _text(context, '\u6682\u65e0\u8d26\u6237', 'No Accounts'),
+            title,
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w700,
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            _text(
-              context,
-              '\u5f53\u524d\u6a21\u677f\u7b5b\u9009\u4e0b\u6ca1\u6709\u53ef\u663e\u793a\u7684\u8d26\u6237\uff0c\u53ef\u4ee5\u5207\u6362\u6a21\u677f\u6216\u65b0\u5efa\u8d26\u6237\u3002',
-              'No accounts are available under the current template filter.',
-            ),
+            message,
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -294,6 +369,88 @@ class _AccountListViewState extends State<AccountListView> {
         ],
       ),
     );
+  }
+
+  Widget _buildCategoryFilterBar(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: SegmentedButton<_VaultCategoryFilter>(
+        segments: [
+          ButtonSegment(
+            value: _VaultCategoryFilter.all,
+            label: Text(_text(context, '全部', 'All')),
+            icon: const Icon(Icons.dashboard_outlined),
+          ),
+          ButtonSegment(
+            value: _VaultCategoryFilter.accounts,
+            label: Text(_text(context, '账号', 'Accounts')),
+            icon: const Icon(Icons.lock_outline),
+          ),
+          ButtonSegment(
+            value: _VaultCategoryFilter.secureNotes,
+            label: Text(_text(context, '安全笔记', 'Notes')),
+            icon: const Icon(Icons.note_outlined),
+          ),
+        ],
+        selected: <_VaultCategoryFilter>{_categoryFilter},
+        onSelectionChanged: (newSelection) {
+          setState(() {
+            _categoryFilter = newSelection.first;
+          });
+        },
+        style: ButtonStyle(
+          backgroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return theme.colorScheme.primaryContainer;
+            }
+            return theme.colorScheme.surface;
+          }),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showAddMenu(BuildContext context) async {
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.lock_outline),
+              title: Text(_text(context, '新建账号', 'New Account')),
+              subtitle: Text(
+                _text(
+                  context,
+                  '存储网站、App 或服务登录信息',
+                  'Store website, app or service credentials',
+                ),
+              ),
+              onTap: () => Navigator.pop(ctx, 'account'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.note_outlined),
+              title: Text(_text(context, '新建安全笔记', 'New Secure Note')),
+              subtitle: Text(
+                _text(
+                  context,
+                  '存储 API Key、助记词、私钥等敏感文本',
+                  'Store API keys, mnemonics, private keys',
+                ),
+              ),
+              onTap: () => Navigator.pop(ctx, 'note'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (choice == null || !context.mounted) return;
+    if (choice == 'note') {
+      setState(() => _categoryFilter = _VaultCategoryFilter.secureNotes);
+    }
+    await _openEditor(context);
   }
 
   Widget _buildModernTemplateDropdown(
@@ -319,7 +476,9 @@ class _AccountListViewState extends State<AccountListView> {
           EdgeInsets.symmetric(vertical: 8),
         ),
         shape: WidgetStatePropertyAll(
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.xl)),
+          RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadii.xl),
+          ),
         ),
       ),
       builder: (context, controller, child) {
@@ -330,7 +489,9 @@ class _AccountListViewState extends State<AccountListView> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: theme.colorScheme.primaryContainer.withAlpha(AppAlphas.high),
+              color: theme.colorScheme.primaryContainer.withAlpha(
+                AppAlphas.high,
+              ),
               borderRadius: BorderRadius.circular(AppRadii.card),
               border: Border.all(
                 color: theme.colorScheme.primary.withAlpha(AppAlphas.low),
@@ -496,9 +657,7 @@ class _AccountListViewState extends State<AccountListView> {
             children: group.accounts.asMap().entries.map((entry) {
               final index = entry.key;
               final account = entry.value;
-              final accountTemplate = provider.getTemplate(
-                account.templateId,
-              );
+              final accountTemplate = provider.getTemplate(account.templateId);
               final legacyFieldCount = _legacyFieldCount(
                 account,
                 accountTemplate,
@@ -608,6 +767,11 @@ class _AccountListViewState extends State<AccountListView> {
                           const SizedBox(height: AppSpacing.xl),
                           AdaptiveSection(
                             maxWidth: AppSectionWidths.panel,
+                            child: _buildCategoryFilterBar(context),
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          AdaptiveSection(
+                            maxWidth: AppSectionWidths.panel,
                             child: _buildSyncPrompt(context, provider),
                           ),
                           const SizedBox(height: AppSpacing.md),
@@ -712,8 +876,8 @@ class _AccountListViewState extends State<AccountListView> {
                   minimum: EdgeInsets.zero,
                   child: GreenAddButton(
                     heroTag: 'add-account-fab',
-                    onPressed: () => _openEditor(context),
-                    tooltip: _text(context, '新建账户', 'Add Account'),
+                    onPressed: () => _showAddMenu(context),
+                    tooltip: _text(context, '新建', 'Add'),
                   ),
                 ),
               ),
@@ -789,7 +953,9 @@ class _GroupCountChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withAlpha(AppAlphas.outline),
+        color: theme.colorScheme.surfaceContainerHighest.withAlpha(
+          AppAlphas.outline,
+        ),
         borderRadius: BorderRadius.circular(AppRadii.pill),
       ),
       child: Text(

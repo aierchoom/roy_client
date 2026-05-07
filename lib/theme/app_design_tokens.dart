@@ -92,6 +92,7 @@ abstract final class AppAlphas {
   static const int strong = 90;
   static const int divider = 100;
   static const int outline = 120;
+  static const int emphasis = 180;
   static const int surfaceOverlay = 210;
   static const int surface = 232;
 }

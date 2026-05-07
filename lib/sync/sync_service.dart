@@ -491,7 +491,6 @@ class SyncService extends ChangeNotifier {
     throw SyncProtocolException('$label must be a non-negative integer.');
   }
 
-
   Future<void> _loadRecoveryMarker(String vaultId) async {
     final raw = await _readVaultScopedSetting(
       vaultId: vaultId,
@@ -557,15 +556,6 @@ class SyncService extends ChangeNotifier {
     await _clearRecoveryMarker();
     return recoveredCount;
   }
-
-
-
-
-
-
-
-
-
 
   Future<String> _getSyncServerUrl() async {
     final prefs = await SharedPreferences.getInstance();
@@ -720,4 +710,3 @@ class SyncService extends ChangeNotifier {
     super.dispose();
   }
 }
-

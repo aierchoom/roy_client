@@ -4,6 +4,7 @@ import 'dart:math';
 import '../models/account_item.dart';
 import '../models/account_template.dart';
 import '../models/hlc.dart';
+import '../models/template_conflict_log.dart';
 import 'package:uuid/uuid.dart';
 
 class ConflictLog {
@@ -52,6 +53,13 @@ class MergeResult {
   MergeResult(this.mergedItem, this.conflictLogs);
 }
 
+class TemplateMergeResult {
+  final AccountTemplate template;
+  final List<TemplateConflictLog> conflictLogs;
+
+  TemplateMergeResult(this.template, this.conflictLogs);
+}
+
 class CrdtMergeEngine {
   /// 单行记录冲突裁决合并入口
   static MergeResult merge(AccountItem local, AccountItem remote) {
@@ -65,7 +73,10 @@ class CrdtMergeEngine {
     final localDel = local.deleteHlc;
     final remoteDel = remote.deleteHlc;
 
-    final int unifiedServerVersion = max(local.serverVersion, remote.serverVersion);
+    final int unifiedServerVersion = max(
+      local.serverVersion,
+      remote.serverVersion,
+    );
 
     if (localDel != null && remoteDel != null) {
       // 双方都删除了
@@ -276,7 +287,7 @@ class CrdtMergeEngine {
     return max;
   }
 
-  static AccountTemplate mergeTemplate(
+  static TemplateMergeResult mergeTemplate(
     AccountTemplate local,
     AccountTemplate remote,
   ) {
@@ -285,40 +296,67 @@ class CrdtMergeEngine {
     }
 
     if (_sameTemplatePayload(local, remote)) {
-      return remote.copyWith(
-        serverVersion: local.serverVersion > remote.serverVersion
-            ? local.serverVersion
-            : remote.serverVersion,
+      return TemplateMergeResult(
+        remote.copyWith(
+          serverVersion: local.serverVersion > remote.serverVersion
+              ? local.serverVersion
+              : remote.serverVersion,
+        ),
+        [],
       );
     }
 
     final localDel = local.deleteHlc;
     final remoteDel = remote.deleteHlc;
+    final int unifiedServerVersion = max(
+      local.serverVersion,
+      remote.serverVersion,
+    );
 
     if (localDel != null && remoteDel != null) {
       if (remoteDel.compareTo(localDel) > 0) {
-        return remote.copyWith(syncStatus: SyncStatus.synchronized);
+        return TemplateMergeResult(
+          remote.copyWith(
+            syncStatus: SyncStatus.synchronized,
+            serverVersion: unifiedServerVersion,
+          ),
+          [],
+        );
       }
-      return local.copyWith(
-        serverVersion: max(local.serverVersion, remote.serverVersion),
-        syncStatus: SyncStatus.synchronized,
+      return TemplateMergeResult(
+        local.copyWith(
+          serverVersion: unifiedServerVersion,
+          syncStatus: SyncStatus.synchronized,
+        ),
+        [],
       );
     } else if (remoteDel != null) {
       if (remoteDel.compareTo(local.hlc ?? Hlc.zero('local')) > 0) {
-        return remote.copyWith(syncStatus: SyncStatus.synchronized);
+        return TemplateMergeResult(
+          remote.copyWith(
+            syncStatus: SyncStatus.synchronized,
+            serverVersion: unifiedServerVersion,
+          ),
+          [],
+        );
       }
-      return local.copyWith(
-        serverVersion: max(local.serverVersion, remote.serverVersion),
+      return TemplateMergeResult(
+        local.copyWith(serverVersion: unifiedServerVersion),
+        [],
       );
     } else if (localDel != null) {
       if (localDel.compareTo(remote.hlc ?? Hlc.zero('remote')) > 0) {
-        return local.copyWith(
-          serverVersion: max(local.serverVersion, remote.serverVersion),
-          syncStatus: SyncStatus.synchronized,
+        return TemplateMergeResult(
+          local.copyWith(
+            serverVersion: unifiedServerVersion,
+            syncStatus: SyncStatus.synchronized,
+          ),
+          [],
         );
       }
-      return remote.copyWith(
-        serverVersion: max(local.serverVersion, remote.serverVersion),
+      return TemplateMergeResult(
+        remote.copyWith(serverVersion: unifiedServerVersion),
+        [],
       );
     }
 
@@ -327,58 +365,242 @@ class CrdtMergeEngine {
     final bool remoteWinsTopLevel = remoteHlc.compareTo(localHlc) > 0;
 
     final String mergedTitle = remoteWinsTopLevel ? remote.title : local.title;
-    final String mergedSubTitle =
-        remoteWinsTopLevel ? remote.subTitle : local.subTitle;
-    final int? mergedIconCodePoint = remoteWinsTopLevel ? remote.iconCodePoint : local.iconCodePoint;
-    final TemplateCategory mergedCategory =
-        remoteWinsTopLevel ? remote.category : local.category;
-    final List<AccountField> winnerFields =
-        remoteWinsTopLevel ? remote.fields : local.fields;
-    final List<AccountField> loserFields =
-        remoteWinsTopLevel ? local.fields : remote.fields;
+    final String mergedSubTitle = remoteWinsTopLevel
+        ? remote.subTitle
+        : local.subTitle;
+    final int? mergedIconCodePoint = remoteWinsTopLevel
+        ? remote.iconCodePoint
+        : local.iconCodePoint;
+    final TemplateCategory mergedCategory = remoteWinsTopLevel
+        ? remote.category
+        : local.category;
     final Hlc mergedHlc = remoteWinsTopLevel ? remoteHlc : localHlc;
 
-    final winnerKeys = winnerFields.map((f) => f.fieldKey).toSet();
-    final allFields = [
-      ...winnerFields,
-      ...loserFields.where((f) => !winnerKeys.contains(f.fieldKey)),
-    ];
+    final localFields = local.fields;
+    final remoteFields = remote.fields;
+    final allFieldKeys = {
+      ...localFields.map((f) => f.fieldKey),
+      ...remoteFields.map((f) => f.fieldKey),
+    };
 
     final List<AccountField> resolvedFields = [];
-    final Map<String, Hlc> mergedFieldHlc = {};
+    final List<TemplateConflictLog> logs = [];
 
-    for (final field in allFields) {
-      final key = field.fieldKey;
-      final localFieldHlc = local.fieldHlc[key] ?? Hlc.zero('local');
-      final remoteFieldHlc = remote.fieldHlc[key] ?? Hlc.zero('remote');
+    for (final key in allFieldKeys) {
+      final localField = localFields.cast<AccountField?>().firstWhere(
+        (f) => f?.fieldKey == key,
+        orElse: () => null,
+      );
+      final remoteField = remoteFields.cast<AccountField?>().firstWhere(
+        (f) => f?.fieldKey == key,
+        orElse: () => null,
+      );
 
-      final AccountField resolvedField;
-      final Hlc resolvedHlc;
-      if (remoteFieldHlc.compareTo(localFieldHlc) > 0) {
-        resolvedField = remote.fields.cast<AccountField?>().firstWhere(
-                  (f) => f?.fieldKey == key,
-                  orElse: () => null,
-                ) ??
-            field;
-        resolvedHlc = remoteFieldHlc;
+      // Label
+      final lLabel = localField?.label ?? '';
+      final rLabel = remoteField?.label ?? '';
+      final lLabelHlc = localField?.labelHlc ?? Hlc.zero('local');
+      final rLabelHlc = remoteField?.labelHlc ?? Hlc.zero('remote');
+      final String mergedLabel;
+      final Hlc mergedLabelHlc;
+      if (rLabelHlc.compareTo(lLabelHlc) > 0) {
+        mergedLabel = rLabel;
+        mergedLabelHlc = rLabelHlc;
+        if (localField != null && lLabel != rLabel) {
+          logs.add(
+            TemplateConflictLog(
+              templateId: local.templateId,
+              fieldKey: key,
+              attributeName: 'label',
+              localValue: lLabel,
+              remoteValue: rLabel,
+              localHlc: lLabelHlc,
+              remoteHlc: rLabelHlc,
+            ),
+          );
+        }
       } else {
-        resolvedField = local.fields.cast<AccountField?>().firstWhere(
-                  (f) => f?.fieldKey == key,
-                  orElse: () => null,
-                ) ??
-            field;
-        resolvedHlc = localFieldHlc;
+        mergedLabel = lLabel;
+        mergedLabelHlc = lLabelHlc;
+        if (remoteField != null && rLabel != lLabel && rLabelHlc.time > 0) {
+          logs.add(
+            TemplateConflictLog(
+              templateId: remote.templateId,
+              fieldKey: key,
+              attributeName: 'label',
+              localValue: lLabel,
+              remoteValue: rLabel,
+              localHlc: lLabelHlc,
+              remoteHlc: rLabelHlc,
+            ),
+          );
+        }
       }
 
-      resolvedFields.add(resolvedField);
-      mergedFieldHlc[key] = resolvedHlc;
+      // Description
+      final lDesc = localField?.description;
+      final rDesc = remoteField?.description;
+      final lDescStr = lDesc ?? '';
+      final rDescStr = rDesc ?? '';
+      final lDescHlc = localField?.descriptionHlc ?? Hlc.zero('local');
+      final rDescHlc = remoteField?.descriptionHlc ?? Hlc.zero('remote');
+      final String? mergedDescription;
+      final Hlc mergedDescriptionHlc;
+      if (rDescHlc.compareTo(lDescHlc) > 0) {
+        mergedDescription = rDesc;
+        mergedDescriptionHlc = rDescHlc;
+        if (localField != null && lDescStr != rDescStr) {
+          logs.add(
+            TemplateConflictLog(
+              templateId: local.templateId,
+              fieldKey: key,
+              attributeName: 'description',
+              localValue: lDescStr,
+              remoteValue: rDescStr,
+              localHlc: lDescHlc,
+              remoteHlc: rDescHlc,
+            ),
+          );
+        }
+      } else {
+        mergedDescription = lDesc;
+        mergedDescriptionHlc = lDescHlc;
+        if (remoteField != null && rDescStr != lDescStr && rDescHlc.time > 0) {
+          logs.add(
+            TemplateConflictLog(
+              templateId: remote.templateId,
+              fieldKey: key,
+              attributeName: 'description',
+              localValue: lDescStr,
+              remoteValue: rDescStr,
+              localHlc: lDescHlc,
+              remoteHlc: rDescHlc,
+            ),
+          );
+        }
+      }
+
+      // Attributes
+      final lAttr = localField?.attributes;
+      final rAttr = remoteField?.attributes;
+      final lAttrHlc = localField?.attributesHlc ?? Hlc.zero('local');
+      final rAttrHlc = remoteField?.attributesHlc ?? Hlc.zero('remote');
+      final AccountFieldAttributes mergedAttributes;
+      final Hlc mergedAttributesHlc;
+      if (rAttrHlc.compareTo(lAttrHlc) > 0) {
+        mergedAttributes =
+            rAttr ?? const AccountFieldAttributes(type: AccountFieldType.text);
+        mergedAttributesHlc = rAttrHlc;
+        if (localField != null &&
+            lAttr != null &&
+            jsonEncode(lAttr.toJson()) != jsonEncode(rAttr?.toJson())) {
+          logs.add(
+            TemplateConflictLog(
+              templateId: local.templateId,
+              fieldKey: key,
+              attributeName: 'attributes',
+              localValue: jsonEncode(lAttr.toJson()),
+              remoteValue: jsonEncode(rAttr?.toJson()),
+              localHlc: lAttrHlc,
+              remoteHlc: rAttrHlc,
+            ),
+          );
+        }
+      } else {
+        mergedAttributes =
+            lAttr ?? const AccountFieldAttributes(type: AccountFieldType.text);
+        mergedAttributesHlc = lAttrHlc;
+        if (remoteField != null &&
+            rAttr != null &&
+            jsonEncode(rAttr.toJson()) != jsonEncode(lAttr?.toJson()) &&
+            rAttrHlc.time > 0) {
+          logs.add(
+            TemplateConflictLog(
+              templateId: remote.templateId,
+              fieldKey: key,
+              attributeName: 'attributes',
+              localValue: jsonEncode(lAttr?.toJson()),
+              remoteValue: jsonEncode(rAttr.toJson()),
+              localHlc: lAttrHlc,
+              remoteHlc: rAttrHlc,
+            ),
+          );
+        }
+      }
+
+      // Order
+      final lOrder = localField?.order ?? 0;
+      final rOrder = remoteField?.order ?? 0;
+      final lOrderHlc = localField?.orderHlc ?? Hlc.zero('local');
+      final rOrderHlc = remoteField?.orderHlc ?? Hlc.zero('remote');
+      final int mergedOrder;
+      final Hlc mergedOrderHlc;
+      if (rOrderHlc.compareTo(lOrderHlc) > 0) {
+        mergedOrder = rOrder;
+        mergedOrderHlc = rOrderHlc;
+        if (localField != null && lOrder != rOrder) {
+          logs.add(
+            TemplateConflictLog(
+              templateId: local.templateId,
+              fieldKey: key,
+              attributeName: 'order',
+              localValue: lOrder.toString(),
+              remoteValue: rOrder.toString(),
+              localHlc: lOrderHlc,
+              remoteHlc: rOrderHlc,
+            ),
+          );
+        }
+      } else {
+        mergedOrder = lOrder;
+        mergedOrderHlc = lOrderHlc;
+        if (remoteField != null && rOrder != lOrder && rOrderHlc.time > 0) {
+          logs.add(
+            TemplateConflictLog(
+              templateId: remote.templateId,
+              fieldKey: key,
+              attributeName: 'order',
+              localValue: lOrder.toString(),
+              remoteValue: rOrder.toString(),
+              localHlc: lOrderHlc,
+              remoteHlc: rOrderHlc,
+            ),
+          );
+        }
+      }
+
+      resolvedFields.add(
+        AccountField(
+          fieldKey: key,
+          label: mergedLabel,
+          description: mergedDescription,
+          attributes: mergedAttributes,
+          order: mergedOrder,
+          labelHlc: mergedLabelHlc,
+          descriptionHlc: mergedDescriptionHlc,
+          attributesHlc: mergedAttributesHlc,
+          orderHlc: mergedOrderHlc,
+        ),
+      );
     }
+
+    resolvedFields.sort((a, b) => a.order.compareTo(b.order));
 
     bool isPureFastForward = remoteWinsTopLevel;
     if (isPureFastForward) {
-      for (final key in mergedFieldHlc.keys) {
-        final remoteFH = remote.fieldHlc[key] ?? Hlc.zero('remote');
-        if (mergedFieldHlc[key]!.compareTo(remoteFH) != 0) {
+      for (final field in resolvedFields) {
+        final remoteField = remoteFields.cast<AccountField?>().firstWhere(
+          (f) => f?.fieldKey == field.fieldKey,
+          orElse: () => null,
+        );
+        if (remoteField == null) {
+          isPureFastForward = false;
+          break;
+        }
+        if (field.labelHlc.compareTo(remoteField.labelHlc) != 0 ||
+            field.descriptionHlc.compareTo(remoteField.descriptionHlc) != 0 ||
+            field.attributesHlc.compareTo(remoteField.attributesHlc) != 0 ||
+            field.orderHlc.compareTo(remoteField.orderHlc) != 0) {
           isPureFastForward = false;
           break;
         }
@@ -396,22 +618,23 @@ class CrdtMergeEngine {
       }
     }
 
-    return AccountTemplate(
-      templateId: local.templateId,
-      title: mergedTitle,
-      subTitle: mergedSubTitle,
-      iconCodePoint: mergedIconCodePoint,
-      category: mergedCategory,
-      fields: resolvedFields,
-      isCustom: local.isCustom,
-      syncStatus: finalStatus,
-      hlc: mergedHlc,
-      fieldHlc: mergedFieldHlc,
-      serverVersion: local.serverVersion > remote.serverVersion
-          ? local.serverVersion
-          : remote.serverVersion,
-      isDeleted: false,
-      deleteHlc: null,
+    return TemplateMergeResult(
+      AccountTemplate(
+        templateId: local.templateId,
+        version: remoteWinsTopLevel ? remote.version : local.version,
+        title: mergedTitle,
+        subTitle: mergedSubTitle,
+        iconCodePoint: mergedIconCodePoint,
+        category: mergedCategory,
+        fields: resolvedFields,
+        isCustom: local.isCustom,
+        syncStatus: finalStatus,
+        hlc: mergedHlc,
+        serverVersion: unifiedServerVersion,
+        isDeleted: false,
+        deleteHlc: null,
+      ),
+      logs,
     );
   }
 

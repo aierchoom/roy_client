@@ -172,10 +172,11 @@ void main() {
           fieldKey: 'url',
           label: 'URL',
           attributes: AccountFieldAttributes(type: AccountFieldType.url),
+          labelHlc: Hlc(100, 0, 'device_test'),
+          attributesHlc: Hlc(100, 0, 'device_test'),
         ),
       ],
       hlc: const Hlc(100, 0, 'device_test'),
-      fieldHlc: const {'url': Hlc(100, 0, 'device_test')},
       syncStatus: SyncStatus.synchronized,
     );
 
@@ -183,7 +184,8 @@ void main() {
 
     final loaded = await storage.loadTemplateById('custom_1');
     expect(loaded, isNotNull);
-    expect(loaded!.fieldHlc['url'], const Hlc(100, 0, 'device_test'));
+    expect(loaded!.fields.first.labelHlc, const Hlc(100, 0, 'device_test'));
+    expect(loaded.fields.first.attributesHlc, const Hlc(100, 0, 'device_test'));
 
     await storage.close(dispose: true);
   });

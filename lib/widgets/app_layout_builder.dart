@@ -29,8 +29,8 @@ class AppLayoutBuilder extends StatelessWidget {
         mediumBuilder?.call(context) ?? compactBuilder(context),
       AppLayoutType.expanded =>
         expandedBuilder?.call(context) ??
-        mediumBuilder?.call(context) ??
-        compactBuilder(context),
+            mediumBuilder?.call(context) ??
+            compactBuilder(context),
     };
   }
 }

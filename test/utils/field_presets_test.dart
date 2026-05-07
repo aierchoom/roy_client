@@ -6,17 +6,11 @@ import 'package:secret_roy/utils/field_presets.dart';
 void main() {
   group('generateUniqueFieldKey', () {
     test('returns base key when no conflict', () {
-      expect(
-        generateUniqueFieldKey('username', <String>{}),
-        'username',
-      );
+      expect(generateUniqueFieldKey('username', <String>{}), 'username');
     });
 
     test('appends suffix when base key exists', () {
-      expect(
-        generateUniqueFieldKey('username', {'username'}),
-        'username_2',
-      );
+      expect(generateUniqueFieldKey('username', {'username'}), 'username_2');
     });
 
     test('increments suffix until unique', () {
@@ -63,10 +57,7 @@ void main() {
     });
 
     test('renames conflicting keys while preserving labels', () {
-      final fields = instantiatePresetFields(
-        preset,
-        existingKeys: {'a'},
-      );
+      final fields = instantiatePresetFields(preset, existingKeys: {'a'});
       expect(fields.length, 2);
       expect(fields[0].fieldKey, 'a_2');
       expect(fields[0].label, 'A');
@@ -75,10 +66,7 @@ void main() {
     });
 
     test('renames multiple conflicting keys', () {
-      final fields = instantiatePresetFields(
-        preset,
-        existingKeys: {'a', 'b'},
-      );
+      final fields = instantiatePresetFields(preset, existingKeys: {'a', 'b'});
       expect(fields[0].fieldKey, 'a_2');
       expect(fields[1].fieldKey, 'b_2');
     });
@@ -115,12 +103,32 @@ void main() {
 
     test('all presets have non-empty id, name and fields', () {
       for (final preset in kFieldPresets) {
-        expect(preset.id.isNotEmpty, true, reason: 'Preset id must not be empty');
-        expect(preset.name.isNotEmpty, true, reason: 'Preset name must not be empty');
-        expect(preset.fields.isNotEmpty, true, reason: 'Preset fields must not be empty');
+        expect(
+          preset.id.isNotEmpty,
+          true,
+          reason: 'Preset id must not be empty',
+        );
+        expect(
+          preset.name.isNotEmpty,
+          true,
+          reason: 'Preset name must not be empty',
+        );
+        expect(
+          preset.fields.isNotEmpty,
+          true,
+          reason: 'Preset fields must not be empty',
+        );
         for (final field in preset.fields) {
-          expect(field.fieldKey.isNotEmpty, true, reason: 'Field key must not be empty');
-          expect(field.label.isNotEmpty, true, reason: 'Field label must not be empty');
+          expect(
+            field.fieldKey.isNotEmpty,
+            true,
+            reason: 'Field key must not be empty',
+          );
+          expect(
+            field.label.isNotEmpty,
+            true,
+            reason: 'Field label must not be empty',
+          );
         }
       }
     });

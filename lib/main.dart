@@ -273,7 +273,11 @@ class _SecretRoyAppState extends State<SecretRoyApp> {
     );
   }
 
-  ThemeData _buildDarkTheme(Color seed, bool trueBlack, AppTextDensity density) {
+  ThemeData _buildDarkTheme(
+    Color seed,
+    bool trueBlack,
+    AppTextDensity density,
+  ) {
     // Boost saturation for blue seeds to avoid 'muddy' dark modes
     Color activeSeed = seed;
     final hsv = HSVColor.fromColor(seed);

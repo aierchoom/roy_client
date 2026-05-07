@@ -34,14 +34,12 @@ class AppHeroCard extends StatelessWidget {
     final colors = theme.colorScheme;
     final layout = AppLayout.of(context);
 
-    final effectivePadding = padding ??
+    final effectivePadding =
+        padding ??
         EdgeInsets.all(layout.isCompact ? AppSpacing.lg : AppSpacing.xxl);
 
-    final effectiveGradient = gradientColors ??
-        [
-          colors.primaryContainer,
-          colors.tertiaryContainer,
-        ];
+    final effectiveGradient =
+        gradientColors ?? [colors.primaryContainer, colors.tertiaryContainer];
 
     return Container(
       padding: effectivePadding,
@@ -64,7 +62,9 @@ class AppHeroCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                padding: EdgeInsets.all(layout.isCompact ? AppSpacing.md : AppSpacing.lg),
+                padding: EdgeInsets.all(
+                  layout.isCompact ? AppSpacing.md : AppSpacing.lg,
+                ),
                 decoration: BoxDecoration(
                   color: colors.surface.withAlpha(layout.isCompact ? 210 : 230),
                   borderRadius: BorderRadius.circular(AppRadii.button),
@@ -84,9 +84,9 @@ class AppHeroCard extends StatelessWidget {
                       title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.heroTitle(context).copyWith(
-                        color: colors.onPrimaryContainer,
-                      ),
+                      style: AppTextStyles.heroTitle(
+                        context,
+                      ).copyWith(color: colors.onPrimaryContainer),
                     ),
                     if (subtitle != null && subtitle!.isNotEmpty) ...[
                       const SizedBox(height: AppSpacing.xs),
@@ -103,7 +103,9 @@ class AppHeroCard extends StatelessWidget {
                 ),
               ),
               if (trailing != null) ...[
-                SizedBox(width: layout.isCompact ? AppSpacing.md : AppSpacing.lg),
+                SizedBox(
+                  width: layout.isCompact ? AppSpacing.md : AppSpacing.lg,
+                ),
                 trailing!,
               ],
             ],

@@ -99,8 +99,8 @@ class _VaultHealthViewState extends State<VaultHealthView> {
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : report == null
-                ? _buildEmptyState()
-                : _buildReport(report),
+            ? _buildEmptyState()
+            : _buildReport(report),
       ),
     );
   }
@@ -110,18 +110,19 @@ class _VaultHealthViewState extends State<VaultHealthView> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.health_and_safety_outlined, size: 64, color: Colors.grey),
-          const SizedBox(height: AppSpacing.lg),
-          Text(
-            '无法计算体检报告',
-            style: Theme.of(context).textTheme.titleMedium,
+          const Icon(
+            Icons.health_and_safety_outlined,
+            size: 64,
+            color: Colors.grey,
           ),
+          const SizedBox(height: AppSpacing.lg),
+          Text('无法计算体检报告', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: AppSpacing.sm),
           Text(
             '请确保保险库已解锁',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.grey,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: Colors.grey),
           ),
         ],
       ),
@@ -152,15 +153,14 @@ class _VaultHealthViewState extends State<VaultHealthView> {
           ...report.lowRiskItems.map((item) => _buildItemCard(item)),
           const SizedBox(height: AppSpacing.lg),
         ],
-        if (report.failedItems.isEmpty)
-          _buildAllPassBanner(),
+        if (report.failedItems.isEmpty) _buildAllPassBanner(),
         const SizedBox(height: AppSpacing.lg),
         Center(
           child: Text(
             '体检时间: ${_formatTime(report.calculatedAt)}',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.grey,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: Colors.grey),
           ),
         ),
       ],
@@ -193,16 +193,14 @@ class _VaultHealthViewState extends State<VaultHealthView> {
                   children: [
                     Text(
                       '${report.score}',
-                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: color,
-                          ),
+                      style: Theme.of(context).textTheme.headlineMedium
+                          ?.copyWith(fontWeight: FontWeight.bold, color: color),
                     ),
                     Text(
                       _gradeLabel(report.grade),
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: color,
-                          ),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: color),
                     ),
                   ],
                 ),
@@ -224,9 +222,9 @@ class _VaultHealthViewState extends State<VaultHealthView> {
   Widget _buildSectionTitle(String title) {
     return Text(
       title,
-      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
+      style: Theme.of(
+        context,
+      ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
     );
   }
 

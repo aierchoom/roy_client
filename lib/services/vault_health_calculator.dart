@@ -36,8 +36,16 @@ class VaultHealthCalculator {
     items.add(VaultHealthCalculator.checkWeakPasswords(accounts));
     items.add(VaultHealthCalculator.checkReusedPasswords(accounts));
     items.add(VaultHealthCalculator.checkStaleRecords(accounts));
-    items.add(VaultHealthCalculator.checkIncompleteRecords(accounts, allTemplates));
-    items.add(VaultHealthCalculator.checkMissing2FA(accounts, allTemplates, totpCredentials));
+    items.add(
+      VaultHealthCalculator.checkIncompleteRecords(accounts, allTemplates),
+    );
+    items.add(
+      VaultHealthCalculator.checkMissing2FA(
+        accounts,
+        allTemplates,
+        totpCredentials,
+      ),
+    );
 
     final score = VaultHealthCalculator.calculateScore(items);
     final grade = VaultHealthCalculator.scoreToGrade(score);
@@ -60,10 +68,7 @@ class VaultHealthCalculator {
         title: '本地数据库加密',
         riskLevel: VaultHealthRiskLevel.high,
         isPass: exists,
-        description:
-            exists
-                ? '数据库已加密存储'
-                : '未检测到加密数据库文件，数据存在泄露风险',
+        description: exists ? '数据库已加密存储' : '未检测到加密数据库文件，数据存在泄露风险',
       );
     } catch (_) {
       return const VaultHealthItem(
@@ -88,7 +93,9 @@ class VaultHealthCalculator {
           riskLevel: VaultHealthRiskLevel.high,
           isPass: false,
           description: '从未进行同步备份',
-          action: VaultHealthAction(type: VaultHealthActionType.navigateToSyncSettings),
+          action: VaultHealthAction(
+            type: VaultHealthActionType.navigateToSyncSettings,
+          ),
         );
       }
       final lastSync = DateTime.tryParse(lastSyncStr);
@@ -107,11 +114,12 @@ class VaultHealthCalculator {
         title: '备份状态',
         riskLevel: VaultHealthRiskLevel.high,
         isPass: daysSince <= 30,
-        description:
-            daysSince <= 30
-                ? '最近备份 $daysSince 天前'
-                : '备份已过期 $daysSince 天，建议立即同步或导出',
-        action: const VaultHealthAction(type: VaultHealthActionType.navigateToExport),
+        description: daysSince <= 30
+            ? '最近备份 $daysSince 天前'
+            : '备份已过期 $daysSince 天，建议立即同步或导出',
+        action: const VaultHealthAction(
+          type: VaultHealthActionType.navigateToExport,
+        ),
       );
     } catch (_) {
       return const VaultHealthItem(
@@ -131,27 +139,26 @@ class VaultHealthCalculator {
       title: 'Vault 身份完整性',
       riskLevel: VaultHealthRiskLevel.high,
       isPass: hasId,
-      description:
-          hasId
-              ? 'Vault 身份和设备身份完整'
-              : 'Vault 身份缺失或损坏，建议重新配对',
+      description: hasId ? 'Vault 身份和设备身份完整' : 'Vault 身份缺失或损坏，建议重新配对',
       action: hasId
           ? null
-          : const VaultHealthAction(type: VaultHealthActionType.navigateToSyncSettings),
+          : const VaultHealthAction(
+              type: VaultHealthActionType.navigateToSyncSettings,
+            ),
     );
   }
 
   Future<VaultHealthItem> _checkSyncAuth() async {
-    final hasToken = _identity.vaultApiToken != null && _identity.vaultApiToken!.isNotEmpty;
+    final hasToken =
+        _identity.vaultApiToken != null && _identity.vaultApiToken!.isNotEmpty;
     return VaultHealthItem(
       id: 'sync_auth',
       title: '同步认证状态',
       riskLevel: VaultHealthRiskLevel.low,
       isPass: hasToken,
-      description:
-          hasToken
-              ? 'Vault-level API token 已配置'
-              : '尚未获取同步认证 token，首次同步将自动签发',
+      description: hasToken
+          ? 'Vault-level API token 已配置'
+          : '尚未获取同步认证 token，首次同步将自动签发',
     );
   }
 
@@ -166,12 +173,11 @@ class VaultHealthCalculator {
         title: '待同步变更',
         riskLevel: VaultHealthRiskLevel.medium,
         isPass: count == 0,
-        description:
-            count == 0
-                ? '没有待审阅的本地变更'
-                : '有 $count 条本地变更待审阅推送',
+        description: count == 0 ? '没有待审阅的本地变更' : '有 $count 条本地变更待审阅推送',
         action: count > 0
-            ? const VaultHealthAction(type: VaultHealthActionType.navigateToOutbox)
+            ? const VaultHealthAction(
+                type: VaultHealthActionType.navigateToOutbox,
+              )
             : null,
       );
     } catch (_) {
@@ -198,12 +204,13 @@ class VaultHealthCalculator {
         title: '同步冲突',
         riskLevel: VaultHealthRiskLevel.medium,
         isPass: conflictCount == 0,
-        description:
-            conflictCount == 0
-                ? '没有未处理的同步冲突'
-                : '有 $conflictCount 个账号存在未处理冲突',
+        description: conflictCount == 0
+            ? '没有未处理的同步冲突'
+            : '有 $conflictCount 个账号存在未处理冲突',
         action: conflictCount > 0
-            ? const VaultHealthAction(type: VaultHealthActionType.navigateToConflictInbox)
+            ? const VaultHealthAction(
+                type: VaultHealthActionType.navigateToConflictInbox,
+              )
             : null,
       );
     } catch (_) {
@@ -223,7 +230,9 @@ class VaultHealthCalculator {
       if (account.isDeleted) continue;
       final password = (account.data['password'] ?? '').toString();
       if (password.isEmpty) continue;
-      final strength = EnhancedCryptoService.calculatePasswordStrength(password);
+      final strength = EnhancedCryptoService.calculatePasswordStrength(
+        password,
+      );
       if (strength < 40) {
         weakAccounts.add(account.name);
       }
@@ -233,14 +242,11 @@ class VaultHealthCalculator {
       title: '弱密码检测',
       riskLevel: VaultHealthRiskLevel.high,
       isPass: weakAccounts.isEmpty,
-      description:
-          weakAccounts.isEmpty
-              ? '未发现弱密码'
-              : '发现 ${weakAccounts.length} 个弱密码账号',
+      description: weakAccounts.isEmpty
+          ? '未发现弱密码'
+          : '发现 ${weakAccounts.length} 个弱密码账号',
       action: weakAccounts.isNotEmpty
-          ? VaultHealthAction(
-              type: VaultHealthActionType.navigateToAccountEdit,
-            )
+          ? VaultHealthAction(type: VaultHealthActionType.navigateToAccountEdit)
           : null,
     );
   }
@@ -259,14 +265,9 @@ class VaultHealthCalculator {
       title: '重复密码检测',
       riskLevel: VaultHealthRiskLevel.high,
       isPass: reusedCount == 0,
-      description:
-          reusedCount == 0
-              ? '未发现重复使用的密码'
-              : '发现 $reusedCount 组重复使用的密码',
+      description: reusedCount == 0 ? '未发现重复使用的密码' : '发现 $reusedCount 组重复使用的密码',
       action: reusedCount > 0
-          ? VaultHealthAction(
-              type: VaultHealthActionType.navigateToAccountEdit,
-            )
+          ? VaultHealthAction(type: VaultHealthActionType.navigateToAccountEdit)
           : null,
     );
   }
@@ -289,14 +290,11 @@ class VaultHealthCalculator {
       title: '陈旧记录',
       riskLevel: VaultHealthRiskLevel.medium,
       isPass: staleAccounts.isEmpty,
-      description:
-          staleAccounts.isEmpty
-              ? '没有超过 180 天未更新的密码'
-              : '有 ${staleAccounts.length} 个账号超过 180 天未更新',
+      description: staleAccounts.isEmpty
+          ? '没有超过 180 天未更新的密码'
+          : '有 ${staleAccounts.length} 个账号超过 180 天未更新',
       action: staleAccounts.isNotEmpty
-          ? VaultHealthAction(
-              type: VaultHealthActionType.navigateToAccountEdit,
-            )
+          ? VaultHealthAction(type: VaultHealthActionType.navigateToAccountEdit)
           : null,
     );
   }
@@ -318,14 +316,11 @@ class VaultHealthCalculator {
       title: '不完整记录',
       riskLevel: VaultHealthRiskLevel.low,
       isPass: incompleteAccounts.isEmpty,
-      description:
-          incompleteAccounts.isEmpty
-              ? '所有账号都有 URL 信息'
-              : '有 ${incompleteAccounts.length} 个账号缺少 URL',
+      description: incompleteAccounts.isEmpty
+          ? '所有账号都有 URL 信息'
+          : '有 ${incompleteAccounts.length} 个账号缺少 URL',
       action: incompleteAccounts.isNotEmpty
-          ? VaultHealthAction(
-              type: VaultHealthActionType.navigateToAccountEdit,
-            )
+          ? VaultHealthAction(type: VaultHealthActionType.navigateToAccountEdit)
           : null,
     );
   }
@@ -345,9 +340,7 @@ class VaultHealthCalculator {
       );
       if (template == null) continue;
       // Check if template has a totp field
-      final hasTotpField = template.fields.any(
-        (f) => f.attributes.isReference,
-      );
+      final hasTotpField = template.fields.any((f) => f.attributes.isReference);
       if (!hasTotpField) continue;
       // Check if account has linked TOTP
       final hasLinkedTotp = totpCredentials.any(
@@ -362,10 +355,9 @@ class VaultHealthCalculator {
       title: '缺少 2FA',
       riskLevel: VaultHealthRiskLevel.medium,
       isPass: missing2faAccounts.isEmpty,
-      description:
-          missing2faAccounts.isEmpty
-              ? '已配置 2FA 的账号均已关联'
-              : '有 ${missing2faAccounts.length} 个支持 2FA 的账号未关联 TOTP',
+      description: missing2faAccounts.isEmpty
+          ? '已配置 2FA 的账号均已关联'
+          : '有 ${missing2faAccounts.length} 个支持 2FA 的账号未关联 TOTP',
     );
   }
 

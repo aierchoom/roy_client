@@ -180,10 +180,14 @@ class _ConflictGroupCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.fromLTRB(18, 16, 18, 12),
               decoration: BoxDecoration(
-                color: theme.colorScheme.errorContainer.withAlpha(AppAlphas.medium),
+                color: theme.colorScheme.errorContainer.withAlpha(
+                  AppAlphas.medium,
+                ),
                 border: Border(
                   bottom: BorderSide(
-                    color: theme.colorScheme.outlineVariant.withAlpha(AppAlphas.high),
+                    color: theme.colorScheme.outlineVariant.withAlpha(
+                      AppAlphas.high,
+                    ),
                   ),
                 ),
               ),
@@ -192,7 +196,9 @@ class _ConflictGroupCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(AppSpacing.sm),
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.error.withAlpha(AppAlphas.subtle),
+                      color: theme.colorScheme.error.withAlpha(
+                        AppAlphas.subtle,
+                      ),
                       borderRadius: BorderRadius.circular(AppRadii.button),
                     ),
                     child: Icon(
@@ -381,7 +387,9 @@ class _ConflictLogRow extends StatelessWidget {
                     : textBuilder('当前值（采纳方）', 'Current (Winner)'),
                 value: winnerValue,
                 color: theme.colorScheme.primary,
-                bgColor: theme.colorScheme.primaryContainer.withAlpha(AppAlphas.medium),
+                bgColor: theme.colorScheme.primaryContainer.withAlpha(
+                  AppAlphas.medium,
+                ),
                 icon: Icons.check_circle_outline,
               ),
               const SizedBox(height: AppSpacing.sm),
@@ -391,7 +399,9 @@ class _ConflictLogRow extends StatelessWidget {
                     : textBuilder('被覆盖值（冲突方）', 'Overwritten (Conflict)'),
                 value: loserValue,
                 color: theme.colorScheme.error,
-                bgColor: theme.colorScheme.errorContainer.withAlpha(AppAlphas.medium),
+                bgColor: theme.colorScheme.errorContainer.withAlpha(
+                  AppAlphas.medium,
+                ),
                 icon: Icons.cancel_outlined,
               ),
               const SizedBox(height: 14),

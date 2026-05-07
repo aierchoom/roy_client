@@ -10,9 +10,7 @@ void main() {
         MaterialApp(
           home: Scaffold(
             body: AppSelectableScrollable(
-              child: ListView(
-                children: const [Text('Hello')],
-              ),
+              child: ListView(children: const [Text('Hello')]),
             ),
           ),
         ),
@@ -28,9 +26,7 @@ void main() {
             data: const MediaQueryData(size: Size(1200, 800)),
             child: Scaffold(
               body: AppSelectableScrollable(
-                child: ListView(
-                  children: const [Text('Selectable')],
-                ),
+                child: ListView(children: const [Text('Selectable')]),
               ),
             ),
           ),
@@ -49,9 +45,7 @@ void main() {
             child: Scaffold(
               body: AppSelectableScrollable(
                 selectable: false,
-                child: ListView(
-                  children: const [Text('Not Selectable')],
-                ),
+                child: ListView(children: const [Text('Not Selectable')]),
               ),
             ),
           ),
@@ -69,9 +63,7 @@ void main() {
             data: const MediaQueryData(size: Size(400, 800)),
             child: Scaffold(
               body: AppSelectableScrollable(
-                child: ListView(
-                  children: const [Text('Touch')],
-                ),
+                child: ListView(children: const [Text('Touch')]),
               ),
             ),
           ),

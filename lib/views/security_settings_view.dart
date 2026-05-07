@@ -258,7 +258,9 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
           Container(
             padding: const EdgeInsets.all(AppSpacing.md),
             decoration: BoxDecoration(
-              color: theme.colorScheme.surface.withAlpha(AppAlphas.surfaceOverlay),
+              color: theme.colorScheme.surface.withAlpha(
+                AppAlphas.surfaceOverlay,
+              ),
               borderRadius: BorderRadius.circular(AppRadii.panel),
             ),
             child: Icon(
@@ -354,7 +356,9 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer.withAlpha(AppAlphas.strong),
+                  color: theme.colorScheme.primaryContainer.withAlpha(
+                    AppAlphas.strong,
+                  ),
                   borderRadius: BorderRadius.circular(AppRadii.button),
                 ),
                 child: Icon(icon, color: theme.colorScheme.primary),
@@ -684,7 +688,9 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
       decoration: BoxDecoration(
         color: theme.colorScheme.errorContainer.withAlpha(AppAlphas.low),
         borderRadius: BorderRadius.circular(AppRadii.panel),
-        border: Border.all(color: theme.colorScheme.error.withAlpha(AppAlphas.medium)),
+        border: Border.all(
+          color: theme.colorScheme.error.withAlpha(AppAlphas.medium),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

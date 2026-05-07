@@ -22,6 +22,8 @@ enum AccountFieldType {
   time,
   custom,
   accountLink,
+  longText,
+  list,
   unknown,
 }
 
@@ -35,6 +37,7 @@ enum TemplateCategory {
   work,
   shopping,
   finance,
+  note,
   custom,
 }
 
@@ -68,6 +71,8 @@ IconData templateCategoryIcon(TemplateCategory category) {
       return Icons.shopping_bag_outlined;
     case TemplateCategory.finance:
       return Icons.account_balance_wallet_outlined;
+    case TemplateCategory.note:
+      return Icons.note_outlined;
     case TemplateCategory.custom:
       return Icons.description_outlined;
   }
@@ -87,21 +92,31 @@ TemplateCategory inferTemplateCategory({
   switch (templateId) {
     case 'generic_info':
       return TemplateCategory.custom;
+    case 'builtin_secure_note':
+    case 'builtin_mnemonic':
+    case 'builtin_api_service':
+      return TemplateCategory.note;
   }
 
-  if (iconCodePoint == Icons.credit_card_outlined.codePoint) return TemplateCategory.payment;
+  if (iconCodePoint == Icons.credit_card_outlined.codePoint) {
+    return TemplateCategory.payment;
+  }
   if (iconCodePoint == Icons.email_outlined.codePoint ||
       iconCodePoint == Icons.language_outlined.codePoint ||
       iconCodePoint == Icons.lock_outline.codePoint ||
       iconCodePoint == Icons.vpn_key_outlined.codePoint) {
     return TemplateCategory.login;
   }
-  if (iconCodePoint == Icons.phone_outlined.codePoint) return TemplateCategory.contact;
+  if (iconCodePoint == Icons.phone_outlined.codePoint) {
+    return TemplateCategory.contact;
+  }
   if (iconCodePoint == Icons.business_center_outlined.codePoint ||
       iconCodePoint == Icons.apartment_outlined.codePoint) {
     return TemplateCategory.work;
   }
-  if (iconCodePoint == Icons.shopping_bag_outlined.codePoint) return TemplateCategory.shopping;
+  if (iconCodePoint == Icons.shopping_bag_outlined.codePoint) {
+    return TemplateCategory.shopping;
+  }
 
   final normalizedTitle = (title ?? '').toLowerCase();
   if (normalizedTitle.contains('bank') ||
@@ -150,6 +165,15 @@ TemplateCategory inferTemplateCategory({
       normalizedTitle.contains('购物')) {
     return TemplateCategory.shopping;
   }
+  if (normalizedTitle.contains('note') ||
+      normalizedTitle.contains('mnemonic') ||
+      normalizedTitle.contains('助记词') ||
+      normalizedTitle.contains('笔记') ||
+      normalizedTitle.contains('密钥') ||
+      normalizedTitle.contains('api key') ||
+      normalizedTitle.contains('私钥')) {
+    return TemplateCategory.note;
+  }
 
   final sourceFields = fields ?? const <AccountField>[];
   final hasEmailLike = sourceFields.any(
@@ -169,9 +193,14 @@ TemplateCategory inferTemplateCategory({
         normalized.contains('支付') ||
         normalized.contains('银行卡');
   });
+  final hasNoteLike = sourceFields.any((field) {
+    return field.attributes.type == AccountFieldType.longText ||
+        field.attributes.type == AccountFieldType.list;
+  });
 
   if (hasPaymentLike) return TemplateCategory.payment;
   if (hasPhoneLike) return TemplateCategory.contact;
+  if (hasNoteLike) return TemplateCategory.note;
   if (hasEmailLike) return TemplateCategory.login;
 
   return TemplateCategory.custom;
@@ -255,6 +284,7 @@ class AccountField {
   final AccountFieldAttributes attributes;
   final int order;
   final Hlc labelHlc;
+  final Hlc descriptionHlc;
   final Hlc attributesHlc;
   final Hlc orderHlc;
 
@@ -264,9 +294,10 @@ class AccountField {
     this.description,
     required this.attributes,
     this.order = 0,
-    required this.labelHlc,
-    required this.attributesHlc,
-    required this.orderHlc,
+    this.labelHlc = const Hlc(0, 0, 'local'),
+    this.descriptionHlc = const Hlc(0, 0, 'local'),
+    this.attributesHlc = const Hlc(0, 0, 'local'),
+    this.orderHlc = const Hlc(0, 0, 'local'),
   });
 
   factory AccountField.fromJson(Map<String, dynamic> json) {
@@ -280,6 +311,9 @@ class AccountField {
       order: json['order'] as int? ?? 0,
       labelHlc: json['labelHlc'] != null
           ? Hlc.parse(json['labelHlc'] as String)
+          : Hlc.zero('local'),
+      descriptionHlc: json['descriptionHlc'] != null
+          ? Hlc.parse(json['descriptionHlc'] as String)
           : Hlc.zero('local'),
       attributesHlc: json['attributesHlc'] != null
           ? Hlc.parse(json['attributesHlc'] as String)
@@ -298,6 +332,7 @@ class AccountField {
       'attributes': attributes.toJson(),
       'order': order,
       'labelHlc': labelHlc.toString(),
+      'descriptionHlc': descriptionHlc.toString(),
       'attributesHlc': attributesHlc.toString(),
       'orderHlc': orderHlc.toString(),
     };
@@ -310,6 +345,7 @@ class AccountField {
     AccountFieldAttributes? attributes,
     int? order,
     Hlc? labelHlc,
+    Hlc? descriptionHlc,
     Hlc? attributesHlc,
     Hlc? orderHlc,
   }) {
@@ -320,6 +356,7 @@ class AccountField {
       attributes: attributes ?? this.attributes,
       order: order ?? this.order,
       labelHlc: labelHlc ?? this.labelHlc,
+      descriptionHlc: descriptionHlc ?? this.descriptionHlc,
       attributesHlc: attributesHlc ?? this.attributesHlc,
       orderHlc: orderHlc ?? this.orderHlc,
     );
@@ -459,6 +496,115 @@ class AccountTemplate {
 
 final _builtinZeroHlc = Hlc.zero('builtin');
 
+final AccountTemplate secureNoteGenericTemplate = AccountTemplate(
+  templateId: 'builtin_secure_note',
+  version: 1,
+  title: '\u901a\u7528\u5b89\u5168\u7b14\u8bb0',
+  subTitle:
+      '\u5b58\u50a8\u52a9\u8bb0\u8bcd\u3001API Key\u3001\u79c1\u94a5\u7b49\u654f\u611f\u6587\u672c',
+  iconCodePoint: Icons.note_outlined.codePoint,
+  category: TemplateCategory.note,
+  fields: [
+    AccountField(
+      fieldKey: 'content',
+      label: '\u5185\u5bb9',
+      description:
+          '\u591a\u884c\u52a0\u5bc6\u6587\u672c\uff0c\u9ed8\u8ba4\u6298\u53e0\u663e\u793a\u3002',
+      attributes: AccountFieldAttributes(
+        type: AccountFieldType.longText,
+        isRequired: true,
+        isSecret: true,
+        hint: '\u7c98\u8d34\u6216\u8f93\u5165\u654f\u611f\u5185\u5bb9...',
+      ),
+      order: 0,
+      labelHlc: _builtinZeroHlc,
+      descriptionHlc: _builtinZeroHlc,
+      attributesHlc: _builtinZeroHlc,
+      orderHlc: _builtinZeroHlc,
+    ),
+  ],
+);
+
+final AccountTemplate secureNoteMnemonicTemplate = AccountTemplate(
+  templateId: 'builtin_mnemonic',
+  version: 1,
+  title: '\u52a9\u8bb0\u8bcd',
+  subTitle: '\u52a0\u5bc6\u5b58\u50a8 12/24 \u4e2a\u5b5d\u590d\u8bcd',
+  iconCodePoint: Icons.vpn_key_outlined.codePoint,
+  category: TemplateCategory.note,
+  fields: [
+    AccountField(
+      fieldKey: 'mnemonic_words',
+      label: '\u52a9\u8bb0\u8bcd',
+      description:
+          '\u652f\u6301\u6574\u6bb5\u7c98\u8d34\u81ea\u52a8\u5206\u8bcd\uff0c\u9ed8\u8ba4\u6298\u53e0\u9690\u85cf\u3002',
+      attributes: AccountFieldAttributes(
+        type: AccountFieldType.list,
+        isRequired: true,
+        isSecret: true,
+        hint:
+            'abandon ability able about above absent absorb abstract absurd abuse access accident',
+      ),
+      order: 0,
+      labelHlc: _builtinZeroHlc,
+      descriptionHlc: _builtinZeroHlc,
+      attributesHlc: _builtinZeroHlc,
+      orderHlc: _builtinZeroHlc,
+    ),
+  ],
+);
+
+final AccountTemplate apiServiceTemplate = AccountTemplate(
+  templateId: 'builtin_api_service',
+  version: 1,
+  title: 'API \u670d\u52a1',
+  subTitle: '\u5b58\u50a8 API Key\u3001Token \u548c\u7aef\u70b9\u4fe1\u606f',
+  iconCodePoint: Icons.code_outlined.codePoint,
+  category: TemplateCategory.note,
+  fields: [
+    AccountField(
+      fieldKey: 'service_name',
+      label: '\u670d\u52a1\u540d\u79f0',
+      attributes: AccountFieldAttributes(
+        type: AccountFieldType.text,
+        isPrimary: true,
+        isRequired: true,
+        isSearchable: true,
+        hint: 'OpenAI / Stripe / AWS',
+      ),
+      order: 0,
+      labelHlc: _builtinZeroHlc,
+      attributesHlc: _builtinZeroHlc,
+      orderHlc: _builtinZeroHlc,
+    ),
+    AccountField(
+      fieldKey: 'api_keys',
+      label: 'API Key',
+      attributes: AccountFieldAttributes(
+        type: AccountFieldType.list,
+        isSecret: true,
+        hint: 'sk-proj-xxxxx',
+      ),
+      order: 1,
+      labelHlc: _builtinZeroHlc,
+      attributesHlc: _builtinZeroHlc,
+      orderHlc: _builtinZeroHlc,
+    ),
+    AccountField(
+      fieldKey: 'endpoint',
+      label: 'API \u7aef\u70b9',
+      attributes: AccountFieldAttributes(
+        type: AccountFieldType.url,
+        hint: 'https://api.example.com/v1',
+      ),
+      order: 2,
+      labelHlc: _builtinZeroHlc,
+      attributesHlc: _builtinZeroHlc,
+      orderHlc: _builtinZeroHlc,
+    ),
+  ],
+);
+
 final AccountTemplate websiteTemplate = AccountTemplate(
   templateId: 'builtin_generic_info',
   version: 1,
@@ -482,6 +628,7 @@ final AccountTemplate websiteTemplate = AccountTemplate(
       ),
       order: 0,
       labelHlc: _builtinZeroHlc,
+      descriptionHlc: _builtinZeroHlc,
       attributesHlc: _builtinZeroHlc,
       orderHlc: _builtinZeroHlc,
     ),
@@ -499,6 +646,7 @@ final AccountTemplate websiteTemplate = AccountTemplate(
       ),
       order: 1,
       labelHlc: _builtinZeroHlc,
+      descriptionHlc: _builtinZeroHlc,
       attributesHlc: _builtinZeroHlc,
       orderHlc: _builtinZeroHlc,
     ),
@@ -514,6 +662,7 @@ final AccountTemplate websiteTemplate = AccountTemplate(
       ),
       order: 2,
       labelHlc: _builtinZeroHlc,
+      descriptionHlc: _builtinZeroHlc,
       attributesHlc: _builtinZeroHlc,
       orderHlc: _builtinZeroHlc,
     ),
@@ -530,6 +679,7 @@ final AccountTemplate websiteTemplate = AccountTemplate(
       ),
       order: 3,
       labelHlc: _builtinZeroHlc,
+      descriptionHlc: _builtinZeroHlc,
       attributesHlc: _builtinZeroHlc,
       orderHlc: _builtinZeroHlc,
     ),
@@ -544,10 +694,16 @@ final AccountTemplate websiteTemplate = AccountTemplate(
       ),
       order: 4,
       labelHlc: _builtinZeroHlc,
+      descriptionHlc: _builtinZeroHlc,
       attributesHlc: _builtinZeroHlc,
       orderHlc: _builtinZeroHlc,
     ),
   ],
 );
 
-final List<AccountTemplate> basicAccountTemplates = [websiteTemplate];
+final List<AccountTemplate> basicAccountTemplates = [
+  websiteTemplate,
+  secureNoteGenericTemplate,
+  secureNoteMnemonicTemplate,
+  apiServiceTemplate,
+];

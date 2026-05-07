@@ -31,12 +31,45 @@ SyncStatus syncStatusFromJson(
 }
 
 @immutable
+class AccountFieldMeta {
+  final String type;
+  final String label;
+  final String? sourceTemplateId;
+  final int? sourceTemplateVersion;
+
+  const AccountFieldMeta({
+    required this.type,
+    required this.label,
+    this.sourceTemplateId,
+    this.sourceTemplateVersion,
+  });
+
+  factory AccountFieldMeta.fromJson(Map<String, dynamic> json) {
+    return AccountFieldMeta(
+      type: json['type'] as String? ?? 'text',
+      label: json['label'] as String? ?? '',
+      sourceTemplateId: json['sourceTemplateId'] as String?,
+      sourceTemplateVersion: json['sourceTemplateVersion'] as int?,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'type': type,
+    'label': label,
+    'sourceTemplateId': sourceTemplateId,
+    'sourceTemplateVersion': sourceTemplateVersion,
+  };
+}
+
+@immutable
 class AccountItem {
   final String id;
   final String name;
   final String email;
   final String templateId; // Corresponds to `template` in old code
+  final int templateVersion;
   final Map<String, dynamic> data; // Custom fields data
+  final Map<String, AccountFieldMeta> fieldMeta;
   final int createdAt;
 
   // Sync specific fields
@@ -53,7 +86,9 @@ class AccountItem {
     required this.name,
     required this.email,
     required this.templateId,
+    this.templateVersion = 0,
     required this.data,
+    this.fieldMeta = const {},
     required this.createdAt,
     required this.nameHlc,
     required this.emailHlc,
@@ -75,10 +110,18 @@ class AccountItem {
       email: json['email'] as String? ?? '',
       templateId:
           json['template'] as String? ?? json['templateId'] as String? ?? '',
-      data:
-          json['data'] is Map
-              ? Map<String, dynamic>.from(json['data'] as Map)
-              : {},
+      templateVersion: json['templateVersion'] as int? ?? 0,
+      data: json['data'] is Map
+          ? Map<String, dynamic>.from(json['data'] as Map)
+          : {},
+      fieldMeta:
+          (json['fieldMeta'] as Map<String, dynamic>?)?.map(
+            (k, v) => MapEntry(
+              k,
+              AccountFieldMeta.fromJson(v as Map<String, dynamic>),
+            ),
+          ) ??
+          const {},
       createdAt:
           json['createdAt'] as int? ?? DateTime.now().millisecondsSinceEpoch,
       nameHlc: json['nameHlc'] != null ? Hlc.parse(json['nameHlc']) : dummyHlc,
@@ -106,7 +149,9 @@ class AccountItem {
       'email': email,
       'template': templateId,
       'templateId': templateId,
+      'templateVersion': templateVersion,
       'data': data,
+      'fieldMeta': fieldMeta.map((k, v) => MapEntry(k, v.toJson())),
       'createdAt': createdAt,
       'nameHlc': nameHlc.toString(),
       'emailHlc': emailHlc.toString(),
@@ -123,7 +168,9 @@ class AccountItem {
     String? name,
     String? email,
     String? templateId,
+    int? templateVersion,
     Map<String, dynamic>? data,
+    Map<String, AccountFieldMeta>? fieldMeta,
     int? createdAt,
     Hlc? nameHlc,
     Hlc? emailHlc,
@@ -138,7 +185,9 @@ class AccountItem {
       name: name ?? this.name,
       email: email ?? this.email,
       templateId: templateId ?? this.templateId,
+      templateVersion: templateVersion ?? this.templateVersion,
       data: data ?? this.data,
+      fieldMeta: fieldMeta ?? this.fieldMeta,
       createdAt: createdAt ?? this.createdAt,
       nameHlc: nameHlc ?? this.nameHlc,
       emailHlc: emailHlc ?? this.emailHlc,

@@ -38,6 +38,12 @@ class EnhancedAppProvider extends ChangeNotifier {
 
   List<AccountTemplate> get allTemplates => _customTemplates;
   List<AccountItem> get allAccounts => _accounts;
+  List<AccountItem> get accountItems => _accounts
+      .where((a) => _templateCategoryOf(a.templateId) != TemplateCategory.note)
+      .toList();
+  List<AccountItem> get secureNoteItems => _accounts
+      .where((a) => _templateCategoryOf(a.templateId) == TemplateCategory.note)
+      .toList();
   List<TotpCredential> get totpCredentials => _totpCredentials;
   List<AccountTemplate> get customTemplates => _customTemplates;
   List<LocalSyncChange> get localSyncChanges => _localSyncChanges;
@@ -70,6 +76,10 @@ class EnhancedAppProvider extends ChangeNotifier {
     return null;
   }
 
+  TemplateCategory _templateCategoryOf(String templateId) {
+    return getTemplate(templateId)?.category ?? TemplateCategory.custom;
+  }
+
   AccountItem? getAccount(String id) {
     try {
       return _accounts.firstWhere((account) => account.id == id);
@@ -90,13 +100,15 @@ class EnhancedAppProvider extends ChangeNotifier {
   }
 
   List<AccountItem> accountsLinkedTo(String accountId) {
-    return _accounts.where((account) {
-      if (account.id == accountId) return false;
-      for (final value in account.data.values) {
-        if (value?.toString() == accountId) return true;
-      }
-      return false;
-    }).toList(growable: false);
+    return _accounts
+        .where((account) {
+          if (account.id == accountId) return false;
+          for (final value in account.data.values) {
+            if (value?.toString() == accountId) return true;
+          }
+          return false;
+        })
+        .toList(growable: false);
   }
 
   SyncState get syncState => _serviceManager.syncState;

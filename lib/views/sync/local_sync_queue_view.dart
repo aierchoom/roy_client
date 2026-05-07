@@ -14,10 +14,7 @@ class LocalSyncQueueView extends StatelessWidget {
     return Localizations.localeOf(context).languageCode == 'zh' ? zh : en;
   }
 
-  Future<void> _pushChange(
-    BuildContext context,
-    LocalSyncChange change,
-  ) async {
+  Future<void> _pushChange(BuildContext context, LocalSyncChange change) async {
     final provider = context.read<EnhancedAppProvider>();
     final result = await provider.pushLocalSyncChange(change.id);
     if (!context.mounted) return;
@@ -70,8 +67,14 @@ class LocalSyncQueueView extends StatelessWidget {
   void _showResultSnack(BuildContext context, SyncResult result) {
     final message = result.success
         ? _text(context, '已推送已确认的本地变更。', 'Approved local changes pushed.')
-        : _text(context, '同步失败：${result.error}', 'Sync failed: ${result.error}');
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+        : _text(
+            context,
+            '同步失败：${result.error}',
+            'Sync failed: ${result.error}',
+          );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _showDetails(BuildContext context, LocalSyncChange change) {
@@ -106,7 +109,12 @@ class LocalSyncQueueView extends StatelessWidget {
                   spacing: 8,
                   runSpacing: 8,
                   children: fields
-                      .map((f) => Chip(label: Text(f), visualDensity: VisualDensity.compact))
+                      .map(
+                        (f) => Chip(
+                          label: Text(f),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      )
                       .toList(),
                 ),
                 if (change.isDelete) ...[
@@ -174,18 +182,20 @@ class LocalSyncQueueView extends StatelessWidget {
     if (change.changedFields.isEmpty) {
       return [_text(context, '记录内容', 'Record content')];
     }
-    return change.changedFields.map((field) {
-      return switch (field) {
-        'record.created' => _text(context, '新建记录', 'New record'),
-        'record.deleted' => _text(context, '删除记录', 'Deleted record'),
-        'record.updated' => _text(context, '记录内容', 'Record content'),
-        'name' => _text(context, '名称', 'Name'),
-        'email' => _text(context, '邮箱', 'Email'),
-        'template' || 'templateId' => _text(context, '模板', 'Template'),
-        _ when field.startsWith('data.') => field.substring(5),
-        _ => field,
-      };
-    }).toList(growable: false);
+    return change.changedFields
+        .map((field) {
+          return switch (field) {
+            'record.created' => _text(context, '新建记录', 'New record'),
+            'record.deleted' => _text(context, '删除记录', 'Deleted record'),
+            'record.updated' => _text(context, '记录内容', 'Record content'),
+            'name' => _text(context, '名称', 'Name'),
+            'email' => _text(context, '邮箱', 'Email'),
+            'template' || 'templateId' => _text(context, '模板', 'Template'),
+            _ when field.startsWith('data.') => field.substring(5),
+            _ => field,
+          };
+        })
+        .toList(growable: false);
   }
 
   @override
@@ -207,13 +217,12 @@ class LocalSyncQueueView extends StatelessWidget {
       ),
       body: AdaptivePage(
         child: changes.isEmpty
-            ? _EmptyState(
-                textBuilder: (zh, en) => _text(context, zh, en),
-              )
+            ? _EmptyState(textBuilder: (zh, en) => _text(context, zh, en))
             : ListView.separated(
                 padding: const EdgeInsets.all(AppSpacing.lg),
                 itemCount: changes.length,
-                separatorBuilder: (context, index) => const SizedBox(height: AppSpacing.md),
+                separatorBuilder: (context, index) =>
+                    const SizedBox(height: AppSpacing.md),
                 itemBuilder: (context, index) {
                   final change = changes[index];
                   return _ChangeCard(
@@ -261,7 +270,9 @@ class _ChangeCard extends StatelessWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppRadii.panel),
-        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(AppAlphas.strong)),
+        side: BorderSide(
+          color: theme.colorScheme.outlineVariant.withAlpha(AppAlphas.strong),
+        ),
       ),
       child: InkWell(
         onTap: onTap,
@@ -274,7 +285,9 @@ class _ChangeCard extends StatelessWidget {
               Row(
                 children: [
                   Icon(
-                    isDelete ? Icons.delete_outline_rounded : Icons.edit_note_rounded,
+                    isDelete
+                        ? Icons.delete_outline_rounded
+                        : Icons.edit_note_rounded,
                     color: tint,
                     size: 20,
                   ),
@@ -284,11 +297,15 @@ class _ChangeCard extends StatelessWidget {
                       change.title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                   ),
                   IconButton(
-                    tooltip: MaterialLocalizations.of(context).cancelButtonLabel,
+                    tooltip: MaterialLocalizations.of(
+                      context,
+                    ).cancelButtonLabel,
                     onPressed: onDiscard,
                     icon: const Icon(Icons.undo_rounded, size: 18),
                   ),
@@ -313,7 +330,9 @@ class _ChangeCard extends StatelessWidget {
                   padding: const EdgeInsets.only(top: AppSpacing.sm),
                   child: Text(
                     '删除类变更推送后会被其他设备直接同步',
-                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.error,
+                    ),
                   ),
                 ),
             ],
@@ -339,16 +358,27 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.cloud_done_outlined, size: 48, color: theme.colorScheme.outline),
+            Icon(
+              Icons.cloud_done_outlined,
+              size: 48,
+              color: theme.colorScheme.outline,
+            ),
             const SizedBox(height: AppSpacing.lg),
             Text(
               textBuilder('没有待同步变更', 'No pending changes'),
-              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
             ),
             const SizedBox(height: AppSpacing.sm),
             Text(
-              textBuilder('本机编辑和删除会出现在这里，确认后才会同步给其他设备。', 'Local edits and deletes appear here until you approve them.'),
-              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              textBuilder(
+                '本机编辑和删除会出现在这里，确认后才会同步给其他设备。',
+                'Local edits and deletes appear here until you approve them.',
+              ),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
               textAlign: TextAlign.center,
             ),
           ],

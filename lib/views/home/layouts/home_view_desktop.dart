@@ -24,7 +24,10 @@ class HomeViewDesktop extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final syncBadgeCount = context.watch<EnhancedAppProvider>().localSyncChanges.length;
+    final syncBadgeCount = context
+        .watch<EnhancedAppProvider>()
+        .localSyncChanges
+        .length;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -47,26 +50,42 @@ class HomeViewDesktop extends StatelessWidget {
                     icon: Icons.inventory_2_outlined,
                     selectedIcon: Icons.inventory_2,
                     label: _text(context, '\u8d26\u6237', 'Accounts'),
-                    description: _text(context, '\u67e5\u770b\u5168\u90e8\u8d26\u6237', 'Browse your vault'),
+                    description: _text(
+                      context,
+                      '\u67e5\u770b\u5168\u90e8\u8d26\u6237',
+                      'Browse your vault',
+                    ),
                   ),
                   AppNavDestination(
                     icon: Icons.search_outlined,
                     selectedIcon: Icons.search,
                     label: _text(context, '\u641c\u7d22', 'Search'),
-                    description: _text(context, '\u5feb\u901f\u5b9a\u4f4d\u8d26\u6237', 'Search and jump fast'),
+                    description: _text(
+                      context,
+                      '\u5feb\u901f\u5b9a\u4f4d\u8d26\u6237',
+                      'Search and jump fast',
+                    ),
                     badgeCount: syncBadgeCount,
                   ),
                   AppNavDestination(
                     icon: Icons.verified_user_outlined,
                     selectedIcon: Icons.verified_user,
                     label: '2FA',
-                    description: _text(context, '\u67e5\u770b\u52a8\u6001\u9a8c\u8bc1\u7801\u8d26\u6237', 'Accounts with codes'),
+                    description: _text(
+                      context,
+                      '\u67e5\u770b\u52a8\u6001\u9a8c\u8bc1\u7801\u8d26\u6237',
+                      'Accounts with codes',
+                    ),
                   ),
                   AppNavDestination(
                     icon: Icons.settings_outlined,
                     selectedIcon: Icons.settings,
                     label: _text(context, '\u8bbe\u7f6e', 'Settings'),
-                    description: _text(context, '\u4e3b\u9898\u3001\u5b89\u5168\u4e0e\u6a21\u677f', 'Theme, security, templates'),
+                    description: _text(
+                      context,
+                      '\u4e3b\u9898\u3001\u5b89\u5168\u4e0e\u6a21\u677f',
+                      'Theme, security, templates',
+                    ),
                   ),
                 ],
                 header: Container(
@@ -107,7 +126,11 @@ class HomeViewDesktop extends StatelessWidget {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              _text(context, '\u5b89\u5168\u5e93\u5de5\u4f5c\u533a', 'Secure workspace'),
+                              _text(
+                                context,
+                                '\u5b89\u5168\u5e93\u5de5\u4f5c\u533a',
+                                'Secure workspace',
+                              ),
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: theme.colorScheme.onSurfaceVariant,
                               ),
@@ -122,7 +145,9 @@ class HomeViewDesktop extends StatelessWidget {
                   width: double.infinity,
                   padding: const EdgeInsets.all(AppSpacing.md),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest.withAlpha(82),
+                    color: theme.colorScheme.surfaceContainerHighest.withAlpha(
+                      82,
+                    ),
                     borderRadius: BorderRadius.circular(AppRadii.panel),
                   ),
                   child: Text(

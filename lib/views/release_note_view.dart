@@ -313,7 +313,9 @@ class ReleaseNoteView extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.all(AppSpacing.lg),
         decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest.withAlpha(AppAlphas.high),
+          color: theme.colorScheme.surfaceContainerHighest.withAlpha(
+            AppAlphas.high,
+          ),
           borderRadius: BorderRadius.circular(AppRadii.panel),
           border: Border.all(
             color: theme.colorScheme.outlineVariant.withAlpha(AppAlphas.medium),
@@ -348,7 +350,11 @@ class ReleaseNoteView extends StatelessWidget {
     return Center(
       child: Column(
         children: [
-          Divider(color: theme.colorScheme.outlineVariant.withAlpha(AppAlphas.divider)),
+          Divider(
+            color: theme.colorScheme.outlineVariant.withAlpha(
+              AppAlphas.divider,
+            ),
+          ),
           const SizedBox(height: AppSpacing.lg),
           Text(
             _text(

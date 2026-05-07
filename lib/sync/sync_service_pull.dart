@@ -10,7 +10,8 @@ extension SyncServicePull on SyncService {
     int limit = 100,
   }) async {
     final vaultId = _identityService.vaultId;
-    final url = '$serverUrl/vaults/$vaultId/sync?since=$since&cursor=$cursor&limit=$limit';
+    final url =
+        '$serverUrl/vaults/$vaultId/sync?since=$since&cursor=$cursor&limit=$limit';
     final headers = <String, String>{};
     headers['X-Vault-Generation'] = '$_serverGeneration';
     final token = _identityService.vaultApiToken;
@@ -23,7 +24,9 @@ extension SyncServicePull on SyncService {
         .timeout(const Duration(seconds: 10));
     if (response.statusCode == 304) {
       final generationHeader = response.headers['x-vault-generation'];
-      final generation = generationHeader != null ? int.tryParse(generationHeader) : null;
+      final generation = generationHeader != null
+          ? int.tryParse(generationHeader)
+          : null;
       return {
         'max_version': since,
         'items': const <dynamic>[],
@@ -57,7 +60,6 @@ extension SyncServicePull on SyncService {
     int? totalCount;
 
     while (true) {
-
       final data = await _fetchRemoteChanges(
         serverUrl,
         since: since,
@@ -79,10 +81,9 @@ extension SyncServicePull on SyncService {
       final nextCursor = data['next_cursor'] as int?;
 
       if (totalCount != null && totalCount > 0) {
-        final progress =
-            ((cursor + itemsList.length) / totalCount * 100)
-                .clamp(0, 99)
-                .round();
+        final progress = ((cursor + itemsList.length) / totalCount * 100)
+            .clamp(0, 99)
+            .round();
         if (hasMore) {
           _statusNote = 'Pulling remote updates ($progress%)...';
           if (!_disposed) notifyListeners();

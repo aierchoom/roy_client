@@ -81,7 +81,9 @@ class _PasswordToolsViewState extends State<PasswordToolsView> {
           Container(
             padding: const EdgeInsets.all(AppSpacing.md),
             decoration: BoxDecoration(
-              color: theme.colorScheme.surface.withAlpha(AppAlphas.surfaceOverlay),
+              color: theme.colorScheme.surface.withAlpha(
+                AppAlphas.surfaceOverlay,
+              ),
               borderRadius: BorderRadius.circular(AppRadii.panel),
             ),
             child: Icon(
@@ -235,7 +237,9 @@ class _PasswordToolsViewState extends State<PasswordToolsView> {
             width: double.infinity,
             padding: const EdgeInsets.all(AppSpacing.lg),
             decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest.withAlpha(AppAlphas.outline),
+              color: theme.colorScheme.surfaceContainerHighest.withAlpha(
+                AppAlphas.outline,
+              ),
               borderRadius: BorderRadius.circular(AppRadii.panel),
             ),
             child: SelectableText(

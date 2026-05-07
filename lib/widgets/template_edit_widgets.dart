@@ -27,6 +27,10 @@ String fieldTypeLabel(AccountFieldType type) {
       return '\u5173\u8054\u8d26\u6237';
     case AccountFieldType.unknown:
       return '\u672a\u77e5';
+    case AccountFieldType.longText:
+      return '\u591a\u884c\u6587\u672c';
+    case AccountFieldType.list:
+      return '\u5217\u8868';
   }
 }
 
@@ -53,6 +57,10 @@ IconData fieldTypeIcon(AccountFieldType type) {
       return Icons.link_outlined;
     case AccountFieldType.unknown:
       return Icons.help_outline_outlined;
+    case AccountFieldType.longText:
+      return Icons.notes_outlined;
+    case AccountFieldType.list:
+      return Icons.list_outlined;
   }
 }
 
@@ -473,7 +481,9 @@ class _FieldPresetPreviewDialogState extends State<FieldPresetPreviewDialog> {
                         contentPadding: EdgeInsets.zero,
                         controlAffinity: ListTileControlAffinity.leading,
                         secondary: Icon(
-                          fieldTypeIcon(widget.preset.fields[i].attributes.type),
+                          fieldTypeIcon(
+                            widget.preset.fields[i].attributes.type,
+                          ),
                           size: 18,
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
@@ -502,10 +512,7 @@ class _FieldPresetPreviewDialogState extends State<FieldPresetPreviewDialog> {
         FilledButton(
           onPressed: _selectedIndices.isEmpty
               ? null
-              : () => Navigator.pop(
-                    context,
-                    _selectedIndices.toList()..sort(),
-                  ),
+              : () => Navigator.pop(context, _selectedIndices.toList()..sort()),
           child: Text(
             _text(
               '\u63d2\u5165 ${_selectedIndices.length} \u4e2a\u5b57\u6bb5',

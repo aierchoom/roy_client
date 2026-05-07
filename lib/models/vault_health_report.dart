@@ -5,11 +5,7 @@ enum VaultHealthGrade {
   critical, // 0-49
 }
 
-enum VaultHealthRiskLevel {
-  high,
-  medium,
-  low,
-}
+enum VaultHealthRiskLevel { high, medium, low }
 
 enum VaultHealthActionType {
   none,
@@ -61,12 +57,15 @@ class VaultHealthReport {
   List<VaultHealthItem> get failedItems =>
       items.where((i) => !i.isPass).toList();
 
-  List<VaultHealthItem> get highRiskItems =>
-      items.where((i) => i.riskLevel == VaultHealthRiskLevel.high && !i.isPass).toList();
+  List<VaultHealthItem> get highRiskItems => items
+      .where((i) => i.riskLevel == VaultHealthRiskLevel.high && !i.isPass)
+      .toList();
 
-  List<VaultHealthItem> get mediumRiskItems =>
-      items.where((i) => i.riskLevel == VaultHealthRiskLevel.medium && !i.isPass).toList();
+  List<VaultHealthItem> get mediumRiskItems => items
+      .where((i) => i.riskLevel == VaultHealthRiskLevel.medium && !i.isPass)
+      .toList();
 
-  List<VaultHealthItem> get lowRiskItems =>
-      items.where((i) => i.riskLevel == VaultHealthRiskLevel.low && !i.isPass).toList();
+  List<VaultHealthItem> get lowRiskItems => items
+      .where((i) => i.riskLevel == VaultHealthRiskLevel.low && !i.isPass)
+      .toList();
 }

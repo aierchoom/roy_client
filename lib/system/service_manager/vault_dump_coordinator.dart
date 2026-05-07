@@ -112,9 +112,7 @@ class VaultDumpCoordinator {
             .map((templateJson) => AccountTemplate.fromJson(templateJson))
             .toList(growable: false),
         accounts: accountsList
-            .map(
-              (accountJson) => AccountItem.fromJson(accountJson),
-            )
+            .map((accountJson) => AccountItem.fromJson(accountJson))
             .toList(growable: false),
       );
     } on VaultDumpImportException {

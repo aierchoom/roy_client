@@ -155,8 +155,14 @@ void main() {
 
   group('VaultHealthCalculator.scoreToGrade', () {
     test('excellent for 90-100', () {
-      expect(VaultHealthCalculator.scoreToGrade(100), VaultHealthGrade.excellent);
-      expect(VaultHealthCalculator.scoreToGrade(90), VaultHealthGrade.excellent);
+      expect(
+        VaultHealthCalculator.scoreToGrade(100),
+        VaultHealthGrade.excellent,
+      );
+      expect(
+        VaultHealthCalculator.scoreToGrade(90),
+        VaultHealthGrade.excellent,
+      );
     });
 
     test('good for 70-89', () {
@@ -266,7 +272,11 @@ void main() {
     test('fails for accounts older than 180 days', () {
       final old = DateTime.now().subtract(const Duration(days: 181));
       final accounts = [
-        _makeAccount(id: 'a', name: 'Old', createdAt: old.millisecondsSinceEpoch),
+        _makeAccount(
+          id: 'a',
+          name: 'Old',
+          createdAt: old.millisecondsSinceEpoch,
+        ),
       ];
       final result = VaultHealthCalculator.checkStaleRecords(accounts);
       expect(result.isPass, isFalse);
@@ -297,18 +307,14 @@ void main() {
     });
 
     test('fails when URL is missing', () {
-      final accounts = [
-        _makeAccount(id: 'a', name: 'NoUrl', data: {}),
-      ];
+      final accounts = [_makeAccount(id: 'a', name: 'NoUrl', data: {})];
       final result = VaultHealthCalculator.checkIncompleteRecords(accounts, []);
       expect(result.isPass, isFalse);
       expect(result.description, contains('1'));
     });
 
     test('ignores deleted accounts', () {
-      final accounts = [
-        _makeAccount(id: 'a', data: {}, isDeleted: true),
-      ];
+      final accounts = [_makeAccount(id: 'a', data: {}, isDeleted: true)];
       final result = VaultHealthCalculator.checkIncompleteRecords(accounts, []);
       expect(result.isPass, isTrue);
     });
@@ -321,7 +327,10 @@ void main() {
         const AccountField(
           fieldKey: 'totp',
           label: '2FA',
-          attributes: AccountFieldAttributes(type: AccountFieldType.custom, isReference: true),
+          attributes: AccountFieldAttributes(
+            type: AccountFieldType.custom,
+            isReference: true,
+          ),
         ),
       ],
     );
@@ -338,14 +347,10 @@ void main() {
     );
 
     test('ignores templates without TOTP field', () {
-      final accounts = [
-        _makeAccount(id: 'a', templateId: 'plain_template'),
-      ];
-      final result = VaultHealthCalculator.checkMissing2FA(
-        accounts,
-        [templateWithoutTotp],
-        [],
-      );
+      final accounts = [_makeAccount(id: 'a', templateId: 'plain_template')];
+      final result = VaultHealthCalculator.checkMissing2FA(accounts, [
+        templateWithoutTotp,
+      ], []);
       expect(result.isPass, isTrue);
     });
 
@@ -356,11 +361,9 @@ void main() {
       final totps = [
         _makeTotp(id: 't1', linkedAccountIds: ['a']),
       ];
-      final result = VaultHealthCalculator.checkMissing2FA(
-        accounts,
-        [templateWithTotp],
-        totps,
-      );
+      final result = VaultHealthCalculator.checkMissing2FA(accounts, [
+        templateWithTotp,
+      ], totps);
       expect(result.isPass, isTrue);
     });
 
@@ -368,28 +371,20 @@ void main() {
       final accounts = [
         _makeAccount(id: 'a', name: 'Unlinked', templateId: 'totp_template'),
       ];
-      final result = VaultHealthCalculator.checkMissing2FA(
-        accounts,
-        [templateWithTotp],
-        [],
-      );
+      final result = VaultHealthCalculator.checkMissing2FA(accounts, [
+        templateWithTotp,
+      ], []);
       expect(result.isPass, isFalse);
       expect(result.description, contains('1'));
     });
 
     test('ignores deleted accounts', () {
       final accounts = [
-        _makeAccount(
-          id: 'a',
-          templateId: 'totp_template',
-          isDeleted: true,
-        ),
+        _makeAccount(id: 'a', templateId: 'totp_template', isDeleted: true),
       ];
-      final result = VaultHealthCalculator.checkMissing2FA(
-        accounts,
-        [templateWithTotp],
-        [],
-      );
+      final result = VaultHealthCalculator.checkMissing2FA(accounts, [
+        templateWithTotp,
+      ], []);
       expect(result.isPass, isTrue);
     });
   });

@@ -184,7 +184,9 @@ class _HomeSearchViewState extends State<HomeSearchView> {
         backgroundColor: WidgetStatePropertyAll(theme.colorScheme.surface),
         elevation: const WidgetStatePropertyAll(6),
         shape: WidgetStatePropertyAll(
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.dialog)),
+          RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadii.dialog),
+          ),
         ),
       ),
       builder: (context, controller, child) {
@@ -385,9 +387,7 @@ class _HomeSearchViewState extends State<HomeSearchView> {
               onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder: (_) => const LocalSyncQueueView(),
-                  ),
+                  MaterialPageRoute(builder: (_) => const LocalSyncQueueView()),
                 );
               },
               textBuilder: _text,
@@ -518,7 +518,8 @@ class _HomeSearchViewState extends State<HomeSearchView> {
                             onEdit: () => _openAccount(context, account),
                             onDelete: () => _deleteAccount(context, account),
                             localeText: (ctx, zh, en) => _text(zh, en),
-                            resolveAccountName: (id) => provider.resolveAccountName(id),
+                            resolveAccountName: (id) =>
+                                provider.resolveAccountName(id),
                           );
                         },
                       ),
@@ -657,7 +658,9 @@ class _ConflictAlertBanner extends StatelessWidget {
           decoration: BoxDecoration(
             color: theme.colorScheme.errorContainer,
             borderRadius: BorderRadius.circular(AppRadii.panel),
-            border: Border.all(color: theme.colorScheme.error.withAlpha(AppAlphas.high)),
+            border: Border.all(
+              color: theme.colorScheme.error.withAlpha(AppAlphas.high),
+            ),
           ),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -787,12 +790,11 @@ class _LocalSyncAlertBanner extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        textBuilder(
-                          '点击进入审阅并推送',
-                          'Tap to review and push',
-                        ),
+                        textBuilder('点击进入审阅并推送', 'Tap to review and push'),
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onPrimaryContainer.withAlpha(190),
+                          color: theme.colorScheme.onPrimaryContainer.withAlpha(
+                            190,
+                          ),
                         ),
                       ),
                     ],

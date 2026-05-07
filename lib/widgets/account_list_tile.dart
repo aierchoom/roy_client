@@ -177,8 +177,10 @@ class _AccountListTileState extends State<AccountListTile> {
     if (widget.template != null) {
       for (final field in widget.template!.fields) {
         usedKeys.add(field.fieldKey);
-        String displayValue = widget.account.data[field.fieldKey]?.toString() ?? '';
-        if (field.attributes.type == AccountFieldType.accountLink && displayValue.isNotEmpty) {
+        String displayValue =
+            widget.account.data[field.fieldKey]?.toString() ?? '';
+        if (field.attributes.type == AccountFieldType.accountLink &&
+            displayValue.isNotEmpty) {
           final resolved = widget.resolveAccountName?.call(displayValue);
           if (resolved != null && resolved.isNotEmpty) {
             displayValue = resolved;
@@ -197,7 +199,11 @@ class _AccountListTileState extends State<AccountListTile> {
 
     for (final entry in widget.account.data.entries) {
       if (usedKeys.contains(entry.key)) continue;
-      addField(_formatKeyLabel(entry.key), entry.value?.toString() ?? '', key: entry.key);
+      addField(
+        _formatKeyLabel(entry.key),
+        entry.value?.toString() ?? '',
+        key: entry.key,
+      );
     }
 
     return fields;
@@ -269,6 +275,10 @@ class _AccountListTileState extends State<AccountListTile> {
         return Icons.account_tree_outlined;
       case AccountFieldType.unknown:
         return Icons.help_outline_outlined;
+      case AccountFieldType.longText:
+        return Icons.notes_outlined;
+      case AccountFieldType.list:
+        return Icons.list_outlined;
       case null:
         final lower = composite.toLowerCase();
         if (lower.contains('email') || composite.contains('\u90ae\u7bb1')) {

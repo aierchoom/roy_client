@@ -9,11 +9,7 @@ class AppSettingsGroup extends StatelessWidget {
   final List<Widget> children;
   final EdgeInsetsGeometry? padding;
 
-  const AppSettingsGroup({
-    super.key,
-    required this.children,
-    this.padding,
-  });
+  const AppSettingsGroup({super.key, required this.children, this.padding});
 
   @override
   Widget build(BuildContext context) {
@@ -39,10 +35,7 @@ class AppSettingsGroup extends StatelessWidget {
       margin: EdgeInsets.zero,
       child: Padding(
         padding: effectivePadding,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: items,
-        ),
+        child: Column(mainAxisSize: MainAxisSize.min, children: items),
       ),
     );
   }

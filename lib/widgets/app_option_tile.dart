@@ -48,8 +48,7 @@ class AppOptionTile extends StatelessWidget {
                 ),
                 child: Icon(icon, color: colors.primary),
               ),
-              SizedBox(
-                  width: layout.isCompact ? AppSpacing.md : AppSpacing.lg),
+              SizedBox(width: layout.isCompact ? AppSpacing.md : AppSpacing.lg),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -72,8 +71,7 @@ class AppOptionTile extends StatelessWidget {
                   ],
                 ),
               ),
-              SizedBox(
-                  width: layout.isCompact ? AppSpacing.md : AppSpacing.lg),
+              SizedBox(width: layout.isCompact ? AppSpacing.md : AppSpacing.lg),
               AnimatedContainer(
                 duration: const Duration(milliseconds: 160),
                 width: 22,
@@ -87,11 +85,7 @@ class AppOptionTile extends StatelessWidget {
                   ),
                 ),
                 child: selected
-                    ? Icon(
-                        Icons.check,
-                        size: 14,
-                        color: colors.onPrimary,
-                      )
+                    ? Icon(Icons.check, size: 14, color: colors.onPrimary)
                     : null,
               ),
             ],

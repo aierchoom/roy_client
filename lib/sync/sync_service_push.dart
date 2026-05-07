@@ -3,12 +3,12 @@
 part of 'sync_service.dart';
 
 extension SyncServicePush on SyncService {
-
   Map<String, dynamic> _readAcceptedVersions(Map<String, dynamic> response) {
     final value = response['accepted_versions'];
     if (value == null) return const <String, dynamic>{};
     return _asStringKeyedMap(value, 'push response accepted_versions');
   }
+
   Future<int> _runPushPhase(String serverUrl) async {
     final vaultId = _identityService.vaultId;
     final approvedChanges = await _storageService.loadApprovedLocalSyncChanges(
@@ -204,7 +204,9 @@ extension SyncServicePush on SyncService {
     return acceptedVersionByItemId.length;
   }
 
-  Map<String, int> _extractAcceptedVersions(Map<String, dynamic> acceptedVersions) {
+  Map<String, int> _extractAcceptedVersions(
+    Map<String, dynamic> acceptedVersions,
+  ) {
     final result = <String, int>{};
     for (final entry in acceptedVersions.entries) {
       final value = entry.value;

@@ -180,8 +180,6 @@ class AppearanceSettingsView extends StatelessWidget {
   }
 }
 
-
-
 class _ColorPresetButton extends StatelessWidget {
   final Color color;
   final bool selected;

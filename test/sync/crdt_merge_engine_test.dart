@@ -110,7 +110,6 @@ void main() {
       String title = 'Template',
       String subTitle = '',
       List<AccountField> fields = const [],
-      Map<String, Hlc> fieldHlc = const {},
       SyncStatus syncStatus = SyncStatus.synchronized,
       int serverVersion = 0,
       bool isDeleted = false,
@@ -123,7 +122,6 @@ void main() {
         category: TemplateCategory.custom,
         fields: fields,
         hlc: hlc,
-        fieldHlc: fieldHlc,
         syncStatus: syncStatus,
         serverVersion: serverVersion,
         isDeleted: isDeleted,
@@ -131,11 +129,22 @@ void main() {
       );
     }
 
-    AccountField buildField(String key, String label) {
+    AccountField buildField(
+      String key,
+      String label, {
+      Hlc labelHlc = const Hlc(0, 0, 'local'),
+      Hlc attributesHlc = const Hlc(0, 0, 'local'),
+      Hlc orderHlc = const Hlc(0, 0, 'local'),
+      Hlc descriptionHlc = const Hlc(0, 0, 'local'),
+    }) {
       return AccountField(
         fieldKey: key,
         label: label,
         attributes: const AccountFieldAttributes(type: AccountFieldType.text),
+        labelHlc: labelHlc,
+        attributesHlc: attributesHlc,
+        orderHlc: orderHlc,
+        descriptionHlc: descriptionHlc,
       );
     }
 
@@ -144,8 +153,7 @@ void main() {
         templateId: 't1',
         hlc: const Hlc(10, 0, 'local'),
         title: 'Old',
-        fields: [buildField('a', 'A')],
-        fieldHlc: {'a': const Hlc(10, 0, 'local')},
+        fields: [buildField('a', 'A', labelHlc: const Hlc(10, 0, 'local'))],
         syncStatus: SyncStatus.synchronized,
         serverVersion: 1,
       );
@@ -154,18 +162,19 @@ void main() {
         templateId: 't1',
         hlc: const Hlc(20, 0, 'remote'),
         title: 'New',
-        fields: [buildField('a', 'A Changed')],
-        fieldHlc: {'a': const Hlc(20, 0, 'remote')},
+        fields: [
+          buildField('a', 'A Changed', labelHlc: const Hlc(20, 0, 'remote')),
+        ],
         syncStatus: SyncStatus.synchronized,
         serverVersion: 2,
       );
 
-      final merged = CrdtMergeEngine.mergeTemplate(local, remote);
+      final result = CrdtMergeEngine.mergeTemplate(local, remote);
 
-      expect(merged.title, 'New');
-      expect(merged.fields.first.label, 'A Changed');
-      expect(merged.syncStatus, SyncStatus.synchronized);
-      expect(merged.serverVersion, 2);
+      expect(result.template.title, 'New');
+      expect(result.template.fields.first.label, 'A Changed');
+      expect(result.template.syncStatus, SyncStatus.synchronized);
+      expect(result.template.serverVersion, 2);
     });
 
     test('local wins top-level, remote wins field definition', () {
@@ -173,61 +182,73 @@ void main() {
         templateId: 't1',
         hlc: const Hlc(30, 0, 'local'),
         title: 'Local Title',
-        fields: [buildField('a', 'Local A')],
-        fieldHlc: {'a': const Hlc(10, 0, 'local')},
+        fields: [
+          buildField('a', 'Local A', labelHlc: const Hlc(10, 0, 'local')),
+        ],
       );
 
       final remote = buildTemplate(
         templateId: 't1',
         hlc: const Hlc(20, 0, 'remote'),
         title: 'Remote Title',
-        fields: [buildField('a', 'Remote A')],
-        fieldHlc: {'a': const Hlc(25, 0, 'remote')},
+        fields: [
+          buildField('a', 'Remote A', labelHlc: const Hlc(25, 0, 'remote')),
+        ],
         syncStatus: SyncStatus.synchronized,
         serverVersion: 2,
       );
 
-      final merged = CrdtMergeEngine.mergeTemplate(local, remote);
+      final result = CrdtMergeEngine.mergeTemplate(local, remote);
 
-      expect(merged.title, 'Local Title');
-      expect(merged.fields.first.label, 'Remote A');
-      expect(merged.syncStatus, SyncStatus.pendingPush);
-      expect(merged.serverVersion, 2);
+      expect(result.template.title, 'Local Title');
+      expect(result.template.fields.first.label, 'Remote A');
+      expect(result.template.syncStatus, SyncStatus.pendingPush);
+      expect(result.template.serverVersion, 2);
     });
 
-    test('preserves fields from both sides with per-field LWW', () {
+    test('preserves fields from both sides with per-attribute LWW', () {
       final local = buildTemplate(
         templateId: 't1',
         hlc: const Hlc(20, 0, 'local'),
         title: 'Local',
-        fields: [buildField('a', 'A Local'), buildField('b', 'B Local')],
-        fieldHlc: {
-          'a': const Hlc(20, 0, 'local'),
-          'b': const Hlc(5, 0, 'local'),
-        },
+        fields: [
+          buildField('a', 'A Local', labelHlc: const Hlc(20, 0, 'local')),
+          buildField('b', 'B Local', labelHlc: const Hlc(5, 0, 'local')),
+        ],
       );
 
       final remote = buildTemplate(
         templateId: 't1',
         hlc: const Hlc(15, 0, 'remote'),
         title: 'Remote',
-        fields: [buildField('a', 'A Remote'), buildField('c', 'C Remote')],
-        fieldHlc: {
-          'a': const Hlc(10, 0, 'remote'),
-          'c': const Hlc(15, 0, 'remote'),
-        },
+        fields: [
+          buildField('a', 'A Remote', labelHlc: const Hlc(10, 0, 'remote')),
+          buildField('c', 'C Remote', labelHlc: const Hlc(15, 0, 'remote')),
+        ],
         syncStatus: SyncStatus.synchronized,
         serverVersion: 3,
       );
 
-      final merged = CrdtMergeEngine.mergeTemplate(local, remote);
+      final result = CrdtMergeEngine.mergeTemplate(local, remote);
 
-      expect(merged.title, 'Local');
-      final labels = {for (final f in merged.fields) f.fieldKey: f.label};
+      expect(result.template.title, 'Local');
+      final labels = {
+        for (final f in result.template.fields) f.fieldKey: f.label,
+      };
       expect(labels, {'a': 'A Local', 'b': 'B Local', 'c': 'C Remote'});
-      expect(merged.fieldHlc['a'], const Hlc(20, 0, 'local'));
-      expect(merged.fieldHlc['b'], const Hlc(5, 0, 'local'));
-      expect(merged.fieldHlc['c'], const Hlc(15, 0, 'remote'));
+
+      final fieldA = result.template.fields.firstWhere(
+        (f) => f.fieldKey == 'a',
+      );
+      final fieldB = result.template.fields.firstWhere(
+        (f) => f.fieldKey == 'b',
+      );
+      final fieldC = result.template.fields.firstWhere(
+        (f) => f.fieldKey == 'c',
+      );
+      expect(fieldA.labelHlc, const Hlc(20, 0, 'local'));
+      expect(fieldB.labelHlc, const Hlc(5, 0, 'local'));
+      expect(fieldC.labelHlc, const Hlc(15, 0, 'remote'));
     });
 
     test('same payload returns remote with max server version', () {
@@ -235,8 +256,7 @@ void main() {
         templateId: 't1',
         hlc: const Hlc(10, 0, 'local'),
         title: 'Same',
-        fields: [buildField('a', 'A')],
-        fieldHlc: {'a': const Hlc(10, 0, 'local')},
+        fields: [buildField('a', 'A', labelHlc: const Hlc(10, 0, 'local'))],
         serverVersion: 5,
       );
 
@@ -244,15 +264,14 @@ void main() {
         templateId: 't1',
         hlc: const Hlc(10, 0, 'local'),
         title: 'Same',
-        fields: [buildField('a', 'A')],
-        fieldHlc: {'a': const Hlc(10, 0, 'local')},
+        fields: [buildField('a', 'A', labelHlc: const Hlc(10, 0, 'local'))],
         serverVersion: 3,
       );
 
-      final merged = CrdtMergeEngine.mergeTemplate(local, remote);
+      final result = CrdtMergeEngine.mergeTemplate(local, remote);
 
-      expect(merged.serverVersion, 5);
-      expect(merged.syncStatus, SyncStatus.synchronized);
+      expect(result.template.serverVersion, 5);
+      expect(result.template.syncStatus, SyncStatus.synchronized);
     });
 
     test('marks conflict when local had pending push', () {
@@ -260,8 +279,9 @@ void main() {
         templateId: 't1',
         hlc: const Hlc(20, 0, 'local'),
         title: 'Local',
-        fields: [buildField('a', 'A Local')],
-        fieldHlc: {'a': const Hlc(20, 0, 'local')},
+        fields: [
+          buildField('a', 'A Local', labelHlc: const Hlc(20, 0, 'local')),
+        ],
         syncStatus: SyncStatus.pendingPush,
         serverVersion: 1,
       );
@@ -270,15 +290,16 @@ void main() {
         templateId: 't1',
         hlc: const Hlc(15, 0, 'remote'),
         title: 'Remote',
-        fields: [buildField('a', 'A Remote')],
-        fieldHlc: {'a': const Hlc(15, 0, 'remote')},
+        fields: [
+          buildField('a', 'A Remote', labelHlc: const Hlc(15, 0, 'remote')),
+        ],
         syncStatus: SyncStatus.synchronized,
         serverVersion: 2,
       );
 
-      final merged = CrdtMergeEngine.mergeTemplate(local, remote);
+      final result = CrdtMergeEngine.mergeTemplate(local, remote);
 
-      expect(merged.syncStatus, SyncStatus.conflict);
+      expect(result.template.syncStatus, SyncStatus.conflict);
     });
 
     test('newer remote tombstone wins', () {
@@ -286,8 +307,7 @@ void main() {
         templateId: 't1',
         hlc: const Hlc(10, 0, 'local'),
         title: 'Local',
-        fields: [buildField('a', 'A')],
-        fieldHlc: {'a': const Hlc(10, 0, 'local')},
+        fields: [buildField('a', 'A', labelHlc: const Hlc(10, 0, 'local'))],
       );
 
       final remote = buildTemplate(
@@ -300,11 +320,11 @@ void main() {
         serverVersion: 2,
       );
 
-      final merged = CrdtMergeEngine.mergeTemplate(local, remote);
+      final result = CrdtMergeEngine.mergeTemplate(local, remote);
 
-      expect(merged.isDeleted, isTrue);
-      expect(merged.deleteHlc, const Hlc(30, 0, 'remote'));
-      expect(merged.syncStatus, SyncStatus.synchronized);
+      expect(result.template.isDeleted, isTrue);
+      expect(result.template.deleteHlc, const Hlc(30, 0, 'remote'));
+      expect(result.template.syncStatus, SyncStatus.synchronized);
     });
   });
 }

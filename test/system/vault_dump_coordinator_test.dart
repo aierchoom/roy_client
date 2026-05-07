@@ -83,80 +83,81 @@ void main() {
   });
 
   group('VaultDumpCoordinator', () {
-    test('preserves source syncStatus during export and validate round-trip',
-        () async {
-      final identity = IdentityService(
-        secureStorage: _MemorySecureKeyValueStore()
-          ..values.addAll({
-            'device_id': 'device_abcdef123456',
-            'vault_id': 'vault_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-            'private_key':
-                'priv_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-            'symmetric_key':
-                'sym_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-            'vault_api_token': 'token_123',
-          }),
-      );
-      await identity.initialize();
+    test(
+      'preserves source syncStatus during export and validate round-trip',
+      () async {
+        final identity = IdentityService(
+          secureStorage: _MemorySecureKeyValueStore()
+            ..values.addAll({
+              'device_id': 'device_abcdef123456',
+              'vault_id': 'vault_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+              'private_key':
+                  'priv_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+              'symmetric_key':
+                  'sym_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+              'vault_api_token': 'token_123',
+            }),
+        );
+        await identity.initialize();
 
-      final storage = SecureStorageService(databaseCipher: cipher);
-      await storage.initialize(deviceId: 'device_test');
-      addTearDown(() => storage.close(dispose: true));
+        final storage = SecureStorageService(databaseCipher: cipher);
+        await storage.initialize(deviceId: 'device_test');
+        addTearDown(() => storage.close(dispose: true));
 
-      final coordinator = VaultDumpCoordinator(
-        identityService: identity,
-        storageService: storage,
-      );
+        final coordinator = VaultDumpCoordinator(
+          identityService: identity,
+          storageService: storage,
+        );
 
-      final accountPending = _makeAccount(
-        id: 'account_pending',
-        name: 'Pending Account',
-        syncStatus: SyncStatus.pendingPush,
-      );
-      final accountConflict = _makeAccount(
-        id: 'account_conflict',
-        name: 'Conflict Account',
-        syncStatus: SyncStatus.conflict,
-      );
-      final accountSynced = _makeAccount(
-        id: 'account_synced',
-        name: 'Synced Account',
-        syncStatus: SyncStatus.synchronized,
-      );
+        final accountPending = _makeAccount(
+          id: 'account_pending',
+          name: 'Pending Account',
+          syncStatus: SyncStatus.pendingPush,
+        );
+        final accountConflict = _makeAccount(
+          id: 'account_conflict',
+          name: 'Conflict Account',
+          syncStatus: SyncStatus.conflict,
+        );
+        final accountSynced = _makeAccount(
+          id: 'account_synced',
+          name: 'Synced Account',
+          syncStatus: SyncStatus.synchronized,
+        );
 
-      await storage.saveAccount(accountPending, isSyncMerge: true);
-      await storage.saveAccount(accountConflict, isSyncMerge: true);
-      await storage.saveAccount(accountSynced, isSyncMerge: true);
+        await storage.saveAccount(accountPending, isSyncMerge: true);
+        await storage.saveAccount(accountConflict, isSyncMerge: true);
+        await storage.saveAccount(accountSynced, isSyncMerge: true);
 
-      final dump = await coordinator.exportEncryptedVaultDump();
-      expect(dump, isNotNull);
+        final dump = await coordinator.exportEncryptedVaultDump();
+        expect(dump, isNotNull);
 
-      final plan = await coordinator.validateEncryptedVaultDump(
-        vaultDumpJson: dump!,
-        vaultId: identity.vaultId,
-        privateKey: identity.privateKey,
-        symmetricKey: identity.symmetricKey,
-      );
+        final plan = await coordinator.validateEncryptedVaultDump(
+          vaultDumpJson: dump!,
+          vaultId: identity.vaultId,
+          privateKey: identity.privateKey,
+          symmetricKey: identity.symmetricKey,
+        );
 
-      expect(plan.accounts.length, 3);
+        expect(plan.accounts.length, 3);
 
-      final parsedPending = plan.accounts.singleWhere(
-        (a) => a.id == 'account_pending',
-      );
-      final parsedConflict = plan.accounts.singleWhere(
-        (a) => a.id == 'account_conflict',
-      );
-      final parsedSynced = plan.accounts.singleWhere(
-        (a) => a.id == 'account_synced',
-      );
+        final parsedPending = plan.accounts.singleWhere(
+          (a) => a.id == 'account_pending',
+        );
+        final parsedConflict = plan.accounts.singleWhere(
+          (a) => a.id == 'account_conflict',
+        );
+        final parsedSynced = plan.accounts.singleWhere(
+          (a) => a.id == 'account_synced',
+        );
 
-      expect(parsedPending.syncStatus, SyncStatus.pendingPush);
-      expect(parsedConflict.syncStatus, SyncStatus.conflict);
-      expect(parsedSynced.syncStatus, SyncStatus.synchronized);
-    });
+        expect(parsedPending.syncStatus, SyncStatus.pendingPush);
+        expect(parsedConflict.syncStatus, SyncStatus.conflict);
+        expect(parsedSynced.syncStatus, SyncStatus.synchronized);
+      },
+    );
 
-    test('validateEncryptedVaultDump does not mutate coordinator identity',
-        () async {
+    test('validateEncryptedVaultDump does not mutate coordinator identity', () async {
       final identityA = IdentityService(
         secureStorage: _MemorySecureKeyValueStore()
           ..values.addAll({
@@ -198,7 +199,11 @@ void main() {
         storageService: storage,
       );
       await storage.saveAccount(
-        _makeAccount(id: 'b_account', name: 'B Account', syncStatus: SyncStatus.synchronized),
+        _makeAccount(
+          id: 'b_account',
+          name: 'B Account',
+          syncStatus: SyncStatus.synchronized,
+        ),
         isSyncMerge: true,
       );
       final dump = await tempCoordinator.exportEncryptedVaultDump();
@@ -216,8 +221,10 @@ void main() {
 
       // Coordinator's own identity (A) must remain untouched
       expect(identityA.vaultId, 'vault_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
-      expect(identityA.privateKey,
-          'priv_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+      expect(
+        identityA.privateKey,
+        'priv_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      );
     });
 
     test('validateEncryptedVaultDump does not write to storage', () async {
@@ -240,7 +247,11 @@ void main() {
 
       // Seed storage with original data
       await storage.saveAccount(
-        _makeAccount(id: 'original', name: 'Original', syncStatus: SyncStatus.synchronized),
+        _makeAccount(
+          id: 'original',
+          name: 'Original',
+          syncStatus: SyncStatus.synchronized,
+        ),
         isSyncMerge: true,
       );
 
@@ -279,10 +290,7 @@ void main() {
         syncStatus: SyncStatus.pendingPush,
       );
 
-      await storage.replaceAllDataForImport(
-        templates: [],
-        accounts: [account],
-      );
+      await storage.replaceAllDataForImport(templates: [], accounts: [account]);
 
       final loaded = await storage.loadAccounts();
       expect(loaded.length, 1);
@@ -348,10 +356,7 @@ void main() {
       final conflictsBefore = await storage.getConflictLogs('account_1');
       expect(conflictsBefore, isNotEmpty);
 
-      await storage.replaceAllDataForImport(
-        templates: [],
-        accounts: [account],
-      );
+      await storage.replaceAllDataForImport(templates: [], accounts: [account]);
 
       final outboxAfter = await storage.loadOpenLocalSyncChanges(
         vaultId: vaultId,
@@ -363,43 +368,42 @@ void main() {
     });
 
     test(
-        'ensurePendingSyncOutboxEntries recreates outbox only for pendingPush accounts after import',
-        () async {
-      final storage = SecureStorageService(databaseCipher: cipher);
-      await storage.initialize(deviceId: 'device_test');
-      addTearDown(() => storage.close(dispose: true));
+      'ensurePendingSyncOutboxEntries recreates outbox only for pendingPush accounts after import',
+      () async {
+        final storage = SecureStorageService(databaseCipher: cipher);
+        await storage.initialize(deviceId: 'device_test');
+        addTearDown(() => storage.close(dispose: true));
 
-      const vaultId = 'vault_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+        const vaultId = 'vault_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
-      final accountPending = _makeAccount(
-        id: 'account_pending',
-        name: 'Pending Account',
-        syncStatus: SyncStatus.pendingPush,
-      );
-      final accountConflict = _makeAccount(
-        id: 'account_conflict',
-        name: 'Conflict Account',
-        syncStatus: SyncStatus.conflict,
-      );
-      final accountSynced = _makeAccount(
-        id: 'account_synced',
-        name: 'Synced Account',
-        syncStatus: SyncStatus.synchronized,
-      );
+        final accountPending = _makeAccount(
+          id: 'account_pending',
+          name: 'Pending Account',
+          syncStatus: SyncStatus.pendingPush,
+        );
+        final accountConflict = _makeAccount(
+          id: 'account_conflict',
+          name: 'Conflict Account',
+          syncStatus: SyncStatus.conflict,
+        );
+        final accountSynced = _makeAccount(
+          id: 'account_synced',
+          name: 'Synced Account',
+          syncStatus: SyncStatus.synchronized,
+        );
 
-      await storage.replaceAllDataForImport(
-        templates: [],
-        accounts: [accountPending, accountConflict, accountSynced],
-      );
+        await storage.replaceAllDataForImport(
+          templates: [],
+          accounts: [accountPending, accountConflict, accountSynced],
+        );
 
-      await storage.ensurePendingSyncOutboxEntries(vaultId);
+        await storage.ensurePendingSyncOutboxEntries(vaultId);
 
-      final outbox = await storage.loadOpenLocalSyncChanges(
-        vaultId: vaultId,
-      );
-      expect(outbox.length, 1);
-      expect(outbox.single.entityId, 'account_pending');
-    });
+        final outbox = await storage.loadOpenLocalSyncChanges(vaultId: vaultId);
+        expect(outbox.length, 1);
+        expect(outbox.single.entityId, 'account_pending');
+      },
+    );
 
     test('preserves sync settings during import', () async {
       final storage = SecureStorageService(databaseCipher: cipher);
@@ -414,10 +418,7 @@ void main() {
         name: 'Test Account',
         syncStatus: SyncStatus.pendingPush,
       );
-      await storage.replaceAllDataForImport(
-        templates: [],
-        accounts: [account],
-      );
+      await storage.replaceAllDataForImport(templates: [], accounts: [account]);
 
       final version = await storage.getSetting('sync_version_testvault');
       final dirty = await storage.getSetting('sync_dirty_testvault');

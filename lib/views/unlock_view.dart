@@ -528,7 +528,9 @@ class _UnlockViewState extends State<UnlockView> {
                           ],
                         )
                       : SingleChildScrollView(
-                          padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxl),
+                          padding: const EdgeInsets.symmetric(
+                            vertical: AppSpacing.xxl,
+                          ),
                           child: Column(
                             children: [
                               _buildBrandPanel(context),
