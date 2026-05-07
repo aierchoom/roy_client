@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 import '../utils/template_icons.dart';
@@ -9,8 +11,6 @@ export '../utils/template_icons.dart'
         kTemplateIconOptions,
         templateIconFromStorageValue,
         templateIconStorageValue,
-        templateCategoryIcon,
-        inferTemplateCategory,
         templateBadgeText,
         iconForBuiltinTemplate;
 
@@ -23,6 +23,7 @@ enum AccountFieldType {
   url,
   time,
   custom,
+  accountLink,
   unknown,
 }
 
@@ -51,6 +52,131 @@ TemplateCategory templateCategoryFromString(String? value) {
     (category) => category.name == value,
     orElse: () => TemplateCategory.custom,
   );
+}
+
+IconData templateCategoryIcon(TemplateCategory category) {
+  switch (category) {
+    case TemplateCategory.login:
+      return Icons.lock_outline;
+    case TemplateCategory.payment:
+      return Icons.credit_card_outlined;
+    case TemplateCategory.contact:
+      return Icons.phone_outlined;
+    case TemplateCategory.identity:
+      return Icons.badge_outlined;
+    case TemplateCategory.work:
+      return Icons.business_center_outlined;
+    case TemplateCategory.shopping:
+      return Icons.shopping_bag_outlined;
+    case TemplateCategory.finance:
+      return Icons.account_balance_wallet_outlined;
+    case TemplateCategory.custom:
+      return Icons.description_outlined;
+  }
+}
+
+TemplateCategory inferTemplateCategory({
+  String? explicitCategory,
+  String? templateId,
+  String? title,
+  List<AccountField>? fields,
+  int? iconCodePoint,
+}) {
+  if (explicitCategory != null && explicitCategory.isNotEmpty) {
+    return templateCategoryFromString(explicitCategory);
+  }
+
+  switch (templateId) {
+    case 'generic_info':
+      return TemplateCategory.custom;
+  }
+
+  if (iconCodePoint == Icons.credit_card_outlined.codePoint) return TemplateCategory.payment;
+  if (iconCodePoint == Icons.email_outlined.codePoint ||
+      iconCodePoint == Icons.language_outlined.codePoint ||
+      iconCodePoint == Icons.lock_outline.codePoint ||
+      iconCodePoint == Icons.vpn_key_outlined.codePoint) {
+    return TemplateCategory.login;
+  }
+  if (iconCodePoint == Icons.phone_outlined.codePoint) return TemplateCategory.contact;
+  if (iconCodePoint == Icons.business_center_outlined.codePoint ||
+      iconCodePoint == Icons.apartment_outlined.codePoint) {
+    return TemplateCategory.work;
+  }
+  if (iconCodePoint == Icons.shopping_bag_outlined.codePoint) return TemplateCategory.shopping;
+
+  final normalizedTitle = (title ?? '').toLowerCase();
+  if (normalizedTitle.contains('bank') ||
+      normalizedTitle.contains('card') ||
+      normalizedTitle.contains('payment') ||
+      normalizedTitle.contains('wallet') ||
+      normalizedTitle.contains('银行卡') ||
+      normalizedTitle.contains('支付')) {
+    return TemplateCategory.payment;
+  }
+  if (normalizedTitle.contains('email') ||
+      normalizedTitle.contains('web') ||
+      normalizedTitle.contains('website') ||
+      normalizedTitle.contains('app') ||
+      normalizedTitle.contains('login') ||
+      normalizedTitle.contains('账号') ||
+      normalizedTitle.contains('登录')) {
+    return TemplateCategory.login;
+  }
+  if (normalizedTitle.contains('phone') ||
+      normalizedTitle.contains('sim') ||
+      normalizedTitle.contains('mobile') ||
+      normalizedTitle.contains('电话') ||
+      normalizedTitle.contains('手机')) {
+    return TemplateCategory.contact;
+  }
+  if (normalizedTitle.contains('id') ||
+      normalizedTitle.contains('passport') ||
+      normalizedTitle.contains('identity') ||
+      normalizedTitle.contains('证件') ||
+      normalizedTitle.contains('身份')) {
+    return TemplateCategory.identity;
+  }
+  if (normalizedTitle.contains('work') ||
+      normalizedTitle.contains('company') ||
+      normalizedTitle.contains('office') ||
+      normalizedTitle.contains('business') ||
+      normalizedTitle.contains('工作') ||
+      normalizedTitle.contains('企业')) {
+    return TemplateCategory.work;
+  }
+  if (normalizedTitle.contains('shop') ||
+      normalizedTitle.contains('shopping') ||
+      normalizedTitle.contains('store') ||
+      normalizedTitle.contains('商城') ||
+      normalizedTitle.contains('购物')) {
+    return TemplateCategory.shopping;
+  }
+
+  final sourceFields = fields ?? const <AccountField>[];
+  final hasEmailLike = sourceFields.any(
+    (field) =>
+        field.attributes.type == AccountFieldType.email ||
+        field.attributes.type == AccountFieldType.url ||
+        field.attributes.type == AccountFieldType.password,
+  );
+  final hasPhoneLike = sourceFields.any(
+    (field) => field.attributes.type == AccountFieldType.phone,
+  );
+  final hasPaymentLike = sourceFields.any((field) {
+    final normalized = '${field.fieldKey} ${field.label}'.toLowerCase();
+    return normalized.contains('card') ||
+        normalized.contains('cvv') ||
+        normalized.contains('bank') ||
+        normalized.contains('支付') ||
+        normalized.contains('银行卡');
+  });
+
+  if (hasPaymentLike) return TemplateCategory.payment;
+  if (hasPhoneLike) return TemplateCategory.contact;
+  if (hasEmailLike) return TemplateCategory.login;
+
+  return TemplateCategory.custom;
 }
 
 class AccountFieldAttributes {
@@ -241,8 +367,22 @@ class AccountTemplate {
   }
 
   static Map<String, Hlc> parseFieldHlc(dynamic value) {
-    if (value is! Map<String, dynamic>) return const {};
-    return value.map((k, v) => MapEntry(k, Hlc.parse(v as String)));
+    final dynamic decoded;
+    if (value is String) {
+      if (value.trim().isEmpty) return const {};
+      try {
+        decoded = jsonDecode(value);
+      } catch (_) {
+        return const {};
+      }
+    } else {
+      decoded = value;
+    }
+
+    if (decoded is! Map) return const {};
+    return decoded.map(
+      (k, v) => MapEntry(k.toString(), Hlc.parse(v.toString())),
+    );
   }
 
   Map<String, dynamic> toJson() {

@@ -52,6 +52,14 @@ class SecureStorageService {
   Stream<StorageChangeEvent> get onChange => _changeController.stream;
   bool get isOpen => _database?.isOpen ?? false;
 
+  String _newWorkingDatabaseName() {
+    if (Platform.environment['SECRETROY_TEST_DIR'] case final path?
+        when path.isNotEmpty) {
+      return '$_workingDatabaseName.${DateTime.now().microsecondsSinceEpoch}';
+    }
+    return _workingDatabaseName;
+  }
+
   void setDatabaseCipher(DatabaseFileCipher cipher) {
     _databaseCipher = cipher;
   }
@@ -73,8 +81,16 @@ class SecureStorageService {
       _changeController = StreamController<StorageChangeEvent>.broadcast();
     }
 
-    final documentsDirectory = await getApplicationDocumentsDirectory();
-    final temporaryDirectory = await getTemporaryDirectory();
+    final Directory documentsDirectory;
+    final Directory temporaryDirectory;
+    if (Platform.environment['SECRETROY_TEST_DIR'] case final path?
+        when path.isNotEmpty) {
+      documentsDirectory = Directory(path);
+      temporaryDirectory = documentsDirectory;
+    } else {
+      documentsDirectory = await getApplicationDocumentsDirectory();
+      temporaryDirectory = await getTemporaryDirectory();
+    }
     _legacyDatabasePath = join(documentsDirectory.path, _databaseName);
     _encryptedDatabasePath = join(
       documentsDirectory.path,
@@ -83,7 +99,7 @@ class SecureStorageService {
     _workingDatabasePath = join(
       temporaryDirectory.path,
       'secret_roy',
-      _workingDatabaseName,
+      _newWorkingDatabaseName(),
     );
 
     if (_databaseCipher == null) {
@@ -108,7 +124,22 @@ class SecureStorageService {
       final backupPath = await _backupUnreadableDatabase(
         _encryptedDatabasePath!,
       );
-      await _deleteWorkingDatabase();
+      try {
+        await _database?.close();
+      } catch (closeError) {
+        AppLogger.d(
+          'Failed to close working database after open error: $closeError',
+        );
+      } finally {
+        _database = null;
+      }
+      try {
+        await _deleteWorkingDatabase();
+      } catch (cleanupError) {
+        AppLogger.d(
+          'Failed to clean working database after open error: $cleanupError',
+        );
+      }
       AppLogger.d('Failed to open database safely: $e');
       throw StorageOpenException(
         originalError: e.toString(),
@@ -170,7 +201,13 @@ class SecureStorageService {
   }
 
   Future<bool> isDatabaseInitialized() async {
-    final documentsDirectory = await getApplicationDocumentsDirectory();
+    final Directory documentsDirectory;
+    if (Platform.environment['SECRETROY_TEST_DIR'] case final path?
+        when path.isNotEmpty) {
+      documentsDirectory = Directory(path);
+    } else {
+      documentsDirectory = await getApplicationDocumentsDirectory();
+    }
     final databasePath = join(documentsDirectory.path, _encryptedDatabaseName);
     return File(databasePath).existsSync();
   }
@@ -178,8 +215,16 @@ class SecureStorageService {
   Future<void> deleteDatabaseFile() async {
     await close();
 
-    final documentsDirectory = await getApplicationDocumentsDirectory();
-    final temporaryDirectory = await getTemporaryDirectory();
+    final Directory documentsDirectory;
+    final Directory temporaryDirectory;
+    if (Platform.environment['SECRETROY_TEST_DIR'] case final path?
+        when path.isNotEmpty) {
+      documentsDirectory = Directory(path);
+      temporaryDirectory = documentsDirectory;
+    } else {
+      documentsDirectory = await getApplicationDocumentsDirectory();
+      temporaryDirectory = await getTemporaryDirectory();
+    }
     _legacyDatabasePath = join(documentsDirectory.path, _databaseName);
     _encryptedDatabasePath = join(
       documentsDirectory.path,
@@ -188,7 +233,7 @@ class SecureStorageService {
     _workingDatabasePath = join(
       temporaryDirectory.path,
       'secret_roy',
-      _workingDatabaseName,
+      _newWorkingDatabaseName(),
     );
 
     try {
@@ -305,7 +350,13 @@ class SecureStorageService {
   }
 
   Future<String> getDatabaseFilePath() async {
-    final documentsDirectory = await getApplicationDocumentsDirectory();
+    final Directory documentsDirectory;
+    if (Platform.environment['SECRETROY_TEST_DIR'] case final path?
+        when path.isNotEmpty) {
+      documentsDirectory = Directory(path);
+    } else {
+      documentsDirectory = await getApplicationDocumentsDirectory();
+    }
     return join(documentsDirectory.path, _encryptedDatabaseName);
   }
 
@@ -588,6 +639,7 @@ class SecureStorageService {
         is_custom INTEGER DEFAULT 1,
         created_at INTEGER NOT NULL,
         hlc TEXT,
+        field_hlc TEXT,
         server_version INTEGER DEFAULT 0,
         sync_status INTEGER DEFAULT 1,
         is_deleted INTEGER DEFAULT 0,
@@ -1055,7 +1107,9 @@ class SecureStorageService {
     );
   }
 
-  Future<TotpCredential> _cleanupOrphanedLinks(TotpCredential credential) async {
+  Future<TotpCredential> _cleanupOrphanedLinks(
+    TotpCredential credential,
+  ) async {
     if (credential.linkedAccountIds.isEmpty) return credential;
 
     final validIds = <String>[];
@@ -1306,10 +1360,8 @@ class SecureStorageService {
       );
       return rows
           .map(
-            (row) => _mapToAccountTemplate(
-              row,
-              isCustom: row['is_custom'] == 1,
-            ),
+            (row) =>
+                _mapToAccountTemplate(row, isCustom: row['is_custom'] == 1),
           )
           .whereType<AccountTemplate>()
           .toList();
@@ -1387,8 +1439,7 @@ class SecureStorageService {
         );
       } else {
         final newFieldHlc = {
-          for (final field in template.fields)
-            field.fieldKey: newStamp,
+          for (final field in template.fields) field.fieldKey: newStamp,
         };
         itemToSave = template.copyWith(
           hlc: newStamp,
@@ -1434,16 +1485,13 @@ class SecureStorageService {
   ) {
     final result = <String, Hlc>{};
     for (final field in updated.fields) {
-      final existingField = existing.fields
-          .cast<AccountField?>()
-          .firstWhere(
-            (f) => f?.fieldKey == field.fieldKey,
-            orElse: () => null,
-          );
+      final existingField = existing.fields.cast<AccountField?>().firstWhere(
+        (f) => f?.fieldKey == field.fieldKey,
+        orElse: () => null,
+      );
       if (existingField != null &&
           jsonEncode(existingField.toJson()) == jsonEncode(field.toJson())) {
-        result[field.fieldKey] =
-            existing.fieldHlc[field.fieldKey] ?? stamp;
+        result[field.fieldKey] = existing.fieldHlc[field.fieldKey] ?? stamp;
       } else {
         result[field.fieldKey] = stamp;
       }
@@ -1961,30 +2009,21 @@ class SecureStorageService {
 
     await _database!.update(
       'accounts',
-      {
-        'sync_status': SyncStatus.pendingPush.index,
-        'modified_at': now,
-      },
+      {'sync_status': SyncStatus.pendingPush.index, 'modified_at': now},
       where: 'sync_status = ?',
       whereArgs: [SyncStatus.synchronized.index],
     );
 
     await _database!.update(
       'templates',
-      {
-        'sync_status': SyncStatus.pendingPush.index,
-        'created_at': now,
-      },
+      {'sync_status': SyncStatus.pendingPush.index, 'created_at': now},
       where: 'sync_status = ? AND is_custom = 1',
       whereArgs: [SyncStatus.synchronized.index],
     );
 
     await _database!.update(
       'totp_credentials',
-      {
-        'sync_status': SyncStatus.pendingPush.index,
-        'modified_at': now,
-      },
+      {'sync_status': SyncStatus.pendingPush.index, 'modified_at': now},
       where: 'sync_status = ?',
       whereArgs: [SyncStatus.synchronized.index],
     );

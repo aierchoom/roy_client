@@ -516,6 +516,7 @@ class _AccountListViewState extends State<AccountListView> {
                     onEdit: () => _openEditor(context, initial: account),
                     onDelete: () => _deleteAccount(context, account),
                     localeText: _text,
+                    resolveAccountName: (id) => provider.resolveAccountName(id),
                   ),
                   if (index < group.accounts.length - 1)
                     Divider(

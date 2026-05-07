@@ -84,6 +84,21 @@ class EnhancedAppProvider extends ChangeNotifier {
         .toList(growable: false);
   }
 
+  String? resolveAccountName(String accountId) {
+    final account = getAccount(accountId);
+    return account?.name;
+  }
+
+  List<AccountItem> accountsLinkedTo(String accountId) {
+    return _accounts.where((account) {
+      if (account.id == accountId) return false;
+      for (final value in account.data.values) {
+        if (value?.toString() == accountId) return true;
+      }
+      return false;
+    }).toList(growable: false);
+  }
+
   SyncState get syncState => _serviceManager.syncState;
   bool get isSyncConnected => _serviceManager.isSyncConnected;
 

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:secret_roy/core/app_logger.dart';
@@ -288,6 +289,9 @@ class ServiceManager extends ChangeNotifier {
   }
 
   Future<bool> isNoPasswordMode() async {
+    if (Platform.environment['SECRETROY_TEST_DISABLE_NO_PASSWORD'] == '1') {
+      return false;
+    }
     const secureStorage = FlutterSecureStorage();
     return await secureStorage.read(key: 'no_password_mode') == 'true';
   }

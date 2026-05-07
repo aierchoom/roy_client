@@ -58,7 +58,7 @@ Execution queue alignment:
 - Stage 1: T9 sync status cleanup + T12 sensitive clipboard policy.
 - Stage 2: T15 key custody ✅ + T16 server auth ✅ + T10 server persistence.
 - Stage 3: T14 backup/restore consistency + T13 Vault Health.
-- Stage 4: T17 UI architecture + T18 2FA next phase.
+- Stage 4: T17 UI architecture（token-based design system、SyncService 拆分已提前落地）+ EA 后模板系统增强（preset groups、字段级 CRDT merge、内置模板入库）+ T18 2FA next phase.
 - New global roadmap items should be tracked as stage steps in
   `docs/product/iteration-tasks.md` rather than scattered in feature notes.
 

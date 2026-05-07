@@ -58,6 +58,10 @@ class _AccountEditViewState extends State<AccountEditView> {
         field.attributes.isReference;
   }
 
+  bool _isAccountLinkField(AccountField field) {
+    return field.attributes.type == AccountFieldType.accountLink;
+  }
+
   DateTime? _tryParseDateTime(String raw, TimeFieldFormat format) {
     final trimmed = raw.trim();
     if (trimmed.isEmpty) return null;
@@ -218,8 +222,9 @@ class _AccountEditViewState extends State<AccountEditView> {
         widget.initial?.id ?? DateTime.now().millisecondsSinceEpoch.toString();
     _isEditing = widget.initial == null;
     _draftData.addAll(
-      (widget.initial?.data ?? const <String, dynamic>{})
-          .map((k, v) => MapEntry(k, v?.toString() ?? '')),
+      (widget.initial?.data ?? const <String, dynamic>{}).map(
+        (k, v) => MapEntry(k, v?.toString() ?? ''),
+      ),
     );
     if (widget.initial != null) {
       _nameCtrl.text = widget.initial!.name;
@@ -275,6 +280,9 @@ class _AccountEditViewState extends State<AccountEditView> {
         _draftData.remove(field.fieldKey);
         continue;
       }
+      if (_isAccountLinkField(field)) {
+        continue;
+      }
       final controller = TextEditingController();
       controller.text = _draftData[field.fieldKey] ?? '';
       _fieldCtrls[field.fieldKey] = controller;
@@ -303,6 +311,37 @@ class _AccountEditViewState extends State<AccountEditView> {
 
   bool get _hasMissingTemplate =>
       _pickedTag != null && _currentTemplate == null;
+
+  void _syncTemplateSelectionFromProvider(List<AccountTemplate> templates) {
+    if (templates.isEmpty) return;
+
+    String? nextTemplateId;
+    if (_pickedTag == null) {
+      if (widget.initial != null) return;
+      final initialTemplateId = widget.initialTemplateId;
+      nextTemplateId =
+          initialTemplateId != null &&
+              templates.any(
+                (template) => template.templateId == initialTemplateId,
+              )
+          ? initialTemplateId
+          : templates.first.templateId;
+    } else if (_currentTemplate == null &&
+        templates.any((template) => template.templateId == _pickedTag)) {
+      nextTemplateId = _pickedTag;
+    }
+
+    if (nextTemplateId == null) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_currentTemplate?.templateId == nextTemplateId) return;
+      setState(() {
+        _pickedTag = nextTemplateId;
+        _buildFieldsForTemplate(nextTemplateId);
+      });
+    });
+  }
 
   Map<String, String> get _legacyData {
     final legacy = <String, String>{};
@@ -463,6 +502,23 @@ class _AccountEditViewState extends State<AccountEditView> {
                 content: Text(
                   _text(
                     '\u8bf7\u5173\u8054\u5fc5\u586b\u5b57\u6bb5\uff1a${field.label}',
+                    'Required link missing: ${field.label}',
+                  ),
+                ),
+              ),
+            );
+            return;
+          }
+          continue;
+        }
+        if (_isAccountLinkField(field)) {
+          if (field.attributes.isRequired &&
+              (_draftData[field.fieldKey]?.isEmpty ?? true)) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  _text(
+                    '\u8bf7\u9009\u62e9\u5fc5\u586b\u5b57\u6bb5\uff1a${field.label}',
                     'Required link missing: ${field.label}',
                   ),
                 ),
@@ -924,7 +980,11 @@ class _AccountEditViewState extends State<AccountEditView> {
     final showMissingTemplateWarning = _hasMissingTemplate;
     final selectedTemplateAccent = selectedTemplate == null
         ? theme.colorScheme.primary
-        : AppSurfaces.soft(theme.colorScheme, tint: theme.colorScheme.primary, tintAlpha: 18);
+        : AppSurfaces.soft(
+            theme.colorScheme,
+            tint: theme.colorScheme.primary,
+            tintAlpha: 18,
+          );
 
     return Container(
       decoration: BoxDecoration(
@@ -1200,11 +1260,18 @@ class _AccountEditViewState extends State<AccountEditView> {
     if (_isTotpField(field)) {
       return _buildTotpLinkSection(context, field);
     }
+    if (_isAccountLinkField(field)) {
+      return _buildAccountLinkSection(context, field);
+    }
 
     final theme = Theme.of(context);
     final controller = _fieldCtrls[field.fieldKey];
     final accent = _fieldAccentColor(theme, field);
-    final previewSurface = AppSurfaces.soft(theme.colorScheme, tint: accent, tintAlpha: 10);
+    final previewSurface = AppSurfaces.soft(
+      theme.colorScheme,
+      tint: accent,
+      tintAlpha: 10,
+    );
     final canPickInlineTime =
         controller != null &&
         _isTimeField(field) &&
@@ -1231,7 +1298,11 @@ class _AccountEditViewState extends State<AccountEditView> {
                   width: 46,
                   height: 46,
                   decoration: BoxDecoration(
-                    color: AppSurfaces.soft(theme.colorScheme, tint: accent, tintAlpha: 18),
+                    color: AppSurfaces.soft(
+                      theme.colorScheme,
+                      tint: accent,
+                      tintAlpha: 18,
+                    ),
                     borderRadius: BorderRadius.circular(15),
                   ),
                   child: Icon(
@@ -1624,6 +1695,219 @@ class _AccountEditViewState extends State<AccountEditView> {
     );
   }
 
+  Widget _buildAccountLinkSection(BuildContext context, AccountField field) {
+    final theme = Theme.of(context);
+    final provider = context.watch<EnhancedAppProvider>();
+    final linkedId = _draftData[field.fieldKey];
+    final linkedAccount = linkedId != null && linkedId.isNotEmpty
+        ? provider.getAccount(linkedId)
+        : null;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppSurfaces.soft(
+          theme.colorScheme,
+          tint: theme.colorScheme.primary,
+          tintAlpha: 10,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withAlpha(88),
+        ),
+        boxShadow: AppShadows.card(theme, depth: 0.55),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.account_tree_outlined,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    field.label.trim().isEmpty
+                        ? _text('\u5173\u8054\u8d26\u6237', 'Linked Account')
+                        : field.label,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                if (linkedAccount != null)
+                  ToneChip(
+                    icon: Icons.check_circle_outlined,
+                    label: _text('\u5df2\u5173\u8054', 'Linked'),
+                    tint: theme.colorScheme.primary,
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              field.description?.trim().isNotEmpty == true
+                  ? field.description!.trim()
+                  : _text(
+                      '\u7528\u4e8e\u5173\u8054\u5176\u4ed6\u8d26\u6237\u8bb0\u5f55\u3002',
+                      'Used to link to another account entry.',
+                    ),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                height: 1.35,
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (linkedAccount != null)
+              _buildLinkedAccountCard(context, linkedAccount, field)
+            else
+              Text(
+                _text(
+                  '\u5c1a\u672a\u5173\u8054\u4efb\u4f55\u8d26\u6237\u3002',
+                  'No account linked yet.',
+                ),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            const SizedBox(height: 10),
+            if (_isEditing)
+              Row(
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: () => _showAccountPicker(context, field),
+                    icon: Icon(
+                      linkedAccount != null
+                          ? Icons.swap_horiz_outlined
+                          : Icons.add_link_outlined,
+                    ),
+                    label: Text(
+                      linkedAccount != null
+                          ? _text('\u66f4\u6362\u5173\u8054', 'Change Link')
+                          : _text('\u9009\u62e9\u8d26\u6237', 'Select Account'),
+                    ),
+                  ),
+                  if (linkedAccount != null) ...[
+                    const SizedBox(width: 8),
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _draftData.remove(field.fieldKey);
+                        });
+                      },
+                      icon: const Icon(Icons.link_off_outlined),
+                      label: Text(_text('\u6e05\u9664\u5173\u8054', 'Clear')),
+                    ),
+                  ],
+                ],
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLinkedAccountCard(
+    BuildContext context,
+    AccountItem account,
+    AccountField field,
+  ) {
+    final theme = Theme.of(context);
+    final provider = context.read<EnhancedAppProvider>();
+    final template = provider.getTemplate(account.templateId);
+
+    return Material(
+      color: theme.colorScheme.surfaceContainerHighest.withAlpha(80),
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => AccountEditView(initial: account),
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              Icon(
+                Icons.account_circle_outlined,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      account.name,
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (template != null)
+                      Text(
+                        template.title,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 14,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showAccountPicker(
+    BuildContext context,
+    AccountField field,
+  ) async {
+    final provider = context.read<EnhancedAppProvider>();
+    final accounts = provider.allAccounts
+        .where((a) => a.id != _accountId)
+        .toList(growable: false);
+
+    final selected = await showDialog<String>(
+      context: context,
+      builder: (context) => _AccountPickerDialog(
+        accounts: accounts,
+        currentSelection: _draftData[field.fieldKey],
+        resolveTemplate: provider.getTemplate,
+        localeText: _text,
+      ),
+    );
+
+    if (selected == null) return;
+    if (!mounted) return;
+
+    setState(() {
+      if (selected.isEmpty) {
+        _draftData.remove(field.fieldKey);
+      } else {
+        _draftData[field.fieldKey] = selected;
+      }
+    });
+  }
+
   Widget _buildFieldSectionHeader(
     BuildContext context,
     AccountTemplate? template,
@@ -1964,6 +2248,8 @@ class _AccountEditViewState extends State<AccountEditView> {
 
   @override
   Widget build(BuildContext context) {
+    final templates = context.watch<EnhancedAppProvider>().allTemplates;
+    _syncTemplateSelectionFromProvider(templates);
     final currentTemplate = _currentTemplate;
     final legacyData = _legacyData;
     final isDesktop = AppBreakpoints.isDesktop(context);
@@ -2198,6 +2484,146 @@ class _AccountEditViewState extends State<AccountEditView> {
           ),
         );
       },
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Account Picker Dialog — used by AccountFieldType.accountLink
+// ---------------------------------------------------------------------------
+
+class _AccountPickerDialog extends StatefulWidget {
+  final List<AccountItem> accounts;
+  final String? currentSelection;
+  final AccountTemplate? Function(String templateId) resolveTemplate;
+  final String Function(String zh, String en) localeText;
+
+  const _AccountPickerDialog({
+    required this.accounts,
+    required this.currentSelection,
+    required this.resolveTemplate,
+    required this.localeText,
+  });
+
+  @override
+  State<_AccountPickerDialog> createState() => _AccountPickerDialogState();
+}
+
+class _AccountPickerDialogState extends State<_AccountPickerDialog> {
+  String _query = '';
+
+  List<AccountItem> get _filtered {
+    if (_query.isEmpty) return widget.accounts;
+    final normalized = _query.toLowerCase();
+    return widget.accounts.where((a) {
+      return a.name.toLowerCase().contains(normalized) ||
+          a.email.toLowerCase().contains(normalized);
+    }).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final filtered = _filtered;
+
+    return AlertDialog(
+      title: Text(
+        widget.localeText(
+          '\u9009\u62e9\u5173\u8054\u8d26\u6237',
+          'Select Linked Account',
+        ),
+      ),
+      contentPadding: const EdgeInsets.fromLTRB(0, 12, 0, 0),
+      content: SizedBox(
+        width: 420,
+        height: 420,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: TextField(
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: widget.localeText(
+                    '\u641c\u7d22\u8d26\u6237...',
+                    'Search accounts...',
+                  ),
+                  prefixIcon: const Icon(Icons.search_outlined),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                ),
+                onChanged: (value) => setState(() => _query = value.trim()),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: filtered.isEmpty
+                  ? Center(
+                      child: Text(
+                        widget.localeText(
+                          '\u672a\u627e\u5230\u8d26\u6237',
+                          'No accounts found',
+                        ),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    )
+                  : ListView.builder(
+                      itemCount: filtered.length,
+                      itemBuilder: (context, index) {
+                        final account = filtered[index];
+                        final template = widget.resolveTemplate(
+                          account.templateId,
+                        );
+                        final isSelected =
+                            widget.currentSelection == account.id;
+
+                        return ListTile(
+                          leading: Icon(
+                            isSelected
+                                ? Icons.radio_button_checked_rounded
+                                : Icons.radio_button_unchecked_rounded,
+                            color: isSelected
+                                ? theme.colorScheme.primary
+                                : theme.colorScheme.onSurfaceVariant,
+                          ),
+                          title: Text(
+                            account.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          subtitle: template != null
+                              ? Text(
+                                  template.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                )
+                              : null,
+                          onTap: () => Navigator.pop(context, account.id),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        if (widget.currentSelection != null &&
+            widget.currentSelection!.isNotEmpty)
+          TextButton(
+            onPressed: () => Navigator.pop(context, ''),
+            child: Text(
+              widget.localeText('\u6e05\u9664\u5173\u8054', 'Clear Link'),
+            ),
+          ),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(widget.localeText('\u53d6\u6d88', 'Cancel')),
+        ),
+      ],
     );
   }
 }

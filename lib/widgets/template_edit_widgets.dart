@@ -23,6 +23,8 @@ String fieldTypeLabel(AccountFieldType type) {
       return '\u65f6\u95f4';
     case AccountFieldType.custom:
       return '\u81ea\u5b9a\u4e49';
+    case AccountFieldType.accountLink:
+      return '\u5173\u8054\u8d26\u6237';
     case AccountFieldType.unknown:
       return '\u672a\u77e5';
   }
@@ -47,6 +49,8 @@ IconData fieldTypeIcon(AccountFieldType type) {
       return Icons.schedule_outlined;
     case AccountFieldType.custom:
       return Icons.extension_outlined;
+    case AccountFieldType.accountLink:
+      return Icons.link_outlined;
     case AccountFieldType.unknown:
       return Icons.help_outline_outlined;
   }
@@ -202,6 +206,9 @@ class _FieldEditorDialogState extends State<FieldEditorDialog> {
   void _setFieldType(AccountFieldType value) {
     setState(() {
       _type = value;
+      if (value == AccountFieldType.accountLink) {
+        _isReference = true;
+      }
     });
   }
 

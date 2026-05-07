@@ -23,6 +23,7 @@ Each report should include:
 
 | Date | Report | Scope |
 |---|---|---|
+| 2026-05-07 | [2026-05-07-quality-convergence.md](2026-05-07-quality-convergence.md) | Template utility dependency and static gate convergence |
 | 2026-05-06 | [2026-05-06-smoke-automation-full-run.md](2026-05-06-smoke-automation-full-run.md) | Windows desktop smoke execution and coverage gap review |
 | 2026-05-01 | [2026-05-01-sync-state-machine-cleanup.md](2026-05-01-sync-state-machine-cleanup.md) | Sync state machine: 5→10 typed states |
 | 2026-05-01 | [2026-05-01-sensitive-clipboard-policy-convergence.md](2026-05-01-sensitive-clipboard-policy-convergence.md) | Global sensitive clipboard policy with risk levels |

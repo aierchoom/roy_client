@@ -1,6 +1,6 @@
 # SecretRoy 应用程序特性基准
 
-**最后更新**: 2026-05-06
+**最后更新**: 2026-05-06（EA tag 后追加：模板字段预设组、字段级 CRDT merge、isReference 与内置模板入库、token-based design system、SyncService 拆分、首页同步推送入口）
 **文档定位**: 全局产品与工程参考
 **适用范围**: 后续所有功能设计、实现、测试、文档和质量收敛
 **维护原则**: 以后扫描代码或迭代功能时，只要发现本文档未记录的真实功能点，必须同步补入本文档
@@ -46,9 +46,9 @@ SecretRoy 是一个本地优先的个人密钥/账号保险库应用。
 | 本地保险库解锁 | 进入本地加密保险库的第一入口 | `unlock_view.dart`, `EnhancedCryptoService`, `SecureStorageService` | 密码校验、无密码模式、生物识别、自动锁定、失败态 |
 | 本地加密数据库 | 用户数据的本地事实存储 | `SecureStorageService`, `DatabaseFileCipher`, `DatabaseFileKeyManager` | 加密落盘、运行时明文清理、数据库迁移、导入覆盖 |
 | 账号管理 | 保存、编辑、删除用户账号和字段数据 | `account_edit_view.dart`, `account_list_view.dart`, `AccountItem` | 历史字段保留、敏感字段展示、删除可控、模板缺失保护 |
-| 模板管理 | 定义账号字段结构和内置/自定义模板 | `template_edit_view.dart`, `template_list_view.dart`, `AccountTemplate` | 模板删除保护、字段变更不静默丢数据、内置模板中文优先 |
+| 模板管理 | 定义账号字段结构和内置/自定义模板 | `template_edit_view.dart`, `template_list_view.dart`, `AccountTemplate` | 模板删除保护、字段变更不静默丢数据、内置模板中文优先；字段预设组与预览对话框、模板字段级 CRDT merge、isReference 模式、内置模板数据库存储 |
 | 2FA/TOTP 验证器 | 独立保存网站 TOTP 凭据并本地生成动态验证码，账号信息只关联它 | `totp_credential.dart`, `totp_service.dart`, `totp_qr_image_import_service.dart`, `totp_account_list_view.dart`, `account_edit_view.dart` | secret 默认隐藏、不搜索、不泄露到服务端、移动端扫码、二维码图片主动粘贴导入、列表只提示已关联、同步走独立 AEAD payload |
-| 首页搜索与任务聚合 | 搜索账号，并聚合需要用户处理的事项 | `home_search_view.dart`, `EnhancedAppProvider` | 待同步变更、冲突入口、搜索结果、移动端布局 |
+| 首页搜索与任务聚合 | 搜索账号，并聚合需要用户处理的事项 | `home_search_view.dart`, `EnhancedAppProvider` | 待同步变更、冲突入口、搜索结果、移动端布局；本地变更存在时首页直接暴露同步推送入口 |
 | 密码工具 | 生成和评估密码强度 | `password_tools_view.dart`, `password_generator_sheet.dart` | 字符池覆盖、强度提示、填入/复制动作 |
 | 外观设置 | 控制主题、色彩和视觉偏好 | `appearance_settings_view.dart`, `theme_provider.dart` | 专业工具感、浅/深色、布局不溢出 |
 | 安全设置 | 管理锁定、生物识别、无密码等安全体验 | `security_settings_view.dart`, `auto_lock_service.dart`, `biometric_auth_service.dart` | 锁定时机、状态文案、敏感操作确认 |
@@ -150,10 +150,12 @@ SecretRoy 是一个本地优先的个人密钥/账号保险库应用。
 当前账号和模板是弱关联模型：
 
 - `accounts` 保存账号主数据。
-- `accounts.data` 保存字段 JSON。
+- `accounts.data` 保存字段 JSON，支持动态类型（由模板字段定义驱动）。
 - `templates` 保存自定义模板定义。
-- 内置模板由客户端代码提供。
+- 内置模板由客户端代码初始化并持久化到数据库。
 - 模板字段变化不会自动迁移历史账号数据。
+- 模板字段支持预设组（preset groups）与预览对话框。
+- 模板字段级 CRDT merge：模板字段变更参与同步冲突合并，而不是整表覆盖。
 
 长期原则：
 

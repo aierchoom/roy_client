@@ -122,6 +122,8 @@ class _TemplateEditViewState extends State<TemplateEditView> {
       case AccountFieldType.custom:
       case AccountFieldType.unknown:
         return field.attributes.hint ?? '';
+      case AccountFieldType.accountLink:
+        return '\u5173\u8054\u8d26\u6237';
     }
   }
 

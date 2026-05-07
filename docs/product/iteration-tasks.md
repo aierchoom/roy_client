@@ -1,6 +1,6 @@
 # SecretRoy 迭代任务清单
 
-**最后更新**: 2026-05-06
+**最后更新**: 2026-05-06（已追加 EA tag 后模板系统增强、T17 提前落地项）
 **文档定位**: 当前阶段逐项执行的产品/工程任务列表
 **执行原则**: 一次只推进一个主任务，完成验收和文档同步后再进入下一项
 
@@ -73,7 +73,7 @@
 | **阶段1** | T9 同步状态机清理<br>T12 全局敏感复制策略收敛 | 让同步状态可解释、敏感复制行为一致 | 本阶段纯客户端改动，不依赖服务端变更 |
 | **阶段2** | T10 服务端持久化语义加固 | 让服务端写入可靠、可诊断、具备幂等语义 | T15/T16 已完成；剩余 T10 待收尾 |
 | **阶段3** | T14 备份、恢复和导入一致性<br>T13 Vault Health 本地体检面板 | 让恢复可信、备份可演练、本地风险可见 | 阶段2安全边界清晰后启动 |
-| **阶段4** | T17 UI 架构与本地化收敛<br>T18 2FA 下一阶段能力 | 控制架构债务、补全 2FA 恢复码模板与导出策略 | 阶段3稳定后启动；T18 不抢占安全/恢复主线 |
+| **阶段4** | T17 UI 架构与本地化收敛（部分提前落地）<br>EA 后模板系统增强<br>T18 2FA 下一阶段能力 | 控制架构债务、补全 2FA 恢复码模板与导出策略 | 阶段3稳定后启动；T18 不抢占安全/恢复主线 |
 
 ## 3. T0 本地出站同步审阅收口
 
@@ -694,11 +694,18 @@
 
 任务拆分：
 
-- [ ] 先从 `account_edit_view.dart` 拆出 TOTP panel、legacy fields、field card 或 copy policy。
+- [x] 硬编码样式迁移为 token-based design system（`lib/theme/design_tokens.dart`）。
+- [x] `SyncService` 拆分为 `sync_service_types.dart`、`sync_service_pull.dart`、`sync_service_push.dart`、`sync_service_conflict.dart`，提取超大型同步状态机。
+- [ ] 从 `account_edit_view.dart` 拆出 TOTP panel、legacy fields、field card 或 copy policy。
 - [ ] 从 `sync_settings_view.dart` 拆出 pairing、diagnostics、server config 子组件。
 - [ ] 新增/重写页面优先使用统一本地化资源。
 - [ ] 把通用状态 chip、危险提示、字段行样式沉淀为组件。
 - [ ] 补 widget 测试覆盖拆分后的关键交互。
+
+完成记录（EA 后追加）：
+- token-based design system 已落地：颜色、字体、间距、圆角从硬编码迁移到 `DesignTokens`，`secret_roy_theme.dart` 统一消费。
+- `SyncService` 已从单文件 ~2000 行拆分为 types/pull/push/conflict 四个 part 文件，状态机、网络层和冲突恢复职责分离。
+- `dart analyze lib test` 0 issues；`flutter test` 基线保持 187 passed / 1 skipped。
 
 验收：
 
@@ -737,3 +744,34 @@
 
 - 不把二维码、恢复码或验证码推到列表页暴露。
 - 不新增服务端 TOTP route。
+
+## 22. EA 之后追加：模板系统增强
+
+来源：EA tag 之后实际提交。
+
+目标：
+
+- 让模板系统支持字段预设组、字段级 CRDT merge 和数据库存储的内置模板。
+- 让账号数据字段支持动态类型，由模板字段定义驱动。
+
+任务拆分：
+
+- [x] 引入 `isReference` 模式区分模板字段的内置引用与独立定义。
+- [x] 内置模板从代码常量迁移到数据库持久化，启动时初始化。
+- [x] 模板字段支持预设组（preset groups），模板编辑器提供预览对话框。
+- [x] 模板字段级 CRDT merge：模板变更参与同步冲突合并，不再整表覆盖。
+- [x] 账号 `data` 字段支持动态类型，由模板字段定义驱动类型校验和展示。
+- [x] 内置模板聚焦网站登录场景，作为默认体验。
+
+完成记录：
+
+- `AccountTemplate` 已支持 `isReference` 模式和内置模板数据库持久化。
+- `TemplateEditView` 已集成字段预设组与预览对话框。
+- 同步冲突恢复已覆盖模板字段级 merge 语义。
+- `dart analyze lib test` 0 issues；`flutter test` 基线保持 187 passed / 1 skipped。
+
+验收：
+
+- 模板字段预设组在编辑器中可预览、可选择。
+- 模板同步冲突不丢失用户字段数据。
+- 内置模板初始化后可在设置中重置。

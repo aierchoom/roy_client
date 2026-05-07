@@ -13,7 +13,6 @@ import '../../widgets/app_selectable_scrollable.dart';
 import '../../widgets/green_add_button.dart';
 import 'template_edit_view.dart';
 
-
 class TemplateListView extends StatelessWidget {
   const TemplateListView({super.key});
 
@@ -238,7 +237,11 @@ class TemplateListView extends StatelessWidget {
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: AppSurfaces.soft(theme.colorScheme, tint: accent, tintAlpha: 14),
+                color: AppSurfaces.soft(
+                  theme.colorScheme,
+                  tint: accent,
+                  tintAlpha: 14,
+                ),
                 borderRadius: BorderRadius.circular(AppRadii.button),
                 border: Border.all(color: accent.withAlpha(44)),
               ),
@@ -272,8 +275,7 @@ class TemplateListView extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final layout = AppLayout.of(context);
-        final crossAxisCount =
-            layout.isCompact ? 1 : (layout.isMedium ? 2 : 3);
+        final crossAxisCount = layout.isCompact ? 1 : (layout.isMedium ? 2 : 3);
 
         final cards = [
           for (final template in templates)
@@ -294,7 +296,9 @@ class TemplateListView extends StatelessWidget {
             color: theme.colorScheme.surface,
             borderRadius: BorderRadius.circular(AppRadii.panel),
             border: Border.all(
-              color: theme.colorScheme.outlineVariant.withAlpha(AppAlphas.outline),
+              color: theme.colorScheme.outlineVariant.withAlpha(
+                AppAlphas.outline,
+              ),
             ),
           ),
           child: crossAxisCount == 1
@@ -308,7 +312,9 @@ class TemplateListView extends StatelessWidget {
                           thickness: 0.5,
                           indent: AppSpacing.lg,
                           endIndent: AppSpacing.lg,
-                          color: theme.colorScheme.outlineVariant.withAlpha(AppAlphas.divider),
+                          color: theme.colorScheme.outlineVariant.withAlpha(
+                            AppAlphas.divider,
+                          ),
                         ),
                     ],
                   ],
@@ -317,7 +323,7 @@ class TemplateListView extends StatelessWidget {
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   crossAxisCount: crossAxisCount,
-                  childAspectRatio: 3.0,
+                  childAspectRatio: layout.isMedium ? 1.65 : 1.45,
                   padding: const EdgeInsets.all(AppSpacing.lg),
                   crossAxisSpacing: AppSpacing.lg,
                   mainAxisSpacing: AppSpacing.lg,
@@ -345,46 +351,46 @@ class TemplateListView extends StatelessWidget {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(0, 16, 0, 120),
             children: [
-            _buildHeroCard(context, provider),
-            const SizedBox(height: 22),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildSectionHeader(
-                  context,
-                  title: '\u81ea\u5b9a\u4e49\u6a21\u677f',
-                  subtitle:
-                      '\u6309\u4f60\u7684\u4f7f\u7528\u4e60\u60ef\u7ec4\u7ec7\u5b57\u6bb5\uff0c\u505a\u6210\u771f\u6b63\u53ef\u590d\u7528\u7684\u6a21\u677f\u5361\u7247\u3002',
-                ),
-                const SizedBox(height: AppSpacing.md),
-                _buildTemplateGrid(
-                  context,
-                  templates: customTemplates,
-                  isCustomSection: true,
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.xl),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildSectionHeader(
-                  context,
-                  title: '\u5185\u7f6e\u6a21\u677f',
-                  subtitle:
-                      '\u5e38\u89c1\u8d26\u6237\u4e0e\u8eab\u4efd\u4fe1\u606f\u7684\u9ed8\u8ba4\u6a21\u677f\uff0c\u53ef\u76f4\u63a5\u4f5c\u4e3a\u8d77\u70b9\u4f7f\u7528\u3002',
-                ),
-                const SizedBox(height: AppSpacing.md),
-                _buildTemplateGrid(
-                  context,
-                  templates: builtinTemplates,
-                  isCustomSection: false,
-                ),
-              ],
-            ),
-          ],
+              _buildHeroCard(context, provider),
+              const SizedBox(height: 22),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildSectionHeader(
+                    context,
+                    title: '\u81ea\u5b9a\u4e49\u6a21\u677f',
+                    subtitle:
+                        '\u6309\u4f60\u7684\u4f7f\u7528\u4e60\u60ef\u7ec4\u7ec7\u5b57\u6bb5\uff0c\u505a\u6210\u771f\u6b63\u53ef\u590d\u7528\u7684\u6a21\u677f\u5361\u7247\u3002',
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  _buildTemplateGrid(
+                    context,
+                    templates: customTemplates,
+                    isCustomSection: true,
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.xl),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildSectionHeader(
+                    context,
+                    title: '\u5185\u7f6e\u6a21\u677f',
+                    subtitle:
+                        '\u5e38\u89c1\u8d26\u6237\u4e0e\u8eab\u4efd\u4fe1\u606f\u7684\u9ed8\u8ba4\u6a21\u677f\uff0c\u53ef\u76f4\u63a5\u4f5c\u4e3a\u8d77\u70b9\u4f7f\u7528\u3002',
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  _buildTemplateGrid(
+                    context,
+                    templates: builtinTemplates,
+                    isCustomSection: false,
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-      ),
       ),
       floatingActionButton: GreenAddButton(
         heroTag: 'add-template-fab',
@@ -642,7 +648,11 @@ class _FieldPreviewTags extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: AppSurfaces.soft(theme.colorScheme, tint: accent, tintAlpha: 10),
+              color: AppSurfaces.soft(
+                theme.colorScheme,
+                tint: accent,
+                tintAlpha: 10,
+              ),
               borderRadius: BorderRadius.circular(AppRadii.control),
               border: Border.all(color: accent.withAlpha(28)),
             ),

@@ -34,6 +34,7 @@ class AccountListTile extends StatefulWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final String Function(BuildContext, String, String) localeText;
+  final String? Function(String accountId)? resolveAccountName;
 
   const AccountListTile({
     super.key,
@@ -46,6 +47,7 @@ class AccountListTile extends StatefulWidget {
     required this.onEdit,
     required this.onDelete,
     required this.localeText,
+    this.resolveAccountName,
   });
 
   @override
@@ -175,9 +177,16 @@ class _AccountListTileState extends State<AccountListTile> {
     if (widget.template != null) {
       for (final field in widget.template!.fields) {
         usedKeys.add(field.fieldKey);
+        String displayValue = widget.account.data[field.fieldKey]?.toString() ?? '';
+        if (field.attributes.type == AccountFieldType.accountLink && displayValue.isNotEmpty) {
+          final resolved = widget.resolveAccountName?.call(displayValue);
+          if (resolved != null && resolved.isNotEmpty) {
+            displayValue = resolved;
+          }
+        }
         addField(
           field.label,
-          widget.account.data[field.fieldKey]?.toString() ?? '',
+          displayValue,
           isSecret: field.attributes.isSecret,
           key: field.fieldKey,
           type: field.attributes.type,
@@ -256,6 +265,8 @@ class _AccountListTileState extends State<AccountListTile> {
         return Icons.schedule_outlined;
       case AccountFieldType.custom:
         return Icons.extension_outlined;
+      case AccountFieldType.accountLink:
+        return Icons.account_tree_outlined;
       case AccountFieldType.unknown:
         return Icons.help_outline_outlined;
       case null:
