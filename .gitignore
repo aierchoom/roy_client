@@ -63,3 +63,5 @@ app.*.map.json
 tool/*.dart
 tool/*.py
 tool/rebase_editor.py
+!tool/check_style_tokens.py
+!tool/check_style_tokens_baseline.txt
