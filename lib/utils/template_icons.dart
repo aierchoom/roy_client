@@ -17,8 +17,9 @@ IconData? templateIconFromStorageValue(Object? rawValue) {
   final codePoint = rawValue is int
       ? rawValue
       : (rawValue is String ? int.tryParse(rawValue) : null);
-  if (codePoint != null && codePoint > 0) {
-    return IconData(codePoint, fontFamily: 'MaterialIcons');
+  if (codePoint == null || codePoint <= 0) return null;
+  for (final icon in kTemplateIconOptions) {
+    if (icon.codePoint == codePoint) return icon;
   }
   return null;
 }

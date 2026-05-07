@@ -299,15 +299,27 @@ class CrdtMergeEngine {
       if (remoteDel.compareTo(localDel) > 0) {
         return remote.copyWith(syncStatus: SyncStatus.synchronized);
       }
-      return _templateWithMaxServerVersion(local, remote);
+      return local.copyWith(
+        serverVersion: max(local.serverVersion, remote.serverVersion),
+        syncStatus: SyncStatus.synchronized,
+      );
     } else if (remoteDel != null) {
       if (remoteDel.compareTo(local.hlc ?? Hlc.zero('local')) > 0) {
         return remote.copyWith(syncStatus: SyncStatus.synchronized);
       }
+      return local.copyWith(
+        serverVersion: max(local.serverVersion, remote.serverVersion),
+      );
     } else if (localDel != null) {
       if (localDel.compareTo(remote.hlc ?? Hlc.zero('remote')) > 0) {
-        return _templateWithMaxServerVersion(local, remote);
+        return local.copyWith(
+          serverVersion: max(local.serverVersion, remote.serverVersion),
+          syncStatus: SyncStatus.synchronized,
+        );
       }
+      return remote.copyWith(
+        serverVersion: max(local.serverVersion, remote.serverVersion),
+      );
     }
 
     final localHlc = local.hlc ?? Hlc.zero('local');
@@ -400,17 +412,6 @@ class CrdtMergeEngine {
           : remote.serverVersion,
       isDeleted: false,
       deleteHlc: null,
-    );
-  }
-
-  static AccountTemplate _templateWithMaxServerVersion(
-    AccountTemplate local,
-    AccountTemplate remote,
-  ) {
-    return local.copyWith(
-      serverVersion: local.serverVersion > remote.serverVersion
-          ? local.serverVersion
-          : remote.serverVersion,
     );
   }
 

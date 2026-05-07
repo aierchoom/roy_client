@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 
 import '../utils/template_icons.dart';
@@ -255,12 +253,20 @@ class AccountField {
   final String label;
   final String? description;
   final AccountFieldAttributes attributes;
+  final int order;
+  final Hlc labelHlc;
+  final Hlc attributesHlc;
+  final Hlc orderHlc;
 
   const AccountField({
     required this.fieldKey,
     required this.label,
     this.description,
     required this.attributes,
+    this.order = 0,
+    required this.labelHlc,
+    required this.attributesHlc,
+    required this.orderHlc,
   });
 
   factory AccountField.fromJson(Map<String, dynamic> json) {
@@ -271,6 +277,16 @@ class AccountField {
       attributes: AccountFieldAttributes.fromJson(
         (json['attributes'] as Map<String, dynamic>?) ?? {},
       ),
+      order: json['order'] as int? ?? 0,
+      labelHlc: json['labelHlc'] != null
+          ? Hlc.parse(json['labelHlc'] as String)
+          : Hlc.zero('local'),
+      attributesHlc: json['attributesHlc'] != null
+          ? Hlc.parse(json['attributesHlc'] as String)
+          : Hlc.zero('local'),
+      orderHlc: json['orderHlc'] != null
+          ? Hlc.parse(json['orderHlc'] as String)
+          : Hlc.zero('local'),
     );
   }
 
@@ -280,12 +296,39 @@ class AccountField {
       'label': label,
       'description': description,
       'attributes': attributes.toJson(),
+      'order': order,
+      'labelHlc': labelHlc.toString(),
+      'attributesHlc': attributesHlc.toString(),
+      'orderHlc': orderHlc.toString(),
     };
+  }
+
+  AccountField copyWith({
+    String? fieldKey,
+    String? label,
+    String? description,
+    AccountFieldAttributes? attributes,
+    int? order,
+    Hlc? labelHlc,
+    Hlc? attributesHlc,
+    Hlc? orderHlc,
+  }) {
+    return AccountField(
+      fieldKey: fieldKey ?? this.fieldKey,
+      label: label ?? this.label,
+      description: description ?? this.description,
+      attributes: attributes ?? this.attributes,
+      order: order ?? this.order,
+      labelHlc: labelHlc ?? this.labelHlc,
+      attributesHlc: attributesHlc ?? this.attributesHlc,
+      orderHlc: orderHlc ?? this.orderHlc,
+    );
   }
 }
 
 class AccountTemplate {
   final String templateId;
+  final int version;
   final String title;
   final String subTitle;
   final int? iconCodePoint;
@@ -295,13 +338,13 @@ class AccountTemplate {
 
   final SyncStatus syncStatus;
   final Hlc? hlc;
-  final Map<String, Hlc> fieldHlc;
   final int serverVersion;
   final bool isDeleted;
   final Hlc? deleteHlc;
 
   const AccountTemplate({
     required this.templateId,
+    this.version = 1,
     required this.title,
     required this.subTitle,
     this.iconCodePoint,
@@ -310,7 +353,6 @@ class AccountTemplate {
     this.isCustom = false,
     this.syncStatus = SyncStatus.pendingPush,
     this.hlc,
-    this.fieldHlc = const {},
     this.serverVersion = 0,
     this.isDeleted = false,
     this.deleteHlc,
@@ -333,6 +375,7 @@ class AccountTemplate {
       templateId:
           json['templateId'] as String? ??
           'custom_${DateTime.now().millisecondsSinceEpoch}',
+      version: json['version'] as int? ?? 1,
       title: json['title'] as String? ?? 'Untitled Template',
       subTitle:
           json['subtitle'] as String? ?? json['subTitle'] as String? ?? '',
@@ -357,7 +400,6 @@ class AccountTemplate {
         fallback: SyncStatus.synchronized,
       ),
       hlc: json['hlc'] != null ? Hlc.parse(json['hlc'] as String) : null,
-      fieldHlc: AccountTemplate.parseFieldHlc(json['fieldHlc']),
       serverVersion: json['serverVersion'] as int? ?? 0,
       isDeleted: json['isDeleted'] == true,
       deleteHlc: json['deleteHlc'] != null
@@ -366,28 +408,10 @@ class AccountTemplate {
     );
   }
 
-  static Map<String, Hlc> parseFieldHlc(dynamic value) {
-    final dynamic decoded;
-    if (value is String) {
-      if (value.trim().isEmpty) return const {};
-      try {
-        decoded = jsonDecode(value);
-      } catch (_) {
-        return const {};
-      }
-    } else {
-      decoded = value;
-    }
-
-    if (decoded is! Map) return const {};
-    return decoded.map(
-      (k, v) => MapEntry(k.toString(), Hlc.parse(v.toString())),
-    );
-  }
-
   Map<String, dynamic> toJson() {
     return {
       'templateId': templateId,
+      'version': version,
       'title': title,
       'subtitle': subTitle,
       'icon': iconCodePoint,
@@ -395,7 +419,6 @@ class AccountTemplate {
       'fields': fields.map((field) => field.toJson()).toList(),
       'syncStatus': syncStatus.name,
       'hlc': hlc?.toString(),
-      'fieldHlc': fieldHlc.map((k, v) => MapEntry(k, v.toString())),
       'serverVersion': serverVersion,
       'isDeleted': isDeleted,
       'deleteHlc': deleteHlc?.toString(),
@@ -403,6 +426,7 @@ class AccountTemplate {
   }
 
   AccountTemplate copyWith({
+    int? version,
     String? title,
     String? subTitle,
     int? iconCodePoint,
@@ -411,13 +435,13 @@ class AccountTemplate {
     bool? isCustom,
     SyncStatus? syncStatus,
     Hlc? hlc,
-    Map<String, Hlc>? fieldHlc,
     int? serverVersion,
     bool? isDeleted,
     Hlc? deleteHlc,
   }) {
     return AccountTemplate(
       templateId: templateId,
+      version: version ?? this.version,
       title: title ?? this.title,
       subTitle: subTitle ?? this.subTitle,
       iconCodePoint: iconCodePoint ?? this.iconCodePoint,
@@ -426,7 +450,6 @@ class AccountTemplate {
       isCustom: isCustom ?? this.isCustom,
       syncStatus: syncStatus ?? this.syncStatus,
       hlc: hlc ?? this.hlc,
-      fieldHlc: fieldHlc ?? this.fieldHlc,
       serverVersion: serverVersion ?? this.serverVersion,
       isDeleted: isDeleted ?? this.isDeleted,
       deleteHlc: deleteHlc ?? this.deleteHlc,
@@ -434,8 +457,11 @@ class AccountTemplate {
   }
 }
 
+final _builtinZeroHlc = Hlc.zero('builtin');
+
 final AccountTemplate websiteTemplate = AccountTemplate(
-  templateId: 'generic_info',
+  templateId: 'builtin_generic_info',
+  version: 1,
   title: '\u7f51\u7ad9\u6a21\u677f',
   subTitle:
       '\u4fdd\u5b58\u7f51\u7ad9\u3001\u767b\u5f55\u8d26\u53f7\u3001\u5bc6\u7801\u548c\u5907\u6ce8',
@@ -454,6 +480,10 @@ final AccountTemplate websiteTemplate = AccountTemplate(
         isSearchable: true,
         hint: 'https://example.com',
       ),
+      order: 0,
+      labelHlc: _builtinZeroHlc,
+      attributesHlc: _builtinZeroHlc,
+      orderHlc: _builtinZeroHlc,
     ),
     AccountField(
       fieldKey: 'username',
@@ -467,6 +497,10 @@ final AccountTemplate websiteTemplate = AccountTemplate(
         isSearchable: true,
         hint: '\u7528\u6237\u540d / \u90ae\u7bb1 / \u624b\u673a\u53f7',
       ),
+      order: 1,
+      labelHlc: _builtinZeroHlc,
+      attributesHlc: _builtinZeroHlc,
+      orderHlc: _builtinZeroHlc,
     ),
     AccountField(
       fieldKey: 'password',
@@ -478,6 +512,10 @@ final AccountTemplate websiteTemplate = AccountTemplate(
         isSecret: true,
         hint: '\u8f93\u5165\u6216\u751f\u6210\u5bc6\u7801',
       ),
+      order: 2,
+      labelHlc: _builtinZeroHlc,
+      attributesHlc: _builtinZeroHlc,
+      orderHlc: _builtinZeroHlc,
     ),
     AccountField(
       fieldKey: 'totp',
@@ -490,6 +528,10 @@ final AccountTemplate websiteTemplate = AccountTemplate(
         isCopyable: false,
         hint: '\u9009\u62e9\u6216\u65b0\u5efa 2FA',
       ),
+      order: 3,
+      labelHlc: _builtinZeroHlc,
+      attributesHlc: _builtinZeroHlc,
+      orderHlc: _builtinZeroHlc,
     ),
     AccountField(
       fieldKey: 'notes',
@@ -500,6 +542,10 @@ final AccountTemplate websiteTemplate = AccountTemplate(
         type: AccountFieldType.text,
         hint: '\u53ef\u9009',
       ),
+      order: 4,
+      labelHlc: _builtinZeroHlc,
+      attributesHlc: _builtinZeroHlc,
+      orderHlc: _builtinZeroHlc,
     ),
   ],
 );
