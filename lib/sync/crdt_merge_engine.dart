@@ -69,10 +69,10 @@ class CrdtMergeEngine {
 
     // If remote HLCs are corrupted, local wins unconditionally to prevent
     // a zero-timestamp HLC from always losing LWW comparisons.
-    final _remoteCorrupted = remote.nameHlc.isCorrupted ||
+    final remoteCorrupted = remote.nameHlc.isCorrupted ||
         remote.emailHlc.isCorrupted ||
         remote.dataHlc.values.any((h) => h.isCorrupted);
-    if (_remoteCorrupted) {
+    if (remoteCorrupted) {
       return MergeResult(
         local.copyWith(
           syncStatus: SyncStatus.pendingPush,
@@ -318,8 +318,8 @@ class CrdtMergeEngine {
     }
 
     // If remote HLC is corrupted, local wins unconditionally.
-    final _remoteTopHlc = remote.hlc ?? Hlc.zero('remote');
-    if (_remoteTopHlc.isCorrupted) {
+    final remoteTopHlc = remote.hlc ?? Hlc.zero('remote');
+    if (remoteTopHlc.isCorrupted) {
       return TemplateMergeResult(
         local.copyWith(
           syncStatus: SyncStatus.pendingPush,
@@ -331,9 +331,9 @@ class CrdtMergeEngine {
             fieldKey: 'hlc',
             attributeName: 'corrupted_remote',
             localValue: local.hlc?.toString() ?? '',
-            remoteValue: _remoteTopHlc.toString(),
+            remoteValue: remoteTopHlc.toString(),
             localHlc: local.hlc ?? Hlc.zero('local'),
-            remoteHlc: _remoteTopHlc,
+            remoteHlc: remoteTopHlc,
           ),
         ],
       );

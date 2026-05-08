@@ -101,6 +101,7 @@ void main() {
         secureStorage: _MemorySecureKeyValueStore(),
       );
       await sourceIdentity.initialize();
+      // ignore: deprecated_member_use_from_same_package
       final linkCode = sourceIdentity.exportTransferCode();
 
       final targetStore = _MemorySecureKeyValueStore();
@@ -134,6 +135,7 @@ void main() {
       secureStorage: _MemorySecureKeyValueStore(),
     );
     await sourceIdentity.initialize();
+    // ignore: deprecated_member_use_from_same_package
     final linkCode = sourceIdentity.exportTransferCode();
 
     final targetIdentity = IdentityService(

@@ -188,6 +188,7 @@ void main() {
     await service.initialize(allowGenerateVaultIdentity: false);
 
     final preview = await service.previewTransferCode(
+      // ignore: deprecated_member_use_from_same_package
       service.exportTransferCode(),
     );
     expect(preview.vaultApiToken, 'token_abc123');
@@ -205,6 +206,7 @@ void main() {
     await service.initialize(allowGenerateVaultIdentity: false);
 
     final preview = await service.previewTransferCode(
+      // ignore: deprecated_member_use_from_same_package
       service.exportTransferCode(),
     );
     expect(preview.vaultApiToken, isNull);

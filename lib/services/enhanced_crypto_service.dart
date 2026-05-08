@@ -202,6 +202,7 @@ class EnhancedCryptoService {
     // Always compare full length to avoid timing leaks.
     // If lengths differ, xor with a dummy to consume the same time.
     if (a.length != b.length) {
+      // ignore: unused_local_variable
       var dummy = 0;
       for (var i = 0; i < b.length; i++) {
         dummy |= b[i] ^ b[i];

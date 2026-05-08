@@ -706,9 +706,11 @@ class ServiceManager extends ChangeNotifier {
     }
   }
 
+  @Deprecated('Use exportSecureVaultLinkCode instead.')
   Future<String> exportVaultLinkCode() async {
     final serverUrl = await _resolveSyncServerUrl(allowEmpty: true);
     final vaultDump = await _exportEncryptedVaultDump();
+    // ignore: deprecated_member_use_from_same_package
     return _identityService.exportTransferCode(
       syncServerUrl: serverUrl.isEmpty ? null : serverUrl,
       vaultDump: vaultDump,
@@ -958,6 +960,7 @@ class ServiceManager extends ChangeNotifier {
     }
 
     final vaultDump = await _exportEncryptedVaultDump();
+    // ignore: deprecated_member_use_from_same_package
     final transferCode = _identityService.exportTransferCode(
       syncServerUrl: serverUrl.isEmpty ? null : serverUrl,
       vaultDump: vaultDump,
@@ -1047,6 +1050,7 @@ class ServiceManager extends ChangeNotifier {
 
     final serverUrl = await _resolveSyncServerUrl(allowEmpty: true);
     final vaultDump = await _exportEncryptedVaultDump();
+    // ignore: deprecated_member_use_from_same_package
     final transferCode = _identityService.exportTransferCode(
       syncServerUrl: serverUrl.isEmpty ? null : serverUrl,
       vaultDump: vaultDump,
