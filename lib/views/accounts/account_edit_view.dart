@@ -2357,8 +2357,8 @@ class _AccountEditViewState extends State<AccountEditView> {
                                         ),
                                         decoration: BoxDecoration(
                                           color: theme.colorScheme.primary
-                                              .withAlpha(18),
-                                          borderRadius: BorderRadius.circular(6),
+                                              .withAlpha(AppAlphas.tint),
+                                          borderRadius: BorderRadius.circular(AppRadii.chip),
                                         ),
                                         child: Text(
                                           meta.type,
