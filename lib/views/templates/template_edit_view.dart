@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:secret_roy/l10n/app_localizations.dart';
 
+import '../../models/account_item.dart';
 import '../../models/account_template.dart';
 import '../../providers/enhanced_app_provider.dart';
 import '../../utils/field_presets.dart';
@@ -72,6 +73,9 @@ class _TemplateEditViewState extends State<TemplateEditView> {
       category: inferTemplateCategory(title: title, fields: _fields),
       fields: List<AccountField>.of(_fields),
       isCustom: true,
+      hlc: widget.initial?.hlc,
+      serverVersion: widget.initial?.serverVersion ?? 0,
+      syncStatus: widget.initial?.syncStatus ?? SyncStatus.pendingPush,
     );
 
     Navigator.pop(context, template);

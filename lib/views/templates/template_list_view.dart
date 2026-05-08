@@ -4,6 +4,7 @@ import 'package:secret_roy/l10n/app_localizations.dart';
 
 import '../../models/account_template.dart';
 import '../../providers/enhanced_app_provider.dart';
+import '../../services/secure_storage_service.dart' hide TemplateInUseException;
 import '../../services/service_manager.dart';
 import '../../theme/app_design_tokens.dart';
 import '../../theme/app_layout.dart';
@@ -38,7 +39,41 @@ class TemplateListView extends StatelessWidget {
       return;
     }
 
-    await provider.updateCustomTemplate(result);
+    try {
+      await provider.updateCustomTemplate(result);
+    } on TemplateStaleException {
+      if (!context.mounted) return;
+      final shouldReload = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(_text(context, '模板已被更新', 'Template Updated')),
+          content: Text(
+            _text(
+              context,
+              '该模板已被同步更新，你的本地编辑已过期。是否重载最新版本后继续编辑？',
+              'This template has been updated by sync. Your local edit is stale. Reload the latest version and continue editing?',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: Text(AppLocalizations.of(context)!.cancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: Text(_text(context, '重载', 'Reload')),
+            ),
+          ],
+        ),
+      );
+      if (shouldReload == true && context.mounted) {
+        await provider.refresh();
+        final refreshed = provider.getTemplate(result.templateId);
+        if (refreshed != null && context.mounted) {
+          await _openEditor(context, initial: refreshed);
+        }
+      }
+    }
   }
 
   int _usageCount(EnhancedAppProvider provider, AccountTemplate template) {

@@ -13,7 +13,7 @@ Next: [01-system-architecture.md](01-system-architecture.md)
 | Scope | SecretRoy current architecture snapshot |
 | Owner | Repository maintainers (formal owner TBD) |
 | Review Status | Draft - Unapproved |
-| Last Updated | 2026-04-28 |
+| Last Updated | 2026-05-07 |
 
 ## Positioning
 
@@ -34,7 +34,7 @@ SecretRoy 当前最准确的定位是：
 
 - 富客户端运行时
 - 加密 SQLite 本地主存储
-- 模板驱动表单
+- 模板驱动表单（4 个内置模板：网站、安全笔记、助记词、API 服务）
 - 解锁/自动锁状态机
 - 客户端主导同步
 - 字段级冲突合并
@@ -86,7 +86,7 @@ Node 服务端只是同步协调器。
 | Dimension | Score (1-5) | Assessment |
 |---|---:|---|
 | Architectural Clarity | 4 | 边界整体清楚，客户端分层较健康。 |
-| Domain Modeling | 4 | 账号、模板、同步元数据建模较完整。 |
+| Domain Modeling | 4 | 账号、模板、同步元数据建模较完整；新增 `longText`/`list`/`accountLink` 字段类型和 `note` 分类。 |
 | Local-first Design | 5 | 本地优先是核心能力，不是附属特性。 |
 | Sync Design | 4 | pull-then-push、HLC、conflict inbox 都较成熟。 |
 | Security Posture | 3 | 已具备主密码 verifier、本地 DB 文件信封加密、离线恢复码、面对面链接和远程配对；同步 payload、服务端认证和运行时硬化仍不足。 |
@@ -98,11 +98,12 @@ Node 服务端只是同步协调器。
 
 ## Recommended Next 90 Days
 
-### Days 1-30
+### Days 1-30（已完成）
 
 - 统一命名、文案和真实能力表述，避免把原型包装成成熟安全产品。
 - 补最小同步回归测试，优先覆盖 pull、push、409 conflict、remote missing。
 - 梳理 `ServiceManager` 职责边界，识别可拆分项。
+- 模板系统扩展：新增 `longText`/`list` 字段类型、`note` 模板分类、4 个内置模板、字段级 HLC 支持。
 
 ### Days 31-60
 
@@ -110,6 +111,7 @@ Node 服务端只是同步协调器。
 - 完善本地数据库加密的备份、恢复和损坏检测闭环。
 - 设计同步 payload 的正式加密/认证模型。
 - 制定服务端从 JSON 文件迁移到正式数据库的目标结构。
+- 模板系统安全重构：合并式保存、模板缺失只读、历史字段区、切模板迁移向导。
 
 ### Days 61-90
 

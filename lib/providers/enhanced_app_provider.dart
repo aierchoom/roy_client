@@ -6,6 +6,7 @@ import 'package:secret_roy/core/app_logger.dart';
 import '../models/account_item.dart';
 import '../models/account_template.dart';
 import '../models/local_sync_change.dart';
+import '../models/template_conflict_log.dart';
 import '../models/totp_credential.dart';
 import '../services/secure_storage_service.dart';
 import '../services/service_manager.dart';
@@ -19,6 +20,7 @@ class EnhancedAppProvider extends ChangeNotifier {
   List<AccountTemplate> _customTemplates = [];
   List<TotpCredential> _totpCredentials = [];
   List<LocalSyncChange> _localSyncChanges = [];
+  List<TemplateConflictLog> _templateConflictLogs = [];
   String _searchQuery = '';
   Set<String> _selectedTags = {};
   bool _isLoading = false;
@@ -36,7 +38,10 @@ class EnhancedAppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  List<AccountTemplate> get allTemplates => _customTemplates;
+  List<AccountTemplate> get allTemplates => [
+    ...basicAccountTemplates,
+    ..._customTemplates,
+  ];
   List<AccountItem> get allAccounts => _accounts;
   List<AccountItem> get accountItems => _accounts
       .where((a) => _templateCategoryOf(a.templateId) != TemplateCategory.note)
@@ -47,6 +52,7 @@ class EnhancedAppProvider extends ChangeNotifier {
   List<TotpCredential> get totpCredentials => _totpCredentials;
   List<AccountTemplate> get customTemplates => _customTemplates;
   List<LocalSyncChange> get localSyncChanges => _localSyncChanges;
+  List<TemplateConflictLog> get templateConflictLogs => _templateConflictLogs;
   String get searchQuery => _searchQuery;
   Set<String> get selectedTags => _selectedTags;
   bool get isLoading => _isLoading;
@@ -68,10 +74,11 @@ class EnhancedAppProvider extends ChangeNotifier {
   }
 
   AccountTemplate? getTemplate(String templateId) {
-    for (final template in allTemplates) {
-      if (template.templateId == templateId) {
-        return template;
-      }
+    for (final template in _customTemplates) {
+      if (template.templateId == templateId) return template;
+    }
+    for (final template in basicAccountTemplates) {
+      if (template.templateId == templateId) return template;
     }
     return null;
   }
@@ -140,12 +147,14 @@ class EnhancedAppProvider extends ChangeNotifier {
     _localSyncChanges = List<LocalSyncChange>.of(
       await _serviceManager.loadOpenLocalSyncChanges(),
     );
-    // Count total conflict logs across all accounts
+    // Count total conflict logs across all accounts and templates
     int count = 0;
     for (final acc in _accounts) {
       final logs = await _storageService.getConflictLogs(acc.id);
       count += logs.length;
     }
+    _templateConflictLogs = await _storageService.getTemplateConflictLogs();
+    count += _templateConflictLogs.length;
     _conflictCount = count;
     _notify();
   }
@@ -162,6 +171,7 @@ class EnhancedAppProvider extends ChangeNotifier {
     _customTemplates = [];
     _totpCredentials = [];
     _localSyncChanges = [];
+    _templateConflictLogs = [];
     _notify();
   }
 
@@ -175,6 +185,7 @@ class EnhancedAppProvider extends ChangeNotifier {
     _customTemplates = [];
     _totpCredentials = [];
     _localSyncChanges = [];
+    _templateConflictLogs = [];
     _notify();
 
     await _loadData();
@@ -336,7 +347,7 @@ class EnhancedAppProvider extends ChangeNotifier {
       _customTemplates.removeWhere(
         (template) => template.templateId == templateId,
       );
-      notifyListeners();
+      _notify();
     } finally {
       _setLoading(false);
     }

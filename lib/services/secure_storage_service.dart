@@ -909,6 +909,8 @@ class SecureStorageService {
       final Map<String, AccountFieldMeta> newFieldMeta = Map.from(
         account.fieldMeta,
       );
+      // Remove stale fieldMeta for keys no longer in account data
+      newFieldMeta.removeWhere((key, _) => !account.data.containsKey(key));
       if (template != null) {
         for (final field in template.fields) {
           if (account.data.containsKey(field.fieldKey)) {
@@ -1302,17 +1304,23 @@ class SecureStorageService {
     await _persistAfterMutation();
   }
 
-  Future<List<TemplateConflictLog>> getTemplateConflictLogs(
-    String templateId,
-  ) async {
+  Future<List<TemplateConflictLog>> getTemplateConflictLogs([
+    String? templateId,
+  ]) async {
     if (!isOpen) return [];
     try {
-      final rows = await _query(
-        'template_conflict_logs',
-        where: 'template_id = ?',
-        whereArgs: [templateId],
-        orderBy: 'saved_at DESC',
-      );
+      final rows =
+          templateId == null
+              ? await _query(
+                'template_conflict_logs',
+                orderBy: 'saved_at DESC',
+              )
+              : await _query(
+                'template_conflict_logs',
+                where: 'template_id = ?',
+                whereArgs: [templateId],
+                orderBy: 'saved_at DESC',
+              );
       return rows.map((r) => TemplateConflictLog.fromJson(r)).toList();
     } catch (_) {
       return [];

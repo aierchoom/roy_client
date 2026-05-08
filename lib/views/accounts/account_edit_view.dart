@@ -2304,6 +2304,10 @@ class _AccountEditViewState extends State<AccountEditView> {
             ),
             const SizedBox(height: 14),
             ...legacyEntries.map((entry) {
+              final meta = widget.initial?.fieldMeta[entry.key];
+              final label = meta?.label ?? _formatKeyLabel(entry.key);
+              final isSecret = meta?.type == AccountFieldType.password.name;
+
               return Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: Container(
@@ -2329,17 +2333,43 @@ class _AccountEditViewState extends State<AccountEditView> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  _formatKeyLabel(entry.key),
+                                  label,
                                   style: theme.textTheme.labelLarge?.copyWith(
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ),
                                 const SizedBox(height: 4),
-                                Text(
-                                  entry.key,
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: theme.colorScheme.onSurfaceVariant,
-                                  ),
+                                Wrap(
+                                  spacing: 6,
+                                  runSpacing: 4,
+                                  children: [
+                                    Text(
+                                      entry.key,
+                                      style: theme.textTheme.bodySmall?.copyWith(
+                                        color: theme.colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                    if (meta != null)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 1,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: theme.colorScheme.primary
+                                              .withAlpha(18),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          meta.type,
+                                          style: theme.textTheme.labelSmall
+                                              ?.copyWith(
+                                                color: theme.colorScheme.primary,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                        ),
+                                      ),
+                                  ],
                                 ),
                               ],
                             ),
@@ -2350,10 +2380,7 @@ class _AccountEditViewState extends State<AccountEditView> {
                               '\u590d\u5236\u5b57\u6bb5\u5185\u5bb9',
                               'Copy field value',
                             ),
-                            onPressed: () => _copyValue(
-                              _formatKeyLabel(entry.key),
-                              entry.value,
-                            ),
+                            onPressed: () => _copyValue(label, entry.value),
                             icon: const Icon(Icons.content_copy_outlined),
                           ),
                           if (_isEditing)
@@ -2371,7 +2398,7 @@ class _AccountEditViewState extends State<AccountEditView> {
                       ),
                       const SizedBox(height: 8),
                       SelectableText(
-                        entry.value,
+                        isSecret ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022' : entry.value,
                         style: theme.textTheme.bodyMedium,
                       ),
                     ],

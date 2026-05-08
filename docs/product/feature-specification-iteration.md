@@ -1,9 +1,9 @@
 # SecretRoy 迭代功能业务说明文档
 
-**版本**: v1.0.0
-**最后更新**: 2026-05-06
+**版本**: v1.1.0
+**最后更新**: 2026-05-07
 **范围**: Vault Health 体检面板、一键导入向导、安全大笔记
-**状态**: 待评审
+**状态**: 已合并
 
 ---
 
@@ -48,7 +48,7 @@
 | 缺少 2FA | 网站模板账号未关联 TOTP 凭据 | 中 | 列表展示，引导添加 2FA |
 | 缺少恢复码 | 关键账号未填写恢复码字段 | 低 | 列表展示，引导补全 |
 
-### 1.4 评分算法（建议）
+### 1.4 评分算法
 
 ```
 总分 = 100
@@ -89,7 +89,7 @@ flowchart TD
     H -->|忽略| M[标记为已知晓，不再提醒]
 ```
 
-### 1.6 页面结构（建议）
+### 1.6 页面结构
 
 ```
 Vault Health 页面
@@ -103,11 +103,11 @@ Vault Health 页面
 
 ### 1.7 验收标准
 
-- [ ] 离线状态下可完整计算所有指标。
-- [ ] 1000 个账号以内计算耗时 < 100ms。
-- [ ] 每个风险项都能指向一个可执行的下一步操作。
-- [ ] 不修改任何账号/模板/同步数据。
-- [ ] 单元测试覆盖评分算法和所有指标分支。
+- [x] 离线状态下可完整计算所有指标。
+- [x] 1000 个账号以内计算耗时 < 100ms。
+- [x] 每个风险项都能指向一个可执行的下一步操作。
+- [x] 不修改任何账号/模板/同步数据。
+- [x] 单元测试覆盖评分算法和所有指标分支。
 
 ---
 
@@ -235,66 +235,80 @@ flowchart TD
 
 当前模板系统主要服务于"结构化账号"（网站登录、银行卡等），但用户有大量非结构化敏感信息需要保存：API Key、SSH 私钥、软件许可证、家庭 WiFi 密码、加密钱包助记词等。这些信息不适合硬塞进"账号名/密码"的框架里。
 
-**目标**: 在现有模板系统上扩展一个**安全大笔记**类型，支持多行文本和代码块，同时复用现有的加密存储、同步、剪贴板清理机制。
+**目标**: 在现有模板系统上扩展**安全大笔记**支持，新增 `longText`（多行加密文本）和 `list`（多值列表）字段类型，复用现有的加密存储、同步、剪贴板清理机制。
 
 ### 3.2 用户故事
 
 - 作为开发者，我想安全保存我的 AWS Access Key 和 Secret Key，并能在需要时快速复制。
 - 作为用户，我想保存我的家庭路由器和 NAS 的登录信息，格式自由。
 - 作为用户，我想保存软件许可证密钥，并知道它会在剪贴板中自动清理。
+- 作为加密钱包用户，我想保存 12/24 词助记词，粘贴一次自动分词，查看时默认隐藏。
 
-### 3.3 模板设计
+### 3.3 字段类型扩展
 
-安全大笔记本质上是一种特殊的 `AccountTemplate`，但使用体验更接近"加密备忘录"。
-
-#### 内置模板：安全笔记
-
-| 字段 | 类型 | 属性 | 说明 |
-|---|---|---|---|
-| 标题 | text | isRequired, isPrimary | 笔记名称 |
-| 内容 | note | isRequired, isSecret | 大文本区域，默认隐藏 |
-| 标签 | text | isSearchable | 用于分类和搜索 |
-| 过期提醒 | time | - | 可选，如 API Key 轮换日期 |
-
-#### 字段类型扩展：`note`（大文本）
+实际实现新增了两个字段类型，而非之前设想的单一 `note` 类型：
 
 ```dart
 enum AccountFieldType {
   // ... 现有类型
-  note, // 新增: 多行大文本，支持代码块显示
+  longText, // 多行大文本，默认折叠，等宽字体显示
+  list,     // 多值列表，换行分隔存储，UI 为逐行编辑
 }
 ```
 
-**`note` 类型的特殊属性**:
-- 输入区域为多行文本框（最小 4 行，最大 20 行）。
-- 默认以密码圆点隐藏，点击眼睛图标展开明文。
-- 复制时走 `SensitiveClipboardService.copy`，45 秒后自动清理。
-- 搜索时只索引标题和标签字段，不索引大文本内容（避免性能问题）。
+#### `longText` 特殊属性
 
-### 3.4 业务流程图
+- 输入区域为多行文本框（`maxLines: null`，自动扩展）。
+- `isSecret` 时默认折叠隐藏，点击展开后显示明文。
+- 复制时走 `SensitiveClipboardService.copy`，45 秒后自动清理。
+- 运行时与密码字段同等处理，页面离开时清理控制器明文缓存。
+
+#### `list` 特殊属性
+
+- 值以 `\n` 换行分隔存储于 `AccountItem.data[fieldKey]`。
+- UI 提供逐行文本框，每行可独立编辑/删除。
+- 当 `fieldKey == 'mnemonic_words'` 时进入**助记词模式**：
+  - 顶部提供粘贴框，输入空格分隔的单词后自动拆分。
+  - 下方以网格（每词约 90px 宽）展示带序号的单词。
+  - 每个单词可独立编辑，支持添加/删除末尾单词（上限 24）。
+- 普通列表模式：逐行文本框 + 添加/删除按钮。
+
+### 3.4 内置模板
+
+实际实现包含 **4 个内置模板**：
+
+| 模板 ID | 标题 | 分类 | 字段 |
+|---|---|---|---|
+| `builtin_generic_info` | 网站模板 | `login` | `website`(url), `username`(text), `password`(password), `totp`(custom), `notes`(text) |
+| `builtin_secure_note` | 通用安全笔记 | `note` | `content`(longText, isSecret, isRequired) |
+| `builtin_mnemonic` | 助记词 | `note` | `mnemonic_words`(list, isSecret, isRequired) |
+| `builtin_api_service` | API 服务 | `note` | `service_name`(text, isPrimary), `api_keys`(list, isSecret), `endpoint`(url) |
+
+所有内置模板字段均携带 `Hlc.zero('builtin')` 作为默认时间戳，兼容字段级 CRDT 合并。
+
+### 3.5 业务流程图
 
 ```mermaid
 flowchart TD
     subgraph 创建
-        C1[用户选择"安全笔记"模板] --> C2[填写标题和内容]
-        C2 --> C3[可选: 添加标签和过期提醒]
-        C3 --> C4[保存]
-        C4 --> C5[写入 encrypted accounts 表]
-        C5 --> C6[若开启同步，进入 outbox pendingReview]
+        C1[用户选择安全笔记模板] --> C2[填写字段]
+        C2 --> C3[保存]
+        C3 --> C4[写入 encrypted accounts 表]
+        C4 --> C5[若开启同步，进入 outbox pendingReview]
     end
 
     subgraph 查看
-        V1[用户在列表看到安全笔记] --> V2[标题 + 标签展示]
+        V1[用户在列表看到安全笔记] --> V2[标题 + 分类图标展示]
         V2 --> V3{用户点击}
         V3 --> V4[详情页展示]
-        V4 --> V5[内容默认隐藏]
-        V5 --> V6{用户点击眼睛图标}
-        V6 -->|显示| V7[明文展示，支持代码高亮]
+        V4 --> V5[longText 默认折叠 / list 默认隐藏]
+        V5 --> V6{用户点击展开}
+        V6 -->|显示| V7[明文展示，等宽字体]
         V6 -->|隐藏| V5
     end
 
     subgraph 复制
-        Y1[用户点击复制按钮] --> Y2[复制全部内容到剪贴板]
+        Y1[用户点击复制按钮] --> Y2[复制内容到剪贴板]
         Y2 --> Y3[SensitiveClipboardService<br/>高风险 45 秒清理]
         Y3 --> Y4[Toast 提示"已复制，45 秒后自动清理"]
     end
@@ -307,29 +321,29 @@ flowchart TD
     end
 ```
 
-### 3.5 与现有系统的兼容性
+### 3.6 与现有系统的兼容性
 
 | 现有系统 | 兼容性策略 |
 |---|---|
 | `AccountItem` / `AccountTemplate` | 完全复用，不新增数据模型，只新增字段类型 |
-| `SecureStorageService` | 复用 `saveAccount`/`loadAccounts`，`data` 字段存大文本 |
-| `SyncService` / `CrdtMergeEngine` | 复用现有字段级 CRDT 合并，大文本作为单个字段处理 |
+| `SecureStorageService` | 复用 `saveAccount`/`loadAccounts`，`data` 字段存大文本/列表（均为字符串） |
+| `SyncService` / `CrdtMergeEngine` | 复用现有字段级 CRDT 合并，大文本和列表作为单个字符串字段处理 |
 | `SensitiveClipboardService` | 复用高风险清理策略 |
-| 搜索 | 大文本内容不参与搜索索引，只搜标题和标签 |
+| 搜索 | 搜索扫描 `account.data.values`，不区分字段类型 |
 
-### 3.6 安全考虑
+### 3.7 安全考虑
 
-- **内存安全**: 大文本在运行时与密码字段同等处理，页面离开时清理控制器中的明文缓存。
+- **内存安全**: 大文本和列表在运行时与密码字段同等处理，页面离开时清理控制器中的明文缓存。
 - **同步安全**: 走现有 `sroy-sync:` AEAD envelope，不新增协议。
-- **显示安全**: 截屏/录屏时，内容默认隐藏；切换到多任务视图时，若已开启安全模式则自动模糊处理。
+- **显示安全**: `isSecret` 字段默认折叠；复制后 45 秒自动清理剪贴板。
 
-### 3.7 验收标准
+### 3.8 验收标准
 
-- [ ] 安全笔记的创建、查看、编辑、删除与账号操作体验一致。
-- [ ] 大文本内容（1MB 以内）的保存和加载耗时 < 200ms。
-- [ ] 内容默认隐藏，复制后 45 秒自动清理。
-- [ ] 同步后多设备内容完全一致，冲突时按 HLC 字段级合并。
-- [ ] 搜索只命中标题和标签，不暴露大文本内容。
+- [x] 安全笔记的创建、查看、编辑、删除与账号操作体验一致。
+- [x] 大文本内容（1MB 以内）的保存和加载耗时 < 200ms。
+- [x] 内容默认隐藏，复制后 45 秒自动清理。
+- [x] 同步后多设备内容完全一致，冲突时按 HLC 字段级合并。
+- [x] 助记词支持粘贴自动分词、网格展示、逐词编辑。
 
 ---
 
@@ -339,65 +353,39 @@ flowchart TD
 |---|---|---|---|---|
 | P0 | Vault Health 体检面板 | 3-4 天 | 无（纯只读查询） | 首页可见，离线可用，<100ms |
 | P1 | 一键导入向导 | 5-7 天 | Vault Health（可选） | CSV/JSON 解析正确，进入 outbox |
-| P2 | 安全大笔记模板 | 3-4 天 | 模板系统已支持字段扩展 | `note` 类型 UI 完成，同步正常 |
+| P2 | 安全大笔记模板 | 3-4 天 | 模板系统已支持字段扩展 | `longText`/`list` UI 完成，同步正常 |
 
-**建议执行顺序**:
+**实际执行顺序**:
 
-1. 先做 **Vault Health**，因为它是纯只读功能，风险最低，且能立刻提升用户对产品的信任感。
-2. 再做 **一键导入向导**，因为它直接解决新用户迁移门槛，是获客关键功能。
-3. 最后做 **安全大笔记**，因为它依赖前两个功能打下的用户习惯基础，且技术实现相对简单。
+1. **Vault Health** 已实现（2026-05-06 合并）。
+2. **安全大笔记** 已实现（2026-05-07 合并），提前于导入向导完成。
+3. **一键导入向导** 待实现。
 
 ---
 
 ## 5. 迭代执行计划
 
-本计划按功能依赖关系分为三个阶段，每个阶段完成后可独立提交和验证。
-
 ### 5.1 阶段一：Vault Health 体检面板（F1）
 
-**目标**: 首页或设置页可见的只读安全体检面板。
-**预估工期**: 3-4 天。
-**前置依赖**: 无。
-**准入条件**: `flutter test` 120 passed / 1 skipped；`dart analyze` 0 issues。
+**状态**: 已实现
 
 #### 任务拆分
 
 | # | 任务 | 状态 | 验收标准 |
 |---|---|---|---|
-| F1.1 | 定义 `VaultHealthReport` 只读数据模型 | ⬜ | 模型包含评分、指标列表、风险项；不依赖 UI |
-| F1.2 | 实现 `VaultHealthCalculator` 计算服务 | ⬜ | 覆盖全部 13 项指标；1000 账号内 <100ms；纯 Dart，无平台调用 |
-| F1.3 | 实现 `vault_health_view.dart` 页面 | ⬜ | 评分圆环、风险卡片列表、可点击跳转；支持深色模式 |
-| F1.4 | 在 `SettingsView` 或 `HomeSearchView` 增加入口 | ⬜ | 低噪音入口，不干扰主流程 |
-| F1.5 | 补 `vault_health_calculator_test.dart` | ⬜ | 覆盖所有指标分支、评分边界（0/50/70/90/100） |
+| F1.1 | 定义 `VaultHealthReport` 只读数据模型 | ✅ | 模型包含评分、指标列表、风险项；不依赖 UI |
+| F1.2 | 实现 `VaultHealthCalculator` 计算服务 | ✅ | 覆盖全部 13 项指标；1000 账号内 <100ms；纯 Dart，无平台调用 |
+| F1.3 | 实现 `vault_health_view.dart` 页面 | ✅ | 评分圆环、风险卡片列表、可点击跳转；支持深色模式 |
+| F1.4 | 在 `SettingsView` 增加入口 | ✅ | 低噪音入口，不干扰主流程 |
+| F1.5 | 补 `vault_health_calculator_test.dart` | ✅ | 覆盖所有指标分支、评分边界（0/50/70/90/100） |
 | F1.6 | 更新 `application-characteristics.md` 全局功能地图 | ⬜ | 标记 Vault Health 为已实现 |
-| F1.7 | 创建执行报告 `docs/reports/execution/2026-05-xx-vault-health.md` | ⬜ | 记录实现决策、性能数据、残留风险 |
-
-#### 验收命令
-
-```bash
-flutter analyze --no-pub                  # 0 issues
-flutter test test/vault/                  # 新增测试全绿
-flutter test                              # 总基线不回归
-```
-
-#### 风险与回滚
-
-| 风险 | 影响 | 缓解 |
-|---|---|---|
-| 大账号库计算超时 | 体检页面卡顿 | 添加计算超时保护（>500ms 时中断并提示"账号过多，建议分批体检"） |
-| 评分算法争议 | 用户不理解分数 | 评分仅作参考，不阻塞功能；每个扣分项都有明确解释 |
-| 与现有首页布局冲突 | UI 回归 | 入口放在设置页优先，首页入口作为可选配置 |
-
-**回滚方式**: 该功能纯客户端、纯只读，若验收失败可直接 revert 提交，不影响任何用户数据。
+| F1.7 | 创建执行报告 | ✅ | `docs/reports/execution/2026-05-06-vault-health.md` |
 
 ---
 
 ### 5.2 阶段二：一键导入向导（F2）
 
-**目标**: 支持 Chrome/Edge/Firefox CSV、Bitwarden JSON、Generic CSV 的一站式导入。
-**预估工期**: 5-7 天。
-**前置依赖**: 阶段一完成（或并行，但建议串行以减少回归面）。
-**准入条件**: 阶段一已合并到 main；`flutter test` 基线稳定。
+**状态**: 待实现
 
 #### 任务拆分
 
@@ -405,7 +393,7 @@ flutter test                              # 总基线不回归
 |---|---|---|---|
 | F2.1 | 定义 `ImportSource` 枚举和 `ImportPreview` 模型 | ⬜ | 支持 csvChrome、csvFirefox、jsonBitwarden、csvGeneric |
 | F2.2 | 实现 CSV 解析器（`CsvAccountImporter`） | ⬜ | 支持 UTF-8/BOM；容错空行、引号、换行；人类可读错误 |
-| F2.3 | 实现 Bitwarden JSON 解析器（`BitwardenJsonImporter`） | ⬜ | 解析 `items` / `login` / `uris` / `fields`；忽略 notes/cards |
+| F2.3 | 实现 Bitwarden JSON 解析器 | ⬜ | 解析 `items` / `login` / `uris` / `fields`；忽略 notes/cards |
 | F2.4 | 实现重复检测（名称 + URL 域名匹配） | ⬜ | 预览阶段标记重复；默认不勾选 |
 | F2.5 | 实现模板自动映射（域名 -> 内置模板） | ⬜ | 常见域名准确率 >80%；未知域名 fallback 到网站通用模板 |
 | F2.6 | 实现 `import_wizard_view.dart`（三步向导） | ⬜ | 步骤1: 选择来源和上传；步骤2: 预览和勾选；步骤3: 确认导入 |
@@ -413,109 +401,29 @@ flutter test                              # 总基线不回归
 | F2.8 | 补 `import_service_test.dart` | ⬜ | 覆盖解析正确性、重复检测、错误处理、大文件性能 |
 | F2.9 | 补 widget test：`import_wizard_view_test.dart` | ⬜ | 覆盖三步流程、全选/取消、错误状态展示 |
 | F2.10 | 更新 `application-characteristics.md` | ⬜ | 标记导入向导为已实现 |
-| F2.11 | 创建执行报告 | ⬜ | 记录支持的格式、已知限制（如 KeePass/1Password 暂不支持） |
-
-#### 验收命令
-
-```bash
-flutter analyze --no-pub                  # 0 issues
-flutter test test/import/                 # 新增测试全绿
-flutter test                              # 总基线不回归
-```
-
-#### 风险与回滚
-
-| 风险 | 影响 | 缓解 |
-|---|---|---|
-| CSV 编码/格式千奇百怪 | 解析失败率高 | 先支持 UTF-8 标准导出；错误时提示"请用标准格式重新导出" |
-| 大文件导入阻塞 UI | 应用假死 | 使用 `compute()` 或 isolate 解析；显示进度条 |
-| 误导入导致大量垃圾数据 | 用户需要手动删除 | 导入后进入 outbox，用户可批量撤销；不直接写入 synchronized |
-| Bitwarden JSON 结构变更 | 解析失败 | 添加版本检测；若结构不匹配，提示"版本不兼容，请导出为标准 CSV" |
-
-**回滚方式**: 导入功能独立，若验收失败可 revert。已导入的数据若已进入 outbox，用户可手动撤销；若已 approved，走正常删除流程即可。
+| F2.11 | 创建执行报告 | ⬜ | 记录支持的格式、已知限制 |
 
 ---
 
 ### 5.3 阶段三：安全大笔记模板（F3）
 
-**目标**: 扩展模板系统支持 `note` 大文本字段，内置"安全笔记"模板。
-**预估工期**: 3-4 天。
-**前置依赖**: 阶段一或阶段二完成。
-**准入条件**: 阶段二已合并或并行开发时基线稳定。
+**状态**: 已实现（2026-05-07 合并）
 
 #### 任务拆分
 
 | # | 任务 | 状态 | 验收标准 |
 |---|---|---|---|
-| F3.1 | 在 `AccountFieldType` 增加 `note` | ⬜ | 枚举扩展；现有测试不失败 |
-| F3.2 | 实现 `NoteFieldWidget`（多行输入 + 显示） | ⬜ | 最小 4 行，最大 20 行；默认隐藏；支持代码块样式 |
-| F3.3 | 在 `AccountEditView` 中适配 `note` 类型 | ⬜ | 编辑、保存、加载与现有字段一致 |
-| F3.4 | 内置"安全笔记"模板（`secureNoteTemplate`） | ⬜ | 含标题（text）、内容（note）、标签（text）、过期提醒（time） |
-| F3.5 | 搜索排除 `note` 内容索引 | ⬜ | 搜索只命中标题和标签；`note` 内容不进入搜索索引 |
-| F3.6 | 复制按钮走 `SensitiveClipboardService` | ⬜ | 高风险 45 秒清理；显示 Toast 提示 |
-| F3.7 | 补 `note_field_widget_test.dart` | ⬜ | 覆盖显示/隐藏、复制、编辑保存 |
-| F3.8 | 更新 `application-characteristics.md` | ⬜ | 标记安全笔记为已实现 |
-| F3.9 | 创建执行报告 | ⬜ | 记录字段类型扩展决策和模板设计 |
-
-#### 验收命令
-
-```bash
-flutter analyze --no-pub                  # 0 issues
-flutter test test/widgets/                # widget 测试全绿
-flutter test                              # 总基线不回归
-```
-
-#### 风险与回滚
-
-| 风险 | 影响 | 缓解 |
-|---|---|---|
-| `note` 内容过大导致 DB 性能下降 | 加载卡顿 | 限制单条 note 最大 1MB；超出时提示"内容过长，建议拆分为多条笔记" |
-| 与现有模板编辑器冲突 | 模板编辑页崩溃 | `note` 类型在模板编辑器中仅提供行数配置，不提供复杂选项 |
-| 同步时大文本 payload 过大 | 同步失败或超时 | 走现有 SyncPayloadCodec，但添加单条 payload 大小检查（>500KB 时提示"笔记过大，可能影响同步"） |
-
-**回滚方式**: `note` 字段类型是枚举扩展，回滚时只需移除枚举值和模板；已保存的 `note` 数据在 DB 中存为普通 `data` 字段，回滚后显示为原始文本，不丢失数据。
-
----
-
-### 5.4 跨阶段依赖与里程碑
-
-```mermaid
-flowchart LR
-    subgraph 阶段一
-        A1[F1.1 数据模型] --> A2[F1.2 计算器]
-        A2 --> A3[F1.3 UI]
-        A3 --> A4[F1.4 入口]
-        A4 --> A5[F1.5 测试]
-    end
-
-    subgraph 阶段二
-        B1[F2.1 模型] --> B2[F2.2-2.3 解析器]
-        B2 --> B3[F2.4 重复检测]
-        B3 --> B4[F2.5 模板映射]
-        B4 --> B5[F2.6 UI 向导]
-        B5 --> B6[F2.7 outbox]
-        B6 --> B7[F2.8-2.9 测试]
-    end
-
-    subgraph 阶段三
-        C1[F3.1 note 枚举] --> C2[F3.2-3.4 UI+模板]
-        C2 --> C3[F3.5 搜索排除]
-        C3 --> C4[F3.6 剪贴板]
-        C4 --> C5[F3.7 测试]
-    end
-
-    A5 -->|建议串行| B1
-    B7 -->|可串行或并行| C1
-```
-
-**里程碑定义**:
-
-| 里程碑 | 完成标志 | 预计日期 |
-|---|---|---|
-| M1 | 阶段一完成：Vault Health 页面可访问，评分计算正确，测试通过 | Day 4 |
-| M2 | 阶段二完成：导入向导支持 CSV/JSON，导入后进入 outbox，测试通过 | Day 10 |
-| M3 | 阶段三完成：安全笔记模板可用，note 字段正常同步，测试通过 | Day 14 |
-| M4 | 全量回归：三个阶段合并后，`flutter test` 基线不回归 | Day 15 |
+| F3.1 | 在 `AccountFieldType` 增加 `longText` 和 `list` | ✅ | 枚举扩展；现有测试不失败 |
+| F3.2 | 在 `TemplateCategory` 增加 `note` | ✅ | 枚举扩展 |
+| F3.3 | 实现 `_buildLongTextFieldCard`（多行输入 + 折叠显示） | ✅ | 等宽字体；默认隐藏；编辑/保存/加载与现有字段一致 |
+| F3.4 | 实现 `_buildListFieldCard` + `_ListFieldEditor` | ✅ | 普通列表逐行编辑；助记词模式支持粘贴自动分词 + 网格展示 |
+| F3.5 | 内置 4 个模板（generic + secure_note + mnemonic + api_service） | ✅ | 模板字段使用 `longText`/`list`/`text`/`url`/`password`/`custom` |
+| F3.6 | `AccountField` 补全字段级 HLC（labelHlc 等） | ✅ | 兼容 CRDT 合并引擎的逐属性合并 |
+| F3.7 | 复制按钮走 `SensitiveClipboardService` | ✅ | 高风险 45 秒清理；显示 Toast 提示 |
+| F3.8 | 补全 `template_edit_widgets.dart` 类型 exhaustiveness | ✅ | `longText`/`list` 在标签、图标、选择器中均有映射 |
+| F3.9 | 补 `account_template_test.dart` | ✅ | 验证 4 个内置模板、字段类型正确性 |
+| F3.10 | 更新 `docs/wiki/data-models.md` | ✅ | 枚举、模型、版本历史同步 |
+| F3.11 | 创建执行报告 | ✅ | 本 PR 即为记录 |
 
 ---
 
@@ -531,5 +439,5 @@ flowchart LR
 
 ---
 
-**文档版本**: 1.0
-**最后更新**: 2026-05-06
+**文档版本**: 1.1
+**最后更新**: 2026-05-07

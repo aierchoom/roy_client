@@ -1,7 +1,7 @@
 # 数据模型
 
-**版本**: v1.2.0
-**最后更新**: 2026-05-01
+**版本**: v1.3.0
+**最后更新**: 2026-05-07
 
 ---
 
@@ -39,15 +39,19 @@
 │ - name          │       │ - label         │
 │ - email         │       │ - attributes    │
 │ - templateId    │       │ - description   │
-│ - data{}        │       └─────────────────┘
-│ - nameHlc       │               │
-│ - dataHlc{}     │               ▼
-└─────────────────┘       ┌─────────────────┐
-                          │ FieldAttributes │
+│ - data{}        │       │ - order         │
+│ - nameHlc       │       │ - labelHlc      │
+│ - dataHlc{}     │       │ - attributesHlc │
+└─────────────────┘       └─────────────────┘
+                                  │
+                                  ▼
+                          ┌─────────────────┐
+                          │FieldAttributes  │
                           ├─────────────────┤
                           │ - type          │
                           │ - isRequired    │
                           │ - isSecret      │
+                          │ - isReference   │
                           │ - ...           │
                           └─────────────────┘
 ```
@@ -271,7 +275,7 @@ class AccountTemplate {
   final String subTitle;
 
   /// 图标（可选）
-  final String? icon;
+  final int? iconCodePoint;
 
   /// 模板分类
   final TemplateCategory category;
@@ -281,12 +285,27 @@ class AccountTemplate {
 
   /// 是否自定义模板
   final bool isCustom;
+
+  /// 同步状态
+  final SyncStatus syncStatus;
+
+  /// 模板级 HLC 时间戳
+  final Hlc? hlc;
+
+  /// 服务器版本号
+  final int serverVersion;
+
+  /// 是否已删除
+  final bool isDeleted;
+
+  /// 删除操作的 HLC
+  final Hlc? deleteHlc;
 }
 ```
 
 ### 4.2 AccountField
 
-模板字段定义。
+模板字段定义。每个字段的独立属性（标签、描述、属性、排序）都有自己的 HLC 时间戳，支持字段级 CRDT 合并。
 
 ```dart
 class AccountField {
@@ -301,6 +320,21 @@ class AccountField {
 
   /// 字段属性
   final AccountFieldAttributes attributes;
+
+  /// 字段排序
+  final int order;
+
+  /// 标签的 HLC 时间戳
+  final Hlc labelHlc;
+
+  /// 描述的 HLC 时间戳
+  final Hlc descriptionHlc;
+
+  /// 属性的 HLC 时间戳
+  final Hlc attributesHlc;
+
+  /// 排序的 HLC 时间戳
+  final Hlc orderHlc;
 }
 ```
 
@@ -330,6 +364,9 @@ class AccountFieldAttributes {
 
   /// 是否可复制
   final bool isCopyable;
+
+  /// 是否为引用字段（如 2FA 关联，不存储实际值）
+  final bool isReference;
 
   /// 最大长度
   final int? maxLength;
@@ -379,13 +416,39 @@ enum AccountFieldType {
   /// 时间/日期
   time,
 
-  /// 2FA 关联控件（仅表示关联关系，不保存 TOTP secret）
-  totp,
-
-  /// 自定义
+  /// 自定义（如 2FA 关联控件）
   custom,
+
+  /// 账户关联（引用其他 AccountItem）
+  accountLink,
+
+  /// 多行大文本（安全笔记内容、助记词等）
+  longText,
+
+  /// 多值列表（换行分隔，UI 为逐行编辑）
+  list,
+
+  /// 未知/不兼容类型（降级兼容）
+  unknown,
 }
 ```
+
+**类型与 UI 映射**:
+
+| 类型 | UI 控件 | 特殊行为 |
+|------|---------|----------|
+| `text` | 单行文本框 | 标准输入 |
+| `password` | 密码框 + 显隐切换 | `isSecret` 时默认隐藏 |
+| `number` | 数字键盘 | 限制数字输入 |
+| `email` | 邮箱键盘 | 基础格式校验 |
+| `phone` | 电话键盘 | - |
+| `url` | URL 键盘 | 可点击跳转 |
+| `time` | 日期/时间选择器 | 受 `timeFormat` 控制 |
+| `custom` | 自定义控件 | 如 2FA 关联选择器 |
+| `accountLink` | 账户选择对话框 | 引用其他 AccountItem ID |
+| `longText` | 多行文本框（等宽字体） | `isSecret` 时可折叠隐藏 |
+| `list` | 逐行列表编辑器 | 助记词模式支持粘贴自动分词 |
+| `unknown` | 纯文本回显 | 降级显示，不可编辑 |
 
 ### 5.2 TimeFieldFormat
 
@@ -434,6 +497,9 @@ enum TemplateCategory {
   /// 金融
   finance,
 
+  /// 安全笔记（助记词、API Key、私钥等）
+  note,
+
   /// 自定义
   custom,
 }
@@ -465,7 +531,7 @@ final account = AccountItem.fromJson(json);
   "id": "1714205400000",
   "name": "淘宝账户",
   "email": "user@example.com",
-  "templateId": "builtin_generic",
+  "templateId": "builtin_generic_info",
   "data": {
     "username": "myuser",
     "password": "encrypted_value"
@@ -489,7 +555,7 @@ final account = AccountItem.fromJson(json);
 {
   "templateId": "custom_bank",
   "title": "银行卡",
-  "subTitle": "银行卡信息模板",
+  "subtitle": "银行卡信息模板",
   "category": "payment",
   "isCustom": true,
   "fields": [
@@ -504,18 +570,16 @@ final account = AccountItem.fromJson(json);
         "isEditable": true,
         "isSearchable": true,
         "isCopyable": true
-      }
-    },
-    {
-      "fieldKey": "cvv",
-      "label": "CVV",
-      "attributes": {
-        "type": "password",
-        "isRequired": false,
-        "isSecret": true
-      }
+      },
+      "order": 0,
+      "labelHlc": "0-0-builtin",
+      "attributesHlc": "0-0-builtin"
     }
-  ]
+  ],
+  "syncStatus": "synchronized",
+  "hlc": "1714205400123-0-device_abc",
+  "serverVersion": 1,
+  "isDeleted": false
 }
 ```
 
@@ -525,11 +589,13 @@ final account = AccountItem.fromJson(json);
 |------|------|
 | v1.0.0 | 初始模型定义 |
 | v1.1.0 | 添加 `dataHlc` 字段级时间戳 |
-| v1.2.0 | 添加 `totp` 字段类型 |
+| v1.2.0 | 添加 `totp` 字段类型（后以 `custom` + `isReference` 替代） |
+| v1.3.0 | 添加 `longText`、`list`、`accountLink`、`unknown` 字段类型；添加 `note` 模板分类；字段定义引入独立 HLC（`labelHlc`、`descriptionHlc`、`attributesHlc`、`orderHlc`）；`AccountFieldAttributes` 新增 `isReference` |
 
 **向后兼容**:
 - 新字段使用默认值
 - 缺失的 Hlc 字段使用 `Hlc.zero('local')`
+- 未知字段类型降级为 `unknown`
 
 ---
 
@@ -542,7 +608,8 @@ final account = AccountItem.fromJson(json);
 | Vault | `lib/models/vault.dart` |
 | AccountItem | `lib/models/account_item.dart` |
 | AccountTemplate | `lib/models/account_template.dart` |
-| Hlc | `lib/models/hlc.dart` |
+| Hlc / SyncClock / SyncValue | `lib/models/hlc.dart` |
+| TemplateConflictLog | `lib/models/template_conflict_log.dart` |
 
 ### B. 数据验证规则
 
@@ -568,5 +635,5 @@ if (field.attributes.type == AccountFieldType.email) {
 
 ---
 
-**文档版本**: 1.2
-**最后更新**: 2026-05-01
+**文档版本**: 1.3
+**最后更新**: 2026-05-07
