@@ -9,7 +9,9 @@ extension SyncServiceConflict on SyncService {
   ) async {
     final itemId = conflict.itemId;
     if (itemId == null) {
-      return;
+      throw SyncProtocolException(
+        'Conflict response missing item_id. Cannot resolve.',
+      );
     }
 
     final localAccount = await _storageService.getAccountById(
@@ -121,7 +123,8 @@ extension SyncServiceConflict on SyncService {
     String serverUrl,
     String itemId,
   ) async {
-    await _pullLatestSnapshot(serverUrl);
+    // Remote is missing — no need to pull; just update local status so
+    // the item is re-pushed as a new record on the next attempt.
 
     final localItem = await _storageService.getAccountById(
       itemId,
@@ -153,7 +156,7 @@ extension SyncServiceConflict on SyncService {
     );
 
     await _storageService.saveAccount(
-      localItem.copyWith(syncStatus: SyncStatus.synchronized, serverVersion: 0),
+      localItem.copyWith(syncStatus: SyncStatus.pendingPush, serverVersion: 0),
       isSyncMerge: true,
     );
     await _storageService.saveConflictLogs([conflictLog]);
@@ -167,7 +170,7 @@ extension SyncServiceConflict on SyncService {
     String serverUrl,
     String itemId,
   ) async {
-    await _pullLatestSnapshot(serverUrl);
+    // Remote template is missing — no need to pull; just update local status.
 
     final localItem = await _storageService.loadTemplateById(itemId);
     if (localItem == null) {
@@ -188,7 +191,7 @@ extension SyncServiceConflict on SyncService {
     }
 
     await _storageService.saveTemplate(
-      localItem.copyWith(syncStatus: SyncStatus.synchronized, serverVersion: 0),
+      localItem.copyWith(syncStatus: SyncStatus.pendingPush, serverVersion: 0),
       isSyncMerge: true,
     );
 

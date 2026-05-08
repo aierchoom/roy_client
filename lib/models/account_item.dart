@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import 'account_template.dart';
 import 'hlc.dart';
 
 enum SyncStatus { synchronized, pendingPush, conflict }
@@ -161,6 +162,16 @@ class AccountItem {
       'isDeleted': isDeleted,
       'deleteHlc': deleteHlc?.toString(),
     };
+  }
+
+  /// Count of data fields not covered by the template (legacy/orphan fields).
+  int legacyFieldCount(AccountTemplate? template) {
+    final visibleKeys =
+        template?.fields.map((field) => field.fieldKey).toSet() ?? <String>{};
+    return data.entries.where((entry) {
+      if (visibleKeys.contains(entry.key)) return false;
+      return entry.value.trim().isNotEmpty;
+    }).length;
   }
 
   AccountItem copyWith({

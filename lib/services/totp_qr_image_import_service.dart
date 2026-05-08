@@ -36,6 +36,7 @@ class TotpQrImageImportService {
     try {
       image = image_lib.decodeImage(bytes);
     } catch (_) {
+      // Image library decode failure is indistinguishable from unsupported format.
       throw const TotpException(imageDecodeFailedMessage);
     }
     if (image == null) {
@@ -51,6 +52,7 @@ class TotpQrImageImportService {
     } on ReaderException {
       throw const TotpException(noQrCodeFoundMessage);
     } catch (_) {
+      // Non-ReaderException decode failure is treated the same way.
       throw const TotpException(noQrCodeFoundMessage);
     }
   }

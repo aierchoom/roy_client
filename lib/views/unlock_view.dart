@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/app_text_extension.dart';
 import '../services/biometric_auth_service.dart';
 import '../services/service_manager.dart';
 import '../widgets/adaptive_page.dart';
@@ -24,10 +25,6 @@ class _UnlockViewState extends State<UnlockView> {
   String _biometricName = 'Biometrics';
   bool _isFirstRun = false;
   bool _checkingStatus = true;
-
-  String _text(String zh, String en) {
-    return Localizations.localeOf(context).languageCode == 'zh' ? zh : en;
-  }
 
   @override
   void initState() {
@@ -96,7 +93,7 @@ class _UnlockViewState extends State<UnlockView> {
       _checkingStatus = false;
       _errorMessage =
           _serviceManager.errorMessage ??
-          _text(
+          context.text(
             '\u89e3\u9501\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u518d\u8bd5\u3002',
             'Unlock failed. Please try again.',
           );
@@ -127,7 +124,7 @@ class _UnlockViewState extends State<UnlockView> {
         return;
       case UnlockResult.invalidPassword:
         setState(
-          () => _errorMessage = _text(
+          () => _errorMessage = context.text(
             '\u4e3b\u5bc6\u7801\u4e0d\u6b63\u786e\u3002',
             'Incorrect master password.',
           ),
@@ -140,7 +137,7 @@ class _UnlockViewState extends State<UnlockView> {
         setState(
           () => _errorMessage =
               _serviceManager.errorMessage ??
-              _text(
+              context.text(
                 '\u89e3\u9501\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u518d\u8bd5\u3002',
                 'Unlock failed. Please try again.',
               ),
@@ -165,7 +162,7 @@ class _UnlockViewState extends State<UnlockView> {
         return;
       case UnlockResult.biometricFailed:
         setState(
-          () => _errorMessage = _text(
+          () => _errorMessage = context.text(
             '\u751f\u7269\u8bc6\u522b\u9a8c\u8bc1\u5931\u8d25\u3002',
             'Biometric verification failed.',
           ),
@@ -176,7 +173,7 @@ class _UnlockViewState extends State<UnlockView> {
       case UnlockResult.alreadyInProgress:
       case UnlockResult.error:
         setState(
-          () => _errorMessage = _text(
+          () => _errorMessage = context.text(
             '\u89e3\u9501\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u518d\u8bd5\u3002',
             'Unlock failed. Please try again.',
           ),
@@ -191,10 +188,10 @@ class _UnlockViewState extends State<UnlockView> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text(
-          _text('\u6e05\u7a7a\u672c\u673a\u5e93', 'Clear Local Vault'),
+          context.text('\u6e05\u7a7a\u672c\u673a\u5e93', 'Clear Local Vault'),
         ),
         content: Text(
-          _text(
+          context.text(
             '\u8fd9\u4f1a\u4ece\u5f53\u524d\u8bbe\u5907\u4e0a\u5220\u9664\u6240\u6709\u672c\u5730\u8d26\u6237\u548c\u8bbe\u7f6e\u3002',
             'This removes all local accounts and settings from this device.',
           ),
@@ -202,14 +199,14 @@ class _UnlockViewState extends State<UnlockView> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: Text(_text('\u53d6\u6d88', 'Cancel')),
+            child: Text(context.text('\u53d6\u6d88', 'Cancel')),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(context).colorScheme.error,
             ),
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: Text(_text('\u6e05\u7a7a', 'Clear')),
+            child: Text(context.text('\u6e05\u7a7a', 'Clear')),
           ),
         ],
       ),
@@ -231,7 +228,7 @@ class _UnlockViewState extends State<UnlockView> {
     messenger.showSnackBar(
       SnackBar(
         content: Text(
-          _text(
+          context.text(
             '\u672c\u5730\u6570\u636e\u5df2\u6e05\u7a7a\u3002',
             'Local data cleared successfully.',
           ),
@@ -280,7 +277,7 @@ class _UnlockViewState extends State<UnlockView> {
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            _text(
+            context.text(
               '\u4e00\u4e2a\u540c\u65f6\u7167\u987e\u624b\u673a\u4e0e\u684c\u9762\u7aef\u4f53\u9a8c\u7684\u5b89\u5168\u5e93\u3002',
               'A secure vault experience designed for both mobile and desktop.',
             ),
@@ -294,14 +291,14 @@ class _UnlockViewState extends State<UnlockView> {
             runSpacing: 10,
             children: [
               _HeroBadge(
-                label: _text(
+                label: context.text(
                   '\u4e3b\u5bc6\u7801\u4fdd\u62a4',
                   'Master password protected',
                 ),
                 onColor: colorScheme.onPrimaryContainer,
               ),
               _HeroBadge(
-                label: _text(
+                label: context.text(
                   '\u652f\u6301\u751f\u7269\u8bc6\u522b',
                   'Biometric support',
                 ),
@@ -327,8 +324,8 @@ class _UnlockViewState extends State<UnlockView> {
           children: [
             Text(
               _isFirstRun
-                  ? _text('\u521b\u5efa\u4fdd\u9669\u5e93', 'Create Vault')
-                  : _text('\u89e3\u9501\u4fdd\u9669\u5e93', 'Unlock Vault'),
+                  ? context.text('\u521b\u5efa\u4fdd\u9669\u5e93', 'Create Vault')
+                  : context.text('\u89e3\u9501\u4fdd\u9669\u5e93', 'Unlock Vault'),
               style: theme.textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.w700,
               ),
@@ -336,11 +333,11 @@ class _UnlockViewState extends State<UnlockView> {
             const SizedBox(height: AppSpacing.sm),
             Text(
               _isFirstRun
-                  ? _text(
+                  ? context.text(
                       '\u7b2c\u4e00\u6b21\u4f7f\u7528\u65f6\uff0c\u8bf7\u5148\u8bbe\u7f6e\u4e3b\u5bc6\u7801\u6216\u9009\u62e9\u8df3\u8fc7\u3002',
                       'Set a master password for your first launch, or choose to skip it.',
                     )
-                  : _text(
+                  : context.text(
                       '\u4f7f\u7528\u4e3b\u5bc6\u7801\u6216\u751f\u7269\u8bc6\u522b\u8fdb\u5165 SecretRoy\u3002',
                       'Use your master password or biometrics to enter SecretRoy.',
                     ),
@@ -357,17 +354,17 @@ class _UnlockViewState extends State<UnlockView> {
               onSubmitted: (_) => _unlockWithPassword(),
               decoration: InputDecoration(
                 labelText: _isFirstRun
-                    ? _text(
+                    ? context.text(
                         '\u521b\u5efa\u4e3b\u5bc6\u7801',
                         'Create Master Password',
                       )
-                    : _text('\u4e3b\u5bc6\u7801', 'Master Password'),
+                    : context.text('\u4e3b\u5bc6\u7801', 'Master Password'),
                 hintText: _isFirstRun
-                    ? _text(
+                    ? context.text(
                         '\u4e3a\u9996\u6b21\u4f7f\u7528\u8bbe\u7f6e\u4e00\u4e2a\u4e3b\u5bc6\u7801',
                         'Set a master password for the first run',
                       )
-                    : _text(
+                    : context.text(
                         '\u8f93\u5165\u4f60\u7684\u4e3b\u5bc6\u7801',
                         'Enter your master password',
                       ),
@@ -434,13 +431,13 @@ class _UnlockViewState extends State<UnlockView> {
                       ),
                 label: Text(
                   _isLoading
-                      ? _text('\u5904\u7406\u4e2d...', 'Working...')
+                      ? context.text('\u5904\u7406\u4e2d...', 'Working...')
                       : (_isFirstRun
-                            ? _text(
+                            ? context.text(
                                 '\u521b\u5efa\u4fdd\u9669\u5e93',
                                 'Create Vault',
                               )
-                            : _text('\u89e3\u9501', 'Unlock')),
+                            : context.text('\u89e3\u9501', 'Unlock')),
                 ),
               ),
             ),
@@ -453,7 +450,7 @@ class _UnlockViewState extends State<UnlockView> {
                   onPressed: _isLoading ? null : _unlockWithNoPassword,
                   icon: const Icon(Icons.no_encryption_outlined),
                   label: Text(
-                    _text(
+                    context.text(
                       '\u8df3\u8fc7\u4e3b\u5bc6\u7801',
                       'Skip Master Password',
                     ),
@@ -471,7 +468,7 @@ class _UnlockViewState extends State<UnlockView> {
                   onPressed: _isLoading ? null : _unlockWithBiometric,
                   icon: const Icon(Icons.fingerprint),
                   label: Text(
-                    _text(
+                    context.text(
                       '\u4f7f\u7528 $_biometricName',
                       'Use $_biometricName',
                     ),
@@ -484,7 +481,7 @@ class _UnlockViewState extends State<UnlockView> {
               TextButton(
                 onPressed: _isLoading ? null : _resetApp,
                 child: Text(
-                  _text(
+                  context.text(
                     '\u5fd8\u8bb0\u5bc6\u7801\uff1f\u91cd\u7f6e\u672c\u673a\u8bbe\u5907',
                     'Forgot password? Reset this device',
                   ),

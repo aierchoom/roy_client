@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../../l10n/app_text_extension.dart';
 import '../../models/account_item.dart';
 import '../../models/account_template.dart';
 import '../../providers/enhanced_app_provider.dart';
@@ -35,11 +36,6 @@ class _HomeSearchViewState extends State<HomeSearchView> {
   final Set<String> _selectedTemplateIds = {};
 
   String get _query => _searchController.text.trim().toLowerCase();
-
-  String _text(String zh, String en) {
-    if (!mounted) return en;
-    return Localizations.localeOf(context).languageCode == 'zh' ? zh : en;
-  }
 
   Set<String> _templateIdSet(List<AccountTemplate> templates) {
     return templates.map((template) => template.templateId).toSet();
@@ -92,9 +88,9 @@ class _HomeSearchViewState extends State<HomeSearchView> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(_text('\u5220\u9664\u8d26\u6237', 'Delete Account')),
+        title: Text(context.text('\u5220\u9664\u8d26\u6237', 'Delete Account')),
         content: Text(
-          _text(
+          context.text(
             '\u786e\u5b9a\u8981\u5220\u9664\u201c${account.name}\u201d\u5417\uff1f\u6b64\u64cd\u4f5c\u4e0d\u53ef\u64a4\u9500\u3002',
             'Are you sure you want to delete "${account.name}"? This action cannot be undone.',
           ),
@@ -102,12 +98,12 @@ class _HomeSearchViewState extends State<HomeSearchView> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text(_text('\u53d6\u6d88', 'Cancel')),
+            child: Text(context.text('\u53d6\u6d88', 'Cancel')),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: Text(_text('\u5220\u9664', 'Delete')),
+            child: Text(context.text('\u5220\u9664', 'Delete')),
           ),
         ],
       ),
@@ -148,14 +144,8 @@ class _HomeSearchViewState extends State<HomeSearchView> {
     return filtered;
   }
 
-  int _legacyFieldCount(AccountItem account, AccountTemplate? template) {
-    final visibleKeys =
-        template?.fields.map((field) => field.fieldKey).toSet() ?? <String>{};
-    return account.data.entries.where((entry) {
-      if (visibleKeys.contains(entry.key)) return false;
-      return entry.value.trim().isNotEmpty;
-    }).length;
-  }
+  int _legacyFieldCount(AccountItem account, AccountTemplate? template) =>
+      account.legacyFieldCount(template);
 
   Widget _buildTemplateMultiSelect(
     BuildContext context,
@@ -166,14 +156,14 @@ class _HomeSearchViewState extends State<HomeSearchView> {
 
     String label;
     if (activeTemplateIds.isEmpty) {
-      label = _text('\u5168\u90e8\u6a21\u677f', 'All Templates');
+      label = context.text('\u5168\u90e8\u6a21\u677f', 'All Templates');
     } else if (activeTemplateIds.length == 1) {
       final id = activeTemplateIds.first;
       label =
           _templateTitleById(templates, id) ??
-          _text('\u5168\u90e8\u6a21\u677f', 'All Templates');
+          context.text('\u5168\u90e8\u6a21\u677f', 'All Templates');
     } else {
-      label = _text(
+      label = context.text(
         '\u5df2\u9009 ${activeTemplateIds.length} \u4e2a\u6a21\u677f',
         '${activeTemplateIds.length} templates selected',
       );
@@ -244,7 +234,7 @@ class _HomeSearchViewState extends State<HomeSearchView> {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
           child: Text(
-            _text('\u9009\u62e9\u6a21\u677f', 'Filter by Templates'),
+            context.text('\u9009\u62e9\u6a21\u677f', 'Filter by Templates'),
             style: theme.textTheme.labelMedium?.copyWith(
               color: theme.colorScheme.primary,
               fontWeight: FontWeight.bold,
@@ -255,7 +245,7 @@ class _HomeSearchViewState extends State<HomeSearchView> {
           closeOnActivate: false,
           onPressed: () => setState(() => _selectedTemplateIds.clear()),
           leadingIcon: const Icon(Icons.all_inclusive, size: 20),
-          child: Text(_text('\u5168\u90e8\u6a21\u677f', 'All Templates')),
+          child: Text(context.text('\u5168\u90e8\u6a21\u677f', 'All Templates')),
         ),
         const PopupMenuDivider(),
         ...templates.map((t) {
@@ -330,7 +320,7 @@ class _HomeSearchViewState extends State<HomeSearchView> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      _text('\u641c\u7d22', 'Search'),
+                      context.text('\u641c\u7d22', 'Search'),
                       style: theme.textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.w700,
                         color: theme.colorScheme.onSurface,
@@ -338,7 +328,7 @@ class _HomeSearchViewState extends State<HomeSearchView> {
                     ),
                     const SizedBox(height: AppSpacing.xs),
                     Text(
-                      _text(
+                      context.text(
                         '\u4ece\u8fd9\u91cc\u6309\u5173\u952e\u5b57\u548c\u6a21\u677f\u76f4\u63a5\u5b9a\u4f4d\u8d26\u6237\u3002',
                         'Find accounts here by keywords and templates.',
                       ),
@@ -357,13 +347,13 @@ class _HomeSearchViewState extends State<HomeSearchView> {
             runSpacing: 10,
             children: [
               _QuickBadge(
-                label: _text(
+                label: context.text(
                   '\u5171 ${provider.allAccounts.length} \u6761\u8d26\u6237',
                   '${provider.allAccounts.length} accounts',
                 ),
               ),
               _QuickBadge(
-                label: _text(
+                label: context.text(
                   '\u5f53\u524d\u7ed3\u679c ${results.length} \u6761',
                   '${results.length} results now',
                 ),
@@ -377,7 +367,7 @@ class _HomeSearchViewState extends State<HomeSearchView> {
             _ConflictAlertBanner(
               count: provider.conflictCount,
               onTap: onOpenConflicts,
-              textBuilder: _text,
+              textBuilder: (zh, en) => context.text(zh, en),
             ),
           ],
           if (provider.localSyncChanges.isNotEmpty) ...[
@@ -390,7 +380,7 @@ class _HomeSearchViewState extends State<HomeSearchView> {
                   MaterialPageRoute(builder: (_) => const LocalSyncQueueView()),
                 );
               },
-              textBuilder: _text,
+              textBuilder: (zh, en) => context.text(zh, en),
             ),
           ],
           const SizedBox(height: 18),
@@ -407,7 +397,7 @@ class _HomeSearchViewState extends State<HomeSearchView> {
                 ),
                 onChanged: (_) => setState(() {}),
                 leading: const Icon(Icons.search),
-                hintText: _text(
+                hintText: context.text(
                   '\u641c\u7d22\u8d26\u6237...',
                   'Search accounts...',
                 ),
@@ -460,7 +450,7 @@ class _HomeSearchViewState extends State<HomeSearchView> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              _text('\u6700\u8fd1\u4f7f\u7528', 'Recently Used'),
+              context.text('\u6700\u8fd1\u4f7f\u7528', 'Recently Used'),
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w700,
               ),
@@ -468,11 +458,11 @@ class _HomeSearchViewState extends State<HomeSearchView> {
             const SizedBox(height: 6),
             Text(
               _query.isEmpty && activeTemplateIds.isEmpty
-                  ? _text(
+                  ? context.text(
                       '\u672a\u8f93\u5165\u5173\u952e\u5b57\u65f6\uff0c\u9ed8\u8ba4\u663e\u793a\u6700\u8fd1 6 \u6761\u8d26\u6237\u3002',
                       'When no keyword is entered, the latest 6 accounts are shown.',
                     )
-                  : _text(
+                  : context.text(
                       '\u5f53\u524d\u5339\u914d ${results.length} \u6761\u7ed3\u679c\u3002',
                       '${results.length} results match the current filters.',
                     ),
@@ -484,11 +474,11 @@ class _HomeSearchViewState extends State<HomeSearchView> {
             Expanded(
               child: results.isEmpty
                   ? _SearchEmptyState(
-                      title: _text(
+                      title: context.text(
                         '\u6ca1\u6709\u627e\u5230\u5339\u914d\u9879',
                         'No matching accounts',
                       ),
-                      subtitle: _text(
+                      subtitle: context.text(
                         '\u8bd5\u8bd5\u5207\u6362\u6a21\u677f\u6216\u66f4\u6362\u5173\u952e\u5b57\u518d\u641c\u4e00\u6b21\u3002',
                         'Try another template or keyword.',
                       ),
@@ -517,7 +507,7 @@ class _HomeSearchViewState extends State<HomeSearchView> {
                             density: AccountListTileDensity.search,
                             onEdit: () => _openAccount(context, account),
                             onDelete: () => _deleteAccount(context, account),
-                            localeText: (ctx, zh, en) => _text(zh, en),
+                            localeText: (ctx, zh, en) => context.text(zh, en),
                             resolveAccountName: (id) =>
                                 provider.resolveAccountName(id),
                           );

@@ -36,6 +36,7 @@ class Hlc implements Comparable<Hlc> {
       String nodeId = value.substring(secondHyphen + 1);
       return Hlc(time, counter, nodeId);
     } catch (_) {
+      // Corrupted HLC string: return a sentinel so downstream can detect it.
       return Hlc.zero(_corruptedNodeId);
     }
   }
@@ -85,9 +86,21 @@ class SyncClock {
     return _current;
   }
 
+  /// Maximum acceptable clock drift from wall-clock time (5 minutes).
+  /// Remote HLCs with timestamps beyond this are rejected to prevent
+  /// future-dated clock injection attacks.
+  static const int _maxDriftMs = 5 * 60 * 1000;
+
   /// 接收到远端时钟时，强制自我校准并跨越向未来
+  /// Throws [ArgumentError] if the remote clock is unreasonably far in the future.
   void receive(Hlc remote) {
     int nowTime = DateTime.now().millisecondsSinceEpoch;
+    if (remote.time > nowTime + _maxDriftMs) {
+      throw ArgumentError(
+        'Remote HLC timestamp ${remote.time} is too far in the future '
+        '(beyond ${nowTime + _maxDriftMs}). Possible clock manipulation.',
+      );
+    }
     if (nowTime > _current.time && nowTime > remote.time) {
       _current = Hlc(nowTime, 0, _nodeId);
       return;

@@ -24,6 +24,7 @@ class EnhancedAppProvider extends ChangeNotifier {
   String _searchQuery = '';
   Set<String> _selectedTags = {};
   bool _isLoading = false;
+  String? _initError;
   int _conflictCount = 0;
   StreamSubscription<StorageChangeEvent>? _storageSubscription;
   bool _disposed = false;
@@ -56,6 +57,7 @@ class EnhancedAppProvider extends ChangeNotifier {
   String get searchQuery => _searchQuery;
   Set<String> get selectedTags => _selectedTags;
   bool get isLoading => _isLoading;
+  String? get initError => _initError;
   int get conflictCount => _conflictCount;
 
   List<AccountItem> get accounts {
@@ -91,6 +93,7 @@ class EnhancedAppProvider extends ChangeNotifier {
     try {
       return _accounts.firstWhere((account) => account.id == id);
     } catch (_) {
+      // firstWhere not found is the idiomatic way to return null for missing items.
       return null;
     }
   }
@@ -128,7 +131,8 @@ class EnhancedAppProvider extends ChangeNotifier {
       await _loadData();
       _storageSubscription = _storageService.onChange.listen(_onStorageChange);
     } catch (e) {
-      AppLogger.d('Failed to initialize app provider: $e');
+      AppLogger.e('Failed to initialize app provider: $e');
+      _initError = e.toString();
     } finally {
       _setLoading(false);
     }

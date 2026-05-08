@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/app_text_extension.dart';
 import '../services/service_manager.dart';
 import '../services/sensitive_clipboard_service.dart';
 
@@ -108,10 +109,6 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
   late bool _includeSpecial;
   late String _password;
 
-  String _text(String zh, String en) {
-    return Localizations.localeOf(context).languageCode == 'zh' ? zh : en;
-  }
-
   @override
   void initState() {
     super.initState();
@@ -206,7 +203,7 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            _text(
+            context.text(
               '\u81f3\u5c11\u4fdd\u7559\u4e00\u79cd\u5b57\u7b26\u7c7b\u578b',
               'Keep at least one character type enabled',
             ),
@@ -244,7 +241,7 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          _text('\u5bc6\u7801\u5df2\u590d\u5236', 'Password copied'),
+          context.text('\u5bc6\u7801\u5df2\u590d\u5236', 'Password copied'),
         ),
       ),
     );
@@ -273,7 +270,7 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
           children: [
             Text(
               widget.title ??
-                  _text('\u5bc6\u7801\u751f\u6210\u5668', 'Password Generator'),
+                  context.text('\u5bc6\u7801\u751f\u6210\u5668', 'Password Generator'),
               style: theme.textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.w800,
               ),
@@ -281,7 +278,7 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
             const SizedBox(height: 8),
             Text(
               widget.subtitle ??
-                  _text(
+                  context.text(
                     '\u50cf 1Password \u4e00\u6837\u81ea\u5b9a\u4e49\u957f\u5ea6\u548c\u5b57\u7b26\u7c7b\u578b\uff0c\u7136\u540e\u4e00\u952e\u5e94\u7528\u3002',
                     'Tune length and character types, then apply the result in one tap.',
                   ),
@@ -325,7 +322,7 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
                       FilledButton.tonalIcon(
                         onPressed: _regenerate,
                         icon: const Icon(Icons.refresh_rounded),
-                        label: Text(_text('\u91cd\u6765', 'Refresh')),
+                        label: Text(context.text('\u91cd\u6765', 'Refresh')),
                       ),
                     ],
                   ),
@@ -337,7 +334,7 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              _text('\u5f3a\u5ea6', 'Strength'),
+                              context.text('\u5f3a\u5ea6', 'Strength'),
                               style: theme.textTheme.labelLarge?.copyWith(
                                 color: theme.colorScheme.onPrimaryContainer
                                     .withAlpha(170),
@@ -397,7 +394,7 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
                     Row(
                       children: [
                         Text(
-                          _text('\u957f\u5ea6', 'Length'),
+                          context.text('\u957f\u5ea6', 'Length'),
                           style: theme.textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.w700,
                           ),
@@ -440,7 +437,7 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
                       Padding(
                         padding: const EdgeInsets.only(top: 12),
                         child: Text(
-                          _text(
+                          context.text(
                             '\u5f53\u524d\u5b57\u6bb5\u957f\u5ea6\u56fa\u5b9a\u4e3a $_length \u4f4d\u3002',
                             'This field is fixed at $_length characters.',
                           ),
@@ -451,7 +448,7 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
                       ),
                     const SizedBox(height: 8),
                     Text(
-                      _text(
+                      context.text(
                         '\u5efa\u8bae\u81f3\u5c11 16 \u4f4d\uff0c\u4e14\u5305\u542b\u591a\u4e2a\u5b57\u7b26\u7c7b\u578b\u3002',
                         'A length of 16+ with mixed character types is recommended.',
                       ),
@@ -471,7 +468,7 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
                 child: Column(
                   children: [
                     _OptionTile(
-                      title: _text('\u5927\u5199\u5b57\u6bcd', 'Uppercase'),
+                      title: context.text('\u5927\u5199\u5b57\u6bcd', 'Uppercase'),
                       subtitle: 'A-Z',
                       value: _includeUppercase,
                       onChanged: (_) => _toggleOption(
@@ -480,7 +477,7 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
                       ),
                     ),
                     _OptionTile(
-                      title: _text('\u5c0f\u5199\u5b57\u6bcd', 'Lowercase'),
+                      title: context.text('\u5c0f\u5199\u5b57\u6bcd', 'Lowercase'),
                       subtitle: 'a-z',
                       value: _includeLowercase,
                       onChanged: (_) => _toggleOption(
@@ -489,7 +486,7 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
                       ),
                     ),
                     _OptionTile(
-                      title: _text('\u6570\u5b57', 'Numbers'),
+                      title: context.text('\u6570\u5b57', 'Numbers'),
                       subtitle: '0-9',
                       value: _includeNumbers,
                       onChanged: (_) => _toggleOption(
@@ -498,7 +495,7 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
                       ),
                     ),
                     _OptionTile(
-                      title: _text('\u7b26\u53f7', 'Symbols'),
+                      title: context.text('\u7b26\u53f7', 'Symbols'),
                       subtitle: '!@#\$%',
                       value: _includeSpecial,
                       onChanged: (_) => _toggleOption(
@@ -517,7 +514,7 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
                   child: OutlinedButton.icon(
                     onPressed: _copyPassword,
                     icon: const Icon(Icons.content_copy_outlined),
-                    label: Text(_text('\u590d\u5236', 'Copy')),
+                    label: Text(context.text('\u590d\u5236', 'Copy')),
                   ),
                 ),
                 if (widget.showApplyAction) ...[
@@ -535,7 +532,7 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
                       icon: const Icon(Icons.check_rounded),
                       label: Text(
                         widget.applyLabel ??
-                            _text('\u4f7f\u7528\u5bc6\u7801', 'Use Password'),
+                            context.text('\u4f7f\u7528\u5bc6\u7801', 'Use Password'),
                       ),
                     ),
                   ),

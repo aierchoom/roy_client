@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:cryptography/cryptography.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:secret_roy/core/crypto_random.dart';
 
 import 'database_file_cipher.dart';
 import 'database_file_key_manager.dart';
@@ -18,6 +19,13 @@ class EnhancedCryptoService {
   final FlutterSecureStorage _secureStorage;
   bool _isUnlocked = false;
   Uint8List? _databaseKeyBytes;
+
+  late final DatabaseFileKeyManager _databaseFileKeyManager = DatabaseFileKeyManager(
+    read: ({required key}) => _readSecureValue(key),
+    write: ({required key, required value}) => _writeSecureValue(key, value),
+    delete: ({required key}) => _deleteSecureValue(key),
+    pbkdf2Iterations: _pbkdf2Iterations,
+  );
 
   EnhancedCryptoService({FlutterSecureStorage? secureStorage})
     : _secureStorage = secureStorage ?? const FlutterSecureStorage();
@@ -119,10 +127,7 @@ class EnhancedCryptoService {
   }
 
   Future<void> _storePbkdf2Hash(String password) async {
-    final salt = List<int>.generate(
-      _saltLength,
-      (_) => Random.secure().nextInt(256),
-    );
+    final salt = CryptoRandom.bytes(_saltLength);
     final pbkdf2 = Pbkdf2(
       macAlgorithm: Hmac.sha256(),
       iterations: _pbkdf2Iterations,
@@ -168,14 +173,14 @@ class EnhancedCryptoService {
   }
 
   Future<Uint8List> _unlockDatabaseFileKey(String password) async {
-    return _databaseFileKeyManager().unlock(password);
+    return _databaseFileKeyManager.unlock(password);
   }
 
   Future<void> _rotateDatabaseKeyEnvelope(
     String newPassword,
     Uint8List databaseKeyBytes,
   ) async {
-    await _databaseFileKeyManager().rotateEnvelope(
+    await _databaseFileKeyManager.rotateEnvelope(
       newPassword: newPassword,
       databaseKeyBytes: databaseKeyBytes,
     );
@@ -193,17 +198,16 @@ class EnhancedCryptoService {
     return _secureStorage.delete(key: key);
   }
 
-  DatabaseFileKeyManager _databaseFileKeyManager() {
-    return DatabaseFileKeyManager(
-      read: ({required key}) => _readSecureValue(key),
-      write: ({required key, required value}) => _writeSecureValue(key, value),
-      delete: ({required key}) => _deleteSecureValue(key),
-      pbkdf2Iterations: _pbkdf2Iterations,
-    );
-  }
-
   static bool _constantTimeEquals(List<int> a, List<int> b) {
-    if (a.length != b.length) return false;
+    // Always compare full length to avoid timing leaks.
+    // If lengths differ, xor with a dummy to consume the same time.
+    if (a.length != b.length) {
+      var dummy = 0;
+      for (var i = 0; i < b.length; i++) {
+        dummy |= b[i] ^ b[i];
+      }
+      return false;
+    }
     var result = 0;
     for (var i = 0; i < a.length; i++) {
       result |= a[i] ^ b[i];

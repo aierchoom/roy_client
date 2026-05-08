@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../../l10n/app_text_extension.dart';
 import '../../models/account_item.dart';
 import '../../models/hlc.dart';
 import '../../models/totp_credential.dart';
@@ -36,10 +37,6 @@ class _TotpCredentialEditViewState extends State<TotpCredentialEditView> {
   final _configCtrl = TextEditingController();
   final Set<String> _linkedAccountIds = {};
   Timer? _timer;
-
-  String _text(String zh, String en) {
-    return Localizations.localeOf(context).languageCode == 'zh' ? zh : en;
-  }
 
   bool get _supportsQrScan =>
       !kIsWeb &&
@@ -81,14 +78,14 @@ class _TotpCredentialEditViewState extends State<TotpCredentialEditView> {
       context,
       MaterialPageRoute(
         builder: (_) => TotpQrScannerView(
-          title: _text('扫描 2FA 二维码', 'Scan 2FA QR Code'),
-          helpText: _text('将二维码放入取景框', 'Place the QR code in the frame.'),
-          invalidMessage: _text(
+          title: context.text('扫描 2FA 二维码', 'Scan 2FA QR Code'),
+          helpText: context.text('将二维码放入取景框', 'Place the QR code in the frame.'),
+          invalidMessage: context.text(
             '这不是可用的 2FA 二维码',
             'This is not a usable 2FA QR code.',
           ),
-          torchTooltip: _text('闪光灯', 'Torch'),
-          switchCameraTooltip: _text('切换摄像头', 'Switch camera'),
+          torchTooltip: context.text('闪光灯', 'Torch'),
+          switchCameraTooltip: context.text('切换摄像头', 'Switch camera'),
         ),
       ),
     );
@@ -127,19 +124,19 @@ class _TotpCredentialEditViewState extends State<TotpCredentialEditView> {
   String _totpErrorMessage(Object error) {
     if (error is TotpException) {
       if (error.message == 'No TOTP QR content was found.') {
-        return _text(
+        return context.text(
           '没有找到可用的 2FA 二维码内容',
           'No usable 2FA QR content was found.',
         );
       }
       if (error.message == TotpQrImageImportService.noClipboardImageMessage) {
-        return _text('剪贴板里没有二维码图片', 'There is no QR image on the clipboard.');
+        return context.text('剪贴板里没有二维码图片', 'There is no QR image on the clipboard.');
       }
       if (error.message == TotpQrImageImportService.imageDecodeFailedMessage) {
-        return _text('二维码图片无法读取', 'The QR image could not be read.');
+        return context.text('二维码图片无法读取', 'The QR image could not be read.');
       }
       if (error.message == TotpQrImageImportService.noQrCodeFoundMessage) {
-        return _text('图片里没有二维码', 'No QR code was found in the image.');
+        return context.text('图片里没有二维码', 'No QR code was found in the image.');
       }
       return error.message;
     }
@@ -154,7 +151,7 @@ class _TotpCredentialEditViewState extends State<TotpCredentialEditView> {
     if (!mounted) return;
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(SnackBar(content: Text(_text('验证码已复制', 'Code copied.'))));
+    ).showSnackBar(SnackBar(content: Text(context.text('验证码已复制', 'Code copied.'))));
   }
 
   void _save() {
@@ -224,7 +221,7 @@ class _TotpCredentialEditViewState extends State<TotpCredentialEditView> {
                   ),
                 ),
                 IconButton(
-                  tooltip: _text('复制验证码', 'Copy code'),
+                  tooltip: context.text('复制验证码', 'Copy code'),
                   onPressed: () => _copyCode(code),
                   icon: const Icon(Icons.content_copy_outlined),
                 ),
@@ -263,7 +260,7 @@ class _TotpCredentialEditViewState extends State<TotpCredentialEditView> {
     final theme = Theme.of(context);
     if (accounts.isEmpty) {
       return Text(
-        _text('暂无可关联账号', 'No accounts available to link.'),
+        context.text('暂无可关联账号', 'No accounts available to link.'),
         style: theme.textTheme.bodySmall?.copyWith(
           color: theme.colorScheme.onSurfaceVariant,
         ),
@@ -301,12 +298,12 @@ class _TotpCredentialEditViewState extends State<TotpCredentialEditView> {
       appBar: AppBar(
         title: Text(
           widget.initial == null
-              ? _text('新建 2FA', 'Add 2FA')
-              : _text('编辑 2FA', 'Edit 2FA'),
+              ? context.text('新建 2FA', 'Add 2FA')
+              : context.text('编辑 2FA', 'Edit 2FA'),
         ),
         actions: [
           IconButton(
-            tooltip: _text('保存', 'Save'),
+            tooltip: context.text('保存', 'Save'),
             onPressed: _save,
             icon: const Icon(Icons.check),
           ),
@@ -318,7 +315,7 @@ class _TotpCredentialEditViewState extends State<TotpCredentialEditView> {
           TextField(
             controller: _labelCtrl,
             decoration: InputDecoration(
-              labelText: _text('名称', 'Label'),
+              labelText: context.text('名称', 'Label'),
               prefixIcon: const Icon(Icons.badge_outlined),
             ),
           ),
@@ -330,7 +327,7 @@ class _TotpCredentialEditViewState extends State<TotpCredentialEditView> {
             keyboardType: TextInputType.visiblePassword,
             onChanged: (_) => setState(() {}),
             decoration: InputDecoration(
-              labelText: _text('密钥 / otpauth URI', 'Secret / otpauth URI'),
+              labelText: context.text('密钥 / otpauth URI', 'Secret / otpauth URI'),
               prefixIcon: const Icon(Icons.key_outlined),
             ),
           ),
@@ -343,12 +340,12 @@ class _TotpCredentialEditViewState extends State<TotpCredentialEditView> {
                 OutlinedButton.icon(
                   onPressed: _scanQr,
                   icon: const Icon(Icons.qr_code_scanner_outlined),
-                  label: Text(_text('扫码', 'Scan')),
+                  label: Text(context.text('扫码', 'Scan')),
                 ),
               OutlinedButton.icon(
                 onPressed: _pasteQr,
                 icon: const Icon(Icons.paste_outlined),
-                label: Text(_text('粘贴二维码', 'Paste QR')),
+                label: Text(context.text('粘贴二维码', 'Paste QR')),
               ),
             ],
           ),
@@ -356,7 +353,7 @@ class _TotpCredentialEditViewState extends State<TotpCredentialEditView> {
           _buildPreview(context),
           const SizedBox(height: AppSpacing.xxl),
           Text(
-            _text('关联账号', 'Linked Accounts'),
+            context.text('关联账号', 'Linked Accounts'),
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w800,
             ),
@@ -368,7 +365,7 @@ class _TotpCredentialEditViewState extends State<TotpCredentialEditView> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _save,
         icon: const Icon(Icons.check),
-        label: Text(_text('保存', 'Save')),
+        label: Text(context.text('保存', 'Save')),
       ),
     );
   }

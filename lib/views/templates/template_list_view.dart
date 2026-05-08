@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:secret_roy/l10n/app_localizations.dart';
 
+import '../../l10n/app_text_extension.dart';
 import '../../models/account_template.dart';
 import '../../providers/enhanced_app_provider.dart';
 import '../../services/secure_storage_service.dart' hide TemplateInUseException;
@@ -16,10 +17,6 @@ import 'template_edit_view.dart';
 
 class TemplateListView extends StatelessWidget {
   const TemplateListView({super.key});
-
-  String _text(BuildContext context, String zh, String en) {
-    return Localizations.localeOf(context).languageCode == 'zh' ? zh : en;
-  }
 
   Future<void> _openEditor(
     BuildContext context, {
@@ -46,11 +43,9 @@ class TemplateListView extends StatelessWidget {
       final shouldReload = await showDialog<bool>(
         context: context,
         builder: (dialogContext) => AlertDialog(
-          title: Text(_text(context, '模板已被更新', 'Template Updated')),
+          title: Text(context.text( '模板已被更新', 'Template Updated')),
           content: Text(
-            _text(
-              context,
-              '该模板已被同步更新，你的本地编辑已过期。是否重载最新版本后继续编辑？',
+            context.text('该模板已被同步更新，你的本地编辑已过期。是否重载最新版本后继续编辑？',
               'This template has been updated by sync. Your local edit is stale. Reload the latest version and continue editing?',
             ),
           ),
@@ -61,7 +56,7 @@ class TemplateListView extends StatelessWidget {
             ),
             FilledButton(
               onPressed: () => Navigator.pop(dialogContext, true),
-              child: Text(_text(context, '重载', 'Reload')),
+              child: Text(context.text( '重载', 'Reload')),
             ),
           ],
         ),
@@ -212,10 +207,8 @@ class TemplateListView extends StatelessWidget {
         .length;
     return AppPageHeader(
       icon: Icons.view_list_outlined,
-      title: _text(context, '\u6a21\u677f\u4e2d\u5fc3', 'Template Hub'),
-      subtitle: _text(
-        context,
-        '\u4e3a\u8d26\u6237\u9875\u7edf\u4e00\u8bbe\u8ba1\u5b57\u6bb5\u7ed3\u6784\u4e0e\u5f55\u5165\u4f53\u9a8c',
+      title: context.text( '\u6a21\u677f\u4e2d\u5fc3', 'Template Hub'),
+      subtitle: context.text('\u4e3a\u8d26\u6237\u9875\u7edf\u4e00\u8bbe\u8ba1\u5b57\u6bb5\u7ed3\u6784\u4e0e\u5f55\u5165\u4f53\u9a8c',
         'Design field structures and editing experiences for account pages',
       ),
       metrics: [
@@ -223,21 +216,21 @@ class TemplateListView extends StatelessWidget {
           context,
           icon: Icons.dashboard_customize_outlined,
           label:
-              '$totalTemplates ${_text(context, '\u4e2a\u6a21\u677f', 'Templates')}',
+              '$totalTemplates ${context.text( '\u4e2a\u6a21\u677f', 'Templates')}',
           tint: theme.colorScheme.primary,
         ),
         _buildToneChip(
           context,
           icon: Icons.tune_outlined,
           label:
-              '$customTemplates ${_text(context, '\u4e2a\u81ea\u5b9a\u4e49', 'Custom')}',
+              '$customTemplates ${context.text( '\u4e2a\u81ea\u5b9a\u4e49', 'Custom')}',
           tint: theme.colorScheme.primary,
         ),
         _buildToneChip(
           context,
           icon: Icons.inventory_2_outlined,
           label:
-              '$usedTemplates ${_text(context, '\u4e2a\u5728\u7528', 'In Use')}',
+              '$usedTemplates ${context.text( '\u4e2a\u5728\u7528', 'In Use')}',
           tint: theme.colorScheme.primary,
         ),
       ],

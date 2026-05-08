@@ -56,6 +56,7 @@ class _TotpQrScannerViewState extends State<TotpQrScannerView> {
         Navigator.of(context).pop(raw);
         return;
       } catch (_) {
+        // Invalid QR code: user feedback is handled by _showInvalidHint.
         _showInvalidHint();
       }
     }

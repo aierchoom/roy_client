@@ -116,6 +116,7 @@ class ConflictException implements Exception {
         serverIsDeleted: json['server_is_deleted'] as bool?,
       );
     } catch (_) {
+      // serverResponse is not valid JSON; wrap the raw string.
       return ConflictException._(serverResponse);
     }
   }

@@ -47,6 +47,22 @@ class SecureStorageService {
   String? _workingDatabasePath;
   String? _legacyDatabasePath;
 
+  Future<Directory> _resolveDocumentsDirectory() async {
+    if (Platform.environment['SECRETROY_TEST_DIR'] case final path?
+        when path.isNotEmpty) {
+      return Directory(path);
+    }
+    return getApplicationDocumentsDirectory();
+  }
+
+  Future<Directory> _resolveTemporaryDirectory() async {
+    if (Platform.environment['SECRETROY_TEST_DIR'] case final path?
+        when path.isNotEmpty) {
+      return Directory(path);
+    }
+    return getTemporaryDirectory();
+  }
+
   SecureStorageService({DatabaseFileCipher? databaseCipher})
     : _databaseCipher = databaseCipher;
 
@@ -82,16 +98,12 @@ class SecureStorageService {
       _changeController = StreamController<StorageChangeEvent>.broadcast();
     }
 
-    final Directory documentsDirectory;
-    final Directory temporaryDirectory;
-    if (Platform.environment['SECRETROY_TEST_DIR'] case final path?
-        when path.isNotEmpty) {
-      documentsDirectory = Directory(path);
-      temporaryDirectory = documentsDirectory;
-    } else {
-      documentsDirectory = await getApplicationDocumentsDirectory();
-      temporaryDirectory = await getTemporaryDirectory();
-    }
+    final documentsDirectory = await _resolveDocumentsDirectory();
+    final temporaryDirectory =
+        Platform.environment['SECRETROY_TEST_DIR'] != null &&
+            Platform.environment['SECRETROY_TEST_DIR']!.isNotEmpty
+        ? documentsDirectory
+        : await _resolveTemporaryDirectory();
     _legacyDatabasePath = join(documentsDirectory.path, _databaseName);
     _encryptedDatabasePath = join(
       documentsDirectory.path,
@@ -191,13 +203,7 @@ class SecureStorageService {
   }
 
   Future<bool> isDatabaseInitialized() async {
-    final Directory documentsDirectory;
-    if (Platform.environment['SECRETROY_TEST_DIR'] case final path?
-        when path.isNotEmpty) {
-      documentsDirectory = Directory(path);
-    } else {
-      documentsDirectory = await getApplicationDocumentsDirectory();
-    }
+    final documentsDirectory = await _resolveDocumentsDirectory();
     final databasePath = join(documentsDirectory.path, _encryptedDatabaseName);
     return File(databasePath).existsSync();
   }
@@ -205,16 +211,12 @@ class SecureStorageService {
   Future<void> deleteDatabaseFile() async {
     await close();
 
-    final Directory documentsDirectory;
-    final Directory temporaryDirectory;
-    if (Platform.environment['SECRETROY_TEST_DIR'] case final path?
-        when path.isNotEmpty) {
-      documentsDirectory = Directory(path);
-      temporaryDirectory = documentsDirectory;
-    } else {
-      documentsDirectory = await getApplicationDocumentsDirectory();
-      temporaryDirectory = await getTemporaryDirectory();
-    }
+    final documentsDirectory = await _resolveDocumentsDirectory();
+    final temporaryDirectory =
+        Platform.environment['SECRETROY_TEST_DIR'] != null &&
+            Platform.environment['SECRETROY_TEST_DIR']!.isNotEmpty
+        ? documentsDirectory
+        : await _resolveTemporaryDirectory();
     _legacyDatabasePath = join(documentsDirectory.path, _databaseName);
     _encryptedDatabasePath = join(
       documentsDirectory.path,
@@ -340,13 +342,7 @@ class SecureStorageService {
   }
 
   Future<String> getDatabaseFilePath() async {
-    final Directory documentsDirectory;
-    if (Platform.environment['SECRETROY_TEST_DIR'] case final path?
-        when path.isNotEmpty) {
-      documentsDirectory = Directory(path);
-    } else {
-      documentsDirectory = await getApplicationDocumentsDirectory();
-    }
+    final documentsDirectory = await _resolveDocumentsDirectory();
     return join(documentsDirectory.path, _encryptedDatabaseName);
   }
 
@@ -506,7 +502,8 @@ class SecureStorageService {
       if (backupFile.existsSync()) {
         await backupFile.delete();
       }
-    } catch (_) {
+    } catch (e) {
+      AppLogger.d('Database file atomic rename failed: $e');
       if (backupFile.existsSync() && !targetFile.existsSync()) {
         await backupFile.rename(targetPath);
       }
@@ -1275,7 +1272,8 @@ class SecureStorageService {
         orderBy: 'saved_at DESC',
       );
       return rows.map((r) => ConflictLog.fromJson(r)).toList();
-    } catch (_) {
+    } catch (e) {
+      AppLogger.d('Failed to load conflict logs: $e');
       return [];
     }
   }
@@ -1322,7 +1320,8 @@ class SecureStorageService {
                 orderBy: 'saved_at DESC',
               );
       return rows.map((r) => TemplateConflictLog.fromJson(r)).toList();
-    } catch (_) {
+    } catch (e) {
+      AppLogger.d('Failed to load template conflict logs: $e');
       return [];
     }
   }
@@ -1996,7 +1995,8 @@ class SecureStorageService {
         [vaultId, ..._openLocalSyncStatusNames],
       );
       return (Sqflite.firstIntValue(rows) ?? 0) > 0;
-    } catch (_) {
+    } catch (e) {
+      AppLogger.d('Failed to check open local sync changes: $e');
       return false;
     }
   }
@@ -2291,9 +2291,6 @@ class SecureStorageService {
     if (nextAction == LocalSyncAction.create) {
       return LocalSyncAction.create;
     }
-    if (originalBefore == null && nextAction == LocalSyncAction.create) {
-      return LocalSyncAction.create;
-    }
     return LocalSyncAction.update;
   }
 
@@ -2357,7 +2354,8 @@ class SecureStorageService {
       );
       if (rows.isEmpty) return null;
       return rows.first['value'] as String?;
-    } catch (_) {
+    } catch (e) {
+      AppLogger.d('Failed to load setting: $key, error: $e');
       return null;
     }
   }

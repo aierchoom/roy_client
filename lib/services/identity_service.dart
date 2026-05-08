@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math';
 
 import 'package:cryptography/cryptography.dart';
+import 'package:secret_roy/core/crypto_random.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:uuid/uuid.dart';
 
@@ -180,6 +180,12 @@ class IdentityService {
   String get symmetricKey =>
       _requireValue(_symmetricKeyMaterial, 'symmetricKey');
 
+  /// Exports vault identity as an unencrypted transfer code.
+  ///
+  /// **WARNING**: This encodes private key and symmetric key in cleartext
+  /// base64. Anyone who obtains this string has full vault access.
+  /// Prefer [exportSecureLinkCode] which encrypts with a password-derived key.
+  @Deprecated('Use exportSecureLinkCode instead for encrypted export')
   String exportTransferCode({String? syncServerUrl, String? vaultDump}) {
     final payload = {
       'version': 1,
@@ -210,8 +216,8 @@ class IdentityService {
       if (vaultDump != null) 'dump': vaultDump,
     };
 
-    final salt = _randomBytes(_secureLinkSaltLength);
-    final nonce = _randomBytes(_secureLinkNonceLength);
+    final salt = CryptoRandom.bytes(_secureLinkSaltLength);
+    final nonce = CryptoRandom.bytes(_secureLinkNonceLength);
     final secretKey = await _deriveSecureLinkKey(
       password: password,
       salt: salt,
@@ -366,9 +372,9 @@ class IdentityService {
             )
             as Map,
       );
-    } catch (_) {
-      throw const IdentityTransferCodeException(
-        'Transfer code is not valid base64 JSON.',
+    } catch (e) {
+      throw IdentityTransferCodeException(
+        'Transfer code is not valid base64 JSON: $e',
       );
     }
 
@@ -472,11 +478,6 @@ class IdentityService {
       secretKey: SecretKey(utf8.encode(password)),
       nonce: salt,
     );
-  }
-
-  List<int> _randomBytes(int length) {
-    final random = Random.secure();
-    return List<int>.generate(length, (_) => random.nextInt(256));
   }
 
   void _validateSecureLinkPassword(String password) {

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../l10n/app_text_extension.dart';
 import '../../models/vault_health_report.dart';
 import '../../services/service_manager.dart';
 import '../../services/vault_health_calculator.dart';
@@ -55,12 +57,12 @@ class _VaultHealthViewState extends State<VaultHealthView> {
     };
   }
 
-  String _gradeLabel(VaultHealthGrade grade) {
+  String _gradeLabel(BuildContext context, VaultHealthGrade grade) {
     return switch (grade) {
-      VaultHealthGrade.excellent => '优秀',
-      VaultHealthGrade.good => '良好',
-      VaultHealthGrade.warning => '需关注',
-      VaultHealthGrade.critical => '危险',
+      VaultHealthGrade.excellent => context.text('优秀', 'Excellent'),
+      VaultHealthGrade.good => context.text('良好', 'Good'),
+      VaultHealthGrade.warning => context.text('需关注', 'Needs Attention'),
+      VaultHealthGrade.critical => context.text('危险', 'Critical'),
     };
   }
 
@@ -72,11 +74,11 @@ class _VaultHealthViewState extends State<VaultHealthView> {
     };
   }
 
-  String _riskLabel(VaultHealthRiskLevel level) {
+  String _riskLabel(BuildContext context, VaultHealthRiskLevel level) {
     return switch (level) {
-      VaultHealthRiskLevel.high => '高风险',
-      VaultHealthRiskLevel.medium => '中风险',
-      VaultHealthRiskLevel.low => '低风险',
+      VaultHealthRiskLevel.high => context.text('高风险', 'High Risk'),
+      VaultHealthRiskLevel.medium => context.text('中风险', 'Medium Risk'),
+      VaultHealthRiskLevel.low => context.text('低风险', 'Low Risk'),
     };
   }
 
@@ -86,7 +88,7 @@ class _VaultHealthViewState extends State<VaultHealthView> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Vault 体检'),
+        title: Text(context.text('Vault 体检', 'Vault Health Check')),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -116,10 +118,10 @@ class _VaultHealthViewState extends State<VaultHealthView> {
             color: Colors.grey,
           ),
           const SizedBox(height: AppSpacing.lg),
-          Text('无法计算体检报告', style: Theme.of(context).textTheme.titleMedium),
+          Text(context.text('无法计算体检报告', 'Cannot calculate health report'), style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            '请确保保险库已解锁',
+            context.text('请确保保险库已解锁', 'Make sure the vault is unlocked'),
             style: Theme.of(
               context,
             ).textTheme.bodyMedium?.copyWith(color: Colors.grey),
@@ -136,19 +138,19 @@ class _VaultHealthViewState extends State<VaultHealthView> {
         _buildScoreCard(report),
         const SizedBox(height: AppSpacing.xxl),
         if (report.highRiskItems.isNotEmpty) ...[
-          _buildSectionTitle('高风险项'),
+          _buildSectionTitle(context.text('高风险项', 'High Risk Items')),
           const SizedBox(height: AppSpacing.sm),
           ...report.highRiskItems.map((item) => _buildItemCard(item)),
           const SizedBox(height: AppSpacing.lg),
         ],
         if (report.mediumRiskItems.isNotEmpty) ...[
-          _buildSectionTitle('中风险项'),
+          _buildSectionTitle(context.text('中风险项', 'Medium Risk Items')),
           const SizedBox(height: AppSpacing.sm),
           ...report.mediumRiskItems.map((item) => _buildItemCard(item)),
           const SizedBox(height: AppSpacing.lg),
         ],
         if (report.lowRiskItems.isNotEmpty) ...[
-          _buildSectionTitle('低风险项'),
+          _buildSectionTitle(context.text('低风险项', 'Low Risk Items')),
           const SizedBox(height: AppSpacing.sm),
           ...report.lowRiskItems.map((item) => _buildItemCard(item)),
           const SizedBox(height: AppSpacing.lg),
@@ -157,7 +159,10 @@ class _VaultHealthViewState extends State<VaultHealthView> {
         const SizedBox(height: AppSpacing.lg),
         Center(
           child: Text(
-            '体检时间: ${_formatTime(report.calculatedAt)}',
+            context.text(
+              '体检时间: ${_formatTime(report.calculatedAt)}',
+              'Check time: ${_formatTime(report.calculatedAt)}',
+            ),
             style: Theme.of(
               context,
             ).textTheme.bodySmall?.copyWith(color: Colors.grey),
@@ -197,7 +202,7 @@ class _VaultHealthViewState extends State<VaultHealthView> {
                           ?.copyWith(fontWeight: FontWeight.bold, color: color),
                     ),
                     Text(
-                      _gradeLabel(report.grade),
+                      _gradeLabel(context, report.grade),
                       style: Theme.of(
                         context,
                       ).textTheme.bodySmall?.copyWith(color: color),
@@ -209,8 +214,11 @@ class _VaultHealthViewState extends State<VaultHealthView> {
             const SizedBox(height: AppSpacing.lg),
             Text(
               report.failedItems.isEmpty
-                  ? '你的保险库状态良好'
-                  : '发现 ${report.failedItems.length} 项需要关注',
+                  ? context.text('你的保险库状态良好', 'Your vault is in good shape')
+                  : context.text(
+                      '发现 ${report.failedItems.length} 项需要关注',
+                      '${report.failedItems.length} item(s) need attention',
+                    ),
               style: Theme.of(context).textTheme.bodyMedium,
             ),
           ],
@@ -242,7 +250,7 @@ class _VaultHealthViewState extends State<VaultHealthView> {
         subtitle: Text(item.description),
         trailing: Chip(
           label: Text(
-            _riskLabel(item.riskLevel),
+            _riskLabel(context, item.riskLevel),
             style: const TextStyle(fontSize: 12),
           ),
           backgroundColor: riskColor.withAlpha(32),
@@ -257,16 +265,16 @@ class _VaultHealthViewState extends State<VaultHealthView> {
   Widget _buildAllPassBanner() {
     return Card(
       color: Colors.green.shade50,
-      child: const Padding(
-        padding: EdgeInsets.all(AppSpacing.lg),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.lg),
         child: Row(
           children: [
-            Icon(Icons.verified, color: Colors.green),
-            SizedBox(width: AppSpacing.md),
+            const Icon(Icons.verified, color: Colors.green),
+            const SizedBox(width: AppSpacing.md),
             Expanded(
               child: Text(
-                '所有体检项均已通过，继续保持！',
-                style: TextStyle(color: Colors.green),
+                context.text('所有体检项均已通过，继续保持！', 'All health checks passed. Keep it up!'),
+                style: const TextStyle(color: Colors.green),
               ),
             ),
           ],

@@ -189,7 +189,8 @@ class AutoLockService extends ChangeNotifier {
       );
       final elapsed = DateTime.now().difference(lastActive);
       return elapsed > _duration.duration;
-    } catch (_) {
+    } catch (e) {
+      AppLogger.d('Auto-lock check failed, defaulting to locked: $e');
       return true;
     }
   }

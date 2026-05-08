@@ -254,7 +254,7 @@ Future<_ConflictScenarioResult> _runConflictScenario({
 
   final remotePayload = remoteItem == null
       ? null
-      : await SyncPayloadCodec.encode(
+      : await SyncPayloadCodec.encodeAccount(
           item: remoteItem,
           vaultId: _vaultId,
           nodeId: 'device_remote999',
@@ -267,6 +267,7 @@ Future<_ConflictScenarioResult> _runConflictScenario({
     await server.close(force: true);
   });
 
+  var pushAttempt = 0;
   server.listen((request) async {
     final path = request.uri.path;
     if (request.method == 'GET' && path == '/vaults/$_vaultId/sync') {
@@ -297,16 +298,31 @@ Future<_ConflictScenarioResult> _runConflictScenario({
     }
 
     if (request.method == 'POST' && path == '/vaults/$_vaultId/sync') {
-      request.response.statusCode = HttpStatus.conflict;
+      pushAttempt++;
+      // First push attempt triggers conflict; subsequent attempts succeed.
+      if (pushAttempt <= 1) {
+        request.response.statusCode = HttpStatus.conflict;
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          jsonEncode({
+            'error': 'Conflict detected on item ${localItem.id}',
+            'conflict_type': conflictType,
+            'item_id': localItem.id,
+            'your_base': localItem.serverVersion,
+            'server_actual': remoteItem == null ? 0 : remoteVersion,
+            'server_is_deleted': remoteItem?.isDeleted == true,
+          }),
+        );
+        await request.response.close();
+        return;
+      }
+      // Accept the re-push after conflict resolution.
       request.response.headers.contentType = ContentType.json;
       request.response.write(
         jsonEncode({
-          'error': 'Conflict detected on item ${localItem.id}',
-          'conflict_type': conflictType,
-          'item_id': localItem.id,
-          'your_base': localItem.serverVersion,
-          'server_actual': remoteItem == null ? 0 : remoteVersion,
-          'server_is_deleted': remoteItem?.isDeleted == true,
+          'accepted_versions': {
+            localItem.id: remoteVersion + pushAttempt,
+          },
         }),
       );
       await request.response.close();
@@ -356,7 +372,7 @@ void main() {
         ..settings['sync_version_$vaultId'] = '1'
         ..accounts['account_1'] = _localPendingItem();
 
-      final remotePayload = await SyncPayloadCodec.encode(
+      final remotePayload = await SyncPayloadCodec.encodeAccount(
         item: _remoteItem(),
         vaultId: vaultId,
         nodeId: 'device_remote999',
@@ -459,8 +475,9 @@ void main() {
       expect(scenario.result.success, isTrue);
       expect(scenario.result.conflictCount, 1);
       expect(scenario.result.notice, contains('Remote record missing'));
+      // After conflict resolution, the item is re-pushed and becomes synchronized.
       expect(finalItem.syncStatus, SyncStatus.synchronized);
-      expect(finalItem.serverVersion, 0);
+      expect(finalItem.serverVersion, greaterThan(0));
       expect(logs.single.fieldKey, 'record.remote_missing');
     },
   );

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../l10n/app_text_extension.dart';
 import '../providers/enhanced_app_provider.dart';
 import '../services/identity_service.dart';
 import '../services/lan_pairing_service.dart';
@@ -50,29 +51,24 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
   }
 
   String _mobileLoopbackHint() {
-    return _text(
+    return context.text(
       '手机端不能使用 127.0.0.1 或 localhost，请改成电脑在同一局域网下的 IP，例如 http://192.168.1.100:8080',
       'Phones cannot use 127.0.0.1 or localhost here. Use your computer\'s LAN IP instead, for example http://192.168.1.100:8080',
     );
   }
 
-  String _text(String zh, String en) {
-    if (!mounted) return en;
-    return Localizations.localeOf(context).languageCode == 'zh' ? zh : en;
-  }
-
   String _syncStateLabel(SyncState state) {
     return switch (state) {
-      SyncState.offline => _text('离线', 'Offline'),
-      SyncState.connecting => _text('连接中', 'Connecting'),
-      SyncState.pulling => _text('拉取中', 'Pulling'),
-      SyncState.pushing => _text('上传中', 'Pushing'),
-      SyncState.conflictRecovery => _text('恢复中', 'Recovering'),
-      SyncState.idle => _text('已就绪', 'Ready'),
-      SyncState.networkUnreachable => _text('网络不可达', 'Unreachable'),
-      SyncState.serverError => _text('服务器错误', 'Server Error'),
-      SyncState.protocolError => _text('协议错误', 'Protocol Error'),
-      SyncState.authError => _text('认证失败', 'Auth Failed'),
+      SyncState.offline => context.text('离线', 'Offline'),
+      SyncState.connecting => context.text('连接中', 'Connecting'),
+      SyncState.pulling => context.text('拉取中', 'Pulling'),
+      SyncState.pushing => context.text('上传中', 'Pushing'),
+      SyncState.conflictRecovery => context.text('恢复中', 'Recovering'),
+      SyncState.idle => context.text('已就绪', 'Ready'),
+      SyncState.networkUnreachable => context.text('网络不可达', 'Unreachable'),
+      SyncState.serverError => context.text('服务器错误', 'Server Error'),
+      SyncState.protocolError => context.text('协议错误', 'Protocol Error'),
+      SyncState.authError => context.text('认证失败', 'Auth Failed'),
     };
   }
 
@@ -126,46 +122,46 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
     String? statusNote,
   }) {
     return switch (state) {
-      SyncState.networkUnreachable => _text(
+      SyncState.networkUnreachable => context.text(
         '无法连接到同步服务器。请检查服务器地址和网络路径。',
         'Cannot reach the sync server. Verify the address and network path.',
       ),
-      SyncState.serverError => _text(
+      SyncState.serverError => context.text(
         '服务器可连接，但同步存储层当前不稳定，请稍后重试或检查服务器数据文件。',
         'The server is reachable, but its sync storage layer is unhealthy. Retry later or inspect the server vault files.',
       ),
       SyncState.protocolError =>
         statusNote ??
-            _text(
+            context.text(
               '同步协议或数据格式异常。请检查客户端/服务端版本一致性。',
               'Sync protocol or data format error. Check client/server version compatibility.',
             ),
       SyncState.authError =>
         statusNote ??
-            _text(
+            context.text(
               '身份验证失败。请解锁保险库并确认本地身份。',
               'Authentication failed. Unlock the vault and verify local identity.',
             ),
-      SyncState.offline => _text(
+      SyncState.offline => context.text(
         '当前未与同步服务器建立连接。',
         'The client is currently not connected to the sync server.',
       ),
-      SyncState.connecting || SyncState.pulling || SyncState.pushing => _text(
+      SyncState.connecting || SyncState.pulling || SyncState.pushing => context.text(
         '正在与远程 vault 交换更新。',
         'Changes are currently being exchanged with the remote vault.',
       ),
-      SyncState.conflictRecovery => _text(
+      SyncState.conflictRecovery => context.text(
         '正在处理上一次中断或冲突后的恢复流程。',
         'The client is replaying recovery steps after an interrupted or conflicting sync cycle.',
       ),
       SyncState.idle =>
         statusNote ??
             (hasDirtyData
-                ? _text(
+                ? context.text(
                     '本地变更已排队，等待下一次同步上传。',
                     'Local changes are queued and waiting for the next upload.',
                   )
-                : _text(
+                : context.text(
                     '同步状态正常，可随时发起新的同步。',
                     'Sync is healthy and ready for the next exchange.',
                   )),
@@ -177,37 +173,37 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
       SyncState.networkUnreachable ||
       SyncState.serverError ||
       SyncState.protocolError ||
-      SyncState.authError => _text('建议动作', 'Recommended action'),
-      SyncState.offline => _text('下一步', 'Next step'),
-      SyncState.conflictRecovery => _text('当前策略', 'Current strategy'),
-      SyncState.idle when hasDirtyData => _text('推荐操作', 'Recommended action'),
+      SyncState.authError => context.text('建议动作', 'Recommended action'),
+      SyncState.offline => context.text('下一步', 'Next step'),
+      SyncState.conflictRecovery => context.text('当前策略', 'Current strategy'),
+      SyncState.idle when hasDirtyData => context.text('推荐操作', 'Recommended action'),
       _ => null,
     };
   }
 
   String? _syncActionDetail(SyncState state, {required bool hasDirtyData}) {
     return switch (state) {
-      SyncState.networkUnreachable => _text(
+      SyncState.networkUnreachable => context.text(
         '打开 Server 设置，改成可达的 URL，手机请使用桌面机 LAN IP。',
         'Open Server settings and switch to a reachable URL. On phones, use the desktop machine LAN IP.',
       ),
-      SyncState.serverError => _text(
+      SyncState.serverError => context.text(
         '先检查服务端 vault JSON/备份文件是否可读，然后再重试。',
         'Inspect the server vault JSON and backup files first, then retry sync.',
       ),
-      SyncState.protocolError || SyncState.authError => _text(
+      SyncState.protocolError || SyncState.authError => context.text(
         '修复提示后再重试 Sync Now，如果重复出现再查看日志。',
         'Retry Sync Now after addressing the issue. If it repeats, inspect the client and server logs.',
       ),
-      SyncState.offline => _text(
+      SyncState.offline => context.text(
         '确认服务器地址、网络可达性，然后手动重试一次同步。',
         'Verify the server address and network reachability, then retry one manual sync.',
       ),
-      SyncState.conflictRecovery => _text(
+      SyncState.conflictRecovery => context.text(
         '系统会先尝试自动收敛，若仍有冲突，再去冲突收件箱审阅。',
         'Let the automatic recovery finish first. If conflicts remain, review them in the conflict inbox.',
       ),
-      SyncState.idle when hasDirtyData => _text(
+      SyncState.idle when hasDirtyData => context.text(
         '本地已有待上传更改，可以现在重试同步或等待下一次自动触发。',
         'There are local changes waiting to upload. Retry sync now or wait for the next automatic run.',
       ),
@@ -224,9 +220,9 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
   }) {
     return switch (state) {
       SyncState.networkUnreachable ||
-      SyncState.offline => _text('再试同步', 'Retry Sync'),
-      SyncState.idle when hasDirtyData => _text('立即上传', 'Upload Now'),
-      _ => _text('立即同步', 'Sync Now'),
+      SyncState.offline => context.text('再试同步', 'Retry Sync'),
+      SyncState.idle when hasDirtyData => context.text('立即上传', 'Upload Now'),
+      _ => context.text('立即同步', 'Sync Now'),
     };
   }
 
@@ -276,7 +272,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
           children: [
             const CircularProgressIndicator(),
             const SizedBox(height: AppSpacing.lg),
-            Text(_text('正在同步数据...', 'Syncing data...')),
+            Text(context.text('正在同步数据...', 'Syncing data...')),
           ],
         ),
       ),
@@ -290,14 +286,14 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
       if (result.success) {
         final hasConflicts = result.conflictCount > 0;
         final defaultMessage = hasConflicts
-            ? _text(
+            ? context.text(
                 '发现 ${result.conflictCount} 个同步冲突，请到冲突收件箱决定是否覆盖',
                 '${result.conflictCount} sync conflict(s) detected. Review the conflict inbox before overwriting.',
               )
             : switch ((result.pulled, result.pushed)) {
-                (true, _) => _text('已拉取远程更新', 'Pulled remote updates'),
-                (_, true) => _text('已上传本地更改', 'Pushed local updates'),
-                _ => _text('数据已是最新', 'Already up to date'),
+                (true, _) => context.text('已拉取远程更新', 'Pulled remote updates'),
+                (_, true) => context.text('已上传本地更改', 'Pushed local updates'),
+                _ => context.text('数据已是最新', 'Already up to date'),
               };
         final message = result.notice ?? defaultMessage;
 
@@ -306,7 +302,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
             content: Text(
               hasConflicts || result.notice != null
                   ? message
-                  : _text(
+                  : context.text(
                       '$message（本地版本: ${result.version}）',
                       '$message (version: ${result.version})',
                     ),
@@ -322,7 +318,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
         messenger.showSnackBar(
           SnackBar(
             content: Text(
-              _text('同步失败：${result.error}', 'Sync failed: ${result.error}'),
+              context.text('同步失败：${result.error}', 'Sync failed: ${result.error}'),
             ),
             backgroundColor: Colors.red,
           ),
@@ -332,7 +328,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
       if (!mounted) return;
       messenger.showSnackBar(
         SnackBar(
-          content: Text(_text('发生未预期的同步错误：$e', 'Unexpected sync error: $e')),
+          content: Text(context.text('发生未预期的同步错误：$e', 'Unexpected sync error: $e')),
           backgroundColor: Colors.red,
         ),
       );
@@ -353,11 +349,11 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
       context: context,
       builder: (dialogContext) => SyncServerDialog(
         initialValue: _syncServerUrl,
-        title: _text('同步服务器', 'Sync Server'),
-        labelText: _text('服务器 URL', 'Server URL'),
-        hintText: _text('http://example.com:8080', 'http://example.com:8080'),
-        cancelLabel: _text('取消', 'Cancel'),
-        saveLabel: _text('保存', 'Save'),
+        title: context.text('同步服务器', 'Sync Server'),
+        labelText: context.text('服务器 URL', 'Server URL'),
+        hintText: context.text('http://example.com:8080', 'http://example.com:8080'),
+        cancelLabel: context.text('取消', 'Cancel'),
+        saveLabel: context.text('保存', 'Save'),
       ),
     );
 
@@ -369,7 +365,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
     final messenger = ScaffoldMessenger.of(context);
     final normalizedUrl = _normalizeSyncServerUrl(rawUrl);
     if (normalizedUrl.isEmpty) {
-      _showError(_text('请先输入有效的服务器地址。', 'Enter a valid server address first.'));
+      _showError(context.text('请先输入有效的服务器地址。', 'Enter a valid server address first.'));
       return;
     }
 
@@ -384,11 +380,11 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
       if (!mounted) return;
       setState(() => _syncServerUrl = normalizedUrl);
       messenger.showSnackBar(
-        SnackBar(content: Text(_text('同步服务器已保存', 'Sync server saved'))),
+        SnackBar(content: Text(context.text('同步服务器已保存', 'Sync server saved'))),
       );
     } catch (e) {
       if (!mounted) return;
-      _showError(_text('保存服务器失败：$e', 'Failed to save server: $e'));
+      _showError(context.text('保存服务器失败：$e', 'Failed to save server: $e'));
     } finally {
       if (mounted) {
         setState(() => _isSavingSyncServer = false);
@@ -428,11 +424,11 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
         final theme = Theme.of(context);
         return AlertDialog(
           title: Text(
-            _text('覆盖本地数据？', 'Overwrite Local Data?'),
+            context.text('覆盖本地数据？', 'Overwrite Local Data?'),
             style: const TextStyle(fontWeight: FontWeight.bold),
           ),
           content: Text(
-            _text(
+            context.text(
               '当前设备已存在本地数据。继续加入将覆盖并清空当前设备上的所有本地数据。你确定要继续吗？',
               'This device already has local data. Joining will overwrite and clear all local data on this device. Are you sure you want to continue?',
             ),
@@ -440,14 +436,14 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: Text(_text('取消', 'Cancel')),
+              child: Text(context.text('取消', 'Cancel')),
             ),
             FilledButton(
               style: FilledButton.styleFrom(
                 backgroundColor: theme.colorScheme.error,
               ),
               onPressed: () => Navigator.of(context).pop(true),
-              child: Text(_text('强制覆盖', 'Overwrite')),
+              child: Text(context.text('强制覆盖', 'Overwrite')),
             ),
           ],
         );
@@ -466,8 +462,8 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
       if (!mounted) return;
 
       await _showGeneratedCodeDialog(
-        _text('面对面链接码', 'Face-to-Face Link Code'),
-        _text(
+        context.text('面对面链接码', 'Face-to-Face Link Code'),
+        context.text(
           '仅在这个窗口打开期间有效。请让另一台设备现在输入这 8 位临时码：',
           'This code expires when this window closes. Enter it on the other device now:',
         ),
@@ -480,7 +476,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
     } catch (e) {
       if (!mounted) return;
       _showError(
-        _text('启动面对面链接失败: $e', 'Failed to start face-to-face linking: $e'),
+        context.text('启动面对面链接失败: $e', 'Failed to start face-to-face linking: $e'),
       );
     } finally {
       await _serviceManager.stopLanVaultPairingHost();
@@ -500,14 +496,14 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
     final pairingCode = await showDialog<String>(
       context: context,
       builder: (dialogContext) => LanPairingCodeDialog(
-        title: _text('输入面对面链接码', 'Enter Face-to-Face Code'),
-        subtitle: _text(
+        title: context.text('输入面对面链接码', 'Enter Face-to-Face Code'),
+        subtitle: context.text(
           '输入可信设备当前弹窗中显示的 8 位临时码。窗口关闭后不能再领取密钥包。',
           'Enter the 8-character temporary code shown on your trusted device. The key bundle is unavailable after that window closes.',
         ),
-        confirmLabel: _text('链接并导入', 'Link & Import'),
-        cancelLabel: _text('取消', 'Cancel'),
-        codeLabel: _text('8 位临时码', '8-Character Temporary Code'),
+        confirmLabel: context.text('链接并导入', 'Link & Import'),
+        cancelLabel: context.text('取消', 'Cancel'),
+        codeLabel: context.text('8 位临时码', '8-Character Temporary Code'),
       ),
     );
 
@@ -530,7 +526,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
       messenger.showSnackBar(
         SnackBar(
           content: Text(
-            _text(
+            context.text(
               '面对面链接完成。若本次未携带全量数据，可执行一次同步拉取远程数据。',
               'Face-to-face link complete. Run Sync Now if this import did not include all data.',
             ),
@@ -543,7 +539,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
     } on IdentityTransferCodeException catch (e) {
       if (!mounted) return;
       _showError(
-        _text(
+        context.text(
           '导入的链接包无效: ${e.message}',
           'Imported bundle is invalid: ${e.message}',
         ),
@@ -556,7 +552,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
       _showError(e.message);
     } catch (e) {
       if (!mounted) return;
-      _showError(_text('面对面链接失败: $e', 'Failed to link face-to-face: $e'));
+      _showError(context.text('面对面链接失败: $e', 'Failed to link face-to-face: $e'));
     } finally {
       if (mounted) {
         setState(() => _isLanPairingBusy = false);
@@ -571,11 +567,11 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
         final theme = Theme.of(context);
         return AlertDialog(
           title: Text(
-            _text('仅在可信局域网使用', 'Use only on a trusted LAN'),
+            context.text('仅在可信局域网使用', 'Use only on a trusted LAN'),
             style: const TextStyle(fontWeight: FontWeight.bold),
           ),
           content: Text(
-            _text(
+            context.text(
               '面对面链接会临时在本机局域网监听。请只在家庭、办公室或手机热点等可信网络中使用；公共 Wi-Fi 不建议使用。',
               'Face-to-face linking temporarily listens on your local network. Use it only on trusted home, office, or hotspot networks; avoid public Wi-Fi.',
             ),
@@ -583,14 +579,14 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: Text(_text('取消', 'Cancel')),
+              child: Text(context.text('取消', 'Cancel')),
             ),
             FilledButton(
               style: FilledButton.styleFrom(
                 backgroundColor: theme.colorScheme.primary,
               ),
               onPressed: () => Navigator.of(context).pop(true),
-              child: Text(_text('继续', 'Continue')),
+              child: Text(context.text('继续', 'Continue')),
             ),
           ],
         );
@@ -617,8 +613,8 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
       });
 
       await _showGeneratedCodeDialog(
-        _text('远程配对码', 'Remote Pairing Code'),
-        _text(
+        context.text('远程配对码', 'Remote Pairing Code'),
+        context.text(
           '请在另一台设备上输入此配对码。新设备提交请求后，还需要本机手动批准。',
           'Enter this code on the other device. The request still needs manual approval on this device.',
         ),
@@ -658,7 +654,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
         messenger.showSnackBar(
           SnackBar(
             content: Text(
-              _text(
+              context.text(
                 '已批准远程配对。新设备现在可以领取加密密钥包。',
                 'Pairing approved. The new device can now import vault keys.',
               ),
@@ -699,7 +695,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
       messenger.showSnackBar(
         SnackBar(
           content: Text(
-            _text(
+            context.text(
               '已允许设备加入。新设备现在可以完成导入。',
               'Device approved. New device can finish import now.',
             ),
@@ -726,14 +722,14 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
     final pairingCode = await showDialog<String>(
       context: context,
       builder: (dialogContext) => VaultLinkCodeDialog(
-        title: _text('加入远程配对', 'Join Remote Pairing'),
-        subtitle: _text(
+        title: context.text('加入远程配对', 'Join Remote Pairing'),
+        subtitle: context.text(
           '输入已有可信设备显示的远程配对码。提交后需要对方设备批准，服务器只负责中转。',
           'Enter the pairing code shown on your trusted existing device.',
         ),
-        confirmLabel: _text('请求配对', 'Request Pairing'),
-        cancelLabel: _text('取消', 'Cancel'),
-        fieldLabel: _text('远程配对码', 'Remote Pairing Code'),
+        confirmLabel: context.text('请求配对', 'Request Pairing'),
+        cancelLabel: context.text('取消', 'Cancel'),
+        fieldLabel: context.text('远程配对码', 'Remote Pairing Code'),
       ),
     );
 
@@ -754,7 +750,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
       messenger.showSnackBar(
         SnackBar(
           content: Text(
-            _text(
+            context.text(
               '配对请求已发送。请在可信设备上检查并批准。',
               'Pairing request sent. Ask the trusted device to approve it.',
             ),
@@ -801,7 +797,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
         messenger.showSnackBar(
           SnackBar(
             content: Text(
-              _text(
+              context.text(
                 '远程配对完成。若本次未携带全量数据，可执行一次同步拉取远程数据。',
                 'Vault pairing completed. Run Sync Now to pull existing data.',
               ),
@@ -816,7 +812,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
         messenger.showSnackBar(
           SnackBar(
             content: Text(
-              _text(
+              context.text(
                 '仍在等待可信设备批准。',
                 'Still waiting for approval on the trusted device.',
               ),
@@ -840,7 +836,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
     } on IdentityTransferCodeException catch (e) {
       if (!mounted) return;
       _showError(
-        _text(
+        context.text(
           '导入的远程配对包无效: ${e.message}',
           'Imported bundle is invalid: ${e.message}',
         ),
@@ -853,7 +849,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
       _showError(e.message);
     } catch (e) {
       if (!mounted) return;
-      _showError(_text('获取远程配对结果失败: $e', 'Failed to fetch pairing bundle: $e'));
+      _showError(context.text('获取远程配对结果失败: $e', 'Failed to fetch pairing bundle: $e'));
     } finally {
       if (mounted) {
         setState(() => _isPairingBusy = false);
@@ -868,9 +864,9 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
       final bool? includeData = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: Text(_text('导出离线恢复码', 'Export Offline Recovery Code')),
+          title: Text(context.text('导出离线恢复码', 'Export Offline Recovery Code')),
           content: Text(
-            _text(
+            context.text(
               '离线恢复码用于没有面对面链接或远程配对条件时手动恢复密钥。\n\n包含全量数据后可在纯离线场景恢复快照，但密文会更长；仅包含身份密钥时，新设备后续仍需要同步服务器拉取数据。',
               'Offline recovery codes are for manual key recovery when face-to-face or remote pairing is unavailable.\n\nIncluding all data enables offline snapshot recovery but makes the ciphertext much longer; identity-only recovery still needs a sync server later.',
             ),
@@ -878,11 +874,11 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: Text(_text('仅恢复密钥', 'Keys Only')),
+              child: Text(context.text('仅恢复密钥', 'Keys Only')),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(context, true),
-              child: Text(_text('密钥 + 数据快照', 'Keys + Data Snapshot')),
+              child: Text(context.text('密钥 + 数据快照', 'Keys + Data Snapshot')),
             ),
           ],
         ),
@@ -891,8 +887,8 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
       if (includeData == null) return;
 
       final password = await _showPasswordInputDialog(
-        title: _text('设置恢复密码', 'Set Recovery Password'),
-        subtitle: _text(
+        title: context.text('设置恢复密码', 'Set Recovery Password'),
+        subtitle: context.text(
           '恢复码会使用此密码加密。请单独保存密码，不要和恢复码放在同一处。',
           'This password encrypts the recovery code. Store it separately from the code.',
         ),
@@ -912,13 +908,13 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
       messenger.showSnackBar(
         SnackBar(
           content: Text(
-            _text('离线恢复码已复制到剪贴板', 'Offline recovery code copied to clipboard'),
+            context.text('离线恢复码已复制到剪贴板', 'Offline recovery code copied to clipboard'),
           ),
         ),
       );
     } catch (e) {
       if (!mounted) return;
-      _showError(_text('导出失败: $e', 'Export failed: $e'));
+      _showError(context.text('导出失败: $e', 'Export failed: $e'));
     }
   }
 
@@ -926,14 +922,14 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
     final code = await showDialog<String>(
       context: context,
       builder: (dialogContext) => VaultLinkCodeDialog(
-        title: _text('导入离线恢复码', 'Import Offline Recovery Code'),
-        subtitle: _text(
+        title: context.text('导入离线恢复码', 'Import Offline Recovery Code'),
+        subtitle: context.text(
           '粘贴此前导出的离线恢复码。恢复会切换本设备的保险库密钥，可能覆盖本地数据。',
           'Paste a previously exported offline recovery code. Importing switches this device to that vault key and may overwrite local data.',
         ),
-        confirmLabel: _text('下一步', 'Next'),
-        cancelLabel: _text('取消', 'Cancel'),
-        fieldLabel: _text('离线恢复码', 'Offline Recovery Code'),
+        confirmLabel: context.text('下一步', 'Next'),
+        cancelLabel: context.text('取消', 'Cancel'),
+        fieldLabel: context.text('离线恢复码', 'Offline Recovery Code'),
         minLines: 4,
         maxLines: 12,
       ),
@@ -942,8 +938,8 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
     if (!mounted || code == null || code.isEmpty) return;
 
     final password = await _showPasswordInputDialog(
-      title: _text('输入恢复密码', 'Enter Recovery Password'),
-      subtitle: _text(
+      title: context.text('输入恢复密码', 'Enter Recovery Password'),
+      subtitle: context.text(
         '请输入导出恢复码时设置的密码。',
         'Enter the password set when the recovery code was exported.',
       ),
@@ -979,13 +975,13 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
       messenger.showSnackBar(
         SnackBar(
           content: Text(
-            _text('离线恢复码导入成功', 'Recovery code imported successfully'),
+            context.text('离线恢复码导入成功', 'Recovery code imported successfully'),
           ),
         ),
       );
     } on IdentityTransferCodeException catch (e) {
       if (!mounted) return;
-      _showError(_text('导入失败: ${e.message}', 'Import failed: ${e.message}'));
+      _showError(context.text('导入失败: ${e.message}', 'Import failed: ${e.message}'));
     } on VaultImportPreconditionException catch (e) {
       if (!mounted) return;
       _showError(e.message);
@@ -994,7 +990,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
       _showError(e.message);
     } catch (e) {
       if (!mounted) return;
-      _showError(_text('导入失败: $e', 'Import failed: $e'));
+      _showError(context.text('导入失败: $e', 'Import failed: $e'));
     } finally {
       if (mounted) {
         setState(() => _isPairingBusy = false);
@@ -1011,7 +1007,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
       builder: (context) {
         return AlertDialog(
           title: Text(
-            _text('恢复预览', 'Restore Preview'),
+            context.text('恢复预览', 'Restore Preview'),
             style: const TextStyle(fontWeight: FontWeight.bold),
           ),
           content: Column(
@@ -1021,15 +1017,15 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
               _buildPreviewRow(
                 context,
                 Icons.hub_outlined,
-                _text('保险库 ID', 'Vault ID'),
+                context.text('保险库 ID', 'Vault ID'),
                 preview.vaultId,
                 trailing: preview.vaultIdMatchesCurrent
                     ? Chip(
-                        label: Text(_text('与当前匹配', 'Matches current')),
+                        label: Text(context.text('与当前匹配', 'Matches current')),
                         backgroundColor: Colors.green.shade50,
                       )
                     : Chip(
-                        label: Text(_text('与当前不同', 'Different')),
+                        label: Text(context.text('与当前不同', 'Different')),
                         backgroundColor: Colors.orange.shade50,
                       ),
               ),
@@ -1037,24 +1033,24 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
               _buildPreviewRow(
                 context,
                 Icons.account_circle_outlined,
-                _text('账号数量', 'Accounts'),
+                context.text('账号数量', 'Accounts'),
                 '${preview.accountCount}',
               ),
               const SizedBox(height: AppSpacing.md),
               _buildPreviewRow(
                 context,
                 Icons.view_list_outlined,
-                _text('模板数量', 'Templates'),
+                context.text('模板数量', 'Templates'),
                 '${preview.templateCount}',
               ),
               const SizedBox(height: AppSpacing.md),
               _buildPreviewRow(
                 context,
                 Icons.storage_outlined,
-                _text('数据快照', 'Data Snapshot'),
+                context.text('数据快照', 'Data Snapshot'),
                 preview.includesDataSnapshot
-                    ? _text('包含全量数据', 'Includes full data')
-                    : _text('仅密钥，无数据', 'Keys only, no data'),
+                    ? context.text('包含全量数据', 'Includes full data')
+                    : context.text('仅密钥，无数据', 'Keys only, no data'),
               ),
               if (preview.hasLocalData) ...[
                 const SizedBox(height: AppSpacing.lg),
@@ -1076,7 +1072,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                       const SizedBox(width: AppSpacing.sm),
                       Expanded(
                         child: Text(
-                          _text(
+                          context.text(
                             '当前设备已有本地数据，导入将覆盖全部现有账号和模板。',
                             'This device already has local data. Importing will overwrite all existing accounts and templates.',
                           ),
@@ -1095,7 +1091,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: Text(_text('取消', 'Cancel')),
+              child: Text(context.text('取消', 'Cancel')),
             ),
             FilledButton(
               style: FilledButton.styleFrom(
@@ -1104,7 +1100,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                     : theme.colorScheme.primary,
               ),
               onPressed: () => Navigator.of(context).pop(true),
-              child: Text(_text('确认导入', 'Confirm Import')),
+              child: Text(context.text('确认导入', 'Confirm Import')),
             ),
           ],
         );
@@ -1153,7 +1149,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
     required String subtitle,
   }) async {
     final controller = TextEditingController();
-    return showDialog<String>(
+    final result = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(title),
@@ -1167,7 +1163,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
               obscureText: true,
               autofocus: true,
               decoration: InputDecoration(
-                labelText: _text('密码', 'Password'),
+                labelText: context.text('密码', 'Password'),
                 border: const OutlineInputBorder(),
               ),
             ),
@@ -1176,15 +1172,17 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text(_text('取消', 'Cancel')),
+            child: Text(context.text('取消', 'Cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, controller.text),
-            child: Text(_text('确定', 'OK')),
+            child: Text(context.text('确定', 'OK')),
           ),
         ],
       ),
     );
+    controller.dispose();
+    return result;
   }
 
   Future<void> _showGeneratedCodeDialog(
@@ -1237,7 +1235,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      _text(
+                      context.text(
                         '配对码已自动复制到剪贴板',
                         'Pairing code copied to clipboard.',
                       ),
@@ -1250,7 +1248,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
               ] else ...[
                 const SizedBox(height: AppSpacing.md),
                 Text(
-                  _text(
+                  context.text(
                     '保持此窗口打开，完成后密钥包会自动销毁。',
                     'Keep this window open. The key bundle is destroyed after use.',
                   ),
@@ -1264,7 +1262,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
           actions: [
             FilledButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: Text(_text('确定', 'OK')),
+              child: Text(context.text('确定', 'OK')),
             ),
           ],
         );
@@ -1312,7 +1310,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                _text('服务器地址', 'Server Address'),
+                context.text('服务器地址', 'Server Address'),
                 style: theme.textTheme.labelLarge?.copyWith(
                   fontWeight: FontWeight.w700,
                 ),
@@ -1330,15 +1328,15 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                 runSpacing: 8,
                 children: [
                   SyncInfoChip(
-                    label: _text(
+                    label: context.text(
                       '版本 V${_serviceManager.syncVersion}',
                       'Version V${_serviceManager.syncVersion}',
                     ),
                   ),
                   SyncInfoChip(
                     label: hasDirtyData
-                        ? _text('有未同步更改', 'Unsynced changes')
-                        : _text('已与服务器对齐', 'Ready to sync'),
+                        ? context.text('有未同步更改', 'Unsynced changes')
+                        : context.text('已与服务器对齐', 'Ready to sync'),
                   ),
                   SyncInfoChip(label: _syncStateLabel(syncState)),
                 ],
@@ -1402,7 +1400,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                             ? null
                             : _showSyncConfigDialog,
                         icon: const Icon(Icons.edit_outlined),
-                        label: Text(_text('修改 Server', 'Edit Server')),
+                        label: Text(context.text('修改 Server', 'Edit Server')),
                       ),
                     if (!showsInlineServerEditAction &&
                         !_serviceManager.syncService.isSyncing)
@@ -1431,7 +1429,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.settings_ethernet_outlined),
-                label: Text(_text('服务器', 'Server')),
+                label: Text(context.text('服务器', 'Server')),
               ),
             ),
             const SizedBox(width: AppSpacing.md),
@@ -1453,8 +1451,8 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
   Widget _buildHeroCard(BuildContext context) {
     return AppPageHeader(
       icon: Icons.sync_outlined,
-      title: _text('分布式同步中心', 'Distributed Sync Center'),
-      subtitle: _text(
+      title: context.text('分布式同步中心', 'Distributed Sync Center'),
+      subtitle: context.text(
         '端到端加密的本地优先架构，确保数据在多设备间安全同步。',
         'Local-first architecture with end-to-end encrypted synchronization.',
       ),
@@ -1520,23 +1518,23 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
 
   String _sectionTitle(_SyncSettingsSection section) {
     return switch (section) {
-      _SyncSettingsSection.sync => _text('同步控制', 'Sync'),
-      _SyncSettingsSection.linking => _text('设备链接与恢复', 'Link & Recover'),
-      _SyncSettingsSection.diagnostics => _text('诊断', 'Diagnostics'),
+      _SyncSettingsSection.sync => context.text('同步控制', 'Sync'),
+      _SyncSettingsSection.linking => context.text('设备链接与恢复', 'Link & Recover'),
+      _SyncSettingsSection.diagnostics => context.text('诊断', 'Diagnostics'),
     };
   }
 
   String _sectionSubtitle(_SyncSettingsSection section) {
     return switch (section) {
-      _SyncSettingsSection.sync => _text(
+      _SyncSettingsSection.sync => context.text(
         '服务器地址、连接状态和即时同步。',
         'Server URL, connection state, and manual sync.',
       ),
-      _SyncSettingsSection.linking => _text(
+      _SyncSettingsSection.linking => context.text(
         '面对面链接、远程配对和离线恢复码。',
         'Face-to-face linking, remote pairing, and recovery codes.',
       ),
-      _SyncSettingsSection.diagnostics => _text(
+      _SyncSettingsSection.diagnostics => context.text(
         '设备标识、同步元数据和技术说明。',
         'Device identity, sync metadata, and technical notes.',
       ),
@@ -1652,7 +1650,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
       animation: syncListenable,
       builder: (context, _) {
         return Scaffold(
-          appBar: AppBar(title: Text(_text('数据同步', 'Sync Data'))),
+          appBar: AppBar(title: Text(context.text('数据同步', 'Sync Data'))),
           body: _isLoading
               ? const Center(child: CircularProgressIndicator())
               : AdaptivePage(
@@ -1677,13 +1675,13 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
     final identity = _serviceManager.identityService;
     final lastSync = _serviceManager.syncService.lastSyncTime;
     final lastSyncStr = lastSync == null
-        ? _text('从未同步', 'Never')
+        ? context.text('从未同步', 'Never')
         : '${lastSync.hour.toString().padLeft(2, '0')}:${lastSync.minute.toString().padLeft(2, '0')}:${lastSync.second.toString().padLeft(2, '0')}';
 
     return _buildSectionCard(
       context: context,
-      title: _text('诊断与标识', 'Diagnostics & Identity'),
-      subtitle: _text(
+      title: context.text('诊断与标识', 'Diagnostics & Identity'),
+      subtitle: context.text(
         '当前设备的同步元数据与网络标识。',
         'Sync metadata and network identity for this device.',
       ),
@@ -1692,21 +1690,21 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
           _buildInfoRow(
             context,
             Icons.fingerprint,
-            _text('节点 ID (Node ID)', 'Node ID'),
+            context.text('节点 ID (Node ID)', 'Node ID'),
             identity.deviceId,
           ),
           const Divider(height: 24),
           _buildInfoRow(
             context,
             Icons.hub_outlined,
-            _text('保险库 ID (Vault ID)', 'Vault ID'),
+            context.text('保险库 ID (Vault ID)', 'Vault ID'),
             identity.vaultId,
           ),
           const Divider(height: 24),
           _buildInfoRow(
             context,
             Icons.update_outlined,
-            _text('上次同步时间', 'Last Sync'),
+            context.text('上次同步时间', 'Last Sync'),
             lastSyncStr,
           ),
         ],
@@ -1721,8 +1719,8 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
     final joinResult = _joinPairingResult;
     return _buildSectionCard(
       context: context,
-      title: _text('密钥恢复与设备链接', 'Key Recovery & Device Linking'),
-      subtitle: _text(
+      title: context.text('密钥恢复与设备链接', 'Key Recovery & Device Linking'),
+      subtitle: context.text(
         '按场景选择入口，避免误用恢复能力覆盖本机保险库。',
         'Choose the route by scenario to avoid accidentally overwriting this device vault.',
       ),
@@ -1739,7 +1737,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
               borderRadius: BorderRadius.circular(AppRadii.panel),
             ),
             child: Text(
-              _text(
+              context.text(
                 '日常加新设备优先使用面对面链接或远程配对；离线恢复码只用于无法配对时的应急恢复；内部兼容码不作为普通用户入口。',
                 'Use face-to-face linking or remote pairing for normal device setup. Offline recovery codes are for emergency recovery, and internal compatibility codes are not a normal user entry.',
               ),
@@ -1754,8 +1752,8 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
           _buildActionHeader(
             context,
             Icons.wifi_find_outlined,
-            _text('面对面链接：8 位临时码', 'Face-to-Face Link: 8-Character Code'),
-            _text(
+            context.text('面对面链接：8 位临时码', 'Face-to-Face Link: 8-Character Code'),
+            context.text(
               '两台设备在同一可信局域网内，且仅在配对码窗口打开期间可领取密钥包。',
               'The key bundle can be claimed only while the 8-character code window is open.',
             ),
@@ -1773,7 +1771,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.wifi_tethering_outlined, size: 18),
-                  label: Text(_text('显示临时码', 'Show Code')),
+                  label: Text(context.text('显示临时码', 'Show Code')),
                 ),
               ),
               const SizedBox(width: AppSpacing.sm),
@@ -1783,14 +1781,14 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                       ? null
                       : _showJoinLanPairingDialog,
                   icon: const Icon(Icons.pin_outlined, size: 18),
-                  label: Text(_text('输入临时码', 'Enter Code')),
+                  label: Text(context.text('输入临时码', 'Enter Code')),
                 ),
               ),
             ],
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            _text(
+            context.text(
               '关闭配对码窗口、领取成功或超时后，本机都会立即销毁本次密钥包。',
               'Closing the code window, a successful claim, or timeout destroys this key bundle.',
             ),
@@ -1805,8 +1803,8 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
           _buildActionHeader(
             context,
             Icons.admin_panel_settings_outlined,
-            _text('远程配对：可信设备批准', 'Remote Pairing: Trusted Approval'),
-            _text(
+            context.text('远程配对：可信设备批准', 'Remote Pairing: Trusted Approval'),
+            context.text(
               '两台设备不在同一局域网时使用。服务器只中转请求和密文，已有设备必须手动批准。',
               'Use when devices are not on the same LAN. The server relays requests and ciphertext, and an existing device must approve.',
             ),
@@ -1824,7 +1822,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.add_link_outlined, size: 18),
-                  label: Text(_text('创建', 'Create')),
+                  label: Text(context.text('创建', 'Create')),
                 ),
               ),
               const SizedBox(width: AppSpacing.sm),
@@ -1832,7 +1830,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                 child: OutlinedButton.icon(
                   onPressed: _isPairingBusy ? null : _showJoinPairingCodeDialog,
                   icon: const Icon(Icons.link_outlined, size: 18),
-                  label: Text(_text('加入', 'Join')),
+                  label: Text(context.text('加入', 'Join')),
                 ),
               ),
             ],
@@ -1850,27 +1848,27 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    _text('主机端会话', 'Host Session'),
+                    context.text('主机端会话', 'Host Session'),
                     style: theme.textTheme.labelMedium?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: 6),
                   SelectableText(
-                    '${_text('配对码', 'Pairing Code')}: ${hostSession.pairingCode}',
+                    '${context.text('配对码', 'Pairing Code')}: ${hostSession.pairingCode}',
                     style: theme.textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: AppSpacing.xs),
                   Text(
-                    '${_text('会话 ID', 'Session')}: ${hostSession.sessionId}',
+                    '${context.text('会话 ID', 'Session')}: ${hostSession.sessionId}',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
                   Text(
-                    '${_text('过期时间', 'Expires')}: ${hostSession.expiresAt.toLocal()}',
+                    '${context.text('过期时间', 'Expires')}: ${hostSession.expiresAt.toLocal()}',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -1883,7 +1881,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                           ? null
                           : _refreshHostPairingSession,
                       icon: const Icon(Icons.refresh_outlined, size: 18),
-                      label: Text(_text('检查设备接入请求', 'Check Requests')),
+                      label: Text(context.text('检查设备接入请求', 'Check Requests')),
                     ),
                   ),
                 ],
@@ -1905,14 +1903,14 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    _text('待处理请求', 'Pending Request'),
+                    context.text('待处理请求', 'Pending Request'),
                     style: theme.textTheme.labelMedium?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    '${_text('请求节点 ID', 'Requester Node')}: ${hostPendingRequest.requesterDeviceId}',
+                    '${context.text('请求节点 ID', 'Requester Node')}: ${hostPendingRequest.requesterDeviceId}',
                     style: theme.textTheme.bodySmall,
                   ),
                   const SizedBox(height: AppSpacing.sm),
@@ -1923,7 +1921,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                           ? null
                           : _approvePendingPairingRequest,
                       icon: const Icon(Icons.verified_user_outlined, size: 18),
-                      label: Text(_text('允许设备加入', 'Approve Device')),
+                      label: Text(context.text('允许设备加入', 'Approve Device')),
                     ),
                   ),
                 ],
@@ -1943,18 +1941,18 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    _text('加入请求处理中', 'Join Request In Progress'),
+                    context.text('加入请求处理中', 'Join Request In Progress'),
                     style: theme.textTheme.labelMedium?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    '${_text('会话 ID', 'Session')}: ${joinResult.sessionId}',
+                    '${context.text('会话 ID', 'Session')}: ${joinResult.sessionId}',
                     style: theme.textTheme.bodySmall,
                   ),
                   Text(
-                    '${_text('请求 ID', 'Request')}: ${joinResult.requestId}',
+                    '${context.text('请求 ID', 'Request')}: ${joinResult.requestId}',
                     style: theme.textTheme.bodySmall,
                   ),
                   const SizedBox(height: AppSpacing.sm),
@@ -1969,7 +1967,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                         size: 18,
                       ),
                       label: Text(
-                        _text('检查授权结果并导入', 'Check Approval & Import'),
+                        context.text('检查授权结果并导入', 'Check Approval & Import'),
                       ),
                     ),
                   ),
@@ -1988,13 +1986,13 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
               color: theme.colorScheme.onSurfaceVariant,
             ),
             title: Text(
-              _text('离线恢复码', 'Offline Recovery Code'),
+              context.text('离线恢复码', 'Offline Recovery Code'),
               style: theme.textTheme.labelLarge?.copyWith(
                 fontWeight: FontWeight.w700,
               ),
             ),
             subtitle: Text(
-              _text(
+              context.text(
                 '手动导出和导入加密恢复码。仅在无法使用面对面链接或远程配对时使用。',
                 'Manually export and import encrypted recovery codes. Use only when pairing is unavailable.',
               ),
@@ -2004,7 +2002,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
               Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: Text(
-                  _text(
+                  context.text(
                     '恢复码会携带保险库密钥材料。请设置恢复密码，并将恢复码和密码分开保存。',
                     'Recovery codes carry vault key material. Set a recovery password and store the code separately from the password.',
                   ),
@@ -2020,7 +2018,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                     child: TextButton.icon(
                       onPressed: _exportSecureVaultLinkCode,
                       icon: const Icon(Icons.copy_all_outlined, size: 18),
-                      label: Text(_text('导出恢复码', 'Export recovery code')),
+                      label: Text(context.text('导出恢复码', 'Export recovery code')),
                     ),
                   ),
                   const SizedBox(width: AppSpacing.sm),
@@ -2028,7 +2026,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                     child: TextButton.icon(
                       onPressed: _importSecureVaultLinkCode,
                       icon: const Icon(Icons.paste_outlined, size: 18),
-                      label: Text(_text('导入恢复码', 'Import recovery code')),
+                      label: Text(context.text('导入恢复码', 'Import recovery code')),
                     ),
                   ),
                 ],
@@ -2043,13 +2041,13 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
               color: theme.colorScheme.onSurfaceVariant,
             ),
             title: Text(
-              _text('内部兼容码说明', 'Internal Compatibility Code'),
+              context.text('内部兼容码说明', 'Internal Compatibility Code'),
               style: theme.textTheme.labelLarge?.copyWith(
                 fontWeight: FontWeight.w700,
               ),
             ),
             subtitle: Text(
-              _text(
+              context.text(
                 '用于旧链路和内部密钥包承载，不作为普通恢复入口展示。',
                 'Used by internal bundle transport; not exposed as a normal recovery entry.',
               ),
@@ -2057,7 +2055,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
             ),
             children: [
               Text(
-                _text(
+                context.text(
                   '内部兼容码是 sroy-link 格式，当前仍被面对面链接和远程配对的密钥包流程承载使用。普通用户请使用上面的三个入口，不要手动保存或粘贴内部兼容码。',
                   'The internal compatibility code uses the sroy-link format and is still carried inside face-to-face and remote pairing bundles. Use the three entries above instead of manually saving or pasting this internal code.',
                 ),
@@ -2076,8 +2074,8 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
   Widget _buildTechnicalInsights(BuildContext context) {
     return _buildSectionCard(
       context: context,
-      title: _text('技术架构说明', 'Technical Insights'),
-      subtitle: _text(
+      title: context.text('技术架构说明', 'Technical Insights'),
+      subtitle: context.text(
         'SecretRoy 如何保障您的数据安全与一致性。',
         'How SecretRoy ensures your data security and consistency.',
       ),
@@ -2086,8 +2084,8 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
           _buildInsightItem(
             context,
             Icons.security,
-            _text('零知识加密 (Zero-Knowledge)', 'Zero-Knowledge Encryption'),
-            _text(
+            context.text('零知识加密 (Zero-Knowledge)', 'Zero-Knowledge Encryption'),
+            context.text(
               '所有数据在离开设备前均经由“保险库主密钥 (Vault Master Key)”进行加密。',
               'All data is encrypted by your "Vault Master Key" before leaving the device.',
             ),
@@ -2096,8 +2094,8 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
           _buildInsightItem(
             context,
             Icons.merge_type,
-            _text('CRDT 无冲突合并', 'CRDT Conflict-Free'),
-            _text(
+            context.text('CRDT 无冲突合并', 'CRDT Conflict-Free'),
+            context.text(
               '使用 HLC 混合逻辑时钟，确保多设备并发修改时能够自动确定性合并。',
               'Uses Hybrid Logical Clocks (HLC) to ensure deterministic merging of concurrent edits.',
             ),
@@ -2113,8 +2111,8 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
         _buildRouteGuideItem(
           context,
           Icons.wifi_tethering_outlined,
-          _text('面对面链接', 'Face-to-face linking'),
-          _text(
+          context.text('面对面链接', 'Face-to-face linking'),
+          context.text(
             '同一可信局域网内使用 8 位临时码，窗口关闭即停止领取。',
             'Use an 8-character temporary code on a trusted LAN; closing the window stops claims.',
           ),
@@ -2123,8 +2121,8 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
         _buildRouteGuideItem(
           context,
           Icons.admin_panel_settings_outlined,
-          _text('远程配对', 'Remote pairing'),
-          _text(
+          context.text('远程配对', 'Remote pairing'),
+          context.text(
             '通过服务器中转配对请求，必须由已有设备批准。',
             'Relay pairing requests through the server; an existing device must approve.',
           ),
@@ -2133,8 +2131,8 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
         _buildRouteGuideItem(
           context,
           Icons.vpn_key_outlined,
-          _text('离线恢复码', 'Offline recovery code'),
-          _text(
+          context.text('离线恢复码', 'Offline recovery code'),
+          context.text(
             '手动保存的加密恢复码，用于无法配对时恢复密钥或数据快照。',
             'A manually saved encrypted recovery code for key or snapshot recovery when pairing is unavailable.',
           ),
@@ -2143,8 +2141,8 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
         _buildRouteGuideItem(
           context,
           Icons.integration_instructions_outlined,
-          _text('内部兼容码', 'Internal compatibility code'),
-          _text(
+          context.text('内部兼容码', 'Internal compatibility code'),
+          context.text(
             'sroy-link 仅作为内部承载格式，不作为普通用户入口。',
             'sroy-link is an internal transport format, not a normal user entry.',
           ),

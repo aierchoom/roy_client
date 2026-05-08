@@ -414,7 +414,7 @@ class _AccountListTileState extends State<AccountListTile> {
         const SizedBox(width: 6),
         Flexible(
           child: Text(
-            '$templateName 路 $fieldLabel',
+            '$templateName · $fieldLabel',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: theme.textTheme.labelMedium?.copyWith(

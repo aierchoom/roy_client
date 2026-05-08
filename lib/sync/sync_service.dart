@@ -44,6 +44,11 @@ class SyncService extends ChangeNotifier {
   SyncRecoveryMarker? _pendingRecovery;
   bool _disposed = false;
 
+  void _notify() {
+    if (_disposed) return;
+    notifyListeners();
+  }
+
   SyncService({
     required SecureStorageService storageService,
     required IdentityService identityService,
@@ -138,7 +143,7 @@ class SyncService extends ChangeNotifier {
       _syncDirtyKey(_identityService.vaultId),
       '1',
     );
-    notifyListeners();
+    _notify();
   }
 
   Future<void> reconcileDirtyState() async {
@@ -156,7 +161,7 @@ class SyncService extends ChangeNotifier {
     } else {
       _statusNote = null;
     }
-    notifyListeners();
+    _notify();
   }
 
   Future<void> reset() async {
@@ -462,8 +467,8 @@ class SyncService extends ChangeNotifier {
       return _asStringKeyedMap(decoded, '$phase response');
     } on SyncProtocolException {
       rethrow;
-    } catch (_) {
-      throw SyncProtocolException('$phase response is not valid JSON.');
+    } catch (e) {
+      throw SyncProtocolException('$phase response is not valid JSON: $e');
     }
   }
 
@@ -472,7 +477,8 @@ class SyncService extends ChangeNotifier {
     if (value is Map) {
       try {
         return Map<String, dynamic>.from(value);
-      } catch (_) {
+      } catch (e) {
+        AppLogger.d('Sync protocol map cast failed: $e');
         // Fall through to the typed protocol error below.
       }
     }
@@ -506,7 +512,8 @@ class SyncService extends ChangeNotifier {
       _pendingRecovery = SyncRecoveryMarker.fromJson(
         jsonDecode(raw) as Map<String, dynamic>,
       );
-    } catch (_) {
+    } catch (e) {
+      AppLogger.d('Sync recovery marker parse failed, clearing: $e');
       _pendingRecovery = null;
       await _storageService.setSetting(_syncRecoveryKey(vaultId), '');
     }
@@ -591,6 +598,24 @@ class SyncService extends ChangeNotifier {
     if (!url.startsWith('http')) {
       url = 'https://$url';
     }
+    if (url.startsWith('http://')) {
+      // Allow loopback HTTP for local development and testing;
+      // reject cleartext HTTP to remote servers.
+      final host = Uri.tryParse(url)?.host.toLowerCase() ?? '';
+      final isLoopback = host == '127.0.0.1' ||
+          host == 'localhost' ||
+          host == '::1' ||
+          host == '0.0.0.0';
+      if (!isLoopback) {
+        _setError(
+          SyncState.protocolError,
+          'Cleartext HTTP is not allowed for remote sync.',
+          statusNote:
+              'Sync requires HTTPS to protect vault data in transit. Use an HTTPS URL.',
+        );
+        return '';
+      }
+    }
     return url;
   }
 
@@ -628,7 +653,7 @@ class SyncService extends ChangeNotifier {
     if (kIsWeb) return false;
     if (!Platform.isAndroid && !Platform.isIOS) return false;
     final host = Uri.tryParse(serverUrl)?.host.toLowerCase() ?? '';
-    return host == '127.0.0.1' || host == 'localhost' || host == '::1';
+    return host == '127.0.0.1' || host == 'localhost' || host == '::1' || host == '0.0.0.0';
   }
 
   bool _looksLikeCleartextBlock(String message) {
@@ -670,7 +695,8 @@ class SyncService extends ChangeNotifier {
           itemId: itemId is String ? itemId : null,
         );
       }
-    } catch (_) {
+    } catch (e) {
+      AppLogger.d('Sync error body JSON parse failed: $e');
       // Ignore non-JSON error bodies and fall back to generic status text.
     }
 
@@ -693,7 +719,7 @@ class SyncService extends ChangeNotifier {
     if (!newState.isError) {
       _errorMessage = null;
     }
-    if (!_disposed) notifyListeners();
+    _notify();
   }
 
   void _setError(SyncState errorState, String message, {String? statusNote}) {

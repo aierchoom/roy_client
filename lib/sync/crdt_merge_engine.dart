@@ -67,6 +67,28 @@ class CrdtMergeEngine {
       throw ArgumentError('Attempted to merge different items.');
     }
 
+    // If remote HLCs are corrupted, local wins unconditionally to prevent
+    // a zero-timestamp HLC from always losing LWW comparisons.
+    final _remoteCorrupted = remote.nameHlc.isCorrupted ||
+        remote.emailHlc.isCorrupted ||
+        remote.dataHlc.values.any((h) => h.isCorrupted);
+    if (_remoteCorrupted) {
+      return MergeResult(
+        local.copyWith(
+          syncStatus: SyncStatus.pendingPush,
+          serverVersion: max(local.serverVersion, remote.serverVersion),
+        ),
+        [
+          ConflictLog(
+            accountId: local.id,
+            fieldKey: 'hlc.corrupted_remote',
+            fieldValue: 'Remote item had corrupted HLC timestamps; local version preserved.',
+            hlc: local.nameHlc,
+          ),
+        ],
+      );
+    }
+
     final List<ConflictLog> logs = [];
 
     // --- 1. 拦截墓碑攻击权 (Tombstone Trumps All) ---
@@ -293,6 +315,28 @@ class CrdtMergeEngine {
   ) {
     if (local.templateId != remote.templateId) {
       throw ArgumentError('Attempted to merge different templates.');
+    }
+
+    // If remote HLC is corrupted, local wins unconditionally.
+    final _remoteTopHlc = remote.hlc ?? Hlc.zero('remote');
+    if (_remoteTopHlc.isCorrupted) {
+      return TemplateMergeResult(
+        local.copyWith(
+          syncStatus: SyncStatus.pendingPush,
+          serverVersion: max(local.serverVersion, remote.serverVersion),
+        ),
+        [
+          TemplateConflictLog(
+            templateId: local.templateId,
+            fieldKey: 'hlc',
+            attributeName: 'corrupted_remote',
+            localValue: local.hlc?.toString() ?? '',
+            remoteValue: _remoteTopHlc.toString(),
+            localHlc: local.hlc ?? Hlc.zero('local'),
+            remoteHlc: _remoteTopHlc,
+          ),
+        ],
+      );
     }
 
     if (_sameTemplatePayload(local, remote)) {

@@ -1,8 +1,9 @@
 import 'dart:convert';
-import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:cryptography/cryptography.dart';
+import 'package:secret_roy/core/app_logger.dart';
+import 'package:secret_roy/core/crypto_random.dart';
 
 import 'database_file_cipher.dart';
 
@@ -102,7 +103,8 @@ class DatabaseFileKeyManager {
           ),
           usedPreviousEnvelope: true,
         );
-      } catch (_) {
+      } catch (e) {
+        AppLogger.d('Previous database key envelope unlock failed: $e');
         if (primaryError != null) {
           throw StateError('Database file key envelope could not be unlocked.');
         }
@@ -168,10 +170,7 @@ class DatabaseFileKeyManager {
       }
     }
 
-    final salt = List<int>.generate(
-      _saltLength,
-      (_) => Random.secure().nextInt(256),
-    );
+    final salt = CryptoRandom.bytes(_saltLength);
     await write(key: databaseKeySaltKey, value: base64Encode(salt));
     return salt;
   }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:secret_roy/l10n/app_localizations.dart';
 
+import '../../l10n/app_text_extension.dart';
 import '../../models/account_item.dart';
 import '../../models/account_template.dart';
 import '../../providers/enhanced_app_provider.dart';
@@ -26,10 +27,6 @@ class _TemplateEditViewState extends State<TemplateEditView> {
   final _subtitleCtrl = TextEditingController();
 
   List<AccountField> _fields = [];
-
-  String _text(String zh, String en) {
-    return Localizations.localeOf(context).languageCode == 'zh' ? zh : en;
-  }
 
   @override
   void initState() {
@@ -355,7 +352,7 @@ class _TemplateEditViewState extends State<TemplateEditView> {
                         borderRadius: BorderRadius.circular(AppRadii.pill),
                       ),
                       child: Text(
-                        _text(
+                        context.text(
                           '\u6a21\u677f\u5fbd\u6807 $badgeText',
                           'Badge $badgeText',
                         ),
@@ -378,13 +375,13 @@ class _TemplateEditViewState extends State<TemplateEditView> {
               _buildToneChip(
                 context,
                 icon: Icons.grid_view_outlined,
-                label: '${_fields.length} ${_text('个字段', 'fields')}',
+                label: '${_fields.length} ${context.text('个字段', 'fields')}',
                 tint: theme.colorScheme.onPrimaryContainer,
               ),
               _buildToneChip(
                 context,
                 icon: Icons.auto_awesome_mosaic_outlined,
-                label: _text('浅色样式优化中', 'Light mode refined'),
+                label: context.text('浅色样式优化中', 'Light mode refined'),
                 tint: theme.colorScheme.onPrimaryContainer,
               ),
             ],
@@ -403,7 +400,7 @@ class _TemplateEditViewState extends State<TemplateEditView> {
               border: Border.all(color: heroEdge.withAlpha(AppAlphas.strong)),
             ),
             child: Text(
-              _text(
+              context.text(
                 '这张卡现在承担模板首页的“封面”职责：先建立名称气质，再往下进入字段结构和预览。',
                 'This cover now sets the visual tone before the field structure and preview area below.',
               ),

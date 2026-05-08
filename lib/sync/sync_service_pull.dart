@@ -181,7 +181,9 @@ extension SyncServicePull on SyncService {
     }
 
     var mergedCount = 0;
+    var skippedCount = 0;
     for (final item in itemsList) {
+      try {
       final remoteEncoded = _readRemoteRecord(item);
       final remoteVersion = _readRemoteVersion(remoteEncoded);
       final isRemoteDeleted = remoteEncoded['is_deleted'] == true;
@@ -237,8 +239,21 @@ extension SyncServicePull on SyncService {
         );
         if (maybeLocal == null) {
           await _storageService.saveTemplate(remoteTemplate, isSyncMerge: true);
-        } else if (maybeLocal.syncStatus == SyncStatus.pendingPush) {
-          await _storageService.saveTemplate(remoteTemplate, isSyncMerge: true);
+        } else if (maybeLocal.syncStatus == SyncStatus.pendingPush ||
+            maybeLocal.syncStatus == SyncStatus.conflict) {
+          final mergeResult = CrdtMergeEngine.mergeTemplate(
+            maybeLocal,
+            remoteTemplate,
+          );
+          await _storageService.saveTemplate(
+            mergeResult.template,
+            isSyncMerge: true,
+          );
+          if (mergeResult.conflictLogs.isNotEmpty) {
+            await _storageService.saveTemplateConflictLogs(
+              mergeResult.conflictLogs,
+            );
+          }
         } else {
           await _storageService.saveTemplate(remoteTemplate, isSyncMerge: true);
         }
@@ -272,6 +287,16 @@ extension SyncServicePull on SyncService {
         }
       }
       mergedCount++;
+      } catch (e) {
+        skippedCount++;
+        AppLogger.d('[Sync] Skipping corrupted remote item: $e');
+      }
+    }
+
+    // Advance version even if some items were skipped, so they aren't
+    // re-fetched indefinitely. Skipped items should be reported to the user.
+    if (skippedCount > 0) {
+      AppLogger.d('[Sync] Skipped $skippedCount corrupted remote item(s).');
     }
 
     // 只有在所有项目都成功处理后，才推进全局版本号

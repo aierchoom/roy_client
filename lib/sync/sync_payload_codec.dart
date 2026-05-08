@@ -1,7 +1,7 @@
 import 'dart:convert';
-import 'dart:math';
 
 import 'package:cryptography/cryptography.dart';
+import 'package:secret_roy/core/crypto_random.dart';
 
 import '../models/account_item.dart';
 import '../models/account_template.dart';
@@ -23,7 +23,6 @@ class SyncPayloadCodec {
   static const int _nonceLength = 12;
   static const int _saltLength = 16;
   static const int _keyLength = 32;
-  static final Random _random = Random.secure();
 
   static Future<String> encodePayload({
     required Map<String, dynamic> payloadJson,
@@ -32,8 +31,8 @@ class SyncPayloadCodec {
     required String privateKey,
     required String symmetricKey,
   }) async {
-    final salt = _randomBytes(_saltLength);
-    final nonce = _randomBytes(_nonceLength);
+    final salt = CryptoRandom.bytes(_saltLength);
+    final nonce = CryptoRandom.bytes(_nonceLength);
     final additionalData = _additionalData(
       version: _currentVersion,
       vaultId: vaultId,
@@ -120,22 +119,6 @@ class SyncPayloadCodec {
     );
   }
 
-  static Future<String> encode({
-    required AccountItem item,
-    required String vaultId,
-    required String nodeId,
-    required String privateKey,
-    required String symmetricKey,
-  }) {
-    return encodeAccount(
-      item: item,
-      vaultId: vaultId,
-      nodeId: nodeId,
-      privateKey: privateKey,
-      symmetricKey: symmetricKey,
-    );
-  }
-
   static Future<Map<String, dynamic>> decodePayload({
     required String encodedPayload,
     required String expectedVaultId,
@@ -193,8 +176,8 @@ class SyncPayloadCodec {
       );
       final payloadJson = jsonDecode(utf8.decode(plaintextBytes));
       return Map<String, dynamic>.from(payloadJson as Map);
-    } catch (_) {
-      throw const SyncPayloadException('Payload decryption failed.');
+    } catch (e) {
+      throw SyncPayloadException('Payload decryption failed: $e');
     }
   }
 
@@ -210,6 +193,12 @@ class SyncPayloadCodec {
       privateKey: privateKey,
       symmetricKey: symmetricKey,
     );
+    final type = payloadJson['_type'];
+    if (type != null && type != 'account') {
+      throw SyncPayloadException(
+        'Expected account payload, got "$type". Use decodePayload() for other types.',
+      );
+    }
     return AccountItem.fromJson(payloadJson);
   }
 
@@ -226,8 +215,8 @@ class SyncPayloadCodec {
         utf8.decode(_decodeBase64Url(normalized.substring(prefix.length))),
       );
       return Map<String, dynamic>.from(envelopeJson as Map);
-    } catch (_) {
-      throw const SyncPayloadException('Payload is not valid envelope JSON.');
+    } catch (e) {
+      throw SyncPayloadException('Payload is not valid envelope JSON: $e');
     }
   }
 
@@ -238,7 +227,9 @@ class SyncPayloadCodec {
     required List<int> salt,
   }) {
     return Hkdf(hmac: Hmac.sha256(), outputLength: _keyLength).deriveKey(
-      secretKey: SecretKey(utf8.encode('$symmetricKey|$privateKey')),
+      secretKey: SecretKey(
+        [...utf8.encode(symmetricKey), 0, ...utf8.encode(privateKey)],
+      ),
       nonce: salt,
       info: utf8.encode('sroy-sync-payload|$_algorithmName|$vaultId'),
     );
@@ -264,13 +255,9 @@ class SyncPayloadCodec {
     }
     try {
       return _decodeBase64Url(value);
-    } catch (_) {
-      throw const SyncPayloadException('Payload envelope is incomplete.');
+    } catch (e) {
+      throw SyncPayloadException('Payload envelope is incomplete: $e');
     }
-  }
-
-  static List<int> _randomBytes(int length) {
-    return List<int>.generate(length, (_) => _random.nextInt(256));
   }
 
   static String _encodeBase64Url(List<int> bytes) {

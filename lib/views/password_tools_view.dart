@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/app_text_extension.dart';
 import '../services/service_manager.dart';
 import '../services/sensitive_clipboard_service.dart';
 import '../widgets/adaptive_page.dart';
@@ -16,21 +17,17 @@ class PasswordToolsView extends StatefulWidget {
 class _PasswordToolsViewState extends State<PasswordToolsView> {
   PasswordGeneratorResult? _lastResult;
 
-  String _text(String zh, String en) {
-    return Localizations.localeOf(context).languageCode == 'zh' ? zh : en;
-  }
-
   Future<void> _showPasswordGenerator(BuildContext context) async {
     final result = await showPasswordGeneratorSheet(
       context,
       initialOptions:
           _lastResult?.options ?? PasswordGeneratorOptions.defaults(length: 20),
-      title: _text('\u5bc6\u7801\u751f\u6210\u5668', 'Password Generator'),
-      subtitle: _text(
+      title: context.text('\u5bc6\u7801\u751f\u6210\u5668', 'Password Generator'),
+      subtitle: context.text(
         '\u50cf 1Password \u4e00\u6837\u8c03\u6574\u957f\u5ea6\u548c\u5b57\u7b26\u7c7b\u578b\uff0c\u7136\u540e\u590d\u5236\u6216\u4fdd\u7559\u751f\u6210\u7ed3\u679c\u3002',
         'Adjust length and character types like 1Password, then copy or keep the result.',
       ),
-      applyLabel: _text('\u4fdd\u7559\u7ed3\u679c', 'Keep Result'),
+      applyLabel: context.text('\u4fdd\u7559\u7ed3\u679c', 'Keep Result'),
     );
     if (result == null || !mounted) return;
 
@@ -51,7 +48,7 @@ class _PasswordToolsViewState extends State<PasswordToolsView> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          _text(
+          context.text(
             '\u5df2\u590d\u5236\u751f\u6210\u7684\u5bc6\u7801',
             'Generated password copied',
           ),
@@ -98,7 +95,7 @@ class _PasswordToolsViewState extends State<PasswordToolsView> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _text('\u5bc6\u7801\u5de5\u5177', 'Password Tools'),
+                  context.text('\u5bc6\u7801\u5de5\u5177', 'Password Tools'),
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w700,
                     color: theme.colorScheme.onPrimaryContainer,
@@ -106,7 +103,7 @@ class _PasswordToolsViewState extends State<PasswordToolsView> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  _text(
+                  context.text(
                     '\u96c6\u4e2d\u751f\u6210\u9ad8\u5f3a\u5ea6\u5bc6\u7801\uff0c\u65b9\u4fbf\u65b0\u5efa\u6216\u66ff\u6362\u654f\u611f\u4fe1\u606f\u3002',
                     'Generate strong passwords for new or updated credentials in one place.',
                   ),
@@ -203,11 +200,11 @@ class _PasswordToolsViewState extends State<PasswordToolsView> {
     if (password == null || password.isEmpty) {
       return _buildSectionCard(
         context: context,
-        title: _text(
+        title: context.text(
           '\u5c1a\u672a\u751f\u6210\u5bc6\u7801',
           'No Password Generated Yet',
         ),
-        subtitle: _text(
+        subtitle: context.text(
           '\u6253\u5f00\u751f\u6210\u5668\u540e\uff0c\u8fd9\u91cc\u4f1a\u4fdd\u7559\u6700\u8fd1\u4e00\u6b21\u7ed3\u679c\uff0c\u65b9\u4fbf\u4f60\u518d\u6b21\u590d\u5236\u6216\u5bf9\u7167\u3002',
           'Once you open the generator, the latest result stays here for quick copying and review.',
         ),
@@ -215,7 +212,7 @@ class _PasswordToolsViewState extends State<PasswordToolsView> {
           onPressed: () => _showPasswordGenerator(context),
           icon: const Icon(Icons.password_outlined),
           label: Text(
-            _text('\u6253\u5f00\u751f\u6210\u5668', 'Open Generator'),
+            context.text('\u6253\u5f00\u751f\u6210\u5668', 'Open Generator'),
           ),
         ),
       );
@@ -225,8 +222,8 @@ class _PasswordToolsViewState extends State<PasswordToolsView> {
 
     return _buildSectionCard(
       context: context,
-      title: _text('\u6700\u8fd1\u4e00\u6b21\u7ed3\u679c', 'Latest Result'),
-      subtitle: _text(
+      title: context.text('\u6700\u8fd1\u4e00\u6b21\u7ed3\u679c', 'Latest Result'),
+      subtitle: context.text(
         '\u7ee7\u7eed\u8c03\u6574\u53c2\u6570\uff0c\u6216\u8005\u76f4\u63a5\u590d\u5236\u8fd9\u6b21\u751f\u6210\u7684\u5bc6\u7801\u3002',
         'Keep tuning the options or copy this generated password directly.',
       ),
@@ -252,7 +249,7 @@ class _PasswordToolsViewState extends State<PasswordToolsView> {
           ),
           const SizedBox(height: AppSpacing.md),
           Text(
-            _text(
+            context.text(
               '\u5f3a\u5ea6\uff1a$strength / 100',
               'Strength: $strength / 100',
             ),
@@ -268,7 +265,7 @@ class _PasswordToolsViewState extends State<PasswordToolsView> {
                 child: OutlinedButton.icon(
                   onPressed: () => _copyLastPassword(context),
                   icon: const Icon(Icons.content_copy_outlined),
-                  label: Text(_text('\u590d\u5236', 'Copy')),
+                  label: Text(context.text('\u590d\u5236', 'Copy')),
                 ),
               ),
               const SizedBox(width: AppSpacing.md),
@@ -277,7 +274,7 @@ class _PasswordToolsViewState extends State<PasswordToolsView> {
                   onPressed: () => _showPasswordGenerator(context),
                   icon: const Icon(Icons.refresh_rounded),
                   label: Text(
-                    _text('\u8c03\u6574\u5e76\u91cd\u751f', 'Adjust & Refresh'),
+                    context.text('\u8c03\u6574\u5e76\u91cd\u751f', 'Adjust & Refresh'),
                   ),
                 ),
               ),
@@ -292,7 +289,7 @@ class _PasswordToolsViewState extends State<PasswordToolsView> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_text('\u5bc6\u7801\u5de5\u5177', 'Password Tools')),
+        title: Text(context.text('\u5bc6\u7801\u5de5\u5177', 'Password Tools')),
       ),
       body: AdaptivePage(
         child: ListView(
@@ -302,18 +299,18 @@ class _PasswordToolsViewState extends State<PasswordToolsView> {
             const SizedBox(height: AppSpacing.lg),
             _buildSectionCard(
               context: context,
-              title: _text('\u5bc6\u7801\u751f\u6210', 'Password Generator'),
-              subtitle: _text(
+              title: context.text('\u5bc6\u7801\u751f\u6210', 'Password Generator'),
+              subtitle: context.text(
                 '\u7528\u66f4\u63a5\u8fd1 1Password \u7684\u65b9\u5f0f\uff0c\u81ea\u5b9a\u4e49\u957f\u5ea6\u3001\u5b57\u7b26\u7c7b\u578b\u548c\u5f3a\u5ea6\u3002',
                 'Use a more 1Password-like flow to customize length, character types, and strength.',
               ),
               child: _buildActionTile(
                 context: context,
-                title: _text(
+                title: context.text(
                   '\u6253\u5f00\u751f\u6210\u5668',
                   'Open Generator',
                 ),
-                subtitle: _text(
+                subtitle: context.text(
                   '\u81ea\u5b9a\u4e49\u957f\u5ea6\u3001\u7ec4\u6210\u548c\u5f3a\u5ea6',
                   'Customize length, composition, and strength',
                 ),

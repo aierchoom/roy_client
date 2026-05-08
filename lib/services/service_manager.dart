@@ -553,7 +553,7 @@ class ServiceManager extends ChangeNotifier {
     await _secureStorageService.initialize(deviceId: _identityService.deviceId);
     await _syncService.initialize();
 
-    notifyListeners();
+    _notify();
 
     return SyncResult.success(
       pulled: result.pulled,
@@ -589,7 +589,7 @@ class ServiceManager extends ChangeNotifier {
     );
     await _syncService.markDirty();
     final result = await syncNow();
-    notifyListeners();
+    _notify();
     return result;
   }
 
@@ -635,7 +635,7 @@ class ServiceManager extends ChangeNotifier {
 
     await _secureStorageService.deleteLocalSyncChange(changeId);
     await _syncService.reconcileDirtyState();
-    notifyListeners();
+    _notify();
   }
 
   SyncState get syncState => _syncService.state;
@@ -656,7 +656,7 @@ class ServiceManager extends ChangeNotifier {
 
     await _syncServerUrlStore.write(url, vaultId: _identityService.vaultId);
     await disconnectFromSyncServer();
-    notifyListeners();
+    _notify();
   }
 
   Future<String?> _exportEncryptedVaultDump() async {
@@ -799,17 +799,7 @@ class ServiceManager extends ChangeNotifier {
     await _importVaultIdentityPreview(preview, forceOverwrite: forceOverwrite);
   }
 
-  Future<void> importVaultLinkCodeWithPreview(
-    VaultIdentityImportPreview preview, {
-    bool forceOverwrite = false,
-  }) async {
-    if (!isUnlocked) {
-      throw StateError('Vault is locked.');
-    }
-    await _importVaultIdentityPreview(preview, forceOverwrite: forceOverwrite);
-  }
-
-  Future<void> importSecureVaultLinkCodeWithPreview(
+  Future<void> importVaultIdentityPreview(
     VaultIdentityImportPreview preview, {
     bool forceOverwrite = false,
   }) async {
@@ -865,7 +855,7 @@ class ServiceManager extends ChangeNotifier {
       }
 
       await _syncService.initialize();
-      notifyListeners();
+      _notify();
     } on VaultDumpImportException catch (error) {
       if (identityApplied && previousIdentity != null) {
         await _identityService.applyImportPreview(previousIdentity);
@@ -1093,7 +1083,7 @@ class ServiceManager extends ChangeNotifier {
 
   Future<void> setAutoLockDuration(AutoLockDuration duration) async {
     await _autoLockService.setDuration(duration);
-    notifyListeners();
+    _notify();
   }
 
   AutoLockDuration get autoLockDuration => _autoLockService.duration;

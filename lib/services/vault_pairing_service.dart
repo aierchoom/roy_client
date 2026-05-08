@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:secret_roy/core/app_logger.dart';
 
 class VaultPairingServiceException implements Exception {
   final String message;
@@ -252,15 +253,19 @@ class VaultPairingService {
         status: status,
         wrappedVaultBundle: body['wrapped_vault_bundle'] as String?,
       );
+    } else {
+      _ensureStatus(
+        response,
+        body,
+        acceptedStatusCodes: const {200, 202, 403, 410},
+        fallbackError: 'Failed to fetch pairing bundle.',
+      );
+      // _ensureStatus always throws for unrecognized status codes,
+      // but the analyzer cannot infer that.
+      throw VaultPairingServiceException(
+        'Failed to fetch pairing bundle.',
+      );
     }
-
-    _ensureStatus(
-      response,
-      body,
-      acceptedStatusCodes: const {200, 202, 403, 410},
-      fallbackError: 'Failed to fetch pairing bundle.',
-    );
-    return const PairingBundleResult(status: 'unknown');
   }
 
   void _ensureStatus(
@@ -290,7 +295,8 @@ class VaultPairingService {
         return decoded;
       }
       return {};
-    } catch (_) {
+    } catch (e) {
+      AppLogger.d('Vault pairing response parse failed: $e');
       return {};
     }
   }

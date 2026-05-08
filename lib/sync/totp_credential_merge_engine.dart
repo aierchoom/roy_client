@@ -7,6 +7,15 @@ class TotpCredentialMergeEngine {
   const TotpCredentialMergeEngine._();
 
   static TotpCredential merge(TotpCredential local, TotpCredential remote) {
+    // If remote HLCs are corrupted, local wins unconditionally.
+    if (remote.labelHlc.isCorrupted ||
+        remote.configHlc.isCorrupted ||
+        remote.linksHlc.isCorrupted) {
+      return local.copyWith(
+        serverVersion: max(local.serverVersion, remote.serverVersion),
+      );
+    }
+
     final labelWinsRemote = remote.labelHlc.compareTo(local.labelHlc) > 0;
     final configWinsRemote = remote.configHlc.compareTo(local.configHlc) > 0;
     final linksWinsRemote = remote.linksHlc.compareTo(local.linksHlc) > 0;

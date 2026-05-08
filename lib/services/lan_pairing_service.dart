@@ -264,7 +264,8 @@ class LanPairingService {
         String rawAdvertisement;
         try {
           rawAdvertisement = utf8.decode(datagram.data);
-        } catch (_) {
+        } catch (e) {
+          AppLogger.d('LAN pairing datagram decode failed: $e');
           return;
         }
 
@@ -316,6 +317,20 @@ class LanPairingService {
   Future<void> _handleHostRequest(HttpRequest request) async {
     final response = request.response;
     response.headers.contentType = ContentType.json;
+
+    // Reject requests from non-local origins.
+    // LAN pairing uses plaintext HTTP; the transfer code payload is protected
+    // by X25519+AES-GCM via VaultPairingCrypto, but the pairing code itself
+    // is sent in cleartext. Restricting to local network segments mitigates
+    // interception on shared WiFi.
+    final remoteAddress = request.connectionInfo?.remoteAddress;
+    if (remoteAddress != null &&
+        !_isLocalNetworkAddress(remoteAddress.address)) {
+      response.statusCode = HttpStatus.forbidden;
+      response.write(jsonEncode({'error': 'Only local network connections are accepted.'}));
+      await response.close();
+      return;
+    }
 
     if (request.method != 'POST' || request.uri.path != _claimPath) {
       response.statusCode = HttpStatus.notFound;
@@ -494,6 +509,24 @@ class LanPairingService {
     } on LanPairingServiceException {
       return null;
     }
+  }
+
+  bool _isLocalNetworkAddress(String address) {
+    // IPv4 loopback
+    if (address == '127.0.0.1') return true;
+    // IPv4 link-local (169.254.x.x)
+    if (address.startsWith('169.254.')) return true;
+    // IPv4 private ranges (10.x, 172.16-31.x, 192.168.x)
+    if (address.startsWith('10.')) return true;
+    if (address.startsWith('192.168.')) return true;
+    if (address.startsWith('172.')) {
+      final second = int.tryParse(address.split('.')[1]) ?? 0;
+      if (second >= 16 && second <= 31) return true;
+    }
+    // IPv6 loopback and link-local
+    if (address == '::1' || address == '::ffff:127.0.0.1') return true;
+    if (address.startsWith('fe80')) return true;
+    return false;
   }
 
   Map<String, dynamic> _decodeJson(String rawValue) {

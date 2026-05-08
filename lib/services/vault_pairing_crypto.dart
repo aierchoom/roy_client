@@ -1,7 +1,7 @@
 import 'dart:convert';
-import 'dart:math';
 
 import 'package:crypto/crypto.dart' show Hmac, sha256;
+import 'package:secret_roy/core/crypto_random.dart';
 import 'package:cryptography/cryptography.dart' hide Hmac;
 
 class VaultPairingCryptoException implements Exception {
@@ -58,8 +58,8 @@ class VaultPairingCrypto {
         remotePublicKey: recipientPublicKey,
       );
       final sharedBytes = await sharedSecret.extractBytes();
-      final salt = _randomBytes(_saltLength);
-      final nonce = _randomBytes(_nonceLength);
+      final salt = CryptoRandom.bytes(_saltLength);
+      final nonce = CryptoRandom.bytes(_nonceLength);
       final keyBytes = _deriveAesKey(sharedBytes: sharedBytes, salt: salt);
       final secretBox = await AesGcm.with256bits().encrypt(
         utf8.encode(plainBundle),
@@ -156,11 +156,6 @@ class VaultPairingCrypto {
       ...salt,
       ...utf8.encode(_algorithmName),
     ]).bytes;
-  }
-
-  static List<int> _randomBytes(int length) {
-    final random = Random.secure();
-    return List<int>.generate(length, (_) => random.nextInt(256));
   }
 
   static String _encodeBase64Url(List<int> bytes) {

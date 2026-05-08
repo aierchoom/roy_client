@@ -44,6 +44,7 @@ class TotpImportService {
       TotpService.parseConfig(value);
       return true;
     } catch (_) {
+      // Validation helper: any parse failure means the value is not valid TOTP config.
       return false;
     }
   }

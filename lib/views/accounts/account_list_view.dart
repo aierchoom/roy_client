@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../l10n/app_text_extension.dart';
 import '../../models/account_item.dart';
 import '../../models/account_template.dart';
 import '../../providers/enhanced_app_provider.dart';
@@ -24,10 +25,6 @@ enum _VaultCategoryFilter { all, accounts, secureNotes }
 class _AccountListViewState extends State<AccountListView> {
   String? _activeTemplateId;
   _VaultCategoryFilter _categoryFilter = _VaultCategoryFilter.all;
-
-  String _text(BuildContext context, String zh, String en) {
-    return Localizations.localeOf(context).languageCode == 'zh' ? zh : en;
-  }
 
   Future<void> _openEditor(BuildContext context, {AccountItem? initial}) async {
     final result = await Navigator.push<AccountItem>(
@@ -63,11 +60,10 @@ class _AccountListViewState extends State<AccountListView> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text(
-          _text(context, '\u5220\u9664\u8d26\u6237', 'Delete Account'),
+          context.text( '\u5220\u9664\u8d26\u6237', 'Delete Account'),
         ),
         content: Text(
-          _text(
-            context,
+          context.text(
             '\u786e\u8ba4\u5220\u9664\u201c${account.name}\u201d\u5417\uff1f\u8be5\u64cd\u4f5c\u4e0d\u53ef\u64a4\u9500\u3002',
             'Delete "${account.name}"? This action cannot be undone.',
           ),
@@ -75,12 +71,12 @@ class _AccountListViewState extends State<AccountListView> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: Text(_text(context, '\u53d6\u6d88', 'Cancel')),
+            child: Text(context.text( '\u53d6\u6d88', 'Cancel')),
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, true),
             child: Text(
-              _text(context, '\u5220\u9664', 'Delete'),
+              context.text( '\u5220\u9664', 'Delete'),
               style: const TextStyle(color: Colors.red),
             ),
           ),
@@ -104,7 +100,7 @@ class _AccountListViewState extends State<AccountListView> {
       messenger.showSnackBar(
         SnackBar(
           content: Text(
-            _text(context, '\u63a8\u9001\u6210\u529f', 'Push succeeded'),
+            context.text( '\u63a8\u9001\u6210\u529f', 'Push succeeded'),
           ),
         ),
       );
@@ -112,8 +108,7 @@ class _AccountListViewState extends State<AccountListView> {
       messenger.showSnackBar(
         SnackBar(
           content: Text(
-            _text(
-              context,
+            context.text(
               '\u63a8\u9001\u5931\u8d25\uff1a${result.error}',
               'Push failed: ${result.error}',
             ),
@@ -149,8 +144,7 @@ class _AccountListViewState extends State<AccountListView> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _text(
-                    context,
+                  context.text(
                     '\u5f85\u540c\u6b65\u53d8\u66f4 ${changes.length} \u9879',
                     '${changes.length} change(s) waiting to sync',
                   ),
@@ -161,8 +155,7 @@ class _AccountListViewState extends State<AccountListView> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  _text(
-                    context,
+                  context.text(
                     '\u70b9\u51fb\u63a8\u9001\u5c06\u672c\u5730\u4fee\u6539\u540c\u6b65\u5230\u5176\u4ed6\u8bbe\u5907',
                     'Tap push to sync local changes to your other devices',
                   ),
@@ -176,7 +169,7 @@ class _AccountListViewState extends State<AccountListView> {
           FilledButton.tonalIcon(
             onPressed: () => _pushAllLocalChanges(context),
             icon: const Icon(Icons.cloud_upload_outlined, size: 18),
-            label: Text(_text(context, '\u63a8\u9001', 'Push')),
+            label: Text(context.text( '\u63a8\u9001', 'Push')),
           ),
         ],
       ),
@@ -190,14 +183,8 @@ class _AccountListViewState extends State<AccountListView> {
         .toList();
   }
 
-  int _legacyFieldCount(AccountItem account, AccountTemplate? template) {
-    final visibleKeys =
-        template?.fields.map((field) => field.fieldKey).toSet() ?? <String>{};
-    return account.data.entries.where((entry) {
-      if (visibleKeys.contains(entry.key)) return false;
-      return entry.value.trim().isNotEmpty;
-    }).length;
-  }
+  int _legacyFieldCount(AccountItem account, AccountTemplate? template) =>
+      account.legacyFieldCount(template);
 
   List<AccountItem> _categoryFilteredAccounts(EnhancedAppProvider provider) {
     final base = _filteredAccounts(provider.allAccounts);
@@ -261,29 +248,26 @@ class _AccountListViewState extends State<AccountListView> {
     String countLabel;
     switch (_categoryFilter) {
       case _VaultCategoryFilter.accounts:
-        title = _text(context, '\u8d26\u53f7\u4e2d\u5fc3', 'Account Hub');
-        subtitle = _text(
-          context,
+        title = context.text( '\u8d26\u53f7\u4e2d\u5fc3', 'Account Hub');
+        subtitle = context.text(
           '\u4f60\u7684\u767b\u5f55\u51ed\u8bc1\u548c\u7f51\u7ad9\u8d26\u53f7',
           'Your login credentials',
         );
-        countLabel = _text(context, '\u4e2a\u8d26\u53f7', 'Accounts');
+        countLabel = context.text( '\u4e2a\u8d26\u53f7', 'Accounts');
       case _VaultCategoryFilter.secureNotes:
-        title = _text(context, '\u5b89\u5168\u7b14\u8bb0', 'Secure Notes');
-        subtitle = _text(
-          context,
+        title = context.text( '\u5b89\u5168\u7b14\u8bb0', 'Secure Notes');
+        subtitle = context.text(
           '\u52a0\u5bc6\u5b58\u50a8\u7684\u654f\u611f\u6587\u672c\u548c\u5bc6\u94a5',
           'Encrypted sensitive text and keys',
         );
-        countLabel = _text(context, '\u4e2a\u7b14\u8bb0', 'Notes');
+        countLabel = context.text( '\u4e2a\u7b14\u8bb0', 'Notes');
       case _VaultCategoryFilter.all:
-        title = _text(context, '\u4fdd\u9669\u5e93', 'Vault');
-        subtitle = _text(
-          context,
+        title = context.text( '\u4fdd\u9669\u5e93', 'Vault');
+        subtitle = context.text(
           '\u4f60\u7684\u52a0\u5bc6\u4fe1\u606f\u5e93',
           'Your encrypted vault',
         );
-        countLabel = _text(context, '\u4e2a\u6761\u76ee', 'Items');
+        countLabel = context.text( '\u4e2a\u6761\u76ee', 'Items');
     }
 
     return AppPageHeader(
@@ -298,12 +282,12 @@ class _AccountListViewState extends State<AccountListView> {
         ),
         _StatChip(
           value: '$usedTemplates',
-          label: _text(context, '\u4e2a\u6a21\u677f', 'Templates'),
+          label: context.text( '\u4e2a\u6a21\u677f', 'Templates'),
           onColor: theme.colorScheme.primary,
         ),
         _StatChip(
           value: '$secretItems',
-          label: _text(context, '\u4e2a\u4fdd\u5bc6', 'Secrets'),
+          label: context.text( '\u4e2a\u4fdd\u5bc6', 'Secrets'),
           onColor: theme.colorScheme.primary,
         ),
       ],
@@ -316,27 +300,23 @@ class _AccountListViewState extends State<AccountListView> {
     String message;
     switch (_categoryFilter) {
       case _VaultCategoryFilter.secureNotes:
-        title = _text(
-          context,
+        title = context.text(
           '\u6682\u65e0\u5b89\u5168\u7b14\u8bb0',
           'No Secure Notes',
         );
-        message = _text(
-          context,
+        message = context.text(
           '\u5c1a\u672a\u521b\u5efa\u4efb\u4f55\u5b89\u5168\u7b14\u8bb0\uff0c\u70b9\u51fb\u53f3\u4e0b\u89d2\u6309\u94ae\u65b0\u5efa\u3002',
           'No secure notes yet. Tap the button to create one.',
         );
       case _VaultCategoryFilter.accounts:
-        title = _text(context, '\u6682\u65e0\u8d26\u53f7', 'No Accounts');
-        message = _text(
-          context,
+        title = context.text( '\u6682\u65e0\u8d26\u53f7', 'No Accounts');
+        message = context.text(
           '\u5f53\u524d\u6a21\u677f\u7b5b\u9009\u4e0b\u6ca1\u6709\u53ef\u663e\u793a\u7684\u8d26\u53f7\uff0c\u53ef\u4ee5\u5207\u6362\u6a21\u677f\u6216\u65b0\u5efa\u8d26\u53f7\u3002',
           'No accounts are available under the current template filter.',
         );
       case _VaultCategoryFilter.all:
-        title = _text(context, '\u6682\u65e0\u6761\u76ee', 'No Items');
-        message = _text(
-          context,
+        title = context.text( '\u6682\u65e0\u6761\u76ee', 'No Items');
+        message = context.text(
           '\u4fdd\u9669\u5e93\u4e2d\u8fd8\u6ca1\u6709\u4efb\u4f55\u5185\u5bb9\uff0c\u70b9\u51fb\u53f3\u4e0b\u89d2\u6309\u94ae\u5f00\u59cb\u6dfb\u52a0\u3002',
           'Your vault is empty. Tap the button to add items.',
         );
@@ -379,17 +359,17 @@ class _AccountListViewState extends State<AccountListView> {
         segments: [
           ButtonSegment(
             value: _VaultCategoryFilter.all,
-            label: Text(_text(context, '全部', 'All')),
+            label: Text(context.text( '全部', 'All')),
             icon: const Icon(Icons.dashboard_outlined),
           ),
           ButtonSegment(
             value: _VaultCategoryFilter.accounts,
-            label: Text(_text(context, '账号', 'Accounts')),
+            label: Text(context.text( '账号', 'Accounts')),
             icon: const Icon(Icons.lock_outline),
           ),
           ButtonSegment(
             value: _VaultCategoryFilter.secureNotes,
-            label: Text(_text(context, '安全笔记', 'Notes')),
+            label: Text(context.text( '安全笔记', 'Notes')),
             icon: const Icon(Icons.note_outlined),
           ),
         ],
@@ -420,10 +400,9 @@ class _AccountListViewState extends State<AccountListView> {
           children: [
             ListTile(
               leading: const Icon(Icons.lock_outline),
-              title: Text(_text(context, '新建账号', 'New Account')),
+              title: Text(context.text( '新建账号', 'New Account')),
               subtitle: Text(
-                _text(
-                  context,
+                context.text(
                   '存储网站、App 或服务登录信息',
                   'Store website, app or service credentials',
                 ),
@@ -432,10 +411,9 @@ class _AccountListViewState extends State<AccountListView> {
             ),
             ListTile(
               leading: const Icon(Icons.note_outlined),
-              title: Text(_text(context, '新建安全笔记', 'New Secure Note')),
+              title: Text(context.text( '新建安全笔记', 'New Secure Note')),
               subtitle: Text(
-                _text(
-                  context,
+                context.text(
                   '存储 API Key、助记词、私钥等敏感文本',
                   'Store API keys, mnemonics, private keys',
                 ),
@@ -465,7 +443,7 @@ class _AccountListViewState extends State<AccountListView> {
     final activeTemplate = templates
         .where((t) => t.templateId == _activeTemplateId)
         .firstOrNull;
-    final label = activeTemplate?.title ?? _text(context, '全部汇总', 'Dashboard');
+    final label = activeTemplate?.title ?? context.text( '全部汇总', 'Dashboard');
     final icon = activeTemplate?.icon ?? Icons.dashboard_outlined;
 
     return MenuAnchor(
@@ -538,7 +516,7 @@ class _AccountListViewState extends State<AccountListView> {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
           child: Text(
-            _text(context, '切换模版', 'Switch Template'),
+            context.text( '切换模版', 'Switch Template'),
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
               fontWeight: FontWeight.bold,
@@ -548,7 +526,7 @@ class _AccountListViewState extends State<AccountListView> {
         MenuItemButton(
           onPressed: () => setState(() => _activeTemplateId = null),
           leadingIcon: const Icon(Icons.dashboard_outlined, size: 20),
-          child: Text(_text(context, '全部汇总', 'Dashboard')),
+          child: Text(context.text( '全部汇总', 'Dashboard')),
         ),
         const Divider(indent: 12, endIndent: 12, height: 16),
         ...sortedTemplates.map((template) {
@@ -602,7 +580,7 @@ class _AccountListViewState extends State<AccountListView> {
   ) {
     final theme = Theme.of(context);
     final template = group.template;
-    final title = template?.title ?? _text(context, '其它', 'Other');
+    final title = template?.title ?? context.text( '其它', 'Other');
     final subtitle = template?.subTitle.trim() ?? '';
 
     return Column(
@@ -674,7 +652,7 @@ class _AccountListViewState extends State<AccountListView> {
                         .length,
                     onEdit: () => _openEditor(context, initial: account),
                     onDelete: () => _deleteAccount(context, account),
-                    localeText: _text,
+                    localeText: (ctx, zh, en) => ctx.text(zh, en),
                     resolveAccountName: (id) => provider.resolveAccountName(id),
                   ),
                   if (index < group.accounts.length - 1)
@@ -789,8 +767,7 @@ class _AccountListViewState extends State<AccountListView> {
                                         MainAxisAlignment.spaceBetween,
                                     children: [
                                       Text(
-                                        _text(
-                                          context,
+                                        context.text(
                                           '账户资源库',
                                           'Account Library',
                                         ),
@@ -877,7 +854,7 @@ class _AccountListViewState extends State<AccountListView> {
                   child: GreenAddButton(
                     heroTag: 'add-account-fab',
                     onPressed: () => _showAddMenu(context),
-                    tooltip: _text(context, '新建', 'Add'),
+                    tooltip: context.text( '新建', 'Add'),
                   ),
                 ),
               ),

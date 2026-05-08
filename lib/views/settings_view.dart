@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:secret_roy/l10n/app_localizations.dart';
 
+import '../l10n/app_text_extension.dart';
 import '../providers/enhanced_app_provider.dart';
 import '../widgets/adaptive_page.dart';
 import '../widgets/app_page_header.dart';
@@ -19,17 +20,11 @@ import '../theme/app_design_tokens.dart';
 class SettingsView extends StatelessWidget {
   const SettingsView({super.key});
 
-  String _text(BuildContext context, String zh, String en) {
-    return Localizations.localeOf(context).languageCode == 'zh' ? zh : en;
-  }
-
   Widget _buildHeroCard(BuildContext context) {
     return AppPageHeader(
       icon: Icons.settings_outlined,
-      title: _text(context, '\u8bbe\u7f6e\u4e2d\u5fc3', 'Settings Center'),
-      subtitle: _text(
-        context,
-        '\u4e2a\u6027\u5316\u3001\u5b89\u5168\u3001\u5bc6\u7801\u5de5\u5177\u3001\u540c\u6b65\u4e0e\u6a21\u677f\u7ba1\u7406',
+      title: context.text( '\u8bbe\u7f6e\u4e2d\u5fc3', 'Settings Center'),
+      subtitle: context.text('\u4e2a\u6027\u5316\u3001\u5b89\u5168\u3001\u5bc6\u7801\u5de5\u5177\u3001\u540c\u6b65\u4e0e\u6a21\u677f\u7ba1\u7406',
         'Visuals, security, password tools, sync, and templates',
       ),
     );
@@ -59,10 +54,8 @@ class SettingsView extends StatelessWidget {
               children: [
                 AppSettingsTile(
                   icon: Icons.palette_outlined,
-                  title: _text(context, '个性化与外观', 'Appearance'),
-                  subtitle: _text(
-                    context,
-                    '设置主题颜色、暗黑模式及视觉风格',
+                  title: context.text( '个性化与外观', 'Appearance'),
+                  subtitle: context.text('设置主题颜色、暗黑模式及视觉风格',
                     'Theme colors, dark mode, and visual style',
                   ),
                   onTap: () {
@@ -87,10 +80,8 @@ class SettingsView extends StatelessWidget {
                 ),
                 AppSettingsTile(
                   icon: Icons.health_and_safety_outlined,
-                  title: _text(context, 'Vault 体检', 'Vault Health'),
-                  subtitle: _text(
-                    context,
-                    '检查保险库安全状态和账号风险',
+                  title: context.text( 'Vault 体检', 'Vault Health'),
+                  subtitle: context.text('检查保险库安全状态和账号风险',
                     'Check vault security status and account risks',
                   ),
                   onTap: () {
@@ -115,10 +106,8 @@ class SettingsView extends StatelessWidget {
                 ),
                 AppSettingsTile(
                   icon: Icons.password_outlined,
-                  title: _text(context, '密码工具', 'Password Tools'),
-                  subtitle: _text(
-                    context,
-                    '生成高强度密码',
+                  title: context.text( '密码工具', 'Password Tools'),
+                  subtitle: context.text('生成高强度密码',
                     'Generate strong passwords',
                   ),
                   onTap: () {
@@ -147,7 +136,7 @@ class SettingsView extends StatelessWidget {
                   icon: Icons.info_outline,
                   title: l10n.aboutSecretRoy,
                   subtitle:
-                      '${l10n.versionNumber} · ${_text(context, '同步与安全增强更新', 'Enhanced Sync & Security')}',
+                      '${l10n.versionNumber} · ${context.text( '同步与安全增强更新', 'Enhanced Sync & Security')}',
                   showChevron: false,
                   onTap: () {
                     Navigator.of(context).push(

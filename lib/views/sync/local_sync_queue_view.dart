@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../l10n/app_text_extension.dart';
 import '../../models/local_sync_change.dart';
 import '../../providers/enhanced_app_provider.dart';
 import '../../sync/sync_service.dart';
@@ -9,10 +10,6 @@ import '../../widgets/adaptive_page.dart';
 
 class LocalSyncQueueView extends StatelessWidget {
   const LocalSyncQueueView({super.key});
-
-  String _text(BuildContext context, String zh, String en) {
-    return Localizations.localeOf(context).languageCode == 'zh' ? zh : en;
-  }
 
   Future<void> _pushChange(BuildContext context, LocalSyncChange change) async {
     final provider = context.read<EnhancedAppProvider>();
@@ -36,22 +33,20 @@ class LocalSyncQueueView extends StatelessWidget {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text(_text(context, '撤销本地变更', 'Discard Local Change')),
+          title: Text(context.text( '撤销本地变更', 'Discard Local Change')),
           content: Text(
-            _text(
-              context,
-              '将把"${change.title}"恢复到本次变更前的状态，此变更不会推送到其他设备。',
+            context.text('将把"${change.title}"恢复到本次变更前的状态，此变更不会推送到其他设备。',
               'This restores "${change.title}" to its previous local state and will not push it to other devices.',
             ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: Text(_text(context, '取消', 'Cancel')),
+              child: Text(context.text( '取消', 'Cancel')),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(context, true),
-              child: Text(_text(context, '撤销', 'Discard')),
+              child: Text(context.text( '撤销', 'Discard')),
             ),
           ],
         );
@@ -66,10 +61,8 @@ class LocalSyncQueueView extends StatelessWidget {
 
   void _showResultSnack(BuildContext context, SyncResult result) {
     final message = result.success
-        ? _text(context, '已推送已确认的本地变更。', 'Approved local changes pushed.')
-        : _text(
-            context,
-            '同步失败：${result.error}',
+        ? context.text( '已推送已确认的本地变更。', 'Approved local changes pushed.')
+        : context.text('同步失败：${result.error}',
             'Sync failed: ${result.error}',
           );
     ScaffoldMessenger.of(
@@ -120,9 +113,7 @@ class LocalSyncQueueView extends StatelessWidget {
                 if (change.isDelete) ...[
                   const SizedBox(height: 14),
                   Text(
-                    _text(
-                      context,
-                      '这是删除类变更。推送后，其他可信设备会直接同步该删除，除非存在本地冲突。',
+                    context.text('这是删除类变更。推送后，其他可信设备会直接同步该删除，除非存在本地冲突。',
                       'This is a delete change. Once pushed, other trusted devices will apply it unless they have local conflicts.',
                     ),
                     style: theme.textTheme.bodySmall?.copyWith(
@@ -139,7 +130,7 @@ class LocalSyncQueueView extends StatelessWidget {
                           Navigator.pop(ctx);
                           _discardChange(context, change);
                         },
-                        child: Text(_text(context, '撤销', 'Discard')),
+                        child: Text(context.text( '撤销', 'Discard')),
                       ),
                     ),
                     const SizedBox(width: AppSpacing.md),
@@ -149,7 +140,7 @@ class LocalSyncQueueView extends StatelessWidget {
                           Navigator.pop(ctx);
                           _pushChange(context, change);
                         },
-                        child: Text(_text(context, '推送', 'Push')),
+                        child: Text(context.text( '推送', 'Push')),
                       ),
                     ),
                   ],
@@ -164,33 +155,33 @@ class LocalSyncQueueView extends StatelessWidget {
 
   String _actionLabel(BuildContext context, LocalSyncAction action) {
     return switch (action) {
-      LocalSyncAction.create => _text(context, '新增', 'Create'),
-      LocalSyncAction.update => _text(context, '修改', 'Update'),
-      LocalSyncAction.delete => _text(context, '删除', 'Delete'),
+      LocalSyncAction.create => context.text( '新增', 'Create'),
+      LocalSyncAction.update => context.text( '修改', 'Update'),
+      LocalSyncAction.delete => context.text( '删除', 'Delete'),
     };
   }
 
   String _entityLabel(BuildContext context, LocalSyncEntityType type) {
     return switch (type) {
-      LocalSyncEntityType.account => _text(context, '账号', 'Account'),
-      LocalSyncEntityType.template => _text(context, '模板', 'Template'),
-      LocalSyncEntityType.totpCredential => _text(context, '2FA', '2FA'),
+      LocalSyncEntityType.account => context.text( '账号', 'Account'),
+      LocalSyncEntityType.template => context.text( '模板', 'Template'),
+      LocalSyncEntityType.totpCredential => context.text( '2FA', '2FA'),
     };
   }
 
   List<String> _changeFields(BuildContext context, LocalSyncChange change) {
     if (change.changedFields.isEmpty) {
-      return [_text(context, '记录内容', 'Record content')];
+      return [context.text( '记录内容', 'Record content')];
     }
     return change.changedFields
         .map((field) {
           return switch (field) {
-            'record.created' => _text(context, '新建记录', 'New record'),
-            'record.deleted' => _text(context, '删除记录', 'Deleted record'),
-            'record.updated' => _text(context, '记录内容', 'Record content'),
-            'name' => _text(context, '名称', 'Name'),
-            'email' => _text(context, '邮箱', 'Email'),
-            'template' || 'templateId' => _text(context, '模板', 'Template'),
+            'record.created' => context.text( '新建记录', 'New record'),
+            'record.deleted' => context.text( '删除记录', 'Deleted record'),
+            'record.updated' => context.text( '记录内容', 'Record content'),
+            'name' => context.text( '名称', 'Name'),
+            'email' => context.text( '邮箱', 'Email'),
+            'template' || 'templateId' => context.text( '模板', 'Template'),
             _ when field.startsWith('data.') => field.substring(5),
             _ => field,
           };
@@ -205,19 +196,19 @@ class LocalSyncQueueView extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_text(context, '待同步变更', 'Pending Sync Changes')),
+        title: Text(context.text( '待同步变更', 'Pending Sync Changes')),
         actions: [
           if (changes.isNotEmpty)
             TextButton.icon(
               onPressed: () => _pushAll(context),
               icon: const Icon(Icons.cloud_upload_outlined, size: 18),
-              label: Text(_text(context, '推送全部', 'Push All')),
+              label: Text(context.text( '推送全部', 'Push All')),
             ),
         ],
       ),
       body: AdaptivePage(
         child: changes.isEmpty
-            ? _EmptyState(textBuilder: (zh, en) => _text(context, zh, en))
+            ? _EmptyState(textBuilder: (zh, en) => context.text( zh, en))
             : ListView.separated(
                 padding: const EdgeInsets.all(AppSpacing.lg),
                 itemCount: changes.length,

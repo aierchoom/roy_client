@@ -77,7 +77,7 @@ extension SyncServicePush on SyncService {
     );
     final pushPayloads = await Future.wait(
       dirtyItems.map((item) async {
-        final ciphertext = await _encryptAndSign(item);
+        final ciphertext = await _encryptPayload(item);
 
         return {
           'id': _syncItemId(item),
@@ -338,7 +338,20 @@ extension SyncServicePush on SyncService {
     if (left.runtimeType != right.runtimeType) return false;
     final leftJson = Map<String, dynamic>.from(left.toJson() as Map);
     final rightJson = Map<String, dynamic>.from(right.toJson() as Map);
-    for (final key in const ['serverVersion', 'syncStatus']) {
+    for (final key in const [
+      'serverVersion',
+      'syncStatus',
+      'nameHlc',
+      'emailHlc',
+      'dataHlc',
+      'labelHlc',
+      'configHlc',
+      'linksHlc',
+      'hlc',
+      'isDeleted',
+      'deleteHlc',
+      '_type',
+    ]) {
       leftJson.remove(key);
       rightJson.remove(key);
     }
@@ -401,7 +414,7 @@ extension SyncServicePush on SyncService {
     return '${type.name}:$entityId';
   }
 
-  Future<String> _encryptAndSign(dynamic item) {
+  Future<String> _encryptPayload(dynamic item) {
     if (item is AccountItem) {
       return SyncPayloadCodec.encodeAccount(
         item: item,

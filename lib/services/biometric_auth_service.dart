@@ -1,7 +1,7 @@
 import 'dart:convert';
-import 'dart:math';
 
 import 'package:secret_roy/core/app_logger.dart';
+import 'package:secret_roy/core/crypto_random.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:local_auth/error_codes.dart' as auth_error;
@@ -49,7 +49,8 @@ class BiometricAuthService {
       return await _isBiometricEnabled()
           ? BiometricAuthStatus.enabled
           : BiometricAuthStatus.available;
-    } catch (_) {
+    } catch (e) {
+      AppLogger.d('Biometric status check failed: $e');
       return BiometricAuthStatus.notSupported;
     }
   }
@@ -57,7 +58,8 @@ class BiometricAuthService {
   Future<List<BiometricType>> getAvailableTypes() async {
     try {
       return await _localAuth.getAvailableBiometrics();
-    } catch (_) {
+    } catch (e) {
+      AppLogger.d('Biometric types check failed: $e');
       return [];
     }
   }
@@ -85,7 +87,7 @@ class BiometricAuthService {
         localizedReason: 'Verify your identity to enable biometric unlock',
         options: const AuthenticationOptions(
           stickyAuth: true,
-          biometricOnly: false,
+          biometricOnly: true,
           sensitiveTransaction: true,
           useErrorDialogs: true,
         ),
@@ -136,7 +138,7 @@ class BiometricAuthService {
         localizedReason: 'Use biometrics to unlock the vault',
         options: const AuthenticationOptions(
           stickyAuth: true,
-          biometricOnly: false,
+          biometricOnly: true,
           sensitiveTransaction: true,
           useErrorDialogs: true,
         ),
@@ -166,7 +168,7 @@ class BiometricAuthService {
   }
 
   Future<void> _storeEncryptedMasterKey(String masterPassword) async {
-    final wrappingKey = _randomBytes(32);
+    final wrappingKey = CryptoRandom.bytes(32);
     final secretBox = await AesGcm.with256bits().encrypt(
       utf8.encode(masterPassword),
       secretKey: SecretKey(wrappingKey),
@@ -212,11 +214,6 @@ class BiometricAuthService {
 
     // Fall back to legacy plaintext (migration path)
     return _secureStorage.read(key: _plaintextMasterKeyKey);
-  }
-
-  static List<int> _randomBytes(int length) {
-    final random = Random.secure();
-    return List<int>.generate(length, (_) => random.nextInt(256));
   }
 
   Future<bool> _isBiometricEnabled() async {

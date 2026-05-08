@@ -3,6 +3,7 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:cryptography/cryptography.dart';
+import 'package:secret_roy/core/crypto_random.dart';
 
 class DatabaseFileCipher {
   static final List<int> _magic = ascii.encode('SROYDB');
@@ -31,10 +32,7 @@ class DatabaseFileCipher {
   }
 
   static Uint8List generateKeyBytes() {
-    final random = Random.secure();
-    return Uint8List.fromList(
-      List<int>.generate(_keyLength, (_) => random.nextInt(256)),
-    );
+    return CryptoRandom.bytes(_keyLength);
   }
 
   static bool looksEncrypted(List<int> bytes) {

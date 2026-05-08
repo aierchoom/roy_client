@@ -36,7 +36,7 @@ void main() {
   test('encodes and decodes an AEAD encrypted payload', () async {
     final item = _item();
 
-    final encoded = await SyncPayloadCodec.encode(
+    final encoded = await SyncPayloadCodec.encodeAccount(
       item: item,
       vaultId: vaultId,
       nodeId: deviceId,
@@ -57,7 +57,7 @@ void main() {
   });
 
   test('rejects tampered payload envelope', () async {
-    final encoded = await SyncPayloadCodec.encode(
+    final encoded = await SyncPayloadCodec.encodeAccount(
       item: _item(),
       vaultId: vaultId,
       nodeId: deviceId,
@@ -94,14 +94,14 @@ void main() {
         isA<SyncPayloadException>().having(
           (error) => error.message,
           'message',
-          'Payload decryption failed.',
+          startsWith('Payload decryption failed'),
         ),
       ),
     );
   });
 
   test('rejects payload from a different vault', () async {
-    final encoded = await SyncPayloadCodec.encode(
+    final encoded = await SyncPayloadCodec.encodeAccount(
       item: _item(),
       vaultId: vaultId,
       nodeId: deviceId,

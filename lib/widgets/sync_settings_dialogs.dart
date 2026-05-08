@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../l10n/app_text_extension.dart';
+
 /// A styled info chip widget for displaying sync status information.
 class SyncInfoChip extends StatelessWidget {
   final String label;
@@ -261,11 +263,6 @@ class _SyncServerDialogState extends State<SyncServerDialog> {
     super.dispose();
   }
 
-  String _text(String zh, String en) {
-    if (!mounted) return en;
-    return Localizations.localeOf(context).languageCode == 'zh' ? zh : en;
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -346,7 +343,7 @@ class _SyncServerDialogState extends State<SyncServerDialog> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    _text(
+                    context.text(
                       '服务器仅作为加密数据的同步中转站，无法解密您的内容。',
                       'The server only acts as a relay for encrypted data and cannot decrypt it.',
                     ),

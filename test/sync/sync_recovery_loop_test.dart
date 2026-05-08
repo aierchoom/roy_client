@@ -334,7 +334,7 @@ void main() {
         serverVersion: 1,
         syncStatus: SyncStatus.synchronized,
       );
-      final remotePayload = await SyncPayloadCodec.encode(
+      final remotePayload = await SyncPayloadCodec.encodeAccount(
         item: remoteItem,
         vaultId: vaultId,
         nodeId: 'device_remote999',
@@ -399,7 +399,7 @@ void main() {
         serverVersion: 1,
         syncStatus: SyncStatus.pendingPush,
       );
-      final acceptedPayload = await SyncPayloadCodec.encode(
+      final acceptedPayload = await SyncPayloadCodec.encodeAccount(
         item: acceptedItem.copyWith(
           serverVersion: 1,
           syncStatus: SyncStatus.synchronized,
@@ -465,7 +465,7 @@ void main() {
         serverVersion: 1,
         syncStatus: SyncStatus.synchronized,
       );
-      final remotePayload = await SyncPayloadCodec.encode(
+      final remotePayload = await SyncPayloadCodec.encodeAccount(
         item: remoteBase,
         vaultId: vaultId,
         nodeId: 'device_remote999',

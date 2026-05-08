@@ -1,4 +1,8 @@
+import 'dart:convert';
 import 'dart:io';
+
+import 'package:crypto/crypto.dart';
+import 'package:secret_roy/core/app_logger.dart';
 
 import '../models/account_item.dart';
 import '../models/account_template.dart';
@@ -70,7 +74,8 @@ class VaultHealthCalculator {
         isPass: exists,
         description: exists ? '数据库已加密存储' : '未检测到加密数据库文件，数据存在泄露风险',
       );
-    } catch (_) {
+    } catch (e) {
+      AppLogger.d('Health check db_encryption failed: $e');
       return const VaultHealthItem(
         id: 'db_encryption',
         title: '本地数据库加密',
@@ -121,7 +126,8 @@ class VaultHealthCalculator {
           type: VaultHealthActionType.navigateToExport,
         ),
       );
-    } catch (_) {
+    } catch (e) {
+      AppLogger.d('Health check backup_age failed: $e');
       return const VaultHealthItem(
         id: 'backup_age',
         title: '备份状态',
@@ -180,7 +186,8 @@ class VaultHealthCalculator {
               )
             : null,
       );
-    } catch (_) {
+    } catch (e) {
+      AppLogger.d('Health check pending_sync failed: $e');
       return const VaultHealthItem(
         id: 'pending_sync',
         title: '待同步变更',
@@ -213,7 +220,8 @@ class VaultHealthCalculator {
               )
             : null,
       );
-    } catch (_) {
+    } catch (e) {
+      AppLogger.d('Health check conflicts failed: $e');
       return const VaultHealthItem(
         id: 'conflicts',
         title: '同步冲突',
@@ -257,7 +265,9 @@ class VaultHealthCalculator {
       if (account.isDeleted) continue;
       final password = (account.data['password'] ?? '').toString();
       if (password.isEmpty) continue;
-      passwordCounts[password] = (passwordCounts[password] ?? 0) + 1;
+      // Use SHA-256 hash as map key to avoid keeping plaintext passwords in memory
+      final hash = sha256.convert(utf8.encode(password)).toString();
+      passwordCounts[hash] = (passwordCounts[hash] ?? 0) + 1;
     }
     final reusedCount = passwordCounts.values.where((c) => c > 1).length;
     return VaultHealthItem(

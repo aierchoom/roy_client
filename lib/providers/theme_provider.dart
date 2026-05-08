@@ -30,7 +30,9 @@ class AppThemeProvider extends ChangeNotifier {
 
   void _loadFromPrefs() {
     final modeIndex = _prefs.getInt(_keyThemeMode) ?? ThemeMode.system.index;
-    _themeMode = ThemeMode.values[modeIndex];
+    _themeMode = modeIndex >= 0 && modeIndex < ThemeMode.values.length
+        ? ThemeMode.values[modeIndex]
+        : ThemeMode.system;
 
     final colorValue =
         _prefs.getInt(_keyColorSeed) ?? AppBrandColors.defaultSeed.toARGB32();

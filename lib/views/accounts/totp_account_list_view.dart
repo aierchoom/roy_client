@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../l10n/app_text_extension.dart';
 import '../../models/account_item.dart';
 import '../../models/totp_credential.dart';
 import '../../providers/enhanced_app_provider.dart';
@@ -23,10 +24,6 @@ class TotpAccountListView extends StatefulWidget {
 
 class _TotpAccountListViewState extends State<TotpAccountListView> {
   Timer? _timer;
-
-  String _text(BuildContext context, String zh, String en) {
-    return Localizations.localeOf(context).languageCode == 'zh' ? zh : en;
-  }
 
   @override
   void initState() {
@@ -62,10 +59,9 @@ class _TotpAccountListViewState extends State<TotpAccountListView> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text(_text(context, '\u5220\u9664 2FA', 'Delete 2FA')),
+        title: Text(context.text( '\u5220\u9664 2FA', 'Delete 2FA')),
         content: Text(
-          _text(
-            context,
+          context.text(
             '\u786e\u8ba4\u5220\u9664\u201c${credential.displayLabel}\u201d\u5417\uff1f',
             'Delete "${credential.displayLabel}"?',
           ),
@@ -73,12 +69,12 @@ class _TotpAccountListViewState extends State<TotpAccountListView> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: Text(_text(context, '\u53d6\u6d88', 'Cancel')),
+            child: Text(context.text( '\u53d6\u6d88', 'Cancel')),
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, true),
             child: Text(
-              _text(context, '\u5220\u9664', 'Delete'),
+              context.text( '\u5220\u9664', 'Delete'),
               style: const TextStyle(color: Colors.red),
             ),
           ),
@@ -102,8 +98,7 @@ class _TotpAccountListViewState extends State<TotpAccountListView> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          _text(
-            context,
+          context.text(
             '\u9a8c\u8bc1\u7801\u5df2\u590d\u5236',
             'Code copied.',
           ),
@@ -161,7 +156,7 @@ class _TotpAccountListViewState extends State<TotpAccountListView> {
           ),
           const SizedBox(height: AppSpacing.lg),
           Text(
-            _text(context, '\u6682\u65e0 2FA', 'No 2FA Items'),
+            context.text( '\u6682\u65e0 2FA', 'No 2FA Items'),
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w700,
             ),
@@ -191,7 +186,7 @@ class _TotpAccountListViewState extends State<TotpAccountListView> {
         title: Text(credential.displayLabel),
         subtitle: Text(error.toString()),
         trailing: IconButton(
-          tooltip: _text(context, '\u7f16\u8f91', 'Edit'),
+          tooltip: context.text( '\u7f16\u8f91', 'Edit'),
           onPressed: () => _openEditor(context, initial: credential),
           icon: const Icon(Icons.edit_outlined),
         ),
@@ -228,8 +223,7 @@ class _TotpAccountListViewState extends State<TotpAccountListView> {
                     const SizedBox(height: AppSpacing.xs),
                     Text(
                       linkedAccounts.isEmpty
-                          ? _text(
-                              context,
+                          ? context.text(
                               '\u672a\u5173\u8054\u8d26\u53f7',
                               'No linked account',
                             )
@@ -246,12 +240,12 @@ class _TotpAccountListViewState extends State<TotpAccountListView> {
                 ),
               ),
               IconButton(
-                tooltip: _text(context, '\u7f16\u8f91', 'Edit'),
+                tooltip: context.text( '\u7f16\u8f91', 'Edit'),
                 onPressed: () => _openEditor(context, initial: credential),
                 icon: const Icon(Icons.edit_outlined),
               ),
               IconButton(
-                tooltip: _text(context, '\u5220\u9664', 'Delete'),
+                tooltip: context.text( '\u5220\u9664', 'Delete'),
                 onPressed: () => _deleteCredential(context, credential),
                 icon: const Icon(Icons.delete_outline),
               ),
@@ -270,9 +264,7 @@ class _TotpAccountListViewState extends State<TotpAccountListView> {
                 ),
               ),
               IconButton(
-                tooltip: _text(
-                  context,
-                  '\u590d\u5236\u9a8c\u8bc1\u7801',
+                tooltip: context.text('\u590d\u5236\u9a8c\u8bc1\u7801',
                   'Copy code',
                 ),
                 onPressed: () => _copyCode(context, code),
@@ -348,27 +340,25 @@ class _TotpAccountListViewState extends State<TotpAccountListView> {
             maxWidth: AppSectionWidths.panel,
             child: AppPageHeader(
               icon: Icons.verified_user_outlined,
-              title: _text(context, '2FA', '2FA'),
-              subtitle: _text(
-                context,
-                '\u72ec\u7acb\u7ba1\u7406\u52a8\u6001\u9a8c\u8bc1\u7801\uff0c\u518d\u5173\u8054\u5230\u8d26\u53f7\u3002',
+              title: context.text( '2FA', '2FA'),
+              subtitle: context.text('\u72ec\u7acb\u7ba1\u7406\u52a8\u6001\u9a8c\u8bc1\u7801\uff0c\u518d\u5173\u8054\u5230\u8d26\u53f7\u3002',
                 'Manage authenticator codes independently, then link accounts.',
               ),
               trailing: FilledButton.icon(
                 onPressed: () => _openEditor(context),
                 icon: const Icon(Icons.add),
-                label: Text(_text(context, '\u65b0\u589e', 'Add')),
+                label: Text(context.text( '\u65b0\u589e', 'Add')),
               ),
               metrics: [
                 _buildMetricChip(
                   context: context,
                   value: '${credentials.length}',
-                  label: _text(context, '\u9879', 'Items'),
+                  label: context.text( '\u9879', 'Items'),
                 ),
                 _buildMetricChip(
                   context: context,
                   value: '$linkedCount',
-                  label: _text(context, '\u5173\u8054', 'Links'),
+                  label: context.text( '\u5173\u8054', 'Links'),
                 ),
               ],
             ),
