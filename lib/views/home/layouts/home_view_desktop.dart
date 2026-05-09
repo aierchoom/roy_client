@@ -1,19 +1,22 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../l10n/app_text_extension.dart';
 import '../../../providers/enhanced_app_provider.dart';
+import '../../../providers/notification_provider.dart';
 import '../../../theme/app_design_tokens.dart';
 import '../../../widgets/app_nav_rail.dart';
 
 class HomeViewDesktop extends StatelessWidget {
   final int selectedIndex;
+  final bool accountShowTemplates;
   final ValueChanged<int> onDestinationSelected;
   final List<Widget> pages;
 
   const HomeViewDesktop({
     super.key,
     required this.selectedIndex,
+    required this.accountShowTemplates,
     required this.onDestinationSelected,
     required this.pages,
   });
@@ -25,6 +28,12 @@ class HomeViewDesktop extends StatelessWidget {
         .watch<EnhancedAppProvider>()
         .localSyncChanges
         .length;
+    final conflictBadgeCount = context
+        .watch<EnhancedAppProvider>()
+        .conflictCount;
+    final notificationBadgeCount = context
+        .watch<NotificationProvider>()
+        .unreadCount;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -44,35 +53,48 @@ class HomeViewDesktop extends StatelessWidget {
                 onDestinationSelected: onDestinationSelected,
                 destinations: [
                   AppNavDestination(
-                    icon: Icons.inventory_2_outlined,
-                    selectedIcon: Icons.inventory_2,
-                    label: context.text( '\u8d26\u6237', 'Accounts'),
-                    description: context.text('\u67e5\u770b\u5168\u90e8\u8d26\u6237',
-                      'Browse your vault',
-                    ),
+                    icon: accountShowTemplates
+                        ? Icons.dashboard_customize_outlined
+                        : Icons.inventory_2_outlined,
+                    selectedIcon: accountShowTemplates
+                        ? Icons.dashboard_customize
+                        : Icons.inventory_2,
+                    label: accountShowTemplates
+                        ? context.text('模板', 'Templates')
+                        : context.text('账户', 'Accounts'),
+                    description: accountShowTemplates
+                        ? context.text('管理账户模板',
+                            'Manage account templates',
+                          )
+                        : context.text('查看全部账户',
+                            'Browse your vault',
+                          ),
+                    badgeLabel: selectedIndex == 0
+                        ? (accountShowTemplates ? '账户' : '模板')
+                        : null,
                   ),
                   AppNavDestination(
                     icon: Icons.search_outlined,
                     selectedIcon: Icons.search,
-                    label: context.text( '\u641c\u7d22', 'Search'),
-                    description: context.text('\u5feb\u901f\u5b9a\u4f4d\u8d26\u6237',
+                    label: context.text( '搜索', 'Search'),
+                    description: context.text('快速定位账户',
                       'Search and jump fast',
                     ),
-                    badgeCount: syncBadgeCount,
                   ),
                   AppNavDestination(
-                    icon: Icons.verified_user_outlined,
-                    selectedIcon: Icons.verified_user,
-                    label: '2FA',
-                    description: context.text('\u67e5\u770b\u52a8\u6001\u9a8c\u8bc1\u7801\u8d26\u6237',
-                      'Accounts with codes',
+                    icon: Icons.notifications_outlined,
+                    selectedIcon: Icons.notifications,
+                    label: context.text('通知', 'Alerts'),
+                    description: context.text('密码安全提醒与通知',
+                      'Password security reminders',
                     ),
+                    badgeCount: notificationBadgeCount + syncBadgeCount + conflictBadgeCount,
                   ),
                   AppNavDestination(
                     icon: Icons.settings_outlined,
                     selectedIcon: Icons.settings,
-                    label: context.text( '\u8bbe\u7f6e', 'Settings'),
-                    description: context.text('\u4e3b\u9898\u3001\u5b89\u5168\u4e0e\u6a21\u677f',
+                    label: context.text( '设置', 'Settings'),
+                    description: context.text('主题、安全与模板',
                       'Theme, security, templates',
                     ),
                   ),
@@ -115,7 +137,7 @@ class HomeViewDesktop extends StatelessWidget {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              context.text('\u5b89\u5168\u5e93\u5de5\u4f5c\u533a',
+                              context.text('安全库工作区',
                                 'Secure workspace',
                               ),
                               style: theme.textTheme.bodySmall?.copyWith(
@@ -138,7 +160,7 @@ class HomeViewDesktop extends StatelessWidget {
                     borderRadius: BorderRadius.circular(AppRadii.panel),
                   ),
                   child: Text(
-                    context.text('\u5bfc\u822a\u4fdd\u6301\u7a33\u5b9a\uff0c\u9ad8\u9891\u5de5\u5177\u5165\u53e3\u4e0d\u518d\u5f3a\u8c03\u60ac\u6d6e\u88c5\u9970\u3002',
+                    context.text('导航保持稳定，高频工具入口不再强调悬浮装饰。',
                       'Navigation stays stable, with less decorative chrome around frequent tools.',
                     ),
                     style: theme.textTheme.bodySmall?.copyWith(

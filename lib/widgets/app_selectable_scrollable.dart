@@ -15,12 +15,14 @@ class AppSelectableScrollable extends StatelessWidget {
   final Widget child;
   final bool showScrollbar;
   final bool selectable;
+  final ScrollController? controller;
 
   const AppSelectableScrollable({
     super.key,
     required this.child,
     this.showScrollbar = true,
     this.selectable = true,
+    this.controller,
   });
 
   @override
@@ -31,7 +33,10 @@ class AppSelectableScrollable extends StatelessWidget {
 
     if (layout.isPointerDevice) {
       if (showScrollbar) {
-        result = Scrollbar(child: result);
+        result = Scrollbar(
+          controller: controller,
+          child: result,
+        );
       }
       if (selectable) {
         result = SelectionArea(child: result);

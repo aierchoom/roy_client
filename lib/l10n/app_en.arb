@@ -54,5 +54,57 @@
     "versionNumber": "Version 1.0.0",
 
     "btnSave": "Save",
-    "btnClose": "Close"
+    "btnClose": "Close",
+
+    "importTemplate": "Import Template",
+    "exportTemplate": "Export Template",
+    "export": "Export",
+    "import": "Import",
+    "importSuccess": "Successfully imported {count} template(s)",
+    "@importSuccess": {
+        "placeholders": {
+            "count": { "type": "int" }
+        }
+    },
+    "importFailed": "Import failed: invalid format",
+    "exportCopied": "Copied to clipboard",
+    "importHint": "Paste template JSON text",
+    "batchExportTitle": "Batch Export Templates",
+    "selectTemplates": "Select templates to export",
+    "noTemplatesToExport": "No custom templates to export",
+    "noTemplatesToImport": "No templates to import",
+
+    "notificationCenter": "Notifications",
+    "notifications": "Alerts",
+    "markAllRead": "Mark all read",
+    "noNotifications": "No notifications",
+    "noNotificationsHint": "Password security reminders will appear here",
+    "notificationItems": "Items",
+    "notificationUnread": "Unread",
+    "passwordExpiryReminder": "Password Expiry Reminder",
+    "passwordExpiryBody": "has not been updated for {days} day(s). Consider changing it soon.",
+    "@passwordExpiryBody": {
+        "placeholders": {
+            "days": { "type": "int" }
+        }
+    },
+    "notificationSettings": "Notification Settings",
+    "notificationSettingsSubtitle": "Password expiry threshold & push",
+    "passwordExpiryDays": "Password Expiry Days",
+    "passwordExpiryDaysDesc": "Remind when password hasn't changed for this many days",
+    "pushNotification": "Push Notifications",
+    "pushNotificationDesc": "Daily check with system push",
+    "daysAgo": "{days} day(s) ago",
+    "@daysAgo": {
+        "placeholders": {
+            "days": { "type": "int" }
+        }
+    },
+    "hoursAgo": "{hours} hour(s) ago",
+    "@hoursAgo": {
+        "placeholders": {
+            "hours": { "type": "int" }
+        }
+    },
+    "justNow": "Just now"
 }

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:secret_roy/l10n/app_localizations.dart';
 
@@ -53,7 +53,7 @@ class _TemplateEditViewState extends State<TemplateEditView> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            '\u8bf7\u81f3\u5c11\u6dfb\u52a0\u4e00\u4e2a\u5b57\u6bb5\u3002',
+            '请至少添加一个字段。',
           ),
         ),
       );
@@ -124,11 +124,11 @@ class _TemplateEditViewState extends State<TemplateEditView> {
       case AccountFieldType.unknown:
         return field.attributes.hint ?? '';
       case AccountFieldType.accountLink:
-        return '\u5173\u8054\u8d26\u6237';
+        return '关联账户';
       case AccountFieldType.longText:
-        return '\u591a\u884c\u6587\u672c';
+        return '多行文本';
       case AccountFieldType.list:
-        return '\u5217\u8868';
+        return '列表';
     }
   }
 
@@ -226,11 +226,11 @@ class _TemplateEditViewState extends State<TemplateEditView> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('\u5220\u9664\u5b57\u6bb5'),
+        title: const Text('删除字段'),
         content: Text(
           usageCount > 0
-              ? '\u786e\u8ba4\u4ece\u6a21\u677f\u4e2d\u5220\u9664\u201c${field.label}\u201d\u5417\uff1f\n\n\u8be5\u6a21\u677f\u76ee\u524d\u88ab $usageCount \u4e2a\u8d26\u6237\u4f7f\u7528\u3002\u5220\u9664\u540e\uff0c\u7cfb\u7edf\u4f1a\u4fdd\u7559\u5386\u53f2\u8d26\u6237\u4e2d\u7684\u539f\u59cb\u503c\uff0c\u907f\u514d\u5728\u540e\u7eed\u4fdd\u5b58\u65f6\u88ab\u9ed8\u9ed8\u5220\u6389\u3002'
-              : '\u786e\u8ba4\u4ece\u6a21\u677f\u4e2d\u5220\u9664\u201c${field.label}\u201d\u5417\uff1f',
+              ? '确认从模板中删除“${field.label}”吗？\n\n该模板目前被 $usageCount 个账户使用。删除后，系统会保留历史账户中的原始值，避免在后续保存时被默默删掉。'
+              : '确认从模板中删除“${field.label}”吗？',
         ),
         actions: [
           TextButton(
@@ -257,7 +257,7 @@ class _TemplateEditViewState extends State<TemplateEditView> {
     final theme = Theme.of(context);
     final badgeText = templateBadgeText(
       _titleCtrl.text.trim().isEmpty
-          ? '\u672a\u547d\u540d\u6a21\u677f'
+          ? '未命名模板'
           : _titleCtrl.text.trim(),
     );
     final heroEdge = theme.colorScheme.primary.withAlpha(42);
@@ -353,7 +353,7 @@ class _TemplateEditViewState extends State<TemplateEditView> {
                       ),
                       child: Text(
                         context.text(
-                          '\u6a21\u677f\u5fbd\u6807 $badgeText',
+                          '模板徽标 $badgeText',
                           'Badge $badgeText',
                         ),
                         style: theme.textTheme.labelMedium?.copyWith(
@@ -416,16 +416,16 @@ class _TemplateEditViewState extends State<TemplateEditView> {
             runSpacing: 10,
             children: [
               EditorMetric(
-                label: '\u5b57\u6bb5\u6570',
+                label: '字段数',
                 value: '${_fields.length}',
               ),
               EditorMetric(
-                label: '\u5fc5\u586b',
+                label: '必填',
                 value:
                     '${_fields.where((field) => field.attributes.isRequired).length}',
               ),
               EditorMetric(
-                label: '\u4fdd\u5bc6',
+                label: '保密',
                 value:
                     '${_fields.where((field) => field.attributes.isSecret).length}',
               ),
@@ -458,14 +458,14 @@ class _TemplateEditViewState extends State<TemplateEditView> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '\u57fa\u672c\u4fe1\u606f',
+              '基本信息',
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w700,
               ),
             ),
             const SizedBox(height: 6),
             Text(
-              '\u8bbe\u7f6e\u6a21\u677f\u540d\u79f0\u4e0e\u526f\u6807\u9898\uff0c\u4e0a\u65b9\u7684\u5fbd\u6807\u4e0e\u4e0b\u65b9\u7684\u9884\u89c8\u4f1a\u540c\u6b65\u66f4\u65b0\uff0c\u8ba9\u6d45\u8272\u6a21\u5f0f\u4e0b\u7684\u53d8\u5316\u66f4\u6709\u5b58\u5728\u611f\u3002',
+              '设置模板名称与副标题，上方的徽标与下方的预览会同步更新，让浅色模式下的变化更有存在感。',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
                 height: 1.35,
@@ -520,7 +520,7 @@ class _TemplateEditViewState extends State<TemplateEditView> {
                     child: Text(
                       templateBadgeText(
                         _titleCtrl.text.trim().isEmpty
-                            ? '\u672a\u547d\u540d\u6a21\u677f'
+                            ? '未命名模板'
                             : _titleCtrl.text.trim(),
                       ),
                       style: theme.textTheme.titleLarge?.copyWith(
@@ -536,7 +536,7 @@ class _TemplateEditViewState extends State<TemplateEditView> {
                       children: [
                         Text(
                           _titleCtrl.text.trim().isEmpty
-                              ? '\u672a\u547d\u540d\u6a21\u677f'
+                              ? '未命名模板'
                               : _titleCtrl.text.trim(),
                           style: theme.textTheme.labelLarge?.copyWith(
                             fontWeight: FontWeight.w700,
@@ -545,7 +545,7 @@ class _TemplateEditViewState extends State<TemplateEditView> {
                         const SizedBox(height: AppSpacing.xs),
                         Text(
                           _subtitleCtrl.text.trim().isEmpty
-                              ? '\u8fd9\u4e2a\u6a21\u677f\u4f1a\u7528\u6765\u7ec4\u7ec7\u8d26\u6237\u5b57\u6bb5\u3002'
+                              ? '这个模板会用来组织账户字段。'
                               : _subtitleCtrl.text.trim(),
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
@@ -560,13 +560,13 @@ class _TemplateEditViewState extends State<TemplateEditView> {
                             _buildToneChip(
                               context,
                               icon: Icons.auto_awesome_mosaic_outlined,
-                              label: '\u5fbd\u6807\u5df2\u8054\u52a8',
+                              label: '徽标已联动',
                             ),
                             _buildToneChip(
                               context,
                               icon: Icons.preview_outlined,
                               label:
-                                  '\u9884\u89c8\u4f1a\u5b9e\u65f6\u66f4\u65b0',
+                                  '预览会实时更新',
                             ),
                           ],
                         ),
@@ -910,14 +910,14 @@ class _TemplateEditViewState extends State<TemplateEditView> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '\u6a21\u677f\u5b57\u6bb5',
+                    '模板字段',
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    '\u8fd9\u91cc\u5b9a\u4e49\u7684\u6bcf\u4e2a\u5b57\u6bb5\u90fd\u4f1a\u76f4\u63a5\u51fa\u73b0\u5728\u8d26\u6237\u7f16\u8f91\u9875\u4e2d\uff0c\u73b0\u5728\u4e5f\u4f1a\u540c\u65f6\u5e26\u51fa\u9884\u89c8\u611f\u548c\u64cd\u4f5c\u5206\u5c42\u3002',
+                    '这里定义的每个字段都会直接出现在账户编辑页中，现在也会同时带出预览感和操作分层。',
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                       height: 1.35,
@@ -931,12 +931,12 @@ class _TemplateEditViewState extends State<TemplateEditView> {
                       _buildToneChip(
                         context,
                         icon: Icons.view_stream_outlined,
-                        label: '\u5171 $total \u4e2a\u5b57\u6bb5',
+                        label: '共 $total 个字段',
                       ),
                       _buildToneChip(
                         context,
                         icon: Icons.star_outline_rounded,
-                        label: '\u5fc5\u586b $requiredCount',
+                        label: '必填 $requiredCount',
                       ),
                     ],
                   ),
@@ -1019,7 +1019,7 @@ class _TemplateEditViewState extends State<TemplateEditView> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          '\u5df2\u6dfb\u52a0 ${preset.name} \u5b57\u6bb5\u7ec4\uff0c\u5171 ${newFields.length} \u4e2a\u5b57\u6bb5',
+          '已添加 ${preset.name} 字段组，共 ${newFields.length} 个字段',
         ),
         duration: const Duration(seconds: 2),
       ),
@@ -1165,14 +1165,14 @@ class _TemplateEditViewState extends State<TemplateEditView> {
                       ),
                       const SizedBox(height: 14),
                       Text(
-                        '\u5f53\u524d\u8fd8\u6ca1\u6709\u5b57\u6bb5',
+                        '当前还没有字段',
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w700,
                         ),
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        '\u53ef\u4ee5\u5148\u52a0\u5165\u4f60\u6700\u5e38\u4fdd\u5b58\u7684\u4fe1\u606f\uff0c\u6bd4\u5982\u7528\u6237\u540d\u3001\u5bc6\u7801\u3001\u5361\u53f7\u3001\u7f16\u53f7\u6216\u5907\u6ce8\u7b49\u5b57\u6bb5\u3002',
+                        '可以先加入你最常保存的信息，比如用户名、密码、卡号、编号或备注等字段。',
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                           height: 1.35,
@@ -1193,7 +1193,7 @@ class _TemplateEditViewState extends State<TemplateEditView> {
           heroTag: widget.initial == null
               ? 'save-template-fab-new'
               : 'save-template-fab-edit',
-          tooltip: '\u4fdd\u5b58\u6a21\u677f',
+          tooltip: '保存模板',
           icon: Icons.check,
           onPressed: _save,
         ),

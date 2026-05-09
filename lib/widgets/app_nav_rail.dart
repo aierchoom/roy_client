@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../theme/app_design_tokens.dart';
@@ -9,6 +11,7 @@ class AppNavDestination {
   final String label;
   final String? description;
   final int badgeCount;
+  final String? badgeLabel;
 
   const AppNavDestination({
     required this.icon,
@@ -16,6 +19,7 @@ class AppNavDestination {
     required this.label,
     this.description,
     this.badgeCount = 0,
+    this.badgeLabel,
   });
 }
 
@@ -161,76 +165,108 @@ class _NavItem extends StatelessWidget {
 
     return Material(
       color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(AppRadii.button),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.md,
-            vertical: AppSpacing.md,
-          ),
-          decoration: BoxDecoration(
-            color: selected
-                ? theme.colorScheme.primary.withAlpha(18)
-                : Colors.transparent,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          InkWell(
+            onTap: onTap,
             borderRadius: BorderRadius.circular(AppRadii.button),
-            border: Border.all(
-              color: selected
-                  ? theme.colorScheme.primary.withAlpha(48)
-                  : Colors.transparent,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.md,
+              ),
+              decoration: BoxDecoration(
+                color: selected
+                    ? theme.colorScheme.primary.withAlpha(18)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(AppRadii.button),
+                border: Border.all(
+                  color: selected
+                      ? theme.colorScheme.primary.withAlpha(48)
+                      : Colors.transparent,
+                ),
+              ),
+              child: Row(
+                children: [
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: selected
+                          ? theme.colorScheme.surface
+                          : theme.colorScheme.surfaceContainerHighest.withAlpha(72),
+                      borderRadius: BorderRadius.circular(AppRadii.button),
+                    ),
+                    child: NavBadgeIcon(
+                      icon: selected
+                          ? destination.selectedIcon
+                          : destination.icon,
+                      color: accentColor,
+                      badgeCount: destination.badgeCount,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          destination.label,
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            color: theme.colorScheme.onSurface,
+                            fontWeight: selected
+                                ? FontWeight.w800
+                                : FontWeight.w600,
+                          ),
+                        ),
+                        if (destination.description != null) ...[
+                          const SizedBox(height: 3),
+                          Text(
+                            destination.description!,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-          child: Row(
-            children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: selected
-                      ? theme.colorScheme.surface
-                      : theme.colorScheme.surfaceContainerHighest.withAlpha(72),
-                  borderRadius: BorderRadius.circular(AppRadii.button),
-                ),
-                child: NavBadgeIcon(
-                  icon: selected ? destination.selectedIcon : destination.icon,
-                  color: accentColor,
-                  badgeCount: destination.badgeCount,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      destination.label,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        color: theme.colorScheme.onSurface,
-                        fontWeight: selected
-                            ? FontWeight.w800
-                            : FontWeight.w600,
-                      ),
+          if (destination.badgeLabel != null)
+            Positioned(
+              top: 4,
+              right: 2,
+              child: Transform.rotate(
+                angle: math.pi / 4,
+                child: Container(
+                  width: 36,
+                  height: 14,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary,
+                  ),
+                  child: Text(
+                    destination.badgeLabel!,
+                    style: TextStyle(
+                      color: theme.colorScheme.onPrimary,
+                      fontSize: 8,
+                      fontWeight: FontWeight.w900,
+                      height: 1,
                     ),
-                    if (destination.description != null) ...[
-                      const SizedBox(height: 3),
-                      Text(
-                        destination.description!,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ],
+                  ),
                 ),
               ),
-            ],
-          ),
-        ),
+            ),
+        ],
       ),
     );
   }

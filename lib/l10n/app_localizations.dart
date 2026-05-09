@@ -331,6 +331,186 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'关闭'**
   String get btnClose;
+
+  /// No description provided for @importTemplate.
+  ///
+  /// In zh, this message translates to:
+  /// **'导入模板'**
+  String get importTemplate;
+
+  /// No description provided for @exportTemplate.
+  ///
+  /// In zh, this message translates to:
+  /// **'导出模板'**
+  String get exportTemplate;
+
+  /// No description provided for @export.
+  ///
+  /// In zh, this message translates to:
+  /// **'导出'**
+  String get export;
+
+  /// No description provided for @import.
+  ///
+  /// In zh, this message translates to:
+  /// **'导入'**
+  String get import;
+
+  /// No description provided for @importSuccess.
+  ///
+  /// In zh, this message translates to:
+  /// **'成功导入 {count} 个模板'**
+  String importSuccess(int count);
+
+  /// No description provided for @importFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'导入失败：格式无效'**
+  String get importFailed;
+
+  /// No description provided for @exportCopied.
+  ///
+  /// In zh, this message translates to:
+  /// **'已复制到剪贴板'**
+  String get exportCopied;
+
+  /// No description provided for @importHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'粘贴模板 JSON 文本'**
+  String get importHint;
+
+  /// No description provided for @batchExportTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'批量导出模板'**
+  String get batchExportTitle;
+
+  /// No description provided for @selectTemplates.
+  ///
+  /// In zh, this message translates to:
+  /// **'选择要导出的模板'**
+  String get selectTemplates;
+
+  /// No description provided for @noTemplatesToExport.
+  ///
+  /// In zh, this message translates to:
+  /// **'没有可导出的自定义模板'**
+  String get noTemplatesToExport;
+
+  /// No description provided for @noTemplatesToImport.
+  ///
+  /// In zh, this message translates to:
+  /// **'没有可导入的模板'**
+  String get noTemplatesToImport;
+
+  /// No description provided for @notificationCenter.
+  ///
+  /// In zh, this message translates to:
+  /// **'通知中心'**
+  String get notificationCenter;
+
+  /// No description provided for @notifications.
+  ///
+  /// In zh, this message translates to:
+  /// **'通知'**
+  String get notifications;
+
+  /// No description provided for @markAllRead.
+  ///
+  /// In zh, this message translates to:
+  /// **'全部已读'**
+  String get markAllRead;
+
+  /// No description provided for @noNotifications.
+  ///
+  /// In zh, this message translates to:
+  /// **'暂无通知'**
+  String get noNotifications;
+
+  /// No description provided for @noNotificationsHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'密码安全提醒会在这里显示'**
+  String get noNotificationsHint;
+
+  /// No description provided for @notificationItems.
+  ///
+  /// In zh, this message translates to:
+  /// **'条通知'**
+  String get notificationItems;
+
+  /// No description provided for @notificationUnread.
+  ///
+  /// In zh, this message translates to:
+  /// **'未读'**
+  String get notificationUnread;
+
+  /// No description provided for @passwordExpiryReminder.
+  ///
+  /// In zh, this message translates to:
+  /// **'密码过期提醒'**
+  String get passwordExpiryReminder;
+
+  /// No description provided for @passwordExpiryBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'的密码已 {days} 天未修改，建议尽快更新。'**
+  String passwordExpiryBody(int days);
+
+  /// No description provided for @notificationSettings.
+  ///
+  /// In zh, this message translates to:
+  /// **'通知设置'**
+  String get notificationSettings;
+
+  /// No description provided for @notificationSettingsSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'密码过期提醒阈值与推送'**
+  String get notificationSettingsSubtitle;
+
+  /// No description provided for @passwordExpiryDays.
+  ///
+  /// In zh, this message translates to:
+  /// **'密码过期提醒天数'**
+  String get passwordExpiryDays;
+
+  /// No description provided for @passwordExpiryDaysDesc.
+  ///
+  /// In zh, this message translates to:
+  /// **'超过此天数未修改密码时发送提醒'**
+  String get passwordExpiryDaysDesc;
+
+  /// No description provided for @pushNotification.
+  ///
+  /// In zh, this message translates to:
+  /// **'推送通知'**
+  String get pushNotification;
+
+  /// No description provided for @pushNotificationDesc.
+  ///
+  /// In zh, this message translates to:
+  /// **'每日定时检查并发送系统推送'**
+  String get pushNotificationDesc;
+
+  /// No description provided for @daysAgo.
+  ///
+  /// In zh, this message translates to:
+  /// **'{days} 天前'**
+  String daysAgo(int days);
+
+  /// No description provided for @hoursAgo.
+  ///
+  /// In zh, this message translates to:
+  /// **'{hours} 小时前'**
+  String hoursAgo(int hours);
+
+  /// No description provided for @justNow.
+  ///
+  /// In zh, this message translates to:
+  /// **'刚刚'**
+  String get justNow;
 }
 
 class _AppLocalizationsDelegate

@@ -6,7 +6,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'l10n/app_localizations.dart';
 import 'providers/enhanced_app_provider.dart';
+import 'providers/notification_provider.dart';
 import 'providers/theme_provider.dart';
+import 'services/notification_service.dart';
 import 'services/service_manager.dart';
 import 'theme/app_design_tokens.dart';
 import 'theme/app_text_styles.dart';
@@ -21,14 +23,17 @@ void main() async {
 
   final prefs = await SharedPreferences.getInstance();
   await ServiceManager.instance.initialize();
+  final notificationService = NotificationService(ServiceManager.instance.storageService);
+  await notificationService.init();
 
-  runApp(SecretRoyApp(prefs: prefs));
+  runApp(SecretRoyApp(prefs: prefs, notificationService: notificationService));
 }
 
 class SecretRoyApp extends StatefulWidget {
   final SharedPreferences prefs;
+  final NotificationService notificationService;
 
-  const SecretRoyApp({super.key, required this.prefs});
+  const SecretRoyApp({super.key, required this.prefs, required this.notificationService});
 
   @override
   State<SecretRoyApp> createState() => _SecretRoyAppState();
@@ -58,6 +63,12 @@ class _SecretRoyAppState extends State<SecretRoyApp> {
           create: (_) => EnhancedAppProvider(
             ServiceManager.instance.storageService,
             ServiceManager.instance,
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => NotificationProvider(
+            ServiceManager.instance.storageService,
+            widget.notificationService,
           ),
         ),
         ChangeNotifierProvider(create: (_) => AppThemeProvider(widget.prefs)),

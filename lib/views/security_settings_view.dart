@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../l10n/app_text_extension.dart';
 import '../services/auto_lock_service.dart';
@@ -26,19 +26,19 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
   String _durationLabel(AutoLockDuration duration) {
     switch (duration) {
       case AutoLockDuration.immediately:
-        return context.text('\u7acb\u5373', 'Immediately');
+        return context.text('立即', 'Immediately');
       case AutoLockDuration.fiveSeconds:
-        return context.text('5 \u79d2', '5 seconds');
+        return context.text('5 秒', '5 seconds');
       case AutoLockDuration.thirtySeconds:
-        return context.text('30 \u79d2', '30 seconds');
+        return context.text('30 秒', '30 seconds');
       case AutoLockDuration.oneMinute:
-        return context.text('1 \u5206\u949f', '1 minute');
+        return context.text('1 分钟', '1 minute');
       case AutoLockDuration.fiveMinutes:
-        return context.text('5 \u5206\u949f', '5 minutes');
+        return context.text('5 分钟', '5 minutes');
       case AutoLockDuration.tenMinutes:
-        return context.text('10 \u5206\u949f', '10 minutes');
+        return context.text('10 分钟', '10 minutes');
       case AutoLockDuration.never:
-        return context.text('\u4ece\u4e0d', 'Never');
+        return context.text('从不', 'Never');
     }
   }
 
@@ -77,7 +77,7 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
         SnackBar(
           content: Text(
             context.text(
-              '\u5df2\u5173\u95ed $_biometricName \u89e3\u9501',
+              '已关闭 $_biometricName 解锁',
               '$_biometricName unlock disabled',
             ),
           ),
@@ -104,7 +104,7 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
           SnackBar(
             content: Text(
               context.text(
-                '$_biometricName \u5df2\u542f\u7528',
+                '$_biometricName 已启用',
                 '$_biometricName enabled',
               ),
             ),
@@ -114,7 +114,7 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
       case BiometricSetupResult.notSupported:
         _showError(
           context.text(
-            '\u5f53\u524d\u8bbe\u5907\u4e0d\u652f\u6301 $_biometricName\u3002',
+            '当前设备不支持 $_biometricName。',
             'This device does not support $_biometricName.',
           ),
         );
@@ -122,7 +122,7 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
       case BiometricSetupResult.notEnrolled:
         _showError(
           context.text(
-            '\u8bf7\u5148\u5728\u7cfb\u7edf\u8bbe\u7f6e\u4e2d\u5f55\u5165 $_biometricName\u3002',
+            '请先在系统设置中录入 $_biometricName。',
             'Set up $_biometricName in system settings first.',
           ),
         );
@@ -132,7 +132,7 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
       case BiometricSetupResult.invalidPassword:
         _showError(
           context.text(
-            '\u4e3b\u5bc6\u7801\u4e0d\u6b63\u786e\uff0c\u65e0\u6cd5\u542f\u7528 $_biometricName\u3002',
+            '主密码不正确，无法启用 $_biometricName。',
             'Incorrect master password. Could not enable $_biometricName.',
           ),
         );
@@ -140,7 +140,7 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
       case BiometricSetupResult.lockedOut:
         _showError(
           context.text(
-            '\u751f\u7269\u8bc6\u522b\u5df2\u88ab\u4e34\u65f6\u9501\u5b9a\uff0c\u8bf7\u7a0d\u540e\u518d\u8bd5\u3002',
+            '生物识别已被临时锁定，请稍后再试。',
             'Biometrics are temporarily locked. Try again later.',
           ),
         );
@@ -148,7 +148,7 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
       case BiometricSetupResult.passcodeNotSet:
         _showError(
           context.text(
-            '\u8bf7\u5148\u4e3a\u8bbe\u5907\u8bbe\u7f6e\u9501\u5c4f\u5bc6\u7801\u3002',
+            '请先为设备设置锁屏密码。',
             'Set a device passcode before enabling biometrics.',
           ),
         );
@@ -156,7 +156,7 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
       case BiometricSetupResult.noPasswordMode:
         _showError(
           context.text(
-            '\u65e0\u5bc6\u7801\u6a21\u5f0f\u4e0b\u65e0\u6cd5\u542f\u7528\u751f\u7269\u8bc6\u522b\u3002\u8bf7\u5148\u8bbe\u7f6e\u4e3b\u5bc6\u7801\u3002',
+            '无密码模式下无法启用生物识别。请先设置主密码。',
             'Biometrics cannot be enabled in no-password mode. Please set a master password first.',
           ),
         );
@@ -164,7 +164,7 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
       case BiometricSetupResult.error:
         _showError(
           context.text(
-            '\u542f\u7528 $_biometricName \u5931\u8d25\u3002',
+            '启用 $_biometricName 失败。',
             'Failed to enable $_biometricName.',
           ),
         );
@@ -184,13 +184,13 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => AlertDialog(
-        title: Text(context.text('\u9a8c\u8bc1\u8eab\u4efd', 'Verify Identity')),
+        title: Text(context.text('验证身份', 'Verify Identity')),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
               context.text(
-                '\u8bf7\u8f93\u5165\u4e3b\u5bc6\u7801\u4ee5\u542f\u7528 $_biometricName \u89e3\u9501\u3002',
+                '请输入主密码以启用 $_biometricName 解锁。',
                 'Enter your master password to enable $_biometricName unlock.',
               ),
             ),
@@ -199,7 +199,7 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
               controller: controller,
               obscureText: true,
               decoration: InputDecoration(
-                labelText: context.text('\u4e3b\u5bc6\u7801', 'Master Password'),
+                labelText: context.text('主密码', 'Master Password'),
               ),
             ),
           ],
@@ -207,11 +207,11 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
-            child: Text(context.text('\u53d6\u6d88', 'Cancel')),
+            child: Text(context.text('取消', 'Cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.of(dialogContext).pop(controller.text),
-            child: Text(context.text('\u786e\u8ba4', 'Confirm')),
+            child: Text(context.text('确认', 'Confirm')),
           ),
         ],
       ),
@@ -271,7 +271,7 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  context.text('\u5b89\u5168\u8bbe\u7f6e', 'Security Settings'),
+                  context.text('安全设置', 'Security Settings'),
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w700,
                     color: theme.colorScheme.onPrimaryContainer,
@@ -280,7 +280,7 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
                 const SizedBox(height: 2),
                 Text(
                   context.text(
-                    '\u7edf\u4e00\u7ba1\u7406\u81ea\u52a8\u9501\u5b9a\u4e0e\u751f\u7269\u8bc6\u522b\u3002',
+                    '统一管理自动锁定与生物识别。',
                     'Manage auto lock and biometrics in one place.',
                   ),
                   style: theme.textTheme.bodySmall?.copyWith(
@@ -416,7 +416,7 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
     if (_biometricStatus == BiometricAuthStatus.notSupported) {
       return Text(
         context.text(
-          '\u5f53\u524d\u8bbe\u5907\u4e0d\u652f\u6301\u751f\u7269\u8bc6\u522b\u3002',
+          '当前设备不支持生物识别。',
           'Biometrics are not supported on this device.',
         ),
       );
@@ -425,7 +425,7 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
     if (_biometricStatus == BiometricAuthStatus.notEnrolled) {
       return Text(
         context.text(
-          '\u8bf7\u5148\u5728\u7cfb\u7edf\u8bbe\u7f6e\u91cc\u5f00\u542f $_biometricName\u3002',
+          '请先在系统设置里开启 $_biometricName。',
           'Set up $_biometricName in the operating system first.',
         ),
       );
@@ -436,13 +436,13 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
       secondary: const Icon(Icons.fingerprint),
       title: Text(
         context.text(
-          '\u4f7f\u7528 $_biometricName \u89e3\u9501',
+          '使用 $_biometricName 解锁',
           'Use $_biometricName to unlock',
         ),
       ),
       subtitle: Text(
         context.text(
-          '\u4f7f\u7528\u751f\u7269\u8bc6\u522b\u66f4\u5feb\u8bbf\u95ee\u4fdd\u9669\u5e93',
+          '使用生物识别更快访问保险库',
           'Use biometrics for faster access',
         ),
       ),
@@ -596,7 +596,7 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(context.text('\u5b89\u5168\u8bbe\u7f6e', 'Security Settings')),
+        title: Text(context.text('安全设置', 'Security Settings')),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -609,16 +609,16 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
                   _buildSectionCard(
                     context: context,
                     title: context.text(
-                      '\u4e3b\u5bc6\u7801\u7ba1\u7406',
+                      '主密码管理',
                       'Master Password',
                     ),
                     subtitle: _isNoPasswordMode
                         ? context.text(
-                            '\u60a8\u5f53\u524d\u5df2\u8df3\u8fc7\u4e3b\u5bc6\u7801\uff0c\u5efa\u8bae\u542f\u7528\u4ee5\u4fdd\u62a4\u6570\u636e\u5b89\u5168\u3002',
+                            '您当前已跳过主密码，建议启用以保护数据安全。',
                             'You currently have no master password. Enable one for better security.',
                           )
                         : context.text(
-                            '\u4fee\u6539\u60a8\u7684\u4fdd\u9669\u5e93\u4e3b\u5bc6\u7801\u3002',
+                            '修改您的保险库主密码。',
                             'Change your vault master password.',
                           ),
                     child: _buildPasswordManagementTile(context),
@@ -626,9 +626,9 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
                   const SizedBox(height: AppSpacing.lg),
                   _buildSectionCard(
                     context: context,
-                    title: context.text('\u81ea\u52a8\u9501\u5b9a', 'Auto Lock'),
+                    title: context.text('自动锁定', 'Auto Lock'),
                     subtitle: context.text(
-                      '\u8bbe\u7f6e\u5e94\u7528\u9000\u5230\u540e\u53f0\u540e\u591a\u4e45\u81ea\u52a8\u9501\u5b9a\u3002',
+                      '设置应用退到后台后多久自动锁定。',
                       'Choose how quickly the vault locks after the app leaves the foreground.',
                     ),
                     child: Column(
@@ -642,7 +642,7 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
                             context: context,
                             title: _durationLabel(AutoLockDuration.values[i]),
                             subtitle: context.text(
-                              '\u5728\u8fbe\u5230\u65f6\u95f4\u540e\u8981\u6c42\u91cd\u65b0\u89e3\u9501',
+                              '在达到时间后要求重新解锁',
                               'Require unlocking again after this delay',
                             ),
                             icon: Icons.timer_outlined,

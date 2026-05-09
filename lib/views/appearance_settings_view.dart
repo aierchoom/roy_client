@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../l10n/app_text_extension.dart';
@@ -22,7 +22,7 @@ class AppearanceSettingsView extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          context.text( '\u4e2a\u6027\u5316\u4e0e\u5916\u89c2', 'Appearance'),
+          context.text( '个性化与外观', 'Appearance'),
         ),
       ),
       body: AdaptivePage(
@@ -31,26 +31,26 @@ class AppearanceSettingsView extends StatelessWidget {
           children: [
             AppHeroCard(
               icon: Icons.palette_outlined,
-              title: context.text('\u89c6\u89c9\u4e2a\u6027\u5316',
+              title: context.text('视觉个性化',
                 'Visual Customization',
               ),
-              subtitle: context.text('\u7edf\u4e00\u8bbe\u7f6e\u4e3b\u9898\u6a21\u5f0f\u3001\u914d\u8272\u4e0e\u6df1\u8272\u7ec6\u8282\uff0c\u8ba9\u6574\u5957\u754c\u9762\u4fdd\u6301\u8212\u9002\u4e14\u6709\u8bc6\u522b\u5ea6\u3002',
+              subtitle: context.text('统一设置主题模式、配色与深色细节，让整套界面保持舒适且有识别度。',
                 'Shape theme mode, accent color, and dark-mode details in one place.',
               ),
             ),
             const SizedBox(height: AppSpacing.lg),
             SectionCard(
-              title: context.text( '\u4e3b\u9898\u6a21\u5f0f', 'Theme Mode'),
-              subtitle: context.text('\u9009\u62e9\u8ddf\u968f\u7cfb\u7edf\u3001\u56fa\u5b9a\u6d45\u8272\u6216\u56fa\u5b9a\u6df1\u8272\u3002',
+              title: context.text( '主题模式', 'Theme Mode'),
+              subtitle: context.text('选择跟随系统、固定浅色或固定深色。',
                 'Choose system, fixed light mode, or fixed dark mode.',
               ),
               child: Column(
                 children: [
                   AppOptionTile(
-                    title: context.text('\u8ddf\u968f\u7cfb\u7edf',
+                    title: context.text('跟随系统',
                       'Follow System',
                     ),
-                    subtitle: context.text('\u8ddf\u968f\u8bbe\u5907\u5f53\u524d\u7684\u6d45\u8272/\u6df1\u8272\u8bbe\u5b9a',
+                    subtitle: context.text('跟随设备当前的浅色/深色设定',
                       'Matches the current device setting',
                     ),
                     icon: Icons.brightness_auto_outlined,
@@ -59,10 +59,10 @@ class AppearanceSettingsView extends StatelessWidget {
                   ),
                   const Divider(height: 1),
                   AppOptionTile(
-                    title: context.text('\u6d45\u8272\u6a21\u5f0f',
+                    title: context.text('浅色模式',
                       'Light Mode',
                     ),
-                    subtitle: context.text('\u4f7f\u7528\u66f4\u660e\u4eae\u3001\u5e72\u51c0\u7684\u754c\u9762\u663e\u793a',
+                    subtitle: context.text('使用更明亮、干净的界面显示',
                       'Uses a brighter and cleaner interface',
                     ),
                     icon: Icons.light_mode_outlined,
@@ -71,10 +71,10 @@ class AppearanceSettingsView extends StatelessWidget {
                   ),
                   const Divider(height: 1),
                   AppOptionTile(
-                    title: context.text('\u6df1\u8272\u6a21\u5f0f',
+                    title: context.text('深色模式',
                       'Dark Mode',
                     ),
-                    subtitle: context.text('\u66f4\u9002\u5408\u591c\u95f4\u4f7f\u7528\u548c\u4f4e\u5149\u73af\u5883',
+                    subtitle: context.text('更适合夜间使用和低光环境',
                       'Better for night use and low-light environments',
                     ),
                     icon: Icons.dark_mode_outlined,
@@ -87,10 +87,10 @@ class AppearanceSettingsView extends StatelessWidget {
             const SizedBox(height: AppSpacing.lg),
             if (themeProvider.themeMode != ThemeMode.light)
               SectionCard(
-                title: context.text('\u6df1\u8272\u6a21\u5f0f\u4f18\u5316',
+                title: context.text('深色模式优化',
                   'Dark Mode Enhancement',
                 ),
-                subtitle: context.text('\u5bf9\u6df1\u8272\u6a21\u5f0f\u505a\u66f4\u8fdb\u4e00\u6b65\u7684\u663e\u793a\u7ec6\u8282\u8c03\u6574\u3002',
+                subtitle: context.text('对深色模式做更进一步的显示细节调整。',
                   'Fine-tune how the dark interface behaves.',
                 ),
                 child: SwitchListTile(
@@ -99,7 +99,7 @@ class AppearanceSettingsView extends StatelessWidget {
                     vertical: 4,
                   ),
                   title: Text(
-                    context.text('\u6781\u81f4\u9ed1 (OLED)',
+                    context.text('极致黑 (OLED)',
                       'True Black (OLED)',
                     ),
                     style: theme.textTheme.titleSmall?.copyWith(
@@ -107,7 +107,7 @@ class AppearanceSettingsView extends StatelessWidget {
                     ),
                   ),
                   subtitle: Text(
-                    context.text('\u5728\u6df1\u8272\u6a21\u5f0f\u4e0b\u4f7f\u7528\u66f4\u7eaf\u7684\u9ed1\u8272\u80cc\u666f\uff0c\u9002\u5408 OLED \u5c4f\u5e55\u3002',
+                    context.text('在深色模式下使用更纯的黑色背景，适合 OLED 屏幕。',
                       'Uses a deeper black background, especially suited to OLED displays.',
                     ),
                     style: theme.textTheme.bodySmall?.copyWith(
@@ -121,8 +121,8 @@ class AppearanceSettingsView extends StatelessWidget {
             if (themeProvider.themeMode != ThemeMode.light)
               const SizedBox(height: AppSpacing.lg),
             SectionCard(
-              title: context.text( '\u4e3b\u9898\u989c\u8272', 'Accent Color'),
-              subtitle: context.text('\u9009\u4e00\u4e2a\u4e3b\u8272\uff0c\u8ba9\u6309\u94ae\u3001\u5bfc\u822a\u548c\u72b6\u6001\u6807\u8bc6\u66f4\u6709\u6574\u4f53\u611f\u3002',
+              title: context.text( '主题颜色', 'Accent Color'),
+              subtitle: context.text('选一个主色，让按钮、导航和状态标识更有整体感。',
                 'Choose the primary color for buttons, navigation, and highlights.',
               ),
               child: Padding(

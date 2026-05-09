@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
 import '../models/account_template.dart';
@@ -8,29 +8,29 @@ import '../utils/field_presets.dart';
 String fieldTypeLabel(AccountFieldType type) {
   switch (type) {
     case AccountFieldType.text:
-      return '\u6587\u672c';
+      return '文本';
     case AccountFieldType.password:
-      return '\u5bc6\u7801';
+      return '密码';
     case AccountFieldType.number:
-      return '\u6570\u5b57';
+      return '数字';
     case AccountFieldType.email:
-      return '\u90ae\u7bb1';
+      return '邮箱';
     case AccountFieldType.phone:
-      return '\u7535\u8bdd';
+      return '电话';
     case AccountFieldType.url:
-      return '\u7f51\u5740';
+      return '网址';
     case AccountFieldType.time:
-      return '\u65f6\u95f4';
+      return '时间';
     case AccountFieldType.custom:
-      return '\u81ea\u5b9a\u4e49';
+      return '自定义';
     case AccountFieldType.accountLink:
-      return '\u5173\u8054\u8d26\u6237';
+      return '关联账户';
     case AccountFieldType.unknown:
-      return '\u672a\u77e5';
+      return '未知';
     case AccountFieldType.longText:
-      return '\u591a\u884c\u6587\u672c';
+      return '多行文本';
     case AccountFieldType.list:
-      return '\u5217\u8868';
+      return '列表';
   }
 }
 
@@ -427,7 +427,7 @@ class _FieldPresetPreviewDialogState extends State<FieldPresetPreviewDialog> {
           Expanded(
             child: Text(
               _text(
-                '\u63d2\u5165\u300c${widget.preset.name}\u300d\u5b57\u6bb5\u7ec4',
+                '插入「${widget.preset.name}」字段组',
                 'Insert "${widget.preset.name}" fields',
               ),
             ),
@@ -450,8 +450,8 @@ class _FieldPresetPreviewDialogState extends State<FieldPresetPreviewDialog> {
               ),
               label: Text(
                 allSelected
-                    ? _text('\u53d6\u6d88\u5168\u9009', 'Deselect all')
-                    : _text('\u5168\u9009', 'Select all'),
+                    ? _text('取消全选', 'Deselect all')
+                    : _text('全选', 'Select all'),
               ),
               style: TextButton.styleFrom(
                 padding: EdgeInsets.zero,
@@ -515,7 +515,7 @@ class _FieldPresetPreviewDialogState extends State<FieldPresetPreviewDialog> {
               : () => Navigator.pop(context, _selectedIndices.toList()..sort()),
           child: Text(
             _text(
-              '\u63d2\u5165 ${_selectedIndices.length} \u4e2a\u5b57\u6bb5',
+              '插入 ${_selectedIndices.length} 个字段',
               'Insert ${_selectedIndices.length} fields',
             ),
           ),

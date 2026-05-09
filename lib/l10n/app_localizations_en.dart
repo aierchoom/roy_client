@@ -129,4 +129,104 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get btnClose => 'Close';
+
+  @override
+  String get importTemplate => 'Import Template';
+
+  @override
+  String get exportTemplate => 'Export Template';
+
+  @override
+  String get export => 'Export';
+
+  @override
+  String get import => 'Import';
+
+  @override
+  String importSuccess(int count) {
+    return 'Successfully imported $count template(s)';
+  }
+
+  @override
+  String get importFailed => 'Import failed: invalid format';
+
+  @override
+  String get exportCopied => 'Copied to clipboard';
+
+  @override
+  String get importHint => 'Paste template JSON text';
+
+  @override
+  String get batchExportTitle => 'Batch Export Templates';
+
+  @override
+  String get selectTemplates => 'Select templates to export';
+
+  @override
+  String get noTemplatesToExport => 'No custom templates to export';
+
+  @override
+  String get noTemplatesToImport => 'No templates to import';
+
+  @override
+  String get notificationCenter => 'Notifications';
+
+  @override
+  String get notifications => 'Alerts';
+
+  @override
+  String get markAllRead => 'Mark all read';
+
+  @override
+  String get noNotifications => 'No notifications';
+
+  @override
+  String get noNotificationsHint =>
+      'Password security reminders will appear here';
+
+  @override
+  String get notificationItems => 'Items';
+
+  @override
+  String get notificationUnread => 'Unread';
+
+  @override
+  String get passwordExpiryReminder => 'Password Expiry Reminder';
+
+  @override
+  String passwordExpiryBody(int days) {
+    return 'has not been updated for $days day(s). Consider changing it soon.';
+  }
+
+  @override
+  String get notificationSettings => 'Notification Settings';
+
+  @override
+  String get notificationSettingsSubtitle => 'Password expiry threshold & push';
+
+  @override
+  String get passwordExpiryDays => 'Password Expiry Days';
+
+  @override
+  String get passwordExpiryDaysDesc =>
+      'Remind when password hasn\'t changed for this many days';
+
+  @override
+  String get pushNotification => 'Push Notifications';
+
+  @override
+  String get pushNotificationDesc => 'Daily check with system push';
+
+  @override
+  String daysAgo(int days) {
+    return '$days day(s) ago';
+  }
+
+  @override
+  String hoursAgo(int hours) {
+    return '$hours hour(s) ago';
+  }
+
+  @override
+  String get justNow => 'Just now';
 }

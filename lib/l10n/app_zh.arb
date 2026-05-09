@@ -54,5 +54,57 @@
     "versionNumber": "版本 1.0.0",
 
     "btnSave": "保存",
-    "btnClose": "关闭"
+    "btnClose": "关闭",
+
+    "importTemplate": "导入模板",
+    "exportTemplate": "导出模板",
+    "export": "导出",
+    "import": "导入",
+    "importSuccess": "成功导入 {count} 个模板",
+    "@importSuccess": {
+        "placeholders": {
+            "count": { "type": "int" }
+        }
+    },
+    "importFailed": "导入失败：格式无效",
+    "exportCopied": "已复制到剪贴板",
+    "importHint": "粘贴模板 JSON 文本",
+    "batchExportTitle": "批量导出模板",
+    "selectTemplates": "选择要导出的模板",
+    "noTemplatesToExport": "没有可导出的自定义模板",
+    "noTemplatesToImport": "没有可导入的模板",
+
+    "notificationCenter": "通知中心",
+    "notifications": "通知",
+    "markAllRead": "全部已读",
+    "noNotifications": "暂无通知",
+    "noNotificationsHint": "密码安全提醒会在这里显示",
+    "notificationItems": "条通知",
+    "notificationUnread": "未读",
+    "passwordExpiryReminder": "密码过期提醒",
+    "passwordExpiryBody": "的密码已 {days} 天未修改，建议尽快更新。",
+    "@passwordExpiryBody": {
+        "placeholders": {
+            "days": { "type": "int" }
+        }
+    },
+    "notificationSettings": "通知设置",
+    "notificationSettingsSubtitle": "密码过期提醒阈值与推送",
+    "passwordExpiryDays": "密码过期提醒天数",
+    "passwordExpiryDaysDesc": "超过此天数未修改密码时发送提醒",
+    "pushNotification": "推送通知",
+    "pushNotificationDesc": "每日定时检查并发送系统推送",
+    "daysAgo": "{days} 天前",
+    "@daysAgo": {
+        "placeholders": {
+            "days": { "type": "int" }
+        }
+    },
+    "hoursAgo": "{hours} 小时前",
+    "@hoursAgo": {
+        "placeholders": {
+            "hours": { "type": "int" }
+        }
+    },
+    "justNow": "刚刚"
 }

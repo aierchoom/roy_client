@@ -11,6 +11,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart' as ffi;
 
 import '../models/account_item.dart';
 import '../models/account_template.dart';
+import '../models/app_notification.dart';
 import '../models/hlc.dart';
 import '../models/local_sync_change.dart';
 import '../models/template_conflict_log.dart';
@@ -34,7 +35,7 @@ class SecureStorageService {
   static const String _databaseName = 'secret_roy_vault.db';
   static const String _encryptedDatabaseName = 'secret_roy_vault.db.enc';
   static const String _workingDatabaseName = 'secret_roy_vault.runtime.db';
-  static const int _databaseVersion = 8;
+  static const int _databaseVersion = 9;
 
   DatabaseFileCipher? _databaseCipher;
 
@@ -759,6 +760,20 @@ class SecureStorageService {
         )
       ''');
     }
+
+    if (oldVersion < 9) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS notifications (
+          id TEXT PRIMARY KEY,
+          type TEXT NOT NULL,
+          title TEXT NOT NULL,
+          body TEXT NOT NULL,
+          account_id TEXT,
+          created_at INTEGER NOT NULL,
+          is_read INTEGER DEFAULT 0
+        )
+      ''');
+    }
   }
 
   Future<void> _createTotpCredentialsTable(Database db) async {
@@ -1326,6 +1341,100 @@ class SecureStorageService {
     }
   }
 
+  // ── Notification CRUD ──────────────────────────────────────────────
+
+  Future<List<AppNotification>> loadNotifications() async {
+    if (!isOpen) return [];
+    try {
+      final rows = await _query(
+        'notifications',
+        orderBy: 'created_at DESC',
+      );
+      return rows.map((r) => AppNotification.fromRow(r)).toList();
+    } catch (e) {
+      AppLogger.d('Failed to load notifications: $e');
+      return [];
+    }
+  }
+
+  Future<void> saveNotification(AppNotification notification) async {
+    if (!isOpen) return;
+    try {
+      await _database!.insert(
+        'notifications',
+        {
+          'id': notification.id,
+          'type': notification.type.name,
+          'title': notification.title,
+          'body': notification.body,
+          'account_id': notification.accountId,
+          'created_at': notification.createdAt,
+          'is_read': notification.isRead ? 1 : 0,
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    } catch (e) {
+      AppLogger.d('Failed to save notification: $e');
+    }
+  }
+
+  Future<void> markNotificationRead(String id) async {
+    if (!isOpen) return;
+    try {
+      await _database!.update(
+        'notifications',
+        {'is_read': 1},
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+    } catch (e) {
+      AppLogger.d('Failed to mark notification read: $e');
+    }
+  }
+
+  Future<void> markAllNotificationsRead() async {
+    if (!isOpen) return;
+    try {
+      await _database!.update(
+        'notifications',
+        {'is_read': 1},
+        where: 'is_read = 0',
+      );
+    } catch (e) {
+      AppLogger.d('Failed to mark all notifications read: $e');
+    }
+  }
+
+  Future<void> deleteNotification(String id) async {
+    if (!isOpen) return;
+    try {
+      await _database!.delete('notifications', where: 'id = ?', whereArgs: [id]);
+    } catch (e) {
+      AppLogger.d('Failed to delete notification: $e');
+    }
+  }
+
+  Future<int> getUnreadNotificationCount() async {
+    if (!isOpen) return 0;
+    try {
+      final rows = await _database!.rawQuery(
+        'SELECT COUNT(*) as cnt FROM notifications WHERE is_read = 0',
+      );
+      return rows.first['cnt'] as int? ?? 0;
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  Future<void> deleteAllNotifications() async {
+    if (!isOpen) return;
+    try {
+      await _database!.delete('notifications');
+    } catch (e) {
+      AppLogger.d('Failed to delete all notifications: $e');
+    }
+  }
+
   AccountItem? _mapToAccountItem(Map<String, dynamic> row) {
     try {
       final dataStr = row['data'] as String;
@@ -1367,6 +1476,7 @@ class SecureStorageService {
         data: mapData,
         fieldMeta: fieldMeta,
         createdAt: row['created_at'] as int,
+        modifiedAt: row['modified_at'] as int? ?? row['created_at'] as int,
         nameHlc: row['name_hlc'] != null
             ? Hlc.parse(row['name_hlc'])
             : dummyHlc,

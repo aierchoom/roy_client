@@ -146,7 +146,7 @@ class EnhancedAppProvider extends ChangeNotifier {
       await _storageService.loadTotpCredentials(),
     );
     _customTemplates = List<AccountTemplate>.of(
-      await _storageService.loadAllTemplates(),
+      await _storageService.loadCustomTemplates(),
     );
     _localSyncChanges = List<LocalSyncChange>.of(
       await _serviceManager.loadOpenLocalSyncChanges(),

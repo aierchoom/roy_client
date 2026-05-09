@@ -74,7 +74,7 @@ class _AccountListTileState extends State<AccountListTile> {
           content: Text(
             widget.localeText(
               context,
-              '$label \u6682\u65e0\u53ef\u590d\u5236\u5185\u5bb9',
+              '$label 暂无可复制内容',
               'No content available to copy for $label',
             ),
           ),
@@ -104,7 +104,7 @@ class _AccountListTileState extends State<AccountListTile> {
             ),
             const SizedBox(width: 8),
             Text(
-              widget.localeText(this.context, '\u5df2\u590d\u5236', 'Copied'),
+              widget.localeText(this.context, '已复制', 'Copied'),
             ),
           ],
         ),
@@ -114,12 +114,12 @@ class _AccountListTileState extends State<AccountListTile> {
 
   String _buildCopyAllText(BuildContext context) {
     final lines = <String>[
-      '${widget.localeText(context, '\u8d26\u6237\u540d\u79f0', 'Account Name')}: ${widget.account.name}',
+      '${widget.localeText(context, '账户名称', 'Account Name')}: ${widget.account.name}',
     ];
 
     if (widget.account.email.isNotEmpty) {
       lines.add(
-        '${widget.localeText(context, '\u90ae\u7bb1', 'Email')}: ${widget.account.email}',
+        '${widget.localeText(context, '邮箱', 'Email')}: ${widget.account.email}',
       );
     }
 
@@ -168,7 +168,7 @@ class _AccountListTileState extends State<AccountListTile> {
     }
 
     addField(
-      widget.localeText(context, '\u90ae\u7bb1', 'Email'),
+      widget.localeText(context, '邮箱', 'Email'),
       widget.account.email,
       key: 'email',
       type: AccountFieldType.email,
@@ -209,10 +209,6 @@ class _AccountListTileState extends State<AccountListTile> {
     return fields;
   }
 
-  bool _hasConfiguredTotp() {
-    return widget.linkedTotpCredentialCount > 0;
-  }
-
   String _formatKeyLabel(String key) {
     final parts = key
         .split(RegExp(r'[_\s]+'))
@@ -234,9 +230,9 @@ class _AccountListTileState extends State<AccountListTile> {
         normalized.contains('time') ||
         normalized.contains('expiry') ||
         normalized.contains('deadline') ||
-        normalized.contains('\u65e5\u671f') ||
-        normalized.contains('\u65f6\u95f4') ||
-        normalized.contains('\u5230\u671f');
+        normalized.contains('日期') ||
+        normalized.contains('时间') ||
+        normalized.contains('到期');
   }
 
   IconData _iconForField({
@@ -281,23 +277,23 @@ class _AccountListTileState extends State<AccountListTile> {
         return Icons.list_outlined;
       case null:
         final lower = composite.toLowerCase();
-        if (lower.contains('email') || composite.contains('\u90ae\u7bb1')) {
+        if (lower.contains('email') || composite.contains('邮箱')) {
           return Icons.email_outlined;
         }
-        if (lower.contains('phone') || composite.contains('\u7535\u8bdd')) {
+        if (lower.contains('phone') || composite.contains('电话')) {
           return Icons.phone_outlined;
         }
         if (lower.contains('url') ||
             lower.contains('site') ||
             lower.contains('link') ||
-            composite.contains('\u7f51\u5740')) {
+            composite.contains('网址')) {
           return Icons.link_outlined;
         }
         if (lower.contains('number') ||
             lower.contains('card') ||
             lower.contains('pin') ||
-            composite.contains('\u6570\u5b57') ||
-            composite.contains('\u5361\u53f7')) {
+            composite.contains('数字') ||
+            composite.contains('卡号')) {
           return Icons.onetwothree_outlined;
         }
         return Icons.text_fields_outlined;
@@ -311,502 +307,332 @@ class _AccountListTileState extends State<AccountListTile> {
   String _maskedPreview(String value) {
     final compact = value.replaceAll(RegExp(r'[\s\-]+'), '');
     if (compact.isEmpty) return '';
-    if (compact.length <= 4) return '****';
-    final suffix = compact.length >= 4
-        ? compact.substring(compact.length - 4)
-        : compact;
-    return '**** $suffix';
+    return '••••';
   }
 
-  Widget _buildSummaryContent(BuildContext context, {int maxLines = 1}) {
-    final theme = Theme.of(context);
+  /// Build the subtitle: field labels + values (up to 3).
+  String _buildSubtitle(BuildContext context) {
     final segments = <String>[];
 
-    void addSegment(
-      String label,
-      String value, {
-      bool isSecret = false,
-      bool showLabel = true,
-    }) {
+    void addSegment(String label, String value, {bool isSecret = false}) {
       final trimmed = value.trim();
       if (trimmed.isEmpty) return;
-
       final displayValue = isSecret ? _maskedPreview(trimmed) : trimmed;
-      segments.add(showLabel ? '$label: $displayValue' : displayValue);
+      segments.add('$label: $displayValue');
     }
 
     if (widget.template != null) {
-      final primaryFields = widget.template!.fields.where(
-        (field) => field.attributes.isPrimary,
-      );
-      for (final field in primaryFields) {
-        addSegment(
-          field.label,
-          widget.account.data[field.fieldKey]?.toString() ?? '',
-          isSecret: field.attributes.isSecret,
-        );
-        if (segments.length >= 2) break;
-      }
-    }
-
-    if (segments.length < 2 && widget.account.email.isNotEmpty) {
-      addSegment(
-        widget.localeText(context, '\u90ae\u7bb1', 'Email'),
-        widget.account.email,
-        showLabel: false,
-      );
-    }
-
-    if (segments.length < 2 && widget.template != null) {
       for (final field in widget.template!.fields) {
-        if (field.attributes.isPrimary) continue;
         addSegment(
           field.label,
           widget.account.data[field.fieldKey]?.toString() ?? '',
           isSecret: field.attributes.isSecret,
         );
-        if (segments.length >= 2) break;
+        if (segments.length >= 3) break;
       }
     }
 
-    if (segments.isEmpty) {
-      return Text(
-        widget.localeText(
-          context,
-          '\u6682\u65e0\u53ef\u7528\u6458\u8981',
-          'No summary information yet',
-        ),
-        style: theme.textTheme.bodySmall?.copyWith(
-          color: theme.colorScheme.onSurfaceVariant.withAlpha(150),
-          fontStyle: FontStyle.italic,
-        ),
+    if (segments.isEmpty && widget.account.email.isNotEmpty) {
+      addSegment(
+        widget.localeText(context, '邮箱', 'Email'),
+        widget.account.email,
       );
     }
 
-    return Text(
-      segments.join('  /  '),
-      maxLines: maxLines,
-      overflow: TextOverflow.ellipsis,
-      style: theme.textTheme.bodySmall?.copyWith(
-        color: theme.colorScheme.onSurfaceVariant.withAlpha(180),
-        height: 1.3,
-      ),
-    );
+    return segments.join('  ·  ');
   }
 
-  Widget _buildMetaLine(
-    BuildContext context,
-    Color accent, {
-    required String templateName,
-    required int fieldCount,
-  }) {
+  /// Build meta info row (created at, sync status, etc.).
+  Widget _buildMetaInfo(BuildContext context, Color accent) {
     final theme = Theme.of(context);
-    final fieldLabel = widget.localeText(
-      context,
-      '$fieldCount \u4e2a\u5b57\u6bb5',
-      '$fieldCount fields',
+    final created = DateTime.fromMillisecondsSinceEpoch(
+      widget.account.createdAt,
     );
+    final dateStr =
+        '${created.year}-${created.month.toString().padLeft(2, '0')}-${created.day.toString().padLeft(2, '0')}';
+
+    final syncLabel = switch (widget.account.syncStatus) {
+      SyncStatus.synchronized => widget.localeText(context, '已同步', 'Synced'),
+      SyncStatus.pendingPush => widget.localeText(context, '待推送', 'Pending'),
+      SyncStatus.conflict => widget.localeText(context, '冲突', 'Conflict'),
+    };
+    final syncColor = switch (widget.account.syncStatus) {
+      SyncStatus.synchronized => theme.colorScheme.primary,
+      SyncStatus.pendingPush => theme.colorScheme.tertiary,
+      SyncStatus.conflict => theme.colorScheme.error,
+    };
 
     return Row(
-      mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(Icons.dashboard_customize_outlined, size: 14, color: accent),
+        Icon(Icons.schedule_outlined, size: 14, color: theme.colorScheme.onSurfaceVariant.withAlpha(150)),
         const SizedBox(width: 6),
-        Flexible(
-          child: Text(
-            '$templateName · $fieldLabel',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.labelMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant.withAlpha(190),
-              fontWeight: FontWeight.w700,
-            ),
+        Text(
+          '${widget.localeText(context, '创建于', 'Created')} $dateStr',
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant.withAlpha(150),
+          ),
+        ),
+        const SizedBox(width: 16),
+        Container(
+          width: 6,
+          height: 6,
+          decoration: BoxDecoration(
+            color: syncColor,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          syncLabel,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: syncColor.withAlpha(200),
+            fontWeight: FontWeight.w700,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildStatusChips(BuildContext context, Color accent) {
-    final theme = Theme.of(context);
-    final chips = <Widget>[];
-
-    if (widget.account.syncStatus == SyncStatus.conflict) {
-      chips.add(
-        _StatusChip(
-          icon: Icons.warning_amber_rounded,
-          label: widget.localeText(context, '\u51b2\u7a81', 'Conflict'),
-          tint: Colors.amber.shade700,
-        ),
-      );
+  /// Find the primary copyable field value for quick-copy.
+  String? _primaryCopyValue() {
+    if (widget.template != null) {
+      for (final field in widget.template!.fields) {
+        if (field.attributes.isPrimary && !field.attributes.isSecret) {
+          final v = widget.account.data[field.fieldKey]?.toString().trim();
+          if (v != null && v.isNotEmpty) return v;
+        }
+      }
     }
-
-    if (widget.hasMissingTemplate) {
-      chips.add(
-        _StatusChip(
-          icon: Icons.error_outline_rounded,
-          label: widget.localeText(
-            context,
-            '\u6a21\u677f\u7f3a\u5931',
-            'Missing Template',
-          ),
-          tint: theme.colorScheme.error,
-        ),
-      );
-    }
-
-    if (widget.legacyFieldCount > 0) {
-      chips.add(
-        _StatusChip(
-          icon: Icons.history_toggle_off_rounded,
-          label: widget.localeText(
-            context,
-            '\u5386\u53f2\u5b57\u6bb5 ${widget.legacyFieldCount}',
-            'Legacy ${widget.legacyFieldCount}',
-          ),
-          tint: accent,
-        ),
-      );
-    }
-
-    if (_hasConfiguredTotp()) {
-      chips.add(
-        _StatusChip(
-          icon: Icons.verified_user_outlined,
-          label: widget.localeText(
-            context,
-            '\u5df2\u5173\u8054 2FA',
-            '2FA enabled',
-          ),
-          tint: accent,
-        ),
-      );
-    }
-
-    if (chips.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    return Wrap(spacing: 6, runSpacing: 6, children: chips);
-  }
-
-  Widget _buildIconAction({
-    required BuildContext context,
-    required Color accent,
-    required IconData icon,
-    required String tooltip,
-    required VoidCallback onPressed,
-  }) {
-    return IconButton(
-      tooltip: tooltip,
-      onPressed: onPressed,
-      style: IconButton.styleFrom(
-        minimumSize: const Size(32, 32),
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-        side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadii.control),
-        ),
-      ),
-      icon: Icon(icon, color: accent, size: 18),
-    );
+    if (widget.account.email.isNotEmpty) return widget.account.email;
+    return null;
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final accent = _tileAccent(theme);
-    final isSearchResult = widget.density == AccountListTileDensity.search;
-    final tileRadius = isSearchResult ? AppRadii.card : 0.0;
+    final isSearch = widget.density == AccountListTileDensity.search;
     final fieldEntries = _buildFieldEntries(context);
-    final templateName =
-        widget.template?.title ??
-        widget.localeText(
-          context,
-          '\u672a\u77e5\u6a21\u677f',
-          'Unknown Template',
-        );
+    final subtitle = _buildSubtitle(context);
+    final primaryValue = _primaryCopyValue();
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 180),
-      curve: Curves.easeOutCubic,
-      decoration: const BoxDecoration(color: Colors.transparent),
-      child: Material(
-        color: isSearchResult
-            ? theme.colorScheme.surfaceContainerHighest.withAlpha(110)
-            : Colors.transparent,
-        borderRadius: BorderRadius.circular(tileRadius),
-        child: InkWell(
-          onTap: widget.onEdit,
-          onLongPress: widget.onDelete,
-          borderRadius: BorderRadius.circular(tileRadius),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(tileRadius),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: double.infinity,
-                  padding: EdgeInsets.fromLTRB(
-                    12,
-                    isSearchResult ? 12 : 10,
-                    10,
-                    4,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: widget.onEdit,
+        onLongPress: () => _showContextMenu(context),
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        child: Padding(
+          padding: EdgeInsets.all(isSearch ? AppSpacing.lg : AppSpacing.md),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Leading diamond badge
+              Transform.rotate(
+                angle: math.pi / 4,
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: AppSurfaces.soft(
+                      theme.colorScheme,
+                      tint: accent,
+                      tintAlpha: 18,
+                    ),
+                    borderRadius: BorderRadius.circular(AppRadii.button),
+                    border: Border.all(color: accent.withAlpha(AppAlphas.low)),
                   ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              widget.account.name,
-                              maxLines: isSearchResult ? 2 : 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                color: theme.colorScheme.onSurface,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            const SizedBox(height: 3),
-                            _buildSummaryContent(
-                              context,
-                              maxLines: isSearchResult ? 2 : 1,
-                            ),
-                          ],
+                  alignment: Alignment.center,
+                  child: Transform.rotate(
+                    angle: -math.pi / 4,
+                    child: Text(
+                      widget.template?.badgeText ?? '?',
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: accent,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              // Content
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      widget.account.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: theme.colorScheme.onSurface,
+                        height: 1.3,
+                      ),
+                    ),
+                    if (subtitle.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant
+                              .withAlpha(AppAlphas.emphasis),
+                          height: 1.35,
                         ),
                       ),
                     ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              // Actions
+              if (primaryValue != null)
+                IconButton(
+                  tooltip: widget.localeText(context, '复制', 'Copy'),
+                  onPressed: () => _copyValue(
+                    context,
+                    widget.localeText(context, '主要字段', 'Primary'),
+                    primaryValue,
+                  ),
+                  style: IconButton.styleFrom(
+                    minimumSize: const Size(36, 36),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppRadii.control),
+                    ),
+                  ),
+                  icon: Icon(
+                    Icons.copy_outlined,
+                    size: 18,
+                    color: theme.colorScheme.onSurfaceVariant
+                        .withAlpha(AppAlphas.medium),
                   ),
                 ),
-                Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    12,
-                    0,
-                    10,
-                    isSearchResult ? 12 : 10,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildMetaLine(
-                                  context,
-                                  accent,
-                                  templateName: templateName,
-                                  fieldCount: fieldEntries.length,
-                                ),
-                                Builder(
-                                  builder: (context) {
-                                    final status = _buildStatusChips(
-                                      context,
-                                      accent,
-                                    );
-                                    if (status is SizedBox) {
-                                      return const SizedBox.shrink();
-                                    }
-                                    return Padding(
-                                      padding: const EdgeInsets.only(top: 6),
-                                      child: status,
-                                    );
-                                  },
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          _buildIconAction(
-                            context: context,
-                            accent: accent,
-                            icon: _isExpanded
-                                ? Icons.keyboard_arrow_up_rounded
-                                : Icons.keyboard_arrow_down_rounded,
-                            tooltip: widget.localeText(
-                              context,
-                              '\u5207\u6362\u8be6\u60c5',
-                              'Toggle details',
-                            ),
-                            onPressed: _toggleExpanded,
-                          ),
-                          const SizedBox(width: 2),
-                          PopupMenuButton<String>(
-                            tooltip: widget.localeText(
-                              context,
-                              '\u64cd\u4f5c',
-                              'Options',
-                            ),
-                            onSelected: (value) {
-                              if (value == 'edit') {
-                                widget.onEdit();
-                              } else if (value == 'copy_all') {
-                                _copyValue(
-                                  context,
-                                  widget.localeText(
-                                    context,
-                                    '\u5168\u90e8\u4fe1\u606f',
-                                    'All Information',
-                                  ),
-                                  _buildCopyAllText(context),
-                                );
-                              } else if (value == 'delete') {
-                                widget.onDelete();
-                              }
-                            },
-                            itemBuilder: (context) => [
-                              PopupMenuItem(
-                                value: 'edit',
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.edit_outlined, size: 18),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      widget.localeText(
-                                        context,
-                                        '\u7f16\u8f91',
-                                        'Edit',
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              PopupMenuItem(
-                                value: 'copy_all',
-                                child: Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.copy_all_outlined,
-                                      size: 18,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      widget.localeText(
-                                        context,
-                                        '\u590d\u5236\u5168\u90e8',
-                                        'Copy all',
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              PopupMenuItem(
-                                value: 'delete',
-                                child: Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.delete_outline,
-                                      size: 18,
-                                      color: Colors.red,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      widget.localeText(
-                                        context,
-                                        '\u5220\u9664',
-                                        'Delete',
-                                      ),
-                                      style: const TextStyle(color: Colors.red),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                            padding: EdgeInsets.zero,
-                            icon: Container(
-                              width: 32,
-                              height: 32,
-                              decoration: BoxDecoration(
-                                color:
-                                    theme.colorScheme.surfaceContainerHighest,
-                                borderRadius: BorderRadius.circular(
-                                  AppRadii.control,
-                                ),
-                                border: Border.all(
-                                  color: theme.colorScheme.outlineVariant,
-                                ),
-                              ),
-                              alignment: Alignment.center,
-                              child: Icon(
-                                Icons.more_horiz_rounded,
-                                color: theme.colorScheme.onSurfaceVariant,
-                                size: 18,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (_isExpanded && fieldEntries.isNotEmpty) ...[
-                        const SizedBox(height: 10),
-                        Container(
-                          padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.surfaceContainerHighest
-                                .withAlpha(80),
-                            borderRadius: BorderRadius.circular(
-                              AppRadii.control,
-                            ),
-                            border: Border.all(
-                              color: theme.colorScheme.outlineVariant,
-                            ),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                widget.localeText(
-                                  context,
-                                  '\u8be6\u7ec6\u5b57\u6bb5',
-                                  'Field Details',
-                                ),
-                                style: theme.textTheme.labelMedium?.copyWith(
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              for (var i = 0; i < fieldEntries.length; i++)
-                                Padding(
-                                  padding: EdgeInsets.only(
-                                    bottom: i == fieldEntries.length - 1
-                                        ? 0
-                                        : 8,
-                                  ),
-                                  child: AccountFieldRow(
-                                    label: fieldEntries[i].label,
-                                    value: fieldEntries[i].value,
-                                    isSecret: fieldEntries[i].isSecret,
-                                    canCopy: fieldEntries[i].canCopy,
-                                    icon: fieldEntries[i].icon,
-                                    accent: accent,
-                                    onCopy: () => _copyValue(
-                                      context,
-                                      fieldEntries[i].label,
-                                      fieldEntries[i].value,
-                                    ),
-                                    copyTooltip: widget.localeText(
-                                      context,
-                                      '\u590d\u5236 ${fieldEntries[i].label}',
-                                      'Copy ${fieldEntries[i].label}',
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ],
+              IconButton(
+                tooltip: widget.localeText(context, '详情', 'Details'),
+                onPressed: _toggleExpanded,
+                style: IconButton.styleFrom(
+                  minimumSize: const Size(36, 36),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppRadii.control),
                   ),
                 ),
-              ],
-            ),
+                icon: AnimatedRotation(
+                  duration: const Duration(milliseconds: 200),
+                  turns: _isExpanded ? 0.5 : 0,
+                  child: Icon(
+                    Icons.expand_more_rounded,
+                    size: 22,
+                    color: theme.colorScheme.onSurfaceVariant
+                        .withAlpha(AppAlphas.medium),
+                  ),
+                ),
+              ),
+            ],
           ),
+          // Expanded detail fields
+          if (_isExpanded && fieldEntries.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.md),
+            Container(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              decoration: BoxDecoration(
+                color: AppSurfaces.soft(theme.colorScheme, tint: accent, tintAlpha: 8),
+                borderRadius: BorderRadius.circular(AppRadii.control),
+                border: Border.all(
+                  color: theme.colorScheme.outlineVariant.withAlpha(AppAlphas.subtle),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (var i = 0; i < fieldEntries.length; i++)
+                    Padding(
+                      padding: EdgeInsets.only(
+                        bottom: i == fieldEntries.length - 1 ? 0 : AppSpacing.sm,
+                      ),
+                      child: AccountFieldRow(
+                        label: fieldEntries[i].label,
+                        value: fieldEntries[i].value,
+                        isSecret: fieldEntries[i].isSecret,
+                        canCopy: fieldEntries[i].canCopy,
+                        icon: fieldEntries[i].icon,
+                        accent: accent,
+                        onCopy: () => _copyValue(
+                          context,
+                          fieldEntries[i].label,
+                          fieldEntries[i].value,
+                        ),
+                        copyTooltip: widget.localeText(
+                          context,
+                          '复制 ${fieldEntries[i].label}',
+                          'Copy ${fieldEntries[i].label}',
+                        ),
+                      ),
+                    ),
+                  const Divider(height: AppSpacing.xl),
+                  _buildMetaInfo(context, accent),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    ),
+      ),
+    );
+  }
+
+  void _showContextMenu(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: Text(widget.localeText(context, '编辑', 'Edit')),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                widget.onEdit();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.copy_all_outlined),
+              title: Text(widget.localeText(context, '复制全部', 'Copy all')),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _copyValue(
+                  context,
+                  widget.localeText(context, '全部信息', 'All Information'),
+                  _buildCopyAllText(context),
+                );
+              },
+            ),
+            ListTile(
+              leading: Icon(
+                Icons.delete_outline,
+                color: Theme.of(context).colorScheme.error,
+              ),
+              title: Text(
+                widget.localeText(context, '删除', 'Delete'),
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                widget.onDelete();
+              },
+            ),
+          ],
         ),
       ),
     );
@@ -877,7 +703,7 @@ class AccountFieldRowBody extends StatefulWidget {
 }
 
 class _AccountFieldRowBodyState extends State<AccountFieldRowBody> {
-  bool _isRevealed = false;
+  bool _isRevealed = true;
 
   String _maskSecret(String value) {
     final length = value.length;
@@ -963,54 +789,6 @@ class _AccountFieldRowBodyState extends State<AccountFieldRowBody> {
                 color: widget.accent.withAlpha(190),
               ),
             ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StatusChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color tint;
-
-  const _StatusChip({
-    required this.icon,
-    required this.label,
-    required this.tint,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: tint.withAlpha(16),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: tint.withAlpha(40)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 13, color: tint),
-          const SizedBox(width: 6),
-          ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: math.max(
-                88,
-                math.min(MediaQuery.sizeOf(context).width - 96, 240),
-              ),
-            ),
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: tint,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
         ],
       ),
     );

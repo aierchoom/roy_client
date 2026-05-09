@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../l10n/app_text_extension.dart';
 import '../services/service_manager.dart';
@@ -156,18 +156,18 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
     final score = _strengthScore;
     if (Localizations.localeOf(context).languageCode == 'zh') {
       if (score >= ServiceManager.passwordStrengthThresholdVeryStrong) {
-        return '\u975e\u5e38\u5f3a';
+        return '非常强';
       }
       if (score >= ServiceManager.passwordStrengthThresholdStrong) {
-        return '\u5f3a';
+        return '强';
       }
       if (score >= ServiceManager.passwordStrengthThresholdMedium) {
-        return '\u4e2d\u7b49';
+        return '中等';
       }
       if (score >= ServiceManager.passwordStrengthThresholdWeak) {
-        return '\u5f31';
+        return '弱';
       }
-      return '\u5f88\u5f31';
+      return '很弱';
     }
     return ServiceManager.getPasswordStrengthLevel(score);
   }
@@ -204,7 +204,7 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
         SnackBar(
           content: Text(
             context.text(
-              '\u81f3\u5c11\u4fdd\u7559\u4e00\u79cd\u5b57\u7b26\u7c7b\u578b',
+              '至少保留一种字符类型',
               'Keep at least one character type enabled',
             ),
           ),
@@ -241,7 +241,7 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          context.text('\u5bc6\u7801\u5df2\u590d\u5236', 'Password copied'),
+          context.text('密码已复制', 'Password copied'),
         ),
       ),
     );
@@ -270,7 +270,7 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
           children: [
             Text(
               widget.title ??
-                  context.text('\u5bc6\u7801\u751f\u6210\u5668', 'Password Generator'),
+                  context.text('密码生成器', 'Password Generator'),
               style: theme.textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.w800,
               ),
@@ -279,7 +279,7 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
             Text(
               widget.subtitle ??
                   context.text(
-                    '\u50cf 1Password \u4e00\u6837\u81ea\u5b9a\u4e49\u957f\u5ea6\u548c\u5b57\u7b26\u7c7b\u578b\uff0c\u7136\u540e\u4e00\u952e\u5e94\u7528\u3002',
+                    '像 1Password 一样自定义长度和字符类型，然后一键应用。',
                     'Tune length and character types, then apply the result in one tap.',
                   ),
               style: theme.textTheme.bodyMedium?.copyWith(
@@ -322,7 +322,7 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
                       FilledButton.tonalIcon(
                         onPressed: _regenerate,
                         icon: const Icon(Icons.refresh_rounded),
-                        label: Text(context.text('\u91cd\u6765', 'Refresh')),
+                        label: Text(context.text('重来', 'Refresh')),
                       ),
                     ],
                   ),
@@ -334,7 +334,7 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              context.text('\u5f3a\u5ea6', 'Strength'),
+                              context.text('强度', 'Strength'),
                               style: theme.textTheme.labelLarge?.copyWith(
                                 color: theme.colorScheme.onPrimaryContainer
                                     .withAlpha(170),
@@ -394,7 +394,7 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
                     Row(
                       children: [
                         Text(
-                          context.text('\u957f\u5ea6', 'Length'),
+                          context.text('长度', 'Length'),
                           style: theme.textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.w700,
                           ),
@@ -438,7 +438,7 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
                         padding: const EdgeInsets.only(top: 12),
                         child: Text(
                           context.text(
-                            '\u5f53\u524d\u5b57\u6bb5\u957f\u5ea6\u56fa\u5b9a\u4e3a $_length \u4f4d\u3002',
+                            '当前字段长度固定为 $_length 位。',
                             'This field is fixed at $_length characters.',
                           ),
                           style: theme.textTheme.bodySmall?.copyWith(
@@ -449,7 +449,7 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
                     const SizedBox(height: 8),
                     Text(
                       context.text(
-                        '\u5efa\u8bae\u81f3\u5c11 16 \u4f4d\uff0c\u4e14\u5305\u542b\u591a\u4e2a\u5b57\u7b26\u7c7b\u578b\u3002',
+                        '建议至少 16 位，且包含多个字符类型。',
                         'A length of 16+ with mixed character types is recommended.',
                       ),
                       style: theme.textTheme.bodySmall?.copyWith(
@@ -468,7 +468,7 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
                 child: Column(
                   children: [
                     _OptionTile(
-                      title: context.text('\u5927\u5199\u5b57\u6bcd', 'Uppercase'),
+                      title: context.text('大写字母', 'Uppercase'),
                       subtitle: 'A-Z',
                       value: _includeUppercase,
                       onChanged: (_) => _toggleOption(
@@ -477,7 +477,7 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
                       ),
                     ),
                     _OptionTile(
-                      title: context.text('\u5c0f\u5199\u5b57\u6bcd', 'Lowercase'),
+                      title: context.text('小写字母', 'Lowercase'),
                       subtitle: 'a-z',
                       value: _includeLowercase,
                       onChanged: (_) => _toggleOption(
@@ -486,7 +486,7 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
                       ),
                     ),
                     _OptionTile(
-                      title: context.text('\u6570\u5b57', 'Numbers'),
+                      title: context.text('数字', 'Numbers'),
                       subtitle: '0-9',
                       value: _includeNumbers,
                       onChanged: (_) => _toggleOption(
@@ -495,7 +495,7 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
                       ),
                     ),
                     _OptionTile(
-                      title: context.text('\u7b26\u53f7', 'Symbols'),
+                      title: context.text('符号', 'Symbols'),
                       subtitle: '!@#\$%',
                       value: _includeSpecial,
                       onChanged: (_) => _toggleOption(
@@ -514,7 +514,7 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
                   child: OutlinedButton.icon(
                     onPressed: _copyPassword,
                     icon: const Icon(Icons.content_copy_outlined),
-                    label: Text(context.text('\u590d\u5236', 'Copy')),
+                    label: Text(context.text('复制', 'Copy')),
                   ),
                 ),
                 if (widget.showApplyAction) ...[
@@ -532,7 +532,7 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
                       icon: const Icon(Icons.check_rounded),
                       label: Text(
                         widget.applyLabel ??
-                            context.text('\u4f7f\u7528\u5bc6\u7801', 'Use Password'),
+                            context.text('使用密码', 'Use Password'),
                       ),
                     ),
                   ),

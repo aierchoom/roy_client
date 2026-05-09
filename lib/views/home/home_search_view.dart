@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
@@ -12,8 +12,6 @@ import '../../widgets/adaptive_page.dart';
 import '../accounts/account_edit_view.dart';
 import '../../widgets/account_list_tile.dart';
 import '../../widgets/app_selectable_scrollable.dart';
-import '../conflict_inbox_view.dart';
-import '../sync/local_sync_queue_view.dart';
 
 class _FocusSearchIntent extends Intent {
   const _FocusSearchIntent();
@@ -88,22 +86,22 @@ class _HomeSearchViewState extends State<HomeSearchView> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(context.text('\u5220\u9664\u8d26\u6237', 'Delete Account')),
+        title: Text(context.text('删除账户', 'Delete Account')),
         content: Text(
           context.text(
-            '\u786e\u5b9a\u8981\u5220\u9664\u201c${account.name}\u201d\u5417\uff1f\u6b64\u64cd\u4f5c\u4e0d\u53ef\u64a4\u9500\u3002',
+            '确定要删除“${account.name}”吗？此操作不可撤销。',
             'Are you sure you want to delete "${account.name}"? This action cannot be undone.',
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text(context.text('\u53d6\u6d88', 'Cancel')),
+            child: Text(context.text('取消', 'Cancel')),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: Text(context.text('\u5220\u9664', 'Delete')),
+            child: Text(context.text('删除', 'Delete')),
           ),
         ],
       ),
@@ -156,15 +154,15 @@ class _HomeSearchViewState extends State<HomeSearchView> {
 
     String label;
     if (activeTemplateIds.isEmpty) {
-      label = context.text('\u5168\u90e8\u6a21\u677f', 'All Templates');
+      label = context.text('全部模板', 'All Templates');
     } else if (activeTemplateIds.length == 1) {
       final id = activeTemplateIds.first;
       label =
           _templateTitleById(templates, id) ??
-          context.text('\u5168\u90e8\u6a21\u677f', 'All Templates');
+          context.text('全部模板', 'All Templates');
     } else {
       label = context.text(
-        '\u5df2\u9009 ${activeTemplateIds.length} \u4e2a\u6a21\u677f',
+        '已选 ${activeTemplateIds.length} 个模板',
         '${activeTemplateIds.length} templates selected',
       );
     }
@@ -234,7 +232,7 @@ class _HomeSearchViewState extends State<HomeSearchView> {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
           child: Text(
-            context.text('\u9009\u62e9\u6a21\u677f', 'Filter by Templates'),
+            context.text('选择模板', 'Filter by Templates'),
             style: theme.textTheme.labelMedium?.copyWith(
               color: theme.colorScheme.primary,
               fontWeight: FontWeight.bold,
@@ -245,7 +243,7 @@ class _HomeSearchViewState extends State<HomeSearchView> {
           closeOnActivate: false,
           onPressed: () => setState(() => _selectedTemplateIds.clear()),
           leadingIcon: const Icon(Icons.all_inclusive, size: 20),
-          child: Text(context.text('\u5168\u90e8\u6a21\u677f', 'All Templates')),
+          child: Text(context.text('全部模板', 'All Templates')),
         ),
         const PopupMenuDivider(),
         ...templates.map((t) {
@@ -284,7 +282,6 @@ class _HomeSearchViewState extends State<HomeSearchView> {
     BuildContext context,
     EnhancedAppProvider provider,
     List<AccountItem> results,
-    VoidCallback onOpenConflicts,
   ) {
     final theme = Theme.of(context);
 
@@ -320,7 +317,7 @@ class _HomeSearchViewState extends State<HomeSearchView> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      context.text('\u641c\u7d22', 'Search'),
+                      context.text('搜索', 'Search'),
                       style: theme.textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.w700,
                         color: theme.colorScheme.onSurface,
@@ -329,7 +326,7 @@ class _HomeSearchViewState extends State<HomeSearchView> {
                     const SizedBox(height: AppSpacing.xs),
                     Text(
                       context.text(
-                        '\u4ece\u8fd9\u91cc\u6309\u5173\u952e\u5b57\u548c\u6a21\u677f\u76f4\u63a5\u5b9a\u4f4d\u8d26\u6237\u3002',
+                        '从这里按关键字和模板直接定位账户。',
                         'Find accounts here by keywords and templates.',
                       ),
                       style: theme.textTheme.bodyMedium?.copyWith(
@@ -348,41 +345,18 @@ class _HomeSearchViewState extends State<HomeSearchView> {
             children: [
               _QuickBadge(
                 label: context.text(
-                  '\u5171 ${provider.allAccounts.length} \u6761\u8d26\u6237',
+                  '共 ${provider.allAccounts.length} 条账户',
                   '${provider.allAccounts.length} accounts',
                 ),
               ),
               _QuickBadge(
                 label: context.text(
-                  '\u5f53\u524d\u7ed3\u679c ${results.length} \u6761',
+                  '当前结果 ${results.length} 条',
                   '${results.length} results now',
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 18),
-          // ── Conflict Alert Banner (only shown when conflicts exist) ──
-          if (provider.conflictCount > 0) ...[
-            const SizedBox(height: 10),
-            _ConflictAlertBanner(
-              count: provider.conflictCount,
-              onTap: onOpenConflicts,
-              textBuilder: (zh, en) => context.text(zh, en),
-            ),
-          ],
-          if (provider.localSyncChanges.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            _LocalSyncAlertBanner(
-              count: provider.localSyncChanges.length,
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const LocalSyncQueueView()),
-                );
-              },
-              textBuilder: (zh, en) => context.text(zh, en),
-            ),
-          ],
           const SizedBox(height: 18),
           Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -398,7 +372,7 @@ class _HomeSearchViewState extends State<HomeSearchView> {
                 onChanged: (_) => setState(() {}),
                 leading: const Icon(Icons.search),
                 hintText: context.text(
-                  '\u641c\u7d22\u8d26\u6237...',
+                  '搜索账户...',
                   'Search accounts...',
                 ),
                 elevation: const WidgetStatePropertyAll<double>(0),
@@ -450,7 +424,7 @@ class _HomeSearchViewState extends State<HomeSearchView> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              context.text('\u6700\u8fd1\u4f7f\u7528', 'Recently Used'),
+              context.text('最近使用', 'Recently Used'),
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w700,
               ),
@@ -459,11 +433,11 @@ class _HomeSearchViewState extends State<HomeSearchView> {
             Text(
               _query.isEmpty && activeTemplateIds.isEmpty
                   ? context.text(
-                      '\u672a\u8f93\u5165\u5173\u952e\u5b57\u65f6\uff0c\u9ed8\u8ba4\u663e\u793a\u6700\u8fd1 6 \u6761\u8d26\u6237\u3002',
+                      '未输入关键字时，默认显示最近 6 条账户。',
                       'When no keyword is entered, the latest 6 accounts are shown.',
                     )
                   : context.text(
-                      '\u5f53\u524d\u5339\u914d ${results.length} \u6761\u7ed3\u679c\u3002',
+                      '当前匹配 ${results.length} 条结果。',
                       '${results.length} results match the current filters.',
                     ),
               style: theme.textTheme.bodySmall?.copyWith(
@@ -475,11 +449,11 @@ class _HomeSearchViewState extends State<HomeSearchView> {
               child: results.isEmpty
                   ? _SearchEmptyState(
                       title: context.text(
-                        '\u6ca1\u6709\u627e\u5230\u5339\u914d\u9879',
+                        '没有找到匹配项',
                         'No matching accounts',
                       ),
                       subtitle: context.text(
-                        '\u8bd5\u8bd5\u5207\u6362\u6a21\u677f\u6216\u66f4\u6362\u5173\u952e\u5b57\u518d\u641c\u4e00\u6b21\u3002',
+                        '试试切换模板或更换关键字再搜一次。',
                         'Try another template or keyword.',
                       ),
                     )
@@ -564,14 +538,7 @@ class _HomeSearchViewState extends State<HomeSearchView> {
                   AdaptiveSection(
                     maxWidth: AppSectionWidths.hero,
                     alignment: Alignment.center,
-                    child: _buildHeroCard(context, provider, results, () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const ConflictInboxView(),
-                        ),
-                      );
-                    }),
+                    child: _buildHeroCard(context, provider, results),
                   ),
                   const SizedBox(height: 18),
                   if (_query.isNotEmpty)
@@ -618,185 +585,6 @@ class _QuickBadge extends StatelessWidget {
         style: theme.textTheme.labelMedium?.copyWith(
           color: theme.colorScheme.onPrimaryContainer,
           fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
-}
-
-class _ConflictAlertBanner extends StatelessWidget {
-  final int count;
-  final VoidCallback onTap;
-  final String Function(String zh, String en) textBuilder;
-
-  const _ConflictAlertBanner({
-    required this.count,
-    required this.onTap,
-    required this.textBuilder,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(AppRadii.panel),
-        child: Ink(
-          decoration: BoxDecoration(
-            color: theme.colorScheme.errorContainer,
-            borderRadius: BorderRadius.circular(AppRadii.panel),
-            border: Border.all(
-              color: theme.colorScheme.error.withAlpha(AppAlphas.high),
-            ),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(AppSpacing.sm),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withAlpha(AppAlphas.low),
-                    borderRadius: BorderRadius.circular(AppRadii.button),
-                  ),
-                  child: Badge(
-                    label: Text('$count'),
-                    backgroundColor: Colors.white,
-                    textColor: theme.colorScheme.error,
-                    child: Icon(
-                      Icons.merge_type_outlined,
-                      color: theme.colorScheme.error,
-                      size: 20,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        textBuilder(
-                          '发现 $count 个同步冲突',
-                          '$count sync conflict(s) detected',
-                        ),
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          color: theme.colorScheme.onErrorContainer,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        textBuilder(
-                          '点击查看并手动解决冲突字段',
-                          'Tap to review and resolve field conflicts',
-                        ),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onErrorContainer.withAlpha(
-                            190,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  color: theme.colorScheme.error,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _LocalSyncAlertBanner extends StatelessWidget {
-  final int count;
-  final VoidCallback onTap;
-  final String Function(String zh, String en) textBuilder;
-
-  const _LocalSyncAlertBanner({
-    required this.count,
-    required this.onTap,
-    required this.textBuilder,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(AppRadii.panel),
-        child: Ink(
-          decoration: BoxDecoration(
-            color: theme.colorScheme.primaryContainer.withAlpha(96),
-            borderRadius: BorderRadius.circular(AppRadii.panel),
-            border: Border.all(color: theme.colorScheme.primary.withAlpha(70)),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(AppSpacing.sm),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withAlpha(AppAlphas.low),
-                    borderRadius: BorderRadius.circular(AppRadii.button),
-                  ),
-                  child: Badge(
-                    label: Text('$count'),
-                    backgroundColor: theme.colorScheme.primary,
-                    textColor: theme.colorScheme.onPrimary,
-                    child: Icon(
-                      Icons.outbox_rounded,
-                      color: theme.colorScheme.primary,
-                      size: 20,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        textBuilder(
-                          '$count 项待同步变更',
-                          '$count change(s) waiting to sync',
-                        ),
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          color: theme.colorScheme.onPrimaryContainer,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        textBuilder('点击进入审阅并推送', 'Tap to review and push'),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onPrimaryContainer.withAlpha(
-                            190,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  color: theme.colorScheme.primary,
-                ),
-              ],
-            ),
-          ),
         ),
       ),
     );

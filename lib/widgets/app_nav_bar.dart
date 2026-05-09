@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../theme/app_design_tokens.dart';
@@ -86,41 +88,75 @@ class _NavItem extends StatelessWidget {
     return Expanded(
       child: Material(
         color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(AppRadii.button),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 18,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: selected
-                      ? theme.colorScheme.primary.withAlpha(18)
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(AppRadii.button),
-                ),
-                child: NavBadgeIcon(
-                  icon: selected ? destination.selectedIcon : destination.icon,
-                  color: color,
-                  badgeCount: destination.badgeCount,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(AppRadii.button),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: selected
+                          ? theme.colorScheme.primary.withAlpha(18)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(AppRadii.button),
+                    ),
+                    child: NavBadgeIcon(
+                      icon: selected
+                          ? destination.selectedIcon
+                          : destination.icon,
+                      color: color,
+                      badgeCount: destination.badgeCount,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    destination.label,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: color,
+                      fontWeight: selected
+                          ? FontWeight.w700
+                          : FontWeight.w500,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (destination.badgeLabel != null)
+              Positioned(
+                top: 2,
+                right: -2,
+                child: Transform.rotate(
+                  angle: math.pi / 4,
+                  child: Container(
+                    width: 32,
+                    height: 12,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary,
+                    ),
+                    child: Text(
+                      destination.badgeLabel!,
+                      style: TextStyle(
+                        color: theme.colorScheme.onPrimary,
+                        fontSize: 7,
+                        fontWeight: FontWeight.w900,
+                        height: 1,
+                      ),
+                    ),
+                  ),
                 ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                destination.label,
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: color,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                  fontSize: 11,
-                ),
-              ),
-            ],
-          ),
+          ],
         ),
       ),
     );

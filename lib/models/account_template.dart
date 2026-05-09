@@ -1,3 +1,5 @@
+﻿import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 import '../utils/template_icons.dart';
@@ -338,6 +340,16 @@ class AccountField {
     };
   }
 
+  Map<String, dynamic> toExportJson() {
+    return {
+      'fieldKey': fieldKey,
+      'label': label,
+      'description': description,
+      'attributes': attributes.toJson(),
+      'order': order,
+    };
+  }
+
   AccountField copyWith({
     String? fieldKey,
     String? label,
@@ -462,7 +474,20 @@ class AccountTemplate {
     };
   }
 
+  Map<String, dynamic> toExportJson() {
+    return {
+      'templateId': templateId,
+      'version': version,
+      'title': title,
+      'subtitle': subTitle,
+      'icon': iconCodePoint,
+      'category': category.name,
+      'fields': fields.map((f) => f.toExportJson()).toList(),
+    };
+  }
+
   AccountTemplate copyWith({
+    String? templateId,
     int? version,
     String? title,
     String? subTitle,
@@ -477,7 +502,7 @@ class AccountTemplate {
     Hlc? deleteHlc,
   }) {
     return AccountTemplate(
-      templateId: templateId,
+      templateId: templateId ?? this.templateId,
       version: version ?? this.version,
       title: title ?? this.title,
       subTitle: subTitle ?? this.subTitle,
@@ -499,22 +524,22 @@ final _builtinZeroHlc = Hlc.zero('builtin');
 final AccountTemplate secureNoteGenericTemplate = AccountTemplate(
   templateId: 'builtin_secure_note',
   version: 1,
-  title: '\u901a\u7528\u5b89\u5168\u7b14\u8bb0',
+  title: '通用安全笔记',
   subTitle:
-      '\u5b58\u50a8\u52a9\u8bb0\u8bcd\u3001API Key\u3001\u79c1\u94a5\u7b49\u654f\u611f\u6587\u672c',
+      '存储助记词、API Key、私钥等敏感文本',
   iconCodePoint: Icons.note_outlined.codePoint,
   category: TemplateCategory.note,
   fields: [
     AccountField(
       fieldKey: 'content',
-      label: '\u5185\u5bb9',
+      label: '内容',
       description:
-          '\u591a\u884c\u52a0\u5bc6\u6587\u672c\uff0c\u9ed8\u8ba4\u6298\u53e0\u663e\u793a\u3002',
+          '多行加密文本，默认折叠显示。',
       attributes: AccountFieldAttributes(
         type: AccountFieldType.longText,
         isRequired: true,
         isSecret: true,
-        hint: '\u7c98\u8d34\u6216\u8f93\u5165\u654f\u611f\u5185\u5bb9...',
+        hint: '粘贴或输入敏感内容...',
       ),
       order: 0,
       labelHlc: _builtinZeroHlc,
@@ -528,16 +553,16 @@ final AccountTemplate secureNoteGenericTemplate = AccountTemplate(
 final AccountTemplate secureNoteMnemonicTemplate = AccountTemplate(
   templateId: 'builtin_mnemonic',
   version: 1,
-  title: '\u52a9\u8bb0\u8bcd',
-  subTitle: '\u52a0\u5bc6\u5b58\u50a8 12/24 \u4e2a\u5b5d\u590d\u8bcd',
+  title: '助记词',
+  subTitle: '加密存储 12/24 个孝复词',
   iconCodePoint: Icons.vpn_key_outlined.codePoint,
   category: TemplateCategory.note,
   fields: [
     AccountField(
       fieldKey: 'mnemonic_words',
-      label: '\u52a9\u8bb0\u8bcd',
+      label: '助记词',
       description:
-          '\u652f\u6301\u6574\u6bb5\u7c98\u8d34\u81ea\u52a8\u5206\u8bcd\uff0c\u9ed8\u8ba4\u6298\u53e0\u9690\u85cf\u3002',
+          '支持整段粘贴自动分词，默认折叠隐藏。',
       attributes: AccountFieldAttributes(
         type: AccountFieldType.list,
         isRequired: true,
@@ -557,14 +582,14 @@ final AccountTemplate secureNoteMnemonicTemplate = AccountTemplate(
 final AccountTemplate apiServiceTemplate = AccountTemplate(
   templateId: 'builtin_api_service',
   version: 1,
-  title: 'API \u670d\u52a1',
-  subTitle: '\u5b58\u50a8 API Key\u3001Token \u548c\u7aef\u70b9\u4fe1\u606f',
+  title: 'API 服务',
+  subTitle: '存储 API Key、Token 和端点信息',
   iconCodePoint: Icons.code_outlined.codePoint,
   category: TemplateCategory.note,
   fields: [
     AccountField(
       fieldKey: 'service_name',
-      label: '\u670d\u52a1\u540d\u79f0',
+      label: '服务名称',
       attributes: AccountFieldAttributes(
         type: AccountFieldType.text,
         isPrimary: true,
@@ -592,7 +617,7 @@ final AccountTemplate apiServiceTemplate = AccountTemplate(
     ),
     AccountField(
       fieldKey: 'endpoint',
-      label: 'API \u7aef\u70b9',
+      label: 'API 端点',
       attributes: AccountFieldAttributes(
         type: AccountFieldType.url,
         hint: 'https://api.example.com/v1',
@@ -608,17 +633,17 @@ final AccountTemplate apiServiceTemplate = AccountTemplate(
 final AccountTemplate websiteTemplate = AccountTemplate(
   templateId: 'builtin_generic_info',
   version: 1,
-  title: '\u7f51\u7ad9\u6a21\u677f',
+  title: '网站模板',
   subTitle:
-      '\u4fdd\u5b58\u7f51\u7ad9\u3001\u767b\u5f55\u8d26\u53f7\u3001\u5bc6\u7801\u548c\u5907\u6ce8',
+      '保存网站、登录账号、密码和备注',
   iconCodePoint: Icons.language_outlined.codePoint,
   category: TemplateCategory.login,
   fields: [
     AccountField(
       fieldKey: 'website',
-      label: '\u7f51\u7ad9',
+      label: '网站',
       description:
-          '\u7f51\u7ad9\u540d\u79f0\u6216\u767b\u5f55\u5730\u5740\u3002',
+          '网站名称或登录地址。',
       attributes: AccountFieldAttributes(
         type: AccountFieldType.url,
         isPrimary: true,
@@ -634,15 +659,15 @@ final AccountTemplate websiteTemplate = AccountTemplate(
     ),
     AccountField(
       fieldKey: 'username',
-      label: '\u8d26\u53f7',
+      label: '账号',
       description:
-          '\u767b\u5f55\u7528\u6237\u540d\u3001\u90ae\u7bb1\u6216\u624b\u673a\u53f7\u3002',
+          '登录用户名、邮箱或手机号。',
       attributes: AccountFieldAttributes(
         type: AccountFieldType.text,
         isPrimary: true,
         isRequired: true,
         isSearchable: true,
-        hint: '\u7528\u6237\u540d / \u90ae\u7bb1 / \u624b\u673a\u53f7',
+        hint: '用户名 / 邮箱 / 手机号',
       ),
       order: 1,
       labelHlc: _builtinZeroHlc,
@@ -652,13 +677,13 @@ final AccountTemplate websiteTemplate = AccountTemplate(
     ),
     AccountField(
       fieldKey: 'password',
-      label: '\u5bc6\u7801',
-      description: '\u8be5\u7f51\u7ad9\u7684\u767b\u5f55\u5bc6\u7801\u3002',
+      label: '密码',
+      description: '该网站的登录密码。',
       attributes: AccountFieldAttributes(
         type: AccountFieldType.password,
         isRequired: true,
         isSecret: true,
-        hint: '\u8f93\u5165\u6216\u751f\u6210\u5bc6\u7801',
+        hint: '输入或生成密码',
       ),
       order: 2,
       labelHlc: _builtinZeroHlc,
@@ -670,12 +695,12 @@ final AccountTemplate websiteTemplate = AccountTemplate(
       fieldKey: 'totp',
       label: '2FA',
       description:
-          '\u5173\u8054\u72ec\u7acb\u7684 2FA/TOTP \u51ed\u636e\uff0c\u4e0d\u5728\u8d26\u6237\u5b57\u6bb5\u4e2d\u4fdd\u5b58\u52a8\u6001\u7801\u5bc6\u94a5\u3002',
+          '关联独立的 2FA/TOTP 凭据，不在账户字段中保存动态码密钥。',
       attributes: AccountFieldAttributes(
         type: AccountFieldType.custom,
         isReference: true,
         isCopyable: false,
-        hint: '\u9009\u62e9\u6216\u65b0\u5efa 2FA',
+        hint: '选择或新建 2FA',
       ),
       order: 3,
       labelHlc: _builtinZeroHlc,
@@ -685,12 +710,12 @@ final AccountTemplate websiteTemplate = AccountTemplate(
     ),
     AccountField(
       fieldKey: 'notes',
-      label: '\u5907\u6ce8',
+      label: '备注',
       description:
-          '\u989d\u5916\u8bf4\u660e\u3001\u6062\u590d\u63d0\u793a\u6216\u5b89\u5168\u95ee\u9898\u7b49\u4fe1\u606f\u3002',
+          '额外说明、恢复提示或安全问题等信息。',
       attributes: AccountFieldAttributes(
         type: AccountFieldType.text,
-        hint: '\u53ef\u9009',
+        hint: '可选',
       ),
       order: 4,
       labelHlc: _builtinZeroHlc,
@@ -707,3 +732,44 @@ final List<AccountTemplate> basicAccountTemplates = [
   secureNoteMnemonicTemplate,
   apiServiceTemplate,
 ];
+
+String encodeTemplateExport(List<AccountTemplate> templates) {
+  return jsonEncode({
+    'version': 1,
+    'templates': templates.map((t) => t.toExportJson()).toList(),
+  });
+}
+
+List<AccountTemplate> parseTemplateExport(
+  String json, {
+  required Set<String> existingIds,
+}) {
+  final trimmed = json.trim();
+  final decoded = const JsonDecoder().convert(trimmed);
+
+  List<Map<String, dynamic>> rawList;
+  if (decoded is Map<String, dynamic>) {
+    if (decoded.containsKey('templates')) {
+      rawList = (decoded['templates'] as List<dynamic>)
+          .cast<Map<String, dynamic>>();
+    } else {
+      rawList = [decoded];
+    }
+  } else if (decoded is List<dynamic>) {
+    rawList = decoded.cast<Map<String, dynamic>>();
+  } else {
+    throw FormatException('Unsupported JSON format');
+  }
+
+  final results = <AccountTemplate>[];
+  for (final raw in rawList) {
+    var template = AccountTemplate.fromJson(raw, isCustom: true);
+    if (existingIds.contains(template.templateId)) {
+      template = template.copyWith(
+        templateId: 'custom_${DateTime.now().millisecondsSinceEpoch}_${results.length}',
+      );
+    }
+    results.add(template);
+  }
+  return results;
+}

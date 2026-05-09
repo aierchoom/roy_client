@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../models/account_template.dart';
 
@@ -21,29 +21,29 @@ class FieldPreset {
 const List<FieldPreset> kFieldPresets = [
   FieldPreset(
     id: 'secure_note',
-    name: '\u5b89\u5168\u7b14\u8bb0',
+    name: '安全笔记',
     icon: Icons.note_outlined,
     fields: [
       AccountField(
         fieldKey: 'content',
-        label: '\u5185\u5bb9',
+        label: '内容',
         attributes: AccountFieldAttributes(
           type: AccountFieldType.longText,
           isRequired: true,
           isSecret: true,
-          hint: '\u7c98\u8d34\u6216\u8f93\u5165\u654f\u611f\u5185\u5bb9...',
+          hint: '粘贴或输入敏感内容...',
         ),
       ),
     ],
   ),
   FieldPreset(
     id: 'mnemonic',
-    name: '\u52a9\u8bb0\u8bcd',
+    name: '助记词',
     icon: Icons.vpn_key_outlined,
     fields: [
       AccountField(
         fieldKey: 'mnemonic_words',
-        label: '\u52a9\u8bb0\u8bcd',
+        label: '助记词',
         attributes: AccountFieldAttributes(
           type: AccountFieldType.list,
           isRequired: true,
@@ -61,7 +61,7 @@ const List<FieldPreset> kFieldPresets = [
     fields: [
       AccountField(
         fieldKey: 'service_name',
-        label: '\u670d\u52a1\u540d\u79f0',
+        label: '服务名称',
         attributes: AccountFieldAttributes(
           type: AccountFieldType.text,
           isPrimary: true,
@@ -83,22 +83,22 @@ const List<FieldPreset> kFieldPresets = [
   ),
   FieldPreset(
     id: 'bank_card',
-    name: '\u94f6\u884c\u5361',
+    name: '银行卡',
     icon: Icons.credit_card_outlined,
     fields: [
       AccountField(
         fieldKey: 'bank_name',
-        label: '\u94f6\u884c\u540d\u79f0',
+        label: '银行名称',
         attributes: AccountFieldAttributes(
           type: AccountFieldType.text,
           isRequired: true,
           isSearchable: true,
-          hint: '\u4e2d\u56fd\u5de5\u5546\u94f6\u884c',
+          hint: '中国工商银行',
         ),
       ),
       AccountField(
         fieldKey: 'card_number',
-        label: '\u5361\u53f7',
+        label: '卡号',
         attributes: AccountFieldAttributes(
           type: AccountFieldType.text,
           isRequired: true,
@@ -112,12 +112,12 @@ const List<FieldPreset> kFieldPresets = [
         attributes: AccountFieldAttributes(
           type: AccountFieldType.password,
           isSecret: true,
-          hint: '\u5361\u80cc\u540e\u4e09\u4f4d',
+          hint: '卡背后三位',
         ),
       ),
       AccountField(
         fieldKey: 'expiry_date',
-        label: '\u6709\u6548\u671f',
+        label: '有效期',
         attributes: AccountFieldAttributes(
           type: AccountFieldType.time,
           timeFormat: TimeFieldFormat.monthYear,
@@ -128,12 +128,12 @@ const List<FieldPreset> kFieldPresets = [
   ),
   FieldPreset(
     id: 'identity',
-    name: '\u8eab\u4efd\u8bc1\u4ef6',
+    name: '身份证件',
     icon: Icons.badge_outlined,
     fields: [
       AccountField(
         fieldKey: 'full_name',
-        label: '\u59d3\u540d',
+        label: '姓名',
         attributes: AccountFieldAttributes(
           type: AccountFieldType.text,
           isRequired: true,
@@ -142,7 +142,7 @@ const List<FieldPreset> kFieldPresets = [
       ),
       AccountField(
         fieldKey: 'id_number',
-        label: '\u8bc1\u4ef6\u53f7\u7801',
+        label: '证件号码',
         attributes: AccountFieldAttributes(
           type: AccountFieldType.text,
           isRequired: true,
@@ -152,15 +152,15 @@ const List<FieldPreset> kFieldPresets = [
       ),
       AccountField(
         fieldKey: 'issuing_authority',
-        label: '\u7b7e\u53d1\u673a\u5173',
+        label: '签发机关',
         attributes: AccountFieldAttributes(
           type: AccountFieldType.text,
-          hint: '\u67d0\u5e02\u516c\u5b89\u5c40',
+          hint: '某市公安局',
         ),
       ),
       AccountField(
         fieldKey: 'valid_until',
-        label: '\u6709\u6548\u671f\u9650',
+        label: '有效期限',
         attributes: AccountFieldAttributes(
           type: AccountFieldType.time,
           timeFormat: TimeFieldFormat.date,
@@ -175,7 +175,7 @@ const List<FieldPreset> kFieldPresets = [
     fields: [
       AccountField(
         fieldKey: 'ssid',
-        label: '\u7f51\u7edc\u540d\u79f0',
+        label: '网络名称',
         attributes: AccountFieldAttributes(
           type: AccountFieldType.text,
           isRequired: true,
@@ -185,33 +185,33 @@ const List<FieldPreset> kFieldPresets = [
       ),
       AccountField(
         fieldKey: 'wifi_password',
-        label: 'WiFi \u5bc6\u7801',
+        label: 'WiFi 密码',
         attributes: AccountFieldAttributes(
           type: AccountFieldType.password,
           isSecret: true,
-          hint: 'wpa2\u5bc6\u7801',
+          hint: 'wpa2密码',
         ),
       ),
     ],
   ),
   FieldPreset(
     id: 'server_ssh',
-    name: '\u670d\u52a1\u5668',
+    name: '服务器',
     icon: Icons.dns_outlined,
     fields: [
       AccountField(
         fieldKey: 'host',
-        label: '\u4e3b\u673a\u5730\u5740',
+        label: '主机地址',
         attributes: AccountFieldAttributes(
           type: AccountFieldType.url,
           isRequired: true,
           isSearchable: true,
-          hint: '192.168.1.100 \u6216 domain.com',
+          hint: '192.168.1.100 或 domain.com',
         ),
       ),
       AccountField(
         fieldKey: 'ssh_user',
-        label: '\u7528\u6237\u540d',
+        label: '用户名',
         attributes: AccountFieldAttributes(
           type: AccountFieldType.text,
           isRequired: true,
@@ -220,7 +220,7 @@ const List<FieldPreset> kFieldPresets = [
       ),
       AccountField(
         fieldKey: 'ssh_port',
-        label: '\u7aef\u53e3',
+        label: '端口',
         attributes: AccountFieldAttributes(
           type: AccountFieldType.number,
           hint: '22',
@@ -228,23 +228,23 @@ const List<FieldPreset> kFieldPresets = [
       ),
       AccountField(
         fieldKey: 'ssh_key',
-        label: 'SSH \u5bc6\u94a5',
+        label: 'SSH 密钥',
         attributes: AccountFieldAttributes(
           type: AccountFieldType.password,
           isSecret: true,
-          hint: 'id_rsa \u79c1\u94a5',
+          hint: 'id_rsa 私钥',
         ),
       ),
     ],
   ),
   FieldPreset(
     id: 'social_media',
-    name: '\u793e\u4ea4\u5a92\u4f53',
+    name: '社交媒体',
     icon: Icons.chat_bubble_outline,
     fields: [
       AccountField(
         fieldKey: 'platform',
-        label: '\u5e73\u53f0\u540d\u79f0',
+        label: '平台名称',
         attributes: AccountFieldAttributes(
           type: AccountFieldType.text,
           isRequired: true,
@@ -254,7 +254,7 @@ const List<FieldPreset> kFieldPresets = [
       ),
       AccountField(
         fieldKey: 'social_username',
-        label: '\u7528\u6237\u540d',
+        label: '用户名',
         attributes: AccountFieldAttributes(
           type: AccountFieldType.text,
           isRequired: true,
@@ -263,7 +263,7 @@ const List<FieldPreset> kFieldPresets = [
       ),
       AccountField(
         fieldKey: 'social_password',
-        label: '\u5bc6\u7801',
+        label: '密码',
         attributes: AccountFieldAttributes(
           type: AccountFieldType.password,
           isSecret: true,
@@ -271,7 +271,7 @@ const List<FieldPreset> kFieldPresets = [
       ),
       AccountField(
         fieldKey: 'phone_bound',
-        label: '\u7ed1\u5b9a\u624b\u673a',
+        label: '绑定手机',
         attributes: AccountFieldAttributes(
           type: AccountFieldType.phone,
           hint: '138 **** 8888',
@@ -281,12 +281,12 @@ const List<FieldPreset> kFieldPresets = [
   ),
   FieldPreset(
     id: 'license_key',
-    name: '\u8f6f\u4ef6\u6388\u6743',
+    name: '软件授权',
     icon: Icons.key_outlined,
     fields: [
       AccountField(
         fieldKey: 'software_name',
-        label: '\u8f6f\u4ef6\u540d\u79f0',
+        label: '软件名称',
         attributes: AccountFieldAttributes(
           type: AccountFieldType.text,
           isRequired: true,
@@ -295,7 +295,7 @@ const List<FieldPreset> kFieldPresets = [
       ),
       AccountField(
         fieldKey: 'license_key',
-        label: '\u6388\u6743\u7801',
+        label: '授权码',
         attributes: AccountFieldAttributes(
           type: AccountFieldType.text,
           isRequired: true,
@@ -305,7 +305,7 @@ const List<FieldPreset> kFieldPresets = [
       ),
       AccountField(
         fieldKey: 'purchase_email',
-        label: '\u8d2d\u4e70\u90ae\u7bb1',
+        label: '购买邮箱',
         attributes: AccountFieldAttributes(
           type: AccountFieldType.email,
           hint: 'name@example.com',

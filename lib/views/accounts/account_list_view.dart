@@ -1,10 +1,15 @@
+﻿import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../l10n/app_text_extension.dart';
 import '../../models/account_item.dart';
 import '../../models/account_template.dart';
+import '../../models/totp_credential.dart';
 import '../../providers/enhanced_app_provider.dart';
+import '../../services/sensitive_clipboard_service.dart';
+import '../../services/totp_service.dart';
 import '../../theme/app_design_tokens.dart';
 import '../../theme/app_layout.dart';
 import '../../widgets/adaptive_page.dart';
@@ -12,19 +17,45 @@ import '../../widgets/app_page_header.dart';
 import '../../widgets/green_add_button.dart';
 import '../../widgets/account_list_tile.dart';
 import 'account_edit_view.dart';
+import 'totp_credential_edit_view.dart';
+import '../templates/template_list_view.dart';
 
 class AccountListView extends StatefulWidget {
-  const AccountListView({super.key});
+  final bool showTemplates;
+  final ValueChanged<bool>? onShowTemplatesChanged;
+
+  const AccountListView({
+    super.key,
+    this.showTemplates = false,
+    this.onShowTemplatesChanged,
+  });
 
   @override
   State<AccountListView> createState() => _AccountListViewState();
 }
 
-enum _VaultCategoryFilter { all, accounts, secureNotes }
+enum _VaultCategoryFilter { all, accounts, secureNotes, totp }
 
 class _AccountListViewState extends State<AccountListView> {
   String? _activeTemplateId;
   _VaultCategoryFilter _categoryFilter = _VaultCategoryFilter.all;
+  Timer? _totpTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _totpTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted && _categoryFilter == _VaultCategoryFilter.totp) {
+        setState(() {});
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _totpTimer?.cancel();
+    super.dispose();
+  }
 
   Future<void> _openEditor(BuildContext context, {AccountItem? initial}) async {
     final result = await Navigator.push<AccountItem>(
@@ -60,23 +91,23 @@ class _AccountListViewState extends State<AccountListView> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text(
-          context.text( '\u5220\u9664\u8d26\u6237', 'Delete Account'),
+          context.text( '删除账户', 'Delete Account'),
         ),
         content: Text(
           context.text(
-            '\u786e\u8ba4\u5220\u9664\u201c${account.name}\u201d\u5417\uff1f\u8be5\u64cd\u4f5c\u4e0d\u53ef\u64a4\u9500\u3002',
+            '确认删除“${account.name}”吗？该操作不可撤销。',
             'Delete "${account.name}"? This action cannot be undone.',
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: Text(context.text( '\u53d6\u6d88', 'Cancel')),
+            child: Text(context.text( '取消', 'Cancel')),
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, true),
             child: Text(
-              context.text( '\u5220\u9664', 'Delete'),
+              context.text( '删除', 'Delete'),
               style: const TextStyle(color: Colors.red),
             ),
           ),
@@ -87,93 +118,6 @@ class _AccountListViewState extends State<AccountListView> {
     if (confirmed == true && context.mounted) {
       await context.read<EnhancedAppProvider>().deleteAccount(account.id);
     }
-  }
-
-  Future<void> _pushAllLocalChanges(BuildContext context) async {
-    final provider = context.read<EnhancedAppProvider>();
-    final result = await provider.pushAllLocalSyncChanges();
-    if (!mounted || !context.mounted) return;
-
-    final messenger = ScaffoldMessenger.of(context);
-
-    if (result.success) {
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            context.text( '\u63a8\u9001\u6210\u529f', 'Push succeeded'),
-          ),
-        ),
-      );
-    } else if (result.error != null) {
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            context.text(
-              '\u63a8\u9001\u5931\u8d25\uff1a${result.error}',
-              'Push failed: ${result.error}',
-            ),
-          ),
-        ),
-      );
-    }
-  }
-
-  Widget _buildSyncPrompt(BuildContext context, EnhancedAppProvider provider) {
-    final changes = provider.localSyncChanges;
-    if (changes.isEmpty) return const SizedBox.shrink();
-
-    final theme = Theme.of(context);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.primaryContainer.withAlpha(80),
-        borderRadius: BorderRadius.circular(AppRadii.panel),
-        border: Border.all(color: theme.colorScheme.primary.withAlpha(60)),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            Icons.cloud_upload_outlined,
-            size: 20,
-            color: theme.colorScheme.primary,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  context.text(
-                    '\u5f85\u540c\u6b65\u53d8\u66f4 ${changes.length} \u9879',
-                    '${changes.length} change(s) waiting to sync',
-                  ),
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: theme.colorScheme.primary,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  context.text(
-                    '\u70b9\u51fb\u63a8\u9001\u5c06\u672c\u5730\u4fee\u6539\u540c\u6b65\u5230\u5176\u4ed6\u8bbe\u5907',
-                    'Tap push to sync local changes to your other devices',
-                  ),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          FilledButton.tonalIcon(
-            onPressed: () => _pushAllLocalChanges(context),
-            icon: const Icon(Icons.cloud_upload_outlined, size: 18),
-            label: Text(context.text( '\u63a8\u9001', 'Push')),
-          ),
-        ],
-      ),
-    );
   }
 
   List<AccountItem> _filteredAccounts(List<AccountItem> accounts) {
@@ -206,6 +150,8 @@ class _AccountListViewState extends State<AccountListView> {
             )
             .toList();
       case _VaultCategoryFilter.all:
+        return base;
+      case _VaultCategoryFilter.totp:
         return base;
     }
   }
@@ -248,26 +194,58 @@ class _AccountListViewState extends State<AccountListView> {
     String countLabel;
     switch (_categoryFilter) {
       case _VaultCategoryFilter.accounts:
-        title = context.text( '\u8d26\u53f7\u4e2d\u5fc3', 'Account Hub');
+        title = context.text( '账号中心', 'Account Hub');
         subtitle = context.text(
-          '\u4f60\u7684\u767b\u5f55\u51ed\u8bc1\u548c\u7f51\u7ad9\u8d26\u53f7',
+          '你的登录凭证和网站账号',
           'Your login credentials',
         );
-        countLabel = context.text( '\u4e2a\u8d26\u53f7', 'Accounts');
+        countLabel = context.text( '个账号', 'Accounts');
       case _VaultCategoryFilter.secureNotes:
-        title = context.text( '\u5b89\u5168\u7b14\u8bb0', 'Secure Notes');
+        title = context.text( '安全笔记', 'Secure Notes');
         subtitle = context.text(
-          '\u52a0\u5bc6\u5b58\u50a8\u7684\u654f\u611f\u6587\u672c\u548c\u5bc6\u94a5',
+          '加密存储的敏感文本和密钥',
           'Encrypted sensitive text and keys',
         );
-        countLabel = context.text( '\u4e2a\u7b14\u8bb0', 'Notes');
+        countLabel = context.text( '个笔记', 'Notes');
       case _VaultCategoryFilter.all:
-        title = context.text( '\u4fdd\u9669\u5e93', 'Vault');
+        title = context.text( '保险库', 'Vault');
         subtitle = context.text(
-          '\u4f60\u7684\u52a0\u5bc6\u4fe1\u606f\u5e93',
+          '你的加密信息库',
           'Your encrypted vault',
         );
-        countLabel = context.text( '\u4e2a\u6761\u76ee', 'Items');
+        countLabel = context.text( '个条目', 'Items');
+      case _VaultCategoryFilter.totp:
+        title = '2FA';
+        subtitle = context.text(
+          '动态验证码管理',
+          'Authenticator code management',
+        );
+        countLabel = context.text( '项', 'Items');
+    }
+
+    if (_categoryFilter == _VaultCategoryFilter.totp) {
+      final credentials = provider.totpCredentials;
+      final linkedCount = credentials.fold<int>(
+        0,
+        (sum, c) => sum + c.linkedAccountIds.length,
+      );
+      return AppPageHeader(
+        icon: Icons.verified_user_outlined,
+        title: title,
+        subtitle: subtitle,
+        metrics: [
+          _StatChip(
+            value: '${credentials.length}',
+            label: countLabel,
+            onColor: theme.colorScheme.primary,
+          ),
+          _StatChip(
+            value: '$linkedCount',
+            label: context.text( '关联', 'Links'),
+            onColor: theme.colorScheme.primary,
+          ),
+        ],
+      );
     }
 
     return AppPageHeader(
@@ -282,12 +260,12 @@ class _AccountListViewState extends State<AccountListView> {
         ),
         _StatChip(
           value: '$usedTemplates',
-          label: context.text( '\u4e2a\u6a21\u677f', 'Templates'),
+          label: context.text( '个模板', 'Templates'),
           onColor: theme.colorScheme.primary,
         ),
         _StatChip(
           value: '$secretItems',
-          label: context.text( '\u4e2a\u4fdd\u5bc6', 'Secrets'),
+          label: context.text( '个保密', 'Secrets'),
           onColor: theme.colorScheme.primary,
         ),
       ],
@@ -301,24 +279,30 @@ class _AccountListViewState extends State<AccountListView> {
     switch (_categoryFilter) {
       case _VaultCategoryFilter.secureNotes:
         title = context.text(
-          '\u6682\u65e0\u5b89\u5168\u7b14\u8bb0',
+          '暂无安全笔记',
           'No Secure Notes',
         );
         message = context.text(
-          '\u5c1a\u672a\u521b\u5efa\u4efb\u4f55\u5b89\u5168\u7b14\u8bb0\uff0c\u70b9\u51fb\u53f3\u4e0b\u89d2\u6309\u94ae\u65b0\u5efa\u3002',
+          '尚未创建任何安全笔记，点击右下角按钮新建。',
           'No secure notes yet. Tap the button to create one.',
         );
       case _VaultCategoryFilter.accounts:
-        title = context.text( '\u6682\u65e0\u8d26\u53f7', 'No Accounts');
+        title = context.text( '暂无账号', 'No Accounts');
         message = context.text(
-          '\u5f53\u524d\u6a21\u677f\u7b5b\u9009\u4e0b\u6ca1\u6709\u53ef\u663e\u793a\u7684\u8d26\u53f7\uff0c\u53ef\u4ee5\u5207\u6362\u6a21\u677f\u6216\u65b0\u5efa\u8d26\u53f7\u3002',
+          '当前模板筛选下没有可显示的账号，可以切换模板或新建账号。',
           'No accounts are available under the current template filter.',
         );
       case _VaultCategoryFilter.all:
-        title = context.text( '\u6682\u65e0\u6761\u76ee', 'No Items');
+        title = context.text( '暂无条目', 'No Items');
         message = context.text(
-          '\u4fdd\u9669\u5e93\u4e2d\u8fd8\u6ca1\u6709\u4efb\u4f55\u5185\u5bb9\uff0c\u70b9\u51fb\u53f3\u4e0b\u89d2\u6309\u94ae\u5f00\u59cb\u6dfb\u52a0\u3002',
+          '保险库中还没有任何内容，点击右下角按钮开始添加。',
           'Your vault is empty. Tap the button to add items.',
+        );
+      case _VaultCategoryFilter.totp:
+        title = context.text( '暂无 2FA', 'No 2FA Items');
+        message = context.text(
+          '尚无动态验证码，点击右下角按钮添加。',
+          'No authenticator codes yet. Tap the button to add one.',
         );
     }
 
@@ -353,40 +337,73 @@ class _AccountListViewState extends State<AccountListView> {
 
   Widget _buildCategoryFilterBar(BuildContext context) {
     final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: SegmentedButton<_VaultCategoryFilter>(
-        segments: [
-          ButtonSegment(
-            value: _VaultCategoryFilter.all,
-            label: Text(context.text( '全部', 'All')),
-            icon: const Icon(Icons.dashboard_outlined),
-          ),
-          ButtonSegment(
-            value: _VaultCategoryFilter.accounts,
-            label: Text(context.text( '账号', 'Accounts')),
-            icon: const Icon(Icons.lock_outline),
-          ),
-          ButtonSegment(
-            value: _VaultCategoryFilter.secureNotes,
-            label: Text(context.text( '安全笔记', 'Notes')),
-            icon: const Icon(Icons.note_outlined),
-          ),
-        ],
-        selected: <_VaultCategoryFilter>{_categoryFilter},
-        onSelectionChanged: (newSelection) {
-          setState(() {
-            _categoryFilter = newSelection.first;
-          });
-        },
-        style: ButtonStyle(
-          backgroundColor: WidgetStateProperty.resolveWith((states) {
-            if (states.contains(WidgetState.selected)) {
-              return theme.colorScheme.primaryContainer;
-            }
-            return theme.colorScheme.surface;
-          }),
+    return SegmentedButton<_VaultCategoryFilter>(
+      showSelectedIcon: false,
+      segments: [
+        ButtonSegment(
+          value: _VaultCategoryFilter.all,
+          label: Text(context.text( '全部', 'All')),
+          icon: const Icon(Icons.dashboard_outlined, size: 16),
         ),
+        ButtonSegment(
+          value: _VaultCategoryFilter.accounts,
+          label: Text(context.text( '账号', 'Accounts')),
+          icon: const Icon(Icons.lock_outline, size: 16),
+        ),
+        ButtonSegment(
+          value: _VaultCategoryFilter.secureNotes,
+          label: Text(context.text( '安全笔记', 'Notes')),
+          icon: const Icon(Icons.note_outlined, size: 16),
+        ),
+        ButtonSegment(
+          value: _VaultCategoryFilter.totp,
+          label: const Text('2FA'),
+          icon: const Icon(Icons.verified_user_outlined, size: 16),
+        ),
+      ],
+      selected: <_VaultCategoryFilter>{_categoryFilter},
+      onSelectionChanged: (newSelection) {
+        setState(() {
+          _categoryFilter = newSelection.first;
+        });
+      },
+      style: ButtonStyle(
+        backgroundColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return theme.colorScheme.primary;
+          }
+          return Colors.transparent;
+        }),
+        foregroundColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return theme.colorScheme.onPrimary;
+          }
+          return theme.colorScheme.onSurfaceVariant;
+        }),
+        side: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return BorderSide(
+              color: theme.colorScheme.primary,
+              width: 1,
+            );
+          }
+          return BorderSide(
+            color: theme.colorScheme.outlineVariant.withAlpha(60),
+            width: 0.5,
+          );
+        }),
+        padding: WidgetStateProperty.all(
+          const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        ),
+        textStyle: WidgetStateProperty.all(
+          theme.textTheme.labelMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+            fontSize: 12,
+          ),
+        ),
+        iconSize: WidgetStateProperty.all(16),
+        visualDensity: VisualDensity.compact,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
     );
   }
@@ -584,7 +601,7 @@ class _AccountListViewState extends State<AccountListView> {
     final subtitle = template?.subTitle.trim() ?? '';
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 2),
@@ -675,16 +692,198 @@ class _AccountListViewState extends State<AccountListView> {
     );
   }
 
-  Widget _buildAccountPanel(
+  // ── TOTP helpers ──
+
+  Future<void> _openTotpEditor(
+    BuildContext context, {
+    TotpCredential? initial,
+  }) async {
+    final result = await Navigator.push<TotpCredential>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TotpCredentialEditView(initial: initial),
+      ),
+    );
+    if (result == null || !context.mounted) return;
+    final provider = context.read<EnhancedAppProvider>();
+    if (initial == null) {
+      await provider.addTotpCredential(result);
+    } else {
+      await provider.updateTotpCredential(result);
+    }
+  }
+
+  Future<void> _deleteTotpCredential(
+    BuildContext context,
+    TotpCredential credential,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(context.text('删除 2FA', 'Delete 2FA')),
+        content: Text(
+          context.text(
+            '确认删除"${credential.displayLabel}"吗？',
+            'Delete "${credential.displayLabel}"?',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(context.text('取消', 'Cancel')),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(
+              context.text('删除', 'Delete'),
+              style: const TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      await context.read<EnhancedAppProvider>().deleteTotpCredential(
+        credential.id,
+      );
+    }
+  }
+
+  Future<void> _copyTotpCode(BuildContext context, TotpCode code) async {
+    await SensitiveClipboardService.copy(
+      text: code.value,
+      level: ClipboardRiskLevel.high,
+    );
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(context.text('验证码已复制', 'Code copied.')),
+      ),
+    );
+  }
+
+  Widget _buildTotpCredentialCard(
+    BuildContext context,
+    EnhancedAppProvider provider,
+    TotpCredential credential,
+  ) {
+    final theme = Theme.of(context);
+    final linkedAccounts = credential.linkedAccountIds
+        .map(provider.getAccount)
+        .whereType<AccountItem>()
+        .toList(growable: false);
+
+    late final TotpCode code;
+    try {
+      code = const TotpService().generate(credential.config);
+    } catch (error) {
+      return ListTile(
+        leading: const Icon(Icons.error_outline),
+        title: Text(credential.displayLabel),
+        subtitle: Text(error.toString()),
+        trailing: IconButton(
+          tooltip: context.text('编辑', 'Edit'),
+          onPressed: () => _openTotpEditor(context, initial: credential),
+          icon: const Icon(Icons.edit_outlined),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(AppRadii.panel),
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withAlpha(AppAlphas.strong),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      credential.displayLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      linkedAccounts.isEmpty
+                          ? context.text('未关联账号', 'No linked account')
+                          : linkedAccounts.map((a) => a.name).join(' / '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: context.text('编辑', 'Edit'),
+                onPressed: () => _openTotpEditor(context, initial: credential),
+                icon: const Icon(Icons.edit_outlined),
+              ),
+              IconButton(
+                tooltip: context.text('删除', 'Delete'),
+                onPressed: () => _deleteTotpCredential(context, credential),
+                icon: const Icon(Icons.delete_outline),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  code.value,
+                  style: theme.textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0,
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: context.text('复制验证码', 'Copy code'),
+                onPressed: () => _copyTotpCode(context, code),
+                icon: const Icon(Icons.content_copy_outlined),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          LinearProgressIndicator(
+            value: code.secondsRemaining / code.period,
+            minHeight: 5,
+            borderRadius: BorderRadius.circular(AppRadii.control),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTotpPanel(
     BuildContext context,
     EnhancedAppProvider provider,
   ) {
-    final groups = _buildGroups(provider);
-    final layout = AppLayout.of(context);
+    final credentials = provider.totpCredentials;
+    if (credentials.isEmpty) return _buildEmptyState(context);
 
-    if (groups.isEmpty) {
-      return _buildEmptyState(context);
-    }
+    final layout = AppLayout.of(context);
+    final children = credentials.map((c) {
+      return _buildTotpCredentialCard(context, provider, c);
+    }).toList();
 
     if (layout.isExpanded) {
       return LayoutBuilder(
@@ -693,11 +892,8 @@ class _AccountListViewState extends State<AccountListView> {
           return Wrap(
             spacing: AppSpacing.lg,
             runSpacing: AppSpacing.lg,
-            children: groups.map((group) {
-              return SizedBox(
-                width: columnWidth,
-                child: _buildGroupSection(context, provider, group, groups),
-              );
+            children: children.map((child) {
+              return SizedBox(width: columnWidth, child: child);
             }).toList(),
           );
         },
@@ -705,7 +901,27 @@ class _AccountListViewState extends State<AccountListView> {
     }
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      children: credentials.map((credential) {
+        return Padding(
+          padding: const EdgeInsets.only(bottom: AppSpacing.md),
+          child: _buildTotpCredentialCard(context, provider, credential),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildAccountPanel(
+    BuildContext context,
+    EnhancedAppProvider provider,
+  ) {
+    final groups = _buildGroups(provider);
+
+    if (groups.isEmpty) {
+      return _buildEmptyState(context);
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: groups.map((group) {
         return _buildGroupSection(context, provider, group, groups);
       }).toList(),
@@ -738,126 +954,125 @@ class _AccountListViewState extends State<AccountListView> {
                       child: Column(
                         children: [
                           const SizedBox(height: AppSpacing.lg),
-                          AdaptiveSection(
-                            maxWidth: AppSectionWidths.panel,
-                            child: _buildHeroCard(context, provider),
-                          ),
-                          const SizedBox(height: AppSpacing.xl),
-                          AdaptiveSection(
-                            maxWidth: AppSectionWidths.panel,
-                            child: _buildCategoryFilterBar(context),
-                          ),
-                          const SizedBox(height: AppSpacing.md),
-                          AdaptiveSection(
-                            maxWidth: AppSectionWidths.panel,
-                            child: _buildSyncPrompt(context, provider),
-                          ),
-                          const SizedBox(height: AppSpacing.md),
-                          AdaptiveSection(
-                            maxWidth: AppSectionWidths.panel,
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        context.text(
-                                          '账户资源库',
-                                          'Account Library',
-                                        ),
-                                        style: theme.textTheme.titleMedium
-                                            ?.copyWith(
-                                              fontWeight: FontWeight.w800,
-                                            ),
-                                      ),
+                          if (!widget.showTemplates) ...[
+                            const SizedBox(height: AppSpacing.lg),
+                            AdaptiveSection(
+                              maxWidth: AppSectionWidths.panel,
+                              child: _buildHeroCard(context, provider),
+                            ),
+                            const SizedBox(height: AppSpacing.lg),
+                            AdaptiveSection(
+                              maxWidth: AppSectionWidths.panel,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: _buildCategoryFilterBar(context),
+                                    ),
+                                    if (_categoryFilter != _VaultCategoryFilter.totp) ...[
+                                      const SizedBox(width: AppSpacing.sm),
                                       _buildModernTemplateDropdown(
                                         context,
                                         provider.allTemplates,
                                         provider.allAccounts,
                                       ),
                                     ],
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
-                          ),
+                            const SizedBox(height: AppSpacing.sm),
+                          ],
                           const SizedBox(height: 14),
                         ],
                       ),
                     ),
-                    // Scrollable list
+                    // Scrollable content
                     Expanded(
-                      child: Stack(
-                        children: [
-                          ScrollConfiguration(
-                            behavior: ScrollConfiguration.of(
-                              context,
-                            ).copyWith(physics: const ClampingScrollPhysics()),
-                            child: ListView(
-                              padding: EdgeInsets.fromLTRB(
-                                8,
-                                0,
-                                8,
-                                fabBottomOffset + 80,
-                              ),
-                              children: [
-                                AdaptiveSection(
-                                  maxWidth: AppSectionWidths.panel,
-                                  child: _buildAccountPanel(context, provider),
-                                ),
-                              ],
-                            ),
-                          ),
-                          // Bottom Fade interaction hint
-                          Positioned(
-                            bottom: 0,
-                            left: 0,
-                            right: 0,
-                            height: 60,
-                            child: IgnorePointer(
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topCenter,
-                                    end: Alignment.bottomCenter,
-                                    colors: [
-                                      theme.scaffoldBackgroundColor.withAlpha(
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 250),
+                        child: widget.showTemplates
+                            ? const TemplateListBody(
+                                key: ValueKey('templates'),
+                              )
+                            : Stack(
+                                key: const ValueKey('accounts'),
+                                children: [
+                                  ScrollConfiguration(
+                                    behavior: ScrollConfiguration.of(
+                                      context,
+                                    ).copyWith(
+                                      physics: const ClampingScrollPhysics(),
+                                    ),
+                                    child: ListView(
+                                      padding: EdgeInsets.fromLTRB(
+                                        16,
                                         0,
+                                        16,
+                                        fabBottomOffset + 80,
                                       ),
-                                      theme.scaffoldBackgroundColor.withAlpha(
-                                        180,
-                                      ),
-                                    ],
+                                      children: [
+                                        if (_categoryFilter == _VaultCategoryFilter.totp)
+                                          _buildTotpPanel(context, provider)
+                                        else
+                                          _buildAccountPanel(
+                                            context,
+                                            provider,
+                                          ),
+                                      ],
+                                    ),
                                   ),
-                                ),
+                                  // Bottom Fade interaction hint
+                                  Positioned(
+                                    bottom: 0,
+                                    left: 0,
+                                    right: 0,
+                                    height: 60,
+                                    child: IgnorePointer(
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            begin: Alignment.topCenter,
+                                            end: Alignment.bottomCenter,
+                                            colors: [
+                                              theme.scaffoldBackgroundColor
+                                                  .withAlpha(0),
+                                              theme.scaffoldBackgroundColor
+                                                  .withAlpha(180),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ),
-                          ),
-                        ],
                       ),
                     ),
                   ],
                 ),
               ),
-              Positioned(
-                right: 20,
-                bottom: fabBottomOffset,
-                child: SafeArea(
-                  top: false,
-                  minimum: EdgeInsets.zero,
-                  child: GreenAddButton(
-                    heroTag: 'add-account-fab',
-                    onPressed: () => _showAddMenu(context),
-                    tooltip: context.text( '新建', 'Add'),
+              if (!widget.showTemplates)
+                Positioned(
+                  right: 20,
+                  bottom: fabBottomOffset,
+                  child: SafeArea(
+                    top: false,
+                    minimum: EdgeInsets.zero,
+                    child: GreenAddButton(
+                      heroTag: _categoryFilter == _VaultCategoryFilter.totp
+                          ? 'add-totp-fab'
+                          : 'add-account-fab',
+                      onPressed: _categoryFilter == _VaultCategoryFilter.totp
+                          ? () => _openTotpEditor(context)
+                          : () => _showAddMenu(context),
+                      tooltip: context.text( '新建', 'Add'),
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
         );
@@ -936,7 +1151,7 @@ class _GroupCountChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppRadii.pill),
       ),
       child: Text(
-        '\u5171 $count \u6761',
+        '共 $count 条',
         style: theme.textTheme.labelSmall?.copyWith(
           color: theme.colorScheme.onSurface,
           fontWeight: FontWeight.w600,

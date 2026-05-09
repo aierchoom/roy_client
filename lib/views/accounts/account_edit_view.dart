@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -124,7 +124,7 @@ class _AccountEditViewState extends State<AccountEditView> {
                   children: [
                     TextButton(
                       onPressed: () => Navigator.pop(context),
-                      child: Text(_text('\u53d6\u6d88', 'Cancel')),
+                      child: Text(_text('取消', 'Cancel')),
                     ),
                     TextButton(
                       onPressed: () {
@@ -136,7 +136,7 @@ class _AccountEditViewState extends State<AccountEditView> {
                         });
                         Navigator.pop(context);
                       },
-                      child: Text(_text('\u786e\u5b9a', 'Confirm')),
+                      child: Text(_text('确定', 'Confirm')),
                     ),
                   ],
                 ),
@@ -159,8 +159,8 @@ class _AccountEditViewState extends State<AccountEditView> {
       final pickedTime = await showTimePicker(
         context: context,
         initialTime: TimeOfDay.fromDateTime(initial),
-        cancelText: _text('\u53d6\u6d88', 'Cancel'),
-        confirmText: _text('\u786e\u5b9a', 'Confirm'),
+        cancelText: _text('取消', 'Cancel'),
+        confirmText: _text('确定', 'Confirm'),
       );
       if (pickedTime != null && mounted) {
         final result = DateTime(
@@ -182,7 +182,7 @@ class _AccountEditViewState extends State<AccountEditView> {
       initialDate: initial,
       firstDate: DateTime(1900),
       lastDate: DateTime(2100),
-      helpText: _text('\u9009\u62e9\u65e5\u671f', 'Select date'),
+      helpText: _text('选择日期', 'Select date'),
     );
     if (pickedDate == null || !mounted) return;
 
@@ -197,8 +197,8 @@ class _AccountEditViewState extends State<AccountEditView> {
     final pickedTime = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.fromDateTime(initial),
-      cancelText: _text('\u53d6\u6d88', 'Cancel'),
-      confirmText: _text('\u786e\u5b9a', 'Confirm'),
+      cancelText: _text('取消', 'Cancel'),
+      confirmText: _text('确定', 'Confirm'),
     );
     if (pickedTime == null || !mounted) return;
 
@@ -386,28 +386,28 @@ class _AccountEditViewState extends State<AccountEditView> {
     final nextTemplate = provider.getTemplate(newTemplateId);
     final currentTemplateName =
         _currentTemplate?.title ??
-        _text('\u5f53\u524d\u6a21\u677f', 'Current template');
+        _text('当前模板', 'Current template');
     final nextTemplateName =
-        nextTemplate?.title ?? _text('\u65b0\u6a21\u677f', 'New template');
+        nextTemplate?.title ?? _text('新模板', 'New template');
 
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text(_text('\u5207\u6362\u6a21\u677f', 'Change Template')),
+        title: Text(_text('切换模板', 'Change Template')),
         content: Text(
           _text(
-            '\u4f60\u6b63\u5728\u5c06\u8d26\u6237\u4ece\u201c$currentTemplateName\u201d\u5207\u6362\u5230\u201c$nextTemplateName\u201d\u3002\n\n\u7cfb\u7edf\u4f1a\u4fdd\u7559\u539f\u6709\u5b57\u6bb5\u503c\uff0c\u4f46\u4e0d\u4f1a\u81ea\u52a8\u8fc1\u79fb\u6210\u65b0\u6a21\u677f\u5b57\u6bb5\uff0c\u8bf7\u5728\u4fdd\u5b58\u524d\u786e\u8ba4\u9700\u8981\u7684\u65b0\u5b57\u6bb5\u5185\u5bb9\u3002',
+            '你正在将账户从“$currentTemplateName”切换到“$nextTemplateName”。\n\n系统会保留原有字段值，但不会自动迁移成新模板字段，请在保存前确认需要的新字段内容。',
             'You are changing this account from "$currentTemplateName" to "$nextTemplateName".\n\nExisting field values will be preserved, but they will not be auto-mapped to the new template. Please review the new template fields before saving.',
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: Text(_text('\u53d6\u6d88', 'Cancel')),
+            child: Text(_text('取消', 'Cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: Text(_text('\u7ee7\u7eed', 'Continue')),
+            child: Text(_text('继续', 'Continue')),
           ),
         ],
       ),
@@ -422,24 +422,24 @@ class _AccountEditViewState extends State<AccountEditView> {
       builder: (dialogContext) => AlertDialog(
         title: Text(
           _text(
-            '\u5220\u9664\u5386\u53f2\u5b57\u6bb5',
+            '删除历史字段',
             'Remove Historical Field',
           ),
         ),
         content: Text(
           _text(
-            '\u786e\u8ba4\u5c06\u201c${_formatKeyLabel(key)}\u201d\u6807\u8bb0\u4e3a\u5220\u9664\u5417\uff1f\n\n\u8fd9\u4e2a\u53d8\u66f4\u4f1a\u5728\u4fdd\u5b58\u8d26\u6237\u540e\u751f\u6548\uff0c\u53ef\u4ee5\u5728\u4fdd\u5b58\u524d\u968f\u65f6\u6062\u590d\u3002',
+            '确认将“${_formatKeyLabel(key)}”标记为删除吗？\n\n这个变更会在保存账户后生效，可以在保存前随时恢复。',
             'Mark "${_formatKeyLabel(key)}" for removal?\n\nThis change will take effect when you save the account, and you can restore it any time before saving.',
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: Text(_text('\u53d6\u6d88', 'Cancel')),
+            child: Text(_text('取消', 'Cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: Text(_text('\u6807\u8bb0\u5220\u9664', 'Mark for Removal')),
+            child: Text(_text('标记删除', 'Mark for Removal')),
           ),
         ],
       ),
@@ -469,7 +469,7 @@ class _AccountEditViewState extends State<AccountEditView> {
         SnackBar(
           content: Text(
             _text(
-              '\u8bf7\u586b\u5199\u8d26\u6237\u540d\u79f0',
+              '请填写账户名称',
               'Please enter a name',
             ),
           ),
@@ -483,7 +483,7 @@ class _AccountEditViewState extends State<AccountEditView> {
         SnackBar(
           content: Text(
             _text(
-              '\u5f53\u524d\u6a21\u677f\u4e0d\u53ef\u7528\uff0c\u8bf7\u5148\u6062\u590d\u6216\u9009\u62e9\u53ef\u7528\u6a21\u677f\u540e\u518d\u4fdd\u5b58\u3002',
+              '当前模板不可用，请先恢复或选择可用模板后再保存。',
               'The selected template is unavailable. Restore it or choose an available template before saving.',
             ),
           ),
@@ -501,7 +501,7 @@ class _AccountEditViewState extends State<AccountEditView> {
               SnackBar(
                 content: Text(
                   _text(
-                    '\u8bf7\u5173\u8054\u5fc5\u586b\u5b57\u6bb5\uff1a${field.label}',
+                    '请关联必填字段：${field.label}',
                     'Required link missing: ${field.label}',
                   ),
                 ),
@@ -518,7 +518,7 @@ class _AccountEditViewState extends State<AccountEditView> {
               SnackBar(
                 content: Text(
                   _text(
-                    '\u8bf7\u9009\u62e9\u5fc5\u586b\u5b57\u6bb5\uff1a${field.label}',
+                    '请选择必填字段：${field.label}',
                     'Required link missing: ${field.label}',
                   ),
                 ),
@@ -534,7 +534,7 @@ class _AccountEditViewState extends State<AccountEditView> {
             SnackBar(
               content: Text(
                 _text(
-                  '\u8bf7\u586b\u5199\u5fc5\u586b\u5b57\u6bb5\uff1a${field.label}',
+                  '请填写必填字段：${field.label}',
                   'Required field missing: ${field.label}',
                 ),
               ),
@@ -590,7 +590,7 @@ class _AccountEditViewState extends State<AccountEditView> {
         SnackBar(
           content: Text(
             _text(
-              '$label \u6682\u65e0\u53ef\u590d\u5236\u5185\u5bb9',
+              '$label 暂无可复制内容',
               'No content available to copy for $label',
             ),
           ),
@@ -606,7 +606,7 @@ class _AccountEditViewState extends State<AccountEditView> {
     if (!mounted) return;
     messenger.showSnackBar(
       SnackBar(
-        content: Text(_text('\u5df2\u590d\u5236 $label', 'Copied $label')),
+        content: Text(_text('已复制 $label', 'Copied $label')),
       ),
     );
   }
@@ -698,7 +698,7 @@ class _AccountEditViewState extends State<AccountEditView> {
     if (_isTimeField(field)) {
       actions.add(
         IconButton(
-          tooltip: _text('\u9009\u62e9\u65f6\u95f4', 'Pick date and time'),
+          tooltip: _text('选择时间', 'Pick date and time'),
           visualDensity: VisualDensity.compact,
           iconSize: 18,
           onPressed: !_isEditing || !field.attributes.isEditable
@@ -728,8 +728,8 @@ class _AccountEditViewState extends State<AccountEditView> {
       actions.add(
         IconButton(
           tooltip: isVisible
-              ? _text('\u9690\u85cf\u5bc6\u7801', 'Hide password')
-              : _text('\u663e\u793a\u5bc6\u7801', 'Show password'),
+              ? _text('隐藏密码', 'Hide password')
+              : _text('显示密码', 'Show password'),
           visualDensity: VisualDensity.compact,
           iconSize: 18,
           onPressed: () => setState(() {
@@ -750,7 +750,7 @@ class _AccountEditViewState extends State<AccountEditView> {
           visualDensity: VisualDensity.compact,
           iconSize: 18,
           tooltip: _text(
-            '\u590d\u5236\u5b57\u6bb5\u5185\u5bb9',
+            '复制字段内容',
             'Copy field value',
           ),
           onPressed: () => _copyValue(field.label, controller.text),
@@ -843,7 +843,7 @@ class _AccountEditViewState extends State<AccountEditView> {
                     Text(
                       _nameCtrl.text.trim().isEmpty
                           ? _text(
-                              '\u672a\u547d\u540d\u8d26\u6237',
+                              '未命名账户',
                               'Untitled Account',
                             )
                           : _nameCtrl.text.trim(),
@@ -856,7 +856,7 @@ class _AccountEditViewState extends State<AccountEditView> {
                     Text(
                       selectedTemplate?.title ??
                           _text(
-                            '\u8bf7\u9009\u62e9\u6a21\u677f',
+                            '请选择模板',
                             'Choose a template',
                           ),
                       style: theme.textTheme.bodyMedium?.copyWith(
@@ -1005,7 +1005,7 @@ class _AccountEditViewState extends State<AccountEditView> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              _text('\u57fa\u672c\u4fe1\u606f', 'Basic Information'),
+              _text('基本信息', 'Basic Information'),
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w700,
               ),
@@ -1034,7 +1034,7 @@ class _AccountEditViewState extends State<AccountEditView> {
                         readOnly: !_isEditing,
                         decoration: InputDecoration(
                           labelText: _text(
-                            '\u8d26\u6237\u540d\u79f0',
+                            '账户名称',
                             'Account Name',
                           ),
                           prefixIcon: const Icon(Icons.badge_outlined),
@@ -1047,7 +1047,7 @@ class _AccountEditViewState extends State<AccountEditView> {
                         readOnly: !_isEditing,
                         decoration: InputDecoration(
                           labelText: _text(
-                            '\u7ed1\u5b9a\u90ae\u7bb1/\u5907\u6ce8',
+                            '绑定邮箱/备注',
                             'Email / Note',
                           ),
                           prefixIcon: const Icon(Icons.alternate_email_rounded),
@@ -1066,7 +1066,7 @@ class _AccountEditViewState extends State<AccountEditView> {
                         readOnly: !_isEditing,
                         decoration: InputDecoration(
                           labelText: _text(
-                            '\u8d26\u6237\u540d\u79f0',
+                            '账户名称',
                             'Account Name',
                           ),
                           prefixIcon: const Icon(Icons.badge_outlined),
@@ -1081,7 +1081,7 @@ class _AccountEditViewState extends State<AccountEditView> {
                         readOnly: !_isEditing,
                         decoration: InputDecoration(
                           labelText: _text(
-                            '\u7ed1\u5b9a\u90ae\u7bb1/\u5907\u6ce8',
+                            '绑定邮箱/备注',
                             'Email / Note',
                           ),
                           prefixIcon: const Icon(Icons.alternate_email_rounded),
@@ -1098,11 +1098,11 @@ class _AccountEditViewState extends State<AccountEditView> {
               initialValue: selectedTemplateId,
               isExpanded: true,
               decoration: InputDecoration(
-                labelText: _text('\u9009\u62e9\u6a21\u677f', 'Select Template'),
+                labelText: _text('选择模板', 'Select Template'),
                 prefixIcon: const Icon(Icons.category_outlined),
               ),
               hint: Text(
-                _text('\u8bf7\u9009\u62e9\u6a21\u677f', 'Choose a template'),
+                _text('请选择模板', 'Choose a template'),
               ),
               items: [
                 for (final template in templates)
@@ -1156,7 +1156,7 @@ class _AccountEditViewState extends State<AccountEditView> {
                     Expanded(
                       child: Text(
                         _text(
-                          '\u5f53\u524d\u6a21\u677f\u7f3a\u5931\uff0c\u8d26\u6237\u5df2\u8fdb\u5165\u4fdd\u62a4\u72b6\u6001\u3002\u4f60\u53ef\u4ee5\u67e5\u770b\u5df2\u4fdd\u5b58\u7684\u5b57\u6bb5\uff0c\u4f46\u9700\u8981\u5148\u6062\u590d\u6216\u5207\u6362\u5230\u53ef\u7528\u6a21\u677f\u540e\u624d\u80fd\u4fdd\u5b58\u3002',
+                          '当前模板缺失，账户已进入保护状态。你可以查看已保存的字段，但需要先恢复或切换到可用模板后才能保存。',
                           'The selected template is missing, so this account is protected until a valid template is restored or selected.',
                         ),
                         style: theme.textTheme.bodyMedium?.copyWith(
@@ -1564,7 +1564,7 @@ class _AccountEditViewState extends State<AccountEditView> {
                       const SizedBox(width: 8),
                       Text(
                         _text(
-                          '\u70b9\u51fb\u5c55\u5f00\u7f16\u8f91\u5185\u5bb9',
+                          '点击展开编辑内容',
                           'Tap to reveal and edit',
                         ),
                         style: theme.textTheme.bodyMedium?.copyWith(
@@ -1820,7 +1820,7 @@ class _AccountEditViewState extends State<AccountEditView> {
                 Expanded(
                   child: Text(
                     field.label.trim().isEmpty
-                        ? _text('2FA \u5173\u8054', '2FA Links')
+                        ? _text('2FA 关联', '2FA Links')
                         : field.label,
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w700,
@@ -1830,7 +1830,7 @@ class _AccountEditViewState extends State<AccountEditView> {
                 ToneChip(
                   icon: Icons.link_outlined,
                   label: _text(
-                    '$linkedCount \u4e2a\u5df2\u5173\u8054',
+                    '$linkedCount 个已关联',
                     '$linkedCount linked',
                   ),
                   tint: theme.colorScheme.primary,
@@ -1842,7 +1842,7 @@ class _AccountEditViewState extends State<AccountEditView> {
               field.description?.trim().isNotEmpty == true
                   ? field.description!.trim()
                   : _text(
-                      '2FA \u662f\u72ec\u7acb\u529f\u80fd\uff0c\u8fd9\u91cc\u53ea\u9009\u62e9\u54ea\u4e9b\u52a8\u6001\u9a8c\u8bc1\u7801\u548c\u8be5\u8d26\u6237\u5173\u8054\u3002',
+                      '2FA 是独立功能，这里只选择哪些动态验证码和该账户关联。',
                       '2FA lives independently. This section only links authenticator entries to this account.',
                     ),
               style: theme.textTheme.bodyMedium?.copyWith(
@@ -1854,7 +1854,7 @@ class _AccountEditViewState extends State<AccountEditView> {
             if (credentials.isEmpty)
               Text(
                 _text(
-                  '\u6682\u65e0 2FA \u9879\uff0c\u53ef\u4ee5\u76f4\u63a5\u5728\u8fd9\u91cc\u65b0\u5efa\u3002',
+                  '暂无 2FA 项，可以直接在这里新建。',
                   'No 2FA items yet. You can create one here.',
                 ),
                 style: theme.textTheme.bodySmall?.copyWith(
@@ -1893,7 +1893,7 @@ class _AccountEditViewState extends State<AccountEditView> {
                     ? null
                     : () => _createTotpCredentialForAccount(provider),
                 icon: const Icon(Icons.add_link_outlined),
-                label: Text(_text('\u65b0\u5efa 2FA', 'Add 2FA')),
+                label: Text(_text('新建 2FA', 'Add 2FA')),
               ),
             ),
           ],
@@ -1938,7 +1938,7 @@ class _AccountEditViewState extends State<AccountEditView> {
                 Expanded(
                   child: Text(
                     field.label.trim().isEmpty
-                        ? _text('\u5173\u8054\u8d26\u6237', 'Linked Account')
+                        ? _text('关联账户', 'Linked Account')
                         : field.label,
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w700,
@@ -1948,7 +1948,7 @@ class _AccountEditViewState extends State<AccountEditView> {
                 if (linkedAccount != null)
                   ToneChip(
                     icon: Icons.check_circle_outlined,
-                    label: _text('\u5df2\u5173\u8054', 'Linked'),
+                    label: _text('已关联', 'Linked'),
                     tint: theme.colorScheme.primary,
                   ),
               ],
@@ -1958,7 +1958,7 @@ class _AccountEditViewState extends State<AccountEditView> {
               field.description?.trim().isNotEmpty == true
                   ? field.description!.trim()
                   : _text(
-                      '\u7528\u4e8e\u5173\u8054\u5176\u4ed6\u8d26\u6237\u8bb0\u5f55\u3002',
+                      '用于关联其他账户记录。',
                       'Used to link to another account entry.',
                     ),
               style: theme.textTheme.bodyMedium?.copyWith(
@@ -1972,7 +1972,7 @@ class _AccountEditViewState extends State<AccountEditView> {
             else
               Text(
                 _text(
-                  '\u5c1a\u672a\u5173\u8054\u4efb\u4f55\u8d26\u6237\u3002',
+                  '尚未关联任何账户。',
                   'No account linked yet.',
                 ),
                 style: theme.textTheme.bodySmall?.copyWith(
@@ -1992,8 +1992,8 @@ class _AccountEditViewState extends State<AccountEditView> {
                     ),
                     label: Text(
                       linkedAccount != null
-                          ? _text('\u66f4\u6362\u5173\u8054', 'Change Link')
-                          : _text('\u9009\u62e9\u8d26\u6237', 'Select Account'),
+                          ? _text('更换关联', 'Change Link')
+                          : _text('选择账户', 'Select Account'),
                     ),
                   ),
                   if (linkedAccount != null) ...[
@@ -2005,7 +2005,7 @@ class _AccountEditViewState extends State<AccountEditView> {
                         });
                       },
                       icon: const Icon(Icons.link_off_outlined),
-                      label: Text(_text('\u6e05\u9664\u5173\u8054', 'Clear')),
+                      label: Text(_text('清除关联', 'Clear')),
                     ),
                   ],
                 ],
@@ -2144,7 +2144,7 @@ class _AccountEditViewState extends State<AccountEditView> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              _text('\u8d26\u6237\u5b57\u6bb5', 'Account Fields'),
+              _text('账户字段', 'Account Fields'),
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w700,
               ),
@@ -2207,18 +2207,18 @@ class _AccountEditViewState extends State<AccountEditView> {
   Widget _buildEmptyFieldState(BuildContext context) {
     final theme = Theme.of(context);
     final title = _hasMissingTemplate
-        ? _text('\u6a21\u677f\u5df2\u7f3a\u5931', 'Template Missing')
+        ? _text('模板已缺失', 'Template Missing')
         : _text(
-            '\u8bf7\u5148\u9009\u62e9\u6a21\u677f',
+            '请先选择模板',
             'Choose a Template First',
           );
     final description = _hasMissingTemplate
         ? _text(
-            '\u8be5\u8d26\u6237\u539f\u6765\u7ed1\u5b9a\u7684\u6a21\u677f\u5df2\u4e0d\u53ef\u7528\u3002\u4e3a\u4e86\u907f\u514d\u539f\u59cb\u6570\u636e\u88ab\u8986\u76d6\uff0c\u7cfb\u7edf\u6682\u65f6\u7981\u6b62\u76f4\u63a5\u4fdd\u5b58\u3002',
+            '该账户原来绑定的模板已不可用。为了避免原始数据被覆盖，系统暂时禁止直接保存。',
             'The template linked to this account is no longer available. Saving is temporarily disabled so the original data is not overwritten.',
           )
         : _text(
-            '\u6a21\u677f\u4f1a\u51b3\u5b9a\u8d26\u6237\u9700\u8981\u5f55\u5165\u54ea\u4e9b\u4fe1\u606f\uff0c\u9009\u62e9\u540e\u4e0b\u65b9\u4f1a\u81ea\u52a8\u5c55\u5f00\u5b57\u6bb5\u3002',
+            '模板会决定账户需要录入哪些信息，选择后下方会自动展开字段。',
             'Templates decide which pieces of information belong to this account.',
           );
 
@@ -2287,7 +2287,7 @@ class _AccountEditViewState extends State<AccountEditView> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              _text('\u5386\u53f2\u5b57\u6bb5', 'Historical Fields'),
+              _text('历史字段', 'Historical Fields'),
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w700,
               ),
@@ -2295,7 +2295,7 @@ class _AccountEditViewState extends State<AccountEditView> {
             const SizedBox(height: 6),
             Text(
               _text(
-                '\u8fd9\u4e9b\u662f\u5f53\u524d\u6a21\u677f\u6ca1\u6709\u5b9a\u4e49\uff0c\u4f46\u8d26\u6237\u4ecd\u7136\u4fdd\u7559\u7684\u5b57\u6bb5\u3002\u4f60\u53ef\u4ee5\u7ee7\u7eed\u4fdd\u7559\u5b83\u4eec\uff0c\u6216\u5728\u4fdd\u5b58\u524d\u660e\u786e\u6807\u8bb0\u5220\u9664\u3002',
+                '这些是当前模板没有定义，但账户仍然保留的字段。你可以继续保留它们，或在保存前明确标记删除。',
                 'These fields still belong to the account even though the current template does not define them. You can keep them, or explicitly mark them for removal before saving.',
               ),
               style: theme.textTheme.bodySmall?.copyWith(
@@ -2377,7 +2377,7 @@ class _AccountEditViewState extends State<AccountEditView> {
                           IconButton(
                             visualDensity: VisualDensity.compact,
                             tooltip: _text(
-                              '\u590d\u5236\u5b57\u6bb5\u5185\u5bb9',
+                              '复制字段内容',
                               'Copy field value',
                             ),
                             onPressed: () => _copyValue(label, entry.value),
@@ -2387,7 +2387,7 @@ class _AccountEditViewState extends State<AccountEditView> {
                             IconButton(
                               visualDensity: VisualDensity.compact,
                               tooltip: _text(
-                                '\u6807\u8bb0\u5220\u9664',
+                                '标记删除',
                                 'Mark for removal',
                               ),
                               onPressed: () =>
@@ -2398,7 +2398,7 @@ class _AccountEditViewState extends State<AccountEditView> {
                       ),
                       const SizedBox(height: 8),
                       SelectableText(
-                        isSecret ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022' : entry.value,
+                        isSecret ? '••••••••' : entry.value,
                         style: theme.textTheme.bodyMedium,
                       ),
                     ],
@@ -2411,7 +2411,7 @@ class _AccountEditViewState extends State<AccountEditView> {
               Divider(color: theme.colorScheme.outlineVariant.withAlpha(120)),
               const SizedBox(height: 12),
               Text(
-                _text('\u5f85\u5220\u9664\u5b57\u6bb5', 'Pending Removal'),
+                _text('待删除字段', 'Pending Removal'),
                 style: theme.textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.w700,
                 ),
@@ -2419,7 +2419,7 @@ class _AccountEditViewState extends State<AccountEditView> {
               const SizedBox(height: 6),
               Text(
                 _text(
-                  '\u8fd9\u4e9b\u5b57\u6bb5\u4f1a\u5728\u4fdd\u5b58\u540e\u4ece\u8d26\u6237\u4e2d\u79fb\u9664\uff0c\u5728\u4fdd\u5b58\u4e4b\u524d\u4ecd\u53ef\u6062\u590d\u3002',
+                  '这些字段会在保存后从账户中移除，在保存之前仍可恢复。',
                   'These fields will be removed from the account after you save. You can still restore them before saving.',
                 ),
                 style: theme.textTheme.bodySmall?.copyWith(
@@ -2466,7 +2466,7 @@ class _AccountEditViewState extends State<AccountEditView> {
                         TextButton.icon(
                           onPressed: () => _restoreLegacyField(entry.key),
                           icon: const Icon(Icons.undo_outlined),
-                          label: Text(_text('\u6062\u590d', 'Restore')),
+                          label: Text(_text('恢复', 'Restore')),
                         ),
                       ],
                     ),
@@ -2494,16 +2494,16 @@ class _AccountEditViewState extends State<AccountEditView> {
       appBar: AppBar(
         title: Text(
           widget.initial == null
-              ? _text('\u65b0\u5efa\u8d26\u6237', 'Add Account')
+              ? _text('新建账户', 'Add Account')
               : _isEditing
-              ? _text('\u7f16\u8f91\u8d26\u6237', 'Edit Account')
-              : _text('\u9884\u89c8\u8d26\u6237', 'Preview Account'),
+              ? _text('编辑账户', 'Edit Account')
+              : _text('预览账户', 'Preview Account'),
         ),
         actions: [
           if (widget.initial != null)
             IconButton(
               tooltip: _text(
-                '\u5386\u53f2\u7248\u672c\u4e0e\u51b2\u7a81',
+                '历史版本与冲突',
                 'History & Conflicts',
               ),
               icon: const Icon(Icons.history_outlined),
@@ -2511,12 +2511,12 @@ class _AccountEditViewState extends State<AccountEditView> {
             ),
           IconButton(
             tooltip: _text(
-              '\u590d\u5236\u5168\u90e8\u4fe1\u606f',
+              '复制全部信息',
               'Copy all information',
             ),
             icon: const Icon(Icons.copy_all_outlined),
             onPressed: () => _copyValue(
-              _text('\u5168\u90e8\u4fe1\u606f', 'All Information'),
+              _text('全部信息', 'All Information'),
               _buildCopyAllText(),
             ),
           ),
@@ -2573,8 +2573,8 @@ class _AccountEditViewState extends State<AccountEditView> {
               ? 'save-account-fab-edit'
               : 'edit-account-fab-preview',
           tooltip: _isEditing
-              ? _text('\u4fdd\u5b58\u8d26\u6237', 'Save Account')
-              : _text('\u7f16\u8f91\u8d26\u6237', 'Edit Account'),
+              ? _text('保存账户', 'Save Account')
+              : _text('编辑账户', 'Edit Account'),
           icon: _isEditing ? Icons.check : Icons.edit_outlined,
           onPressed: _isEditing
               ? (_hasMissingTemplate ? null : _save)
@@ -2610,7 +2610,7 @@ class _AccountEditViewState extends State<AccountEditView> {
         SnackBar(
           content: Text(
             _text(
-              '\u6ca1\u6709\u5386\u53f2\u6216\u51b2\u7a81\u8bb0\u5f55',
+              '没有历史或冲突记录',
               'No history or conflicts found',
             ),
           ),
@@ -2635,7 +2635,7 @@ class _AccountEditViewState extends State<AccountEditView> {
             children: [
               Text(
                 _text(
-                  '\u5386\u53f2\u51b2\u7a81\u8bb0\u5f55 (Conflict Logs)',
+                  '历史冲突记录 (Conflict Logs)',
                   'History & Conflicts',
                 ),
                 style: sheetTheme.textTheme.titleLarge?.copyWith(
@@ -2645,7 +2645,7 @@ class _AccountEditViewState extends State<AccountEditView> {
               const SizedBox(height: 8),
               Text(
                 _text(
-                  '\u70b9\u51fb\u6062\u590d\u4ee5\u5c06\u65e7\u6570\u636e\u586b\u5165\u7f16\u8f91\u6846\uff0c\u4fdd\u5b58\u5373\u53ef\u8986\u76d6\u4e91\u7aef\u3002',
+                  '点击恢复以将旧数据填入编辑框，保存即可覆盖云端。',
                   'Tap Restore to load old data into the form. Saving it will overwrite the cloud.',
                 ),
                 style: sheetTheme.textTheme.bodySmall,
@@ -2681,7 +2681,7 @@ class _AccountEditViewState extends State<AccountEditView> {
                         ],
                       ),
                       trailing: FilledButton.tonal(
-                        child: Text(_text('\u6062\u590d', 'Restore')),
+                        child: Text(_text('恢复', 'Restore')),
                         onPressed: () {
                           if (log.fieldKey == 'name') {
                             _nameCtrl.text = log.fieldValue;
@@ -2702,7 +2702,7 @@ class _AccountEditViewState extends State<AccountEditView> {
                             SnackBar(
                               content: Text(
                                 _text(
-                                  '\u5df2\u586b\u5165\u8868\u5355\uff0c\u8bf7\u70b9\u51fb\u4fdd\u5b58\u4ee5\u751f\u6548',
+                                  '已填入表单，请点击保存以生效',
                                   'Draft loaded. Hit save to commit.',
                                 ),
                               ),
@@ -2816,7 +2816,7 @@ class _ListFieldEditorState extends State<_ListFieldEditor> {
             decoration: InputDecoration(
               hintText:
                   widget.hint ??
-                  '\u7c98\u8d34 12 \u6216 24 \u4e2a\u5355\u8bcd\uff0c\u81ea\u52a8\u5206\u8bcd',
+                  '粘贴 12 或 24 个单词，自动分词',
               prefixIcon: const Icon(Icons.paste_outlined),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -2827,7 +2827,7 @@ class _ListFieldEditorState extends State<_ListFieldEditor> {
         if (!widget.readOnly) const SizedBox(height: 12),
         if (_items.isEmpty)
           Text(
-            '\u8fd8\u672a\u8f93\u5165\u52a9\u8bb0\u8bcd',
+            '还未输入助记词',
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -2892,14 +2892,14 @@ class _ListFieldEditorState extends State<_ListFieldEditor> {
               TextButton.icon(
                 onPressed: _items.length < 24 ? _addItem : null,
                 icon: const Icon(Icons.add, size: 18),
-                label: const Text('\u6dfb\u52a0\u5355\u8bcd'),
+                label: const Text('添加单词'),
               ),
               TextButton.icon(
                 onPressed: _items.isNotEmpty
                     ? () => _removeItem(_items.length - 1)
                     : null,
                 icon: const Icon(Icons.remove, size: 18),
-                label: const Text('\u5220\u9664\u672b\u5c3e'),
+                label: const Text('删除末尾'),
               ),
             ],
           ),
@@ -2952,7 +2952,7 @@ class _ListFieldEditorState extends State<_ListFieldEditor> {
           TextButton.icon(
             onPressed: _addItem,
             icon: const Icon(Icons.add),
-            label: const Text('\u6dfb\u52a0\u9879'),
+            label: const Text('添加项'),
           ),
       ],
     );
@@ -3000,7 +3000,7 @@ class _AccountPickerDialogState extends State<_AccountPickerDialog> {
     return AlertDialog(
       title: Text(
         widget.localeText(
-          '\u9009\u62e9\u5173\u8054\u8d26\u6237',
+          '选择关联账户',
           'Select Linked Account',
         ),
       ),
@@ -3016,7 +3016,7 @@ class _AccountPickerDialogState extends State<_AccountPickerDialog> {
                 autofocus: true,
                 decoration: InputDecoration(
                   hintText: widget.localeText(
-                    '\u641c\u7d22\u8d26\u6237...',
+                    '搜索账户...',
                     'Search accounts...',
                   ),
                   prefixIcon: const Icon(Icons.search_outlined),
@@ -3034,7 +3034,7 @@ class _AccountPickerDialogState extends State<_AccountPickerDialog> {
                   ? Center(
                       child: Text(
                         widget.localeText(
-                          '\u672a\u627e\u5230\u8d26\u6237',
+                          '未找到账户',
                           'No accounts found',
                         ),
                         style: theme.textTheme.bodyMedium?.copyWith(
@@ -3087,12 +3087,12 @@ class _AccountPickerDialogState extends State<_AccountPickerDialog> {
           TextButton(
             onPressed: () => Navigator.pop(context, ''),
             child: Text(
-              widget.localeText('\u6e05\u9664\u5173\u8054', 'Clear Link'),
+              widget.localeText('清除关联', 'Clear Link'),
             ),
           ),
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: Text(widget.localeText('\u53d6\u6d88', 'Cancel')),
+          child: Text(widget.localeText('取消', 'Cancel')),
         ),
       ],
     );

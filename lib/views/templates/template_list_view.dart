@@ -1,4 +1,7 @@
+﻿import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:secret_roy/l10n/app_localizations.dart';
 
@@ -12,11 +15,24 @@ import '../../theme/app_layout.dart';
 import '../../widgets/adaptive_page.dart';
 import '../../widgets/app_page_header.dart';
 import '../../widgets/app_selectable_scrollable.dart';
-import '../../widgets/green_add_button.dart';
+
 import 'template_edit_view.dart';
 
-class TemplateListView extends StatelessWidget {
-  const TemplateListView({super.key});
+class TemplateListBody extends StatefulWidget {
+  const TemplateListBody({super.key});
+
+  @override
+  State<TemplateListBody> createState() => _TemplateListBodyState();
+}
+
+class _TemplateListBodyState extends State<TemplateListBody> {
+  final _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   Future<void> _openEditor(
     BuildContext context, {
@@ -45,7 +61,8 @@ class TemplateListView extends StatelessWidget {
         builder: (dialogContext) => AlertDialog(
           title: Text(context.text( '模板已被更新', 'Template Updated')),
           content: Text(
-            context.text('该模板已被同步更新，你的本地编辑已过期。是否重载最新版本后继续编辑？',
+            context.text(
+              '该模板已被同步更新，你的本地编辑已过期。是否重载最新版本后继续编辑？',
               'This template has been updated by sync. Your local edit is stale. Reload the latest version and continue editing?',
             ),
           ),
@@ -120,7 +137,7 @@ class TemplateListView extends StatelessWidget {
       messenger.showSnackBar(
         SnackBar(
           content: Text(
-            '\u8be5\u6a21\u677f\u4ecd\u88ab $usageCount \u4e2a\u8d26\u6237\u4f7f\u7528\uff0c\u6682\u65f6\u4e0d\u80fd\u5220\u9664\u3002',
+            '该模板仍被 $usageCount 个账户使用，暂时不能删除。',
           ),
         ),
       );
@@ -130,9 +147,9 @@ class TemplateListView extends StatelessWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('\u5220\u9664\u6a21\u677f'),
+        title: const Text('删除模板'),
         content: Text(
-          '\u786e\u8ba4\u5220\u9664\u201c${template.title}\u201d\u5417\uff1f',
+          '确认删除“${template.title}”吗？',
         ),
         actions: [
           TextButton(
@@ -159,12 +176,167 @@ class TemplateListView extends StatelessWidget {
         messenger.showSnackBar(
           SnackBar(
             content: Text(
-              '\u8be5\u6a21\u677f\u4ecd\u88ab ${e.usageCount} \u4e2a\u8d26\u6237\u4f7f\u7528\uff0c\u6682\u65f6\u4e0d\u80fd\u5220\u9664\u3002',
+              '该模板仍被 ${e.usageCount} 个账户使用，暂时不能删除。',
             ),
           ),
         );
       }
     }
+  }
+
+  void _showCopiedSnackBar(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(AppLocalizations.of(context)!.exportCopied)),
+    );
+  }
+
+  void _exportSingle(BuildContext context, AccountTemplate template) {
+    final json = encodeTemplateExport([template]);
+    Clipboard.setData(ClipboardData(text: json));
+    _showCopiedSnackBar(context);
+  }
+
+  Future<void> _openImportDialog(BuildContext context) async {
+    final provider = context.read<EnhancedAppProvider>();
+    final l10n = AppLocalizations.of(context)!;
+    final controller = TextEditingController();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l10n.importTemplate),
+        content: SizedBox(
+          width: 480,
+          child: TextField(
+            controller: controller,
+            maxLines: 8,
+            decoration: InputDecoration(
+              hintText: l10n.importHint,
+              border: const OutlineInputBorder(),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(l10n.import),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    try {
+      final existingIds = provider.allTemplates.map((t) => t.templateId).toSet();
+      final templates = parseTemplateExport(
+        controller.text,
+        existingIds: existingIds,
+      );
+      if (templates.isEmpty) {
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.noTemplatesToImport)),
+        );
+        return;
+      }
+      for (final template in templates) {
+        await provider.addCustomTemplate(template);
+      }
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.importSuccess(templates.length))),
+      );
+    } on FormatException catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.importFailed)),
+      );
+    }
+  }
+
+  Future<void> _openBatchExportDialog(BuildContext context) async {
+    final provider = context.read<EnhancedAppProvider>();
+    final l10n = AppLocalizations.of(context)!;
+    final customTemplates = provider.customTemplates;
+
+    if (customTemplates.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.noTemplatesToExport)),
+      );
+      return;
+    }
+
+    final selected = <String>{...customTemplates.map((t) => t.templateId)};
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: Text(l10n.batchExportTitle),
+          content: SizedBox(
+            width: 480,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    l10n.selectTemplates,
+                    style: Theme.of(dialogContext).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 12),
+                  ...customTemplates.map((t) => CheckboxListTile(
+                    value: selected.contains(t.templateId),
+                    title: Text(t.title),
+                    subtitle: Text(
+                      '${t.fields.length} ${context.text('字段', 'fields')}',
+                    ),
+                    controlAffinity: ListTileControlAffinity.leading,
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    onChanged: (v) {
+                      setDialogState(() {
+                        if (v == true) {
+                          selected.add(t.templateId);
+                        } else {
+                          selected.remove(t.templateId);
+                        }
+                      });
+                    },
+                  )),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: Text(l10n.cancel),
+            ),
+            FilledButton(
+              onPressed: selected.isEmpty
+                  ? null
+                  : () => Navigator.pop(dialogContext, true),
+              child: Text(l10n.export),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    final toExport = customTemplates
+        .where((t) => selected.contains(t.templateId))
+        .toList();
+    final json = encodeTemplateExport(toExport);
+    Clipboard.setData(ClipboardData(text: json));
+    _showCopiedSnackBar(context);
   }
 
   Widget _buildSectionHeader(
@@ -207,8 +379,8 @@ class TemplateListView extends StatelessWidget {
         .length;
     return AppPageHeader(
       icon: Icons.view_list_outlined,
-      title: context.text( '\u6a21\u677f\u4e2d\u5fc3', 'Template Hub'),
-      subtitle: context.text('\u4e3a\u8d26\u6237\u9875\u7edf\u4e00\u8bbe\u8ba1\u5b57\u6bb5\u7ed3\u6784\u4e0e\u5f55\u5165\u4f53\u9a8c',
+      title: context.text( '模板中心', 'Template Hub'),
+      subtitle: context.text('为账户页统一设计字段结构与录入体验',
         'Design field structures and editing experiences for account pages',
       ),
       metrics: [
@@ -216,21 +388,21 @@ class TemplateListView extends StatelessWidget {
           context,
           icon: Icons.dashboard_customize_outlined,
           label:
-              '$totalTemplates ${context.text( '\u4e2a\u6a21\u677f', 'Templates')}',
+              '$totalTemplates ${context.text( '个模板', 'Templates')}',
           tint: theme.colorScheme.primary,
         ),
         _buildToneChip(
           context,
           icon: Icons.tune_outlined,
           label:
-              '$customTemplates ${context.text( '\u4e2a\u81ea\u5b9a\u4e49', 'Custom')}',
+              '$customTemplates ${context.text( '个自定义', 'Custom')}',
           tint: theme.colorScheme.primary,
         ),
         _buildToneChip(
           context,
           icon: Icons.inventory_2_outlined,
           label:
-              '$usedTemplates ${context.text( '\u4e2a\u5728\u7528', 'In Use')}',
+              '$usedTemplates ${context.text( '个在用', 'In Use')}',
           tint: theme.colorScheme.primary,
         ),
       ],
@@ -252,48 +424,52 @@ class TemplateListView extends StatelessWidget {
 
       return Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(AppSpacing.lg),
+        padding: const EdgeInsets.all(AppSpacing.xl),
         decoration: BoxDecoration(
           color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(AppRadii.panel),
-          border: Border.all(color: theme.colorScheme.outlineVariant),
+          border: Border.all(
+            color: theme.colorScheme.outlineVariant.withAlpha(60),
+          ),
+          boxShadow: AppShadows.card(theme, depth: 0.3),
         ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Container(
-              width: 44,
-              height: 44,
+              width: 56,
+              height: 56,
               decoration: BoxDecoration(
-                color: AppSurfaces.soft(
-                  theme.colorScheme,
-                  tint: accent,
-                  tintAlpha: 14,
-                ),
-                borderRadius: BorderRadius.circular(AppRadii.button),
-                border: Border.all(color: accent.withAlpha(44)),
+                color: accent.withAlpha(14),
+                shape: BoxShape.circle,
               ),
               alignment: Alignment.center,
-              child: Icon(Icons.layers_clear_outlined, size: 24, color: accent),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            Text(
-              isCustomSection
-                  ? '\u8fd8\u6ca1\u6709\u81ea\u5b9a\u4e49\u6a21\u677f'
-                  : '\u5f53\u524d\u6ca1\u6709\u53ef\u5c55\u793a\u7684\u5185\u7f6e\u6a21\u677f',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
+              child: Icon(
+                Icons.layers_clear_outlined,
+                size: 28,
+                color: accent.withAlpha(180),
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: AppSpacing.lg),
             Text(
               isCustomSection
-                  ? '\u521b\u5efa\u540e\u4f1a\u7acb\u5373\u51fa\u73b0\u5728\u8fd9\u91cc\uff0c\u4f5c\u4e3a\u53ef\u590d\u7528\u7684\u6a21\u677f\u5361\u7247\u3002'
-                  : '\u5185\u7f6e\u6a21\u677f\u4f1a\u81ea\u52a8\u5c55\u793a\u5728\u8fd9\u91cc\u3002',
+                  ? '还没有自定义模板'
+                  : '当前没有可展示的内置模板',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              isCustomSection
+                  ? '创建后会立即出现在这里，作为可复用的模板卡片。'
+                  : '内置模板会自动展示在这里。',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
-                height: 1.3,
+                height: 1.4,
               ),
+              textAlign: TextAlign.center,
             ),
           ],
         ),
@@ -303,7 +479,7 @@ class TemplateListView extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final layout = AppLayout.of(context);
-        final crossAxisCount = layout.isCompact ? 1 : (layout.isMedium ? 2 : 3);
+        final crossAxisCount = layout.isCompact ? 1 : 2;
 
         final cards = [
           for (final template in templates)
@@ -313,51 +489,35 @@ class TemplateListView extends StatelessWidget {
               onOpen: template.isCustom
                   ? () => _openEditor(context, initial: template)
                   : null,
+              onExport: template.isCustom
+                  ? () => _exportSingle(context, template)
+                  : null,
               onDelete: template.isCustom
                   ? () => _deleteTemplate(context, template)
                   : null,
             ),
         ];
 
-        return Container(
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surface,
-            borderRadius: BorderRadius.circular(AppRadii.panel),
-            border: Border.all(
-              color: theme.colorScheme.outlineVariant.withAlpha(
-                AppAlphas.outline,
-              ),
-            ),
-          ),
-          child: crossAxisCount == 1
-              ? Column(
-                  children: [
-                    for (var i = 0; i < cards.length; i++) ...[
-                      cards[i],
-                      if (i < cards.length - 1)
-                        Divider(
-                          height: 1,
-                          thickness: 0.5,
-                          indent: AppSpacing.lg,
-                          endIndent: AppSpacing.lg,
-                          color: theme.colorScheme.outlineVariant.withAlpha(
-                            AppAlphas.divider,
-                          ),
-                        ),
-                    ],
+        return crossAxisCount == 1
+            ? Column(
+                children: [
+                  for (var i = 0; i < cards.length; i++) ...[
+                    cards[i],
+                    if (i < cards.length - 1)
+                      const SizedBox(height: AppSpacing.md),
                   ],
-                )
-              : GridView.count(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  crossAxisCount: crossAxisCount,
-                  childAspectRatio: layout.isMedium ? 1.65 : 1.45,
-                  padding: const EdgeInsets.all(AppSpacing.lg),
-                  crossAxisSpacing: AppSpacing.lg,
-                  mainAxisSpacing: AppSpacing.lg,
-                  children: cards,
-                ),
-        );
+                ],
+              )
+            : GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: crossAxisCount,
+                childAspectRatio: 1.65,
+                padding: const EdgeInsets.all(AppSpacing.xl),
+                crossAxisSpacing: AppSpacing.xl,
+                mainAxisSpacing: AppSpacing.xl,
+                children: cards,
+              );
       },
     );
   }
@@ -371,61 +531,77 @@ class TemplateListView extends StatelessWidget {
         .toList();
     final l10n = AppLocalizations.of(context)!;
 
-    return Scaffold(
-      appBar: AppBar(title: Text(l10n.templatesTitle)),
-      body: AdaptivePage(
-        desktopMaxWidth: 1320,
-        child: AppSelectableScrollable(
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(0, 16, 0, 120),
-            children: [
-              _buildHeroCard(context, provider),
-              const SizedBox(height: 22),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+    return AppSelectableScrollable(
+      controller: _scrollController,
+      child: ListView(
+        controller: _scrollController,
+        padding: const EdgeInsets.fromLTRB(0, 16, 0, 120),
+        children: [
+            _buildHeroCard(context, provider),
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
                 children: [
-                  _buildSectionHeader(
-                    context,
-                    title: '\u81ea\u5b9a\u4e49\u6a21\u677f',
-                    subtitle:
-                        '\u6309\u4f60\u7684\u4f7f\u7528\u4e60\u60ef\u7ec4\u7ec7\u5b57\u6bb5\uff0c\u505a\u6210\u771f\u6b63\u53ef\u590d\u7528\u7684\u6a21\u677f\u5361\u7247\u3002',
+                  FilledButton.icon(
+                    onPressed: () => _openEditor(context),
+                    icon: const Icon(Icons.add, size: 18),
+                    label: Text(l10n.addTemplate),
                   ),
-                  const SizedBox(height: AppSpacing.md),
-                  _buildTemplateGrid(
-                    context,
-                    templates: customTemplates,
-                    isCustomSection: true,
+                  OutlinedButton.icon(
+                    onPressed: () => _openImportDialog(context),
+                    icon: const Icon(Icons.download_outlined, size: 18),
+                    label: Text(l10n.importTemplate),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () => _openBatchExportDialog(context),
+                    icon: const Icon(Icons.upload_outlined, size: 18),
+                    label: Text(l10n.exportTemplate),
                   ),
                 ],
               ),
-              const SizedBox(height: AppSpacing.xl),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildSectionHeader(
-                    context,
-                    title: '\u5185\u7f6e\u6a21\u677f',
-                    subtitle:
-                        '\u5e38\u89c1\u8d26\u6237\u4e0e\u8eab\u4efd\u4fe1\u606f\u7684\u9ed8\u8ba4\u6a21\u677f\uff0c\u53ef\u76f4\u63a5\u4f5c\u4e3a\u8d77\u70b9\u4f7f\u7528\u3002',
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  _buildTemplateGrid(
-                    context,
-                    templates: builtinTemplates,
-                    isCustomSection: false,
-                  ),
-                ],
-              ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 22),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildSectionHeader(
+                  context,
+                  title: '自定义模板',
+                  subtitle:
+                      '按你的使用习惯组织字段，做成真正可复用的模板卡片。',
+                ),
+                const SizedBox(height: AppSpacing.md),
+                _buildTemplateGrid(
+                  context,
+                  templates: customTemplates,
+                  isCustomSection: true,
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildSectionHeader(
+                  context,
+                  title: '内置模板',
+                  subtitle:
+                      '常见账户与身份信息的默认模板，可直接作为起点使用。',
+                ),
+                const SizedBox(height: AppSpacing.md),
+                _buildTemplateGrid(
+                  context,
+                  templates: builtinTemplates,
+                  isCustomSection: false,
+                ),
+              ],
+            ),
+          ],
         ),
-      ),
-      floatingActionButton: GreenAddButton(
-        heroTag: 'add-template-fab',
-        onPressed: () => _openEditor(context),
-        tooltip: l10n.addTemplate,
-      ),
-    );
+      );
   }
 }
 
@@ -433,12 +609,14 @@ class _TemplateCard extends StatelessWidget {
   final AccountTemplate template;
   final int usageCount;
   final VoidCallback? onOpen;
+  final VoidCallback? onExport;
   final VoidCallback? onDelete;
 
   const _TemplateCard({
     required this.template,
     required this.usageCount,
     this.onOpen,
+    this.onExport,
     this.onDelete,
   });
 
@@ -451,33 +629,83 @@ class _TemplateCard extends StatelessWidget {
 
     return Material(
       color: Colors.transparent,
-      child: InkWell(
-        onTap: onOpen,
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final isCompact = constraints.maxWidth < 720;
-              final content = _TemplateCardContent(
-                template: template,
-                usageCount: usageCount,
-                accent: accent,
-                onOpen: onOpen,
-                onDelete: onDelete,
-                compact: isCompact,
-              );
-              if (isCompact) return content;
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _TemplateBadge(template: template, accent: accent),
-                  const SizedBox(width: AppSpacing.lg),
-                  Expanded(child: content),
-                ],
-              );
-            },
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          InkWell(
+            onTap: onOpen,
+            borderRadius: BorderRadius.circular(AppRadii.panel),
+            child: Container(
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                borderRadius: BorderRadius.circular(AppRadii.panel),
+                border: Border.all(
+                  color: theme.colorScheme.outlineVariant.withAlpha(50),
+                ),
+                boxShadow: AppShadows.card(theme, depth: 0.4),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isCompact = constraints.maxWidth < 720;
+                    final content = _TemplateCardContent(
+                      template: template,
+                      usageCount: usageCount,
+                      accent: accent,
+                      onOpen: onOpen,
+                      onExport: onExport,
+                      onDelete: onDelete,
+                      compact: isCompact,
+                    );
+                    if (isCompact) return content;
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _TemplateBadge(template: template, accent: accent),
+                        const SizedBox(width: AppSpacing.lg),
+                        Expanded(child: content),
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ),
           ),
-        ),
+          if (template.isCustom)
+            Positioned(
+              top: 12,
+              right: -2,
+              child: Transform.rotate(
+                angle: math.pi / 4,
+                child: Container(
+                  width: 48,
+                  height: 16,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary,
+                    boxShadow: [
+                      BoxShadow(
+                        color: theme.colorScheme.primary.withAlpha(60),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Text(
+                    '自定义',
+                    style: TextStyle(
+                      color: theme.colorScheme.onPrimary,
+                      fontSize: 8,
+                      fontWeight: FontWeight.w900,
+                      height: 1,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -488,6 +716,7 @@ class _TemplateCardContent extends StatelessWidget {
   final int usageCount;
   final Color accent;
   final VoidCallback? onOpen;
+  final VoidCallback? onExport;
   final VoidCallback? onDelete;
   final bool compact;
 
@@ -496,6 +725,7 @@ class _TemplateCardContent extends StatelessWidget {
     required this.usageCount,
     required this.accent,
     required this.onOpen,
+    required this.onExport,
     required this.onDelete,
     required this.compact,
   });
@@ -504,45 +734,35 @@ class _TemplateCardContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    final header = Row(
+    final header = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (compact) ...[
-          _TemplateBadge(template: template, accent: accent),
-          const SizedBox(width: AppSpacing.md),
-        ],
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      template.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: theme.colorScheme.onSurface,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  _TemplateTypeChip(template: template, accent: accent),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                template.subTitle.isEmpty ? '暂无模板描述' : template.subTitle,
-                maxLines: compact ? 2 : 1,
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                template.title,
+                maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                  height: 1.3,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: theme.colorScheme.onSurface,
+                  letterSpacing: -0.2,
                 ),
               ),
-            ],
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            _TemplateTypeChip(template: template, accent: accent),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          template.subTitle.isEmpty ? '暂无模板描述' : template.subTitle,
+          maxLines: compact ? 2 : 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+            height: 1.4,
           ),
         ),
       ],
@@ -557,44 +777,93 @@ class _TemplateCardContent extends StatelessWidget {
           label: '${template.fields.length} 字段',
           tint: accent,
         ),
-        _InfoChip(
-          icon: Icons.inventory_2_outlined,
-          label: '已使用 $usageCount 次',
-          tint: accent,
-        ),
+        if (usageCount > 0)
+          _InfoChip(
+            icon: Icons.inventory_2_outlined,
+            label: '已使用 $usageCount 次',
+            tint: accent,
+          ),
       ],
     );
 
     final actions = template.isCustom
-        ? Wrap(
-            spacing: AppSpacing.sm,
-            runSpacing: AppSpacing.sm,
+        ? Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              OutlinedButton.icon(
-                onPressed: onOpen,
-                icon: const Icon(Icons.edit_outlined, size: 18),
-                label: const Text('编辑'),
+              _IconActionButton(
+                icon: Icons.edit_outlined,
+                tooltip: '编辑模板',
+                onTap: onOpen,
+                accent: accent,
               ),
-              IconButton(
-                onPressed: onDelete,
-                icon: const Icon(Icons.delete_outline),
+              const SizedBox(width: AppSpacing.xs),
+              _IconActionButton(
+                icon: Icons.upload_outlined,
+                tooltip: '导出模板',
+                onTap: onExport,
+                accent: accent,
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              _IconActionButton(
+                icon: Icons.delete_outline,
                 tooltip: '删除模板',
+                onTap: onDelete,
+                accent: accent,
+                isDestructive: true,
               ),
             ],
           )
         : const SizedBox.shrink();
 
+    final bottomActions = template.isCustom
+        ? actions
+        : _BuiltinTemplateFooter(accent: accent);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        header,
-        const SizedBox(height: AppSpacing.md),
-        meta,
-        const SizedBox(height: AppSpacing.md),
-        _FieldPreviewTags(template: template, accent: accent),
-        if (template.isCustom) ...[
+        if (compact) ...[
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _TemplateBadge(template: template, accent: accent),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(child: header),
+            ],
+          ),
+        ] else
+          header,
+        const SizedBox(height: AppSpacing.lg),
+        if (compact) ...[
+          meta,
           const SizedBox(height: AppSpacing.md),
-          actions,
+          _FieldPreviewTags(template: template, accent: accent),
+          const SizedBox(height: AppSpacing.lg),
+          bottomActions,
+        ] else ...[
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    meta,
+                    const SizedBox(height: AppSpacing.md),
+                    _FieldPreviewTags(
+                      template: template,
+                      accent: accent,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.xl),
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: bottomActions,
+              ),
+            ],
+          ),
         ],
       ],
     );
@@ -612,19 +881,27 @@ class _TemplateBadge extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Container(
-      width: 44,
-      height: 44,
+      width: 52,
+      height: 52,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: AppSurfaces.soft(theme.colorScheme, tint: accent, tintAlpha: 12),
-        borderRadius: BorderRadius.circular(AppRadii.button),
-        border: Border.all(color: accent.withAlpha(AppAlphas.low)),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            accent.withAlpha(40),
+            accent.withAlpha(80),
+          ],
+        ),
+        shape: BoxShape.circle,
+        border: Border.all(color: accent.withAlpha(50)),
       ),
       child: Text(
         template.badgeText,
-        style: theme.textTheme.titleSmall?.copyWith(
+        style: theme.textTheme.titleMedium?.copyWith(
           color: accent,
           fontWeight: FontWeight.w900,
+          letterSpacing: 0.5,
         ),
       ),
     );
@@ -641,17 +918,19 @@ class _TemplateTypeChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: accent.withAlpha(14),
-        borderRadius: BorderRadius.circular(AppRadii.control),
-        border: Border.all(color: accent.withAlpha(38)),
+        color: accent.withAlpha(18),
+        borderRadius: BorderRadius.circular(AppRadii.pill),
+        border: Border.all(color: accent.withAlpha(40)),
       ),
       child: Text(
         template.isCustom ? '自定义' : '内置',
         style: theme.textTheme.labelSmall?.copyWith(
           color: accent,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w800,
+          fontSize: 10,
+          letterSpacing: 0.3,
         ),
       ),
     );
@@ -667,29 +946,40 @@ class _FieldPreviewTags extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final displayFields = template.fields.take(5).toList();
+    final remaining = template.fields.length - displayFields.length;
 
     return Wrap(
-      spacing: 8,
-      runSpacing: 8,
+      spacing: 6,
+      runSpacing: 6,
       children: [
-        for (final field in template.fields)
+        for (final field in displayFields)
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
-              color: AppSurfaces.soft(
-                theme.colorScheme,
-                tint: accent,
-                tintAlpha: 10,
+              color: accent.withAlpha(12),
+              borderRadius: BorderRadius.circular(AppRadii.pill),
+              border: Border.all(
+                color: accent.withAlpha(50),
               ),
-              borderRadius: BorderRadius.circular(AppRadii.control),
-              border: Border.all(color: accent.withAlpha(28)),
             ),
             child: Text(
               field.label,
-              style: theme.textTheme.bodySmall?.copyWith(
+              style: theme.textTheme.labelSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: accent.withAlpha(200),
+                height: 1.1,
+              ),
+            ),
+          ),
+        if (remaining > 0)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            child: Text(
+              '+$remaining',
+              style: theme.textTheme.labelSmall?.copyWith(
                 fontWeight: FontWeight.w700,
                 color: accent,
-                height: 1.1,
               ),
             ),
           ),
@@ -714,25 +1004,131 @@ class _InfoChip extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: AppSurfaces.soft(theme.colorScheme, tint: tint, tintAlpha: 12),
-        borderRadius: BorderRadius.circular(AppRadii.panel),
-        border: Border.all(color: tint.withAlpha(34)),
+        color: tint.withAlpha(16),
+        borderRadius: BorderRadius.circular(AppRadii.pill),
+        border: Border.all(color: tint.withAlpha(50)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: tint),
+          Icon(icon, size: 14, color: tint.withAlpha(180)),
           const SizedBox(width: 6),
           Text(
             label,
-            style: theme.textTheme.labelMedium?.copyWith(
-              color: tint,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: tint.withAlpha(220),
               fontWeight: FontWeight.w600,
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _IconActionButton extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onTap;
+  final Color accent;
+  final bool isDestructive;
+
+  const _IconActionButton({
+    required this.icon,
+    required this.tooltip,
+    this.onTap,
+    required this.accent,
+    this.isDestructive = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = isDestructive
+        ? theme.colorScheme.error
+        : theme.colorScheme.onSurfaceVariant;
+
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(AppRadii.button),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(AppRadii.button),
+          child: Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: isDestructive
+                  ? theme.colorScheme.errorContainer.withAlpha(40)
+                  : theme.colorScheme.surfaceContainerHighest.withAlpha(60),
+              borderRadius: BorderRadius.circular(AppRadii.button),
+            ),
+            child: Icon(
+              icon,
+              size: 18,
+              color: color,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BuiltinTemplateFooter extends StatelessWidget {
+  final Color accent;
+
+  const _BuiltinTemplateFooter({required this.accent});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: accent.withAlpha(28),
+            borderRadius: BorderRadius.circular(AppRadii.button),
+            border: Border.all(color: accent.withAlpha(55)),
+          ),
+          alignment: Alignment.center,
+          child: Icon(
+            Icons.touch_app_outlined,
+            size: 16,
+            color: accent.withAlpha(160),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Text(
+          '点击卡片使用此模板',
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant.withAlpha(140),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class TemplateListView extends StatelessWidget {
+  const TemplateListView({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return Scaffold(
+      appBar: AppBar(title: Text(l10n.templatesTitle)),
+      body: const AdaptivePage(
+        desktopMaxWidth: 1320,
+        child: TemplateListBody(),
       ),
     );
   }

@@ -72,6 +72,7 @@ class AccountItem {
   final Map<String, dynamic> data; // Custom fields data
   final Map<String, AccountFieldMeta> fieldMeta;
   final int createdAt;
+  final int modifiedAt;
 
   // Sync specific fields
   final Hlc nameHlc;
@@ -91,6 +92,7 @@ class AccountItem {
     required this.data,
     this.fieldMeta = const {},
     required this.createdAt,
+    this.modifiedAt = 0,
     required this.nameHlc,
     required this.emailHlc,
     required this.dataHlc,
@@ -183,6 +185,7 @@ class AccountItem {
     Map<String, dynamic>? data,
     Map<String, AccountFieldMeta>? fieldMeta,
     int? createdAt,
+    int? modifiedAt,
     Hlc? nameHlc,
     Hlc? emailHlc,
     Map<String, Hlc>? dataHlc,
@@ -200,6 +203,7 @@ class AccountItem {
       data: data ?? this.data,
       fieldMeta: fieldMeta ?? this.fieldMeta,
       createdAt: createdAt ?? this.createdAt,
+      modifiedAt: modifiedAt ?? this.modifiedAt,
       nameHlc: nameHlc ?? this.nameHlc,
       emailHlc: emailHlc ?? this.emailHlc,
       dataHlc: dataHlc ?? this.dataHlc,
