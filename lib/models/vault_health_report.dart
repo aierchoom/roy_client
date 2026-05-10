@@ -19,8 +19,13 @@ enum VaultHealthActionType {
 class VaultHealthAction {
   final VaultHealthActionType type;
   final String? targetId;
+  final List<String> targetIds;
 
-  const VaultHealthAction({required this.type, this.targetId});
+  const VaultHealthAction({
+    required this.type,
+    this.targetId,
+    this.targetIds = const [],
+  });
 }
 
 class VaultHealthItem {

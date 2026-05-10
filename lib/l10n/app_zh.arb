@@ -106,5 +106,14 @@
             "hours": { "type": "int" }
         }
     },
-    "justNow": "刚刚"
+    "justNow": "刚刚",
+    "today": "今天 {time}",
+    "@today": { "placeholders": { "time": { "type": "String" } } },
+    "yesterday": "昨天 {time}",
+    "@yesterday": { "placeholders": { "time": { "type": "String" } } },
+    "minutesAgo": "{minutes}分钟前",
+    "@minutesAgo": { "placeholders": { "minutes": { "type": "int" } } },
+    "unknownDevice": "未知设备",
+    "thisDevice": "本机",
+    "deviceLabel": "设备"
 }

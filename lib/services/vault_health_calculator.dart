@@ -233,7 +233,8 @@ class VaultHealthCalculator {
   }
 
   static VaultHealthItem checkWeakPasswords(List<AccountItem> accounts) {
-    final weakAccounts = <String>[];
+    final weakAccountIds = <String>[];
+    final weakAccountNames = <String>[];
     for (final account in accounts) {
       if (account.isDeleted) continue;
       final password = (account.data['password'] ?? '').toString();
@@ -242,69 +243,86 @@ class VaultHealthCalculator {
         password,
       );
       if (strength < 40) {
-        weakAccounts.add(account.name);
+        weakAccountIds.add(account.id);
+        weakAccountNames.add(account.name);
       }
     }
     return VaultHealthItem(
       id: 'weak_passwords',
       title: '弱密码检测',
       riskLevel: VaultHealthRiskLevel.high,
-      isPass: weakAccounts.isEmpty,
-      description: weakAccounts.isEmpty
+      isPass: weakAccountIds.isEmpty,
+      description: weakAccountIds.isEmpty
           ? '未发现弱密码'
-          : '发现 ${weakAccounts.length} 个弱密码账号',
-      action: weakAccounts.isNotEmpty
-          ? VaultHealthAction(type: VaultHealthActionType.navigateToAccountEdit)
+          : '发现 ${weakAccountIds.length} 个弱密码账号',
+      action: weakAccountIds.isNotEmpty
+          ? VaultHealthAction(
+              type: VaultHealthActionType.navigateToAccountEdit,
+              targetIds: weakAccountIds,
+            )
           : null,
     );
   }
 
   static VaultHealthItem checkReusedPasswords(List<AccountItem> accounts) {
-    final passwordCounts = <String, int>{};
+    final passwordHashes = <String, List<String>>{};
     for (final account in accounts) {
       if (account.isDeleted) continue;
       final password = (account.data['password'] ?? '').toString();
       if (password.isEmpty) continue;
       // Use SHA-256 hash as map key to avoid keeping plaintext passwords in memory
       final hash = sha256.convert(utf8.encode(password)).toString();
-      passwordCounts[hash] = (passwordCounts[hash] ?? 0) + 1;
+      passwordHashes.putIfAbsent(hash, () => []).add(account.id);
     }
-    final reusedCount = passwordCounts.values.where((c) => c > 1).length;
+    final reusedIds = passwordHashes.values
+        .where((ids) => ids.length > 1)
+        .expand((ids) => ids)
+        .toList();
+    final reusedCount = passwordHashes.values.where((ids) => ids.length > 1).length;
     return VaultHealthItem(
       id: 'reused_passwords',
       title: '重复密码检测',
       riskLevel: VaultHealthRiskLevel.high,
-      isPass: reusedCount == 0,
-      description: reusedCount == 0 ? '未发现重复使用的密码' : '发现 $reusedCount 组重复使用的密码',
-      action: reusedCount > 0
-          ? VaultHealthAction(type: VaultHealthActionType.navigateToAccountEdit)
+      isPass: reusedIds.isEmpty,
+      description: reusedIds.isEmpty ? '未发现重复使用的密码' : '发现 $reusedCount 组重复使用的密码',
+      action: reusedIds.isNotEmpty
+          ? VaultHealthAction(
+              type: VaultHealthActionType.navigateToAccountEdit,
+              targetIds: reusedIds,
+            )
           : null,
     );
   }
 
   static VaultHealthItem checkStaleRecords(List<AccountItem> accounts) {
     final now = DateTime.now();
-    final staleAccounts = <String>[];
+    final staleAccountIds = <String>[];
+    final staleAccountNames = <String>[];
     for (final account in accounts) {
       if (account.isDeleted) continue;
       // Use modified_at from the account if available, otherwise createdAt
+      final ts = account.modifiedAt > 0 ? account.modifiedAt : account.createdAt;
       final age = now.difference(
-        DateTime.fromMillisecondsSinceEpoch(account.createdAt),
+        DateTime.fromMillisecondsSinceEpoch(ts),
       );
       if (age.inDays > 180) {
-        staleAccounts.add(account.name);
+        staleAccountIds.add(account.id);
+        staleAccountNames.add(account.name);
       }
     }
     return VaultHealthItem(
       id: 'stale_records',
       title: '陈旧记录',
       riskLevel: VaultHealthRiskLevel.medium,
-      isPass: staleAccounts.isEmpty,
-      description: staleAccounts.isEmpty
+      isPass: staleAccountIds.isEmpty,
+      description: staleAccountIds.isEmpty
           ? '没有超过 180 天未更新的密码'
-          : '有 ${staleAccounts.length} 个账号超过 180 天未更新',
-      action: staleAccounts.isNotEmpty
-          ? VaultHealthAction(type: VaultHealthActionType.navigateToAccountEdit)
+          : '有 ${staleAccountIds.length} 个账号超过 180 天未更新',
+      action: staleAccountIds.isNotEmpty
+          ? VaultHealthAction(
+              type: VaultHealthActionType.navigateToAccountEdit,
+              targetIds: staleAccountIds,
+            )
           : null,
     );
   }
@@ -313,24 +331,29 @@ class VaultHealthCalculator {
     List<AccountItem> accounts,
     List<AccountTemplate> templates,
   ) {
-    final incompleteAccounts = <String>[];
+    final incompleteAccountIds = <String>[];
+    final incompleteAccountNames = <String>[];
     for (final account in accounts) {
       if (account.isDeleted) continue;
       final url = (account.data['url'] ?? '').toString();
       if (url.isEmpty) {
-        incompleteAccounts.add(account.name);
+        incompleteAccountIds.add(account.id);
+        incompleteAccountNames.add(account.name);
       }
     }
     return VaultHealthItem(
       id: 'incomplete_records',
       title: '不完整记录',
       riskLevel: VaultHealthRiskLevel.low,
-      isPass: incompleteAccounts.isEmpty,
-      description: incompleteAccounts.isEmpty
+      isPass: incompleteAccountIds.isEmpty,
+      description: incompleteAccountIds.isEmpty
           ? '所有账号都有 URL 信息'
-          : '有 ${incompleteAccounts.length} 个账号缺少 URL',
-      action: incompleteAccounts.isNotEmpty
-          ? VaultHealthAction(type: VaultHealthActionType.navigateToAccountEdit)
+          : '有 ${incompleteAccountIds.length} 个账号缺少 URL',
+      action: incompleteAccountIds.isNotEmpty
+          ? VaultHealthAction(
+              type: VaultHealthActionType.navigateToAccountEdit,
+              targetIds: incompleteAccountIds,
+            )
           : null,
     );
   }
@@ -341,7 +364,8 @@ class VaultHealthCalculator {
     List<dynamic> totpCredentials,
   ) {
     // Accounts that use website template but have no linked TOTP
-    final missing2faAccounts = <String>[];
+    final missing2faIds = <String>[];
+    final missing2faNames = <String>[];
     for (final account in accounts) {
       if (account.isDeleted) continue;
       final template = templates.cast<AccountTemplate?>().firstWhere(
@@ -357,17 +381,24 @@ class VaultHealthCalculator {
         (c) => c.linkedAccountIds.contains(account.id),
       );
       if (!hasLinkedTotp) {
-        missing2faAccounts.add(account.name);
+        missing2faIds.add(account.id);
+        missing2faNames.add(account.name);
       }
     }
     return VaultHealthItem(
       id: 'missing_2fa',
       title: '缺少 2FA',
       riskLevel: VaultHealthRiskLevel.medium,
-      isPass: missing2faAccounts.isEmpty,
-      description: missing2faAccounts.isEmpty
+      isPass: missing2faIds.isEmpty,
+      description: missing2faIds.isEmpty
           ? '已配置 2FA 的账号均已关联'
-          : '有 ${missing2faAccounts.length} 个支持 2FA 的账号未关联 TOTP',
+          : '有 ${missing2faIds.length} 个支持 2FA 的账号未关联 TOTP',
+      action: missing2faIds.isNotEmpty
+          ? VaultHealthAction(
+              type: VaultHealthActionType.navigateToAccountEdit,
+              targetIds: missing2faIds,
+            )
+          : null,
     );
   }
 

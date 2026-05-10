@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../providers/enhanced_app_provider.dart';
 import '../../providers/notification_provider.dart';
 import '../../widgets/app_layout_builder.dart';
+import '../../widgets/lan_sync_conflict_sheet.dart';
 import '../accounts/account_list_view.dart';
 import '../notifications/notification_center_view.dart';
 import '../settings_view.dart';
@@ -67,25 +68,30 @@ class _HomeViewState extends State<HomeView> {
       const SettingsView(),
     ];
 
-    return AppLayoutBuilder(
-      compactBuilder: (context) => HomeViewMobile(
-        selectedIndex: _selectedIndex,
-        accountShowTemplates: _accountShowTemplates,
-        onDestinationSelected: _onItemTapped,
-        pages: pages,
-      ),
-      mediumBuilder: (context) => HomeViewDesktop(
-        selectedIndex: _selectedIndex,
-        accountShowTemplates: _accountShowTemplates,
-        onDestinationSelected: _onItemTapped,
-        pages: pages,
-      ),
-      expandedBuilder: (context) => HomeViewDesktop(
-        selectedIndex: _selectedIndex,
-        accountShowTemplates: _accountShowTemplates,
-        onDestinationSelected: _onItemTapped,
-        pages: pages,
-      ),
+    return Stack(
+      children: [
+        AppLayoutBuilder(
+          compactBuilder: (context) => HomeViewMobile(
+            selectedIndex: _selectedIndex,
+            accountShowTemplates: _accountShowTemplates,
+            onDestinationSelected: _onItemTapped,
+            pages: pages,
+          ),
+          mediumBuilder: (context) => HomeViewDesktop(
+            selectedIndex: _selectedIndex,
+            accountShowTemplates: _accountShowTemplates,
+            onDestinationSelected: _onItemTapped,
+            pages: pages,
+          ),
+          expandedBuilder: (context) => HomeViewDesktop(
+            selectedIndex: _selectedIndex,
+            accountShowTemplates: _accountShowTemplates,
+            onDestinationSelected: _onItemTapped,
+            pages: pages,
+          ),
+        ),
+        const LanSyncConflictOverlay(),
+      ],
     );
   }
 }

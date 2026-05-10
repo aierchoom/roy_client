@@ -8,6 +8,7 @@ import '../../models/account_template.dart';
 import '../../providers/enhanced_app_provider.dart';
 import '../../utils/field_presets.dart';
 import '../../widgets/adaptive_page.dart';
+import '../../widgets/edit_metadata_row.dart';
 import '../../widgets/green_add_button.dart';
 import '../../widgets/template_edit_widgets.dart';
 import '../../theme/app_design_tokens.dart';
@@ -70,6 +71,10 @@ class _TemplateEditViewState extends State<TemplateEditView> {
       category: inferTemplateCategory(title: title, fields: _fields),
       fields: List<AccountField>.of(_fields),
       isCustom: true,
+      createdAt: widget.initial?.createdAt,
+      modifiedAt: widget.initial?.modifiedAt,
+      lastEditedBy: widget.initial?.lastEditedBy,
+      lastEditedAt: widget.initial?.lastEditedAt,
       hlc: widget.initial?.hlc,
       serverVersion: widget.initial?.serverVersion ?? 0,
       syncStatus: widget.initial?.syncStatus ?? SyncStatus.pendingPush,
@@ -431,6 +436,13 @@ class _TemplateEditViewState extends State<TemplateEditView> {
               ),
             ],
           ),
+          if (widget.initial != null) ...[
+            const SizedBox(height: 10),
+            EditMetadataRow(
+              editedAt: widget.initial!.lastEditedAt ?? widget.initial!.modifiedAt,
+              editedBy: widget.initial!.lastEditedBy,
+            ),
+          ],
         ],
       ),
     );

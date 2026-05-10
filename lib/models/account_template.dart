@@ -60,23 +60,23 @@ TemplateCategory templateCategoryFromString(String? value) {
 IconData templateCategoryIcon(TemplateCategory category) {
   switch (category) {
     case TemplateCategory.login:
-      return Icons.lock_outline;
+      return Icons.lock_person_outlined;
     case TemplateCategory.payment:
       return Icons.credit_card_outlined;
     case TemplateCategory.contact:
-      return Icons.phone_outlined;
+      return Icons.contact_mail_outlined;
     case TemplateCategory.identity:
       return Icons.badge_outlined;
     case TemplateCategory.work:
-      return Icons.business_center_outlined;
+      return Icons.work_outline;
     case TemplateCategory.shopping:
       return Icons.shopping_bag_outlined;
     case TemplateCategory.finance:
-      return Icons.account_balance_wallet_outlined;
+      return Icons.account_balance_outlined;
     case TemplateCategory.note:
-      return Icons.note_outlined;
+      return Icons.sticky_note_2_outlined;
     case TemplateCategory.custom:
-      return Icons.description_outlined;
+      return Icons.widgets_outlined;
   }
 }
 
@@ -384,6 +384,10 @@ class AccountTemplate {
   final TemplateCategory category;
   final List<AccountField> fields;
   final bool isCustom;
+  final int? createdAt;
+  final int? modifiedAt;
+  final String? lastEditedBy;
+  final int? lastEditedAt;
 
   final SyncStatus syncStatus;
   final Hlc? hlc;
@@ -400,6 +404,10 @@ class AccountTemplate {
     required this.category,
     required this.fields,
     this.isCustom = false,
+    this.createdAt,
+    this.modifiedAt,
+    this.lastEditedBy,
+    this.lastEditedAt,
     this.syncStatus = SyncStatus.pendingPush,
     this.hlc,
     this.serverVersion = 0,
@@ -444,6 +452,10 @@ class AccountTemplate {
           .map((field) => AccountField.fromJson(field as Map<String, dynamic>))
           .toList(),
       isCustom: isCustom,
+      createdAt: json['createdAt'] as int?,
+      modifiedAt: json['modifiedAt'] as int?,
+      lastEditedBy: json['lastEditedBy'] as String?,
+      lastEditedAt: json['lastEditedAt'] as int?,
       syncStatus: syncStatusFromJson(
         json['syncStatus'],
         fallback: SyncStatus.synchronized,
@@ -466,6 +478,10 @@ class AccountTemplate {
       'icon': iconCodePoint,
       'category': category.name,
       'fields': fields.map((field) => field.toJson()).toList(),
+      'createdAt': createdAt,
+      'modifiedAt': modifiedAt,
+      'lastEditedBy': lastEditedBy,
+      'lastEditedAt': lastEditedAt,
       'syncStatus': syncStatus.name,
       'hlc': hlc?.toString(),
       'serverVersion': serverVersion,
@@ -495,6 +511,10 @@ class AccountTemplate {
     TemplateCategory? category,
     List<AccountField>? fields,
     bool? isCustom,
+    int? createdAt,
+    int? modifiedAt,
+    String? lastEditedBy,
+    int? lastEditedAt,
     SyncStatus? syncStatus,
     Hlc? hlc,
     int? serverVersion,
@@ -510,6 +530,10 @@ class AccountTemplate {
       category: category ?? this.category,
       fields: fields ?? this.fields,
       isCustom: isCustom ?? this.isCustom,
+      createdAt: createdAt ?? this.createdAt,
+      modifiedAt: modifiedAt ?? this.modifiedAt,
+      lastEditedBy: lastEditedBy ?? this.lastEditedBy,
+      lastEditedAt: lastEditedAt ?? this.lastEditedAt,
       syncStatus: syncStatus ?? this.syncStatus,
       hlc: hlc ?? this.hlc,
       serverVersion: serverVersion ?? this.serverVersion,

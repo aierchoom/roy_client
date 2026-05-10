@@ -35,7 +35,7 @@ class SecureStorageService {
   static const String _databaseName = 'secret_roy_vault.db';
   static const String _encryptedDatabaseName = 'secret_roy_vault.db.enc';
   static const String _workingDatabaseName = 'secret_roy_vault.runtime.db';
-  static const int _databaseVersion = 9;
+  static const int _databaseVersion = 10;
 
   DatabaseFileCipher? _databaseCipher;
 
@@ -44,6 +44,7 @@ class SecureStorageService {
       StreamController<StorageChangeEvent>.broadcast();
 
   String _deviceId = 'local';
+  SyncClock? _syncClock;
   String? _encryptedDatabasePath;
   String? _workingDatabasePath;
   String? _legacyDatabasePath;
@@ -95,6 +96,7 @@ class SecureStorageService {
 
   Future<void> initialize({String deviceId = 'local'}) async {
     _deviceId = deviceId;
+    _syncClock = SyncClock(deviceId);
     if (_changeController.isClosed) {
       _changeController = StreamController<StorageChangeEvent>.broadcast();
     }
@@ -417,15 +419,15 @@ class SecureStorageService {
     final tempFile = File('$encryptedPath.tmp');
 
     if (!targetFile.existsSync() && backupFile.existsSync()) {
-      await backupFile.rename(targetFile.path);
+      try { await backupFile.rename(targetFile.path); } catch (_) {}
     }
 
     if (targetFile.existsSync() && tempFile.existsSync()) {
-      await tempFile.delete();
+      try { await tempFile.delete(); } catch (_) {}
     }
 
     if (targetFile.existsSync() && backupFile.existsSync()) {
-      await backupFile.delete();
+      try { await backupFile.delete(); } catch (_) {}
     }
   }
 
@@ -487,32 +489,40 @@ class SecureStorageService {
     final backupFile = File('$targetPath.bak');
 
     if (tempFile.existsSync()) {
-      await tempFile.delete();
+      try { await tempFile.delete(); } catch (_) {}
     }
     await tempFile.writeAsBytes(bytes, flush: true);
 
     if (backupFile.existsSync()) {
-      await backupFile.delete();
+      try { await backupFile.delete(); } catch (_) {}
     }
     if (targetFile.existsSync()) {
       await targetFile.rename(backupFile.path);
     }
 
     try {
-      await tempFile.rename(targetPath);
+      try {
+        await tempFile.rename(targetPath);
+      } on PathNotFoundException catch (_) {
+        // Windows: rename can fail across volumes or if path is invalid.
+        // Fallback to copy + delete.
+        await tempFile.copy(targetPath);
+        try { await tempFile.delete(); } catch (_) {}
+      }
       if (backupFile.existsSync()) {
-        await backupFile.delete();
+        try { await backupFile.delete(); } catch (_) {}
       }
     } catch (e) {
-      AppLogger.d('Database file atomic rename failed: $e');
+      AppLogger.d('Database file atomic write failed: $e');
       if (backupFile.existsSync() && !targetFile.existsSync()) {
-        await backupFile.rename(targetPath);
+        try { await backupFile.rename(targetPath); } catch (_) {}
       }
       rethrow;
     } finally {
-      if (tempFile.existsSync()) {
-        await tempFile.delete();
-      }
+      // Best-effort cleanup — never let temp file deletion propagate.
+      try {
+        if (tempFile.existsSync()) await tempFile.delete();
+      } catch (_) {}
     }
   }
 
@@ -597,6 +607,7 @@ class SecureStorageService {
         field_meta TEXT,
         created_at INTEGER NOT NULL,
         modified_at INTEGER NOT NULL,
+        last_edited_by TEXT,
         name_hlc TEXT,
         email_hlc TEXT,
         data_hlc TEXT,
@@ -628,6 +639,8 @@ class SecureStorageService {
         fields TEXT NOT NULL,
         is_custom INTEGER DEFAULT 1,
         created_at INTEGER NOT NULL,
+        modified_at INTEGER,
+        last_edited_by TEXT,
         hlc TEXT,
         version INTEGER DEFAULT 1,
         server_version INTEGER DEFAULT 0,
@@ -774,6 +787,12 @@ class SecureStorageService {
         )
       ''');
     }
+
+    if (oldVersion < 10) {
+      await db.execute('ALTER TABLE accounts ADD COLUMN last_edited_by TEXT');
+      await db.execute('ALTER TABLE templates ADD COLUMN modified_at INTEGER');
+      await db.execute('ALTER TABLE templates ADD COLUMN last_edited_by TEXT');
+    }
   }
 
   Future<void> _createTotpCredentialsTable(Database db) async {
@@ -915,7 +934,7 @@ class SecureStorageService {
         where: 'id = ?',
         whereArgs: [account.id],
       );
-      final newStamp = Hlc.now(_deviceId);
+      final newStamp = _syncClock!.send();
 
       final template = await loadTemplateById(account.templateId);
       final Map<String, AccountFieldMeta> newFieldMeta = Map.from(
@@ -991,6 +1010,7 @@ class SecureStorageService {
       ),
       'created_at': itemToSave.createdAt,
       'modified_at': DateTime.now().millisecondsSinceEpoch,
+      'last_edited_by': _deviceId,
       'name_hlc': itemToSave.nameHlc.toString(),
       'email_hlc': itemToSave.emailHlc.toString(),
       'data_hlc': jsonEncode(
@@ -1019,7 +1039,7 @@ class SecureStorageService {
   }) async {
     if (!isOpen) return;
 
-    Hlc stamp = syncDeleteHlc ?? Hlc.now(_deviceId);
+    Hlc stamp = syncDeleteHlc ?? _syncClock!.send();
 
     // Apply Soft Delete (Tombstone)
     await _database!.update(
@@ -1477,6 +1497,8 @@ class SecureStorageService {
         fieldMeta: fieldMeta,
         createdAt: row['created_at'] as int,
         modifiedAt: row['modified_at'] as int? ?? row['created_at'] as int,
+        lastEditedBy: row['last_edited_by'] as String?,
+        lastEditedAt: row['modified_at'] as int?,
         nameHlc: row['name_hlc'] != null
             ? Hlc.parse(row['name_hlc'])
             : dummyHlc,
@@ -1495,6 +1517,53 @@ class SecureStorageService {
       AppLogger.d('Skipping unreadable account row: $e');
       return null;
     }
+  }
+
+  Map<String, dynamic> _accountItemToMap(AccountItem item) {
+    return {
+      'id': item.id,
+      'name': item.name,
+      'email': item.email,
+      'template_id': item.templateId,
+      'template_version': item.templateVersion,
+      'data': jsonEncode(item.data),
+      'field_meta': jsonEncode(
+        item.fieldMeta.map((k, v) => MapEntry(k, v.toJson())),
+      ),
+      'created_at': item.createdAt,
+      'modified_at': DateTime.now().millisecondsSinceEpoch,
+      'last_edited_by': item.lastEditedBy ?? _deviceId,
+      'name_hlc': item.nameHlc.toString(),
+      'email_hlc': item.emailHlc.toString(),
+      'data_hlc': jsonEncode(
+        item.dataHlc.map((k, v) => MapEntry(k, v.toString())),
+      ),
+      'server_version': item.serverVersion,
+      'sync_status': item.syncStatus.index,
+      'is_deleted': item.isDeleted ? 1 : 0,
+      'delete_hlc': item.deleteHlc?.toString(),
+    };
+  }
+
+  Map<String, dynamic> _templateToMap(AccountTemplate item) {
+    return {
+      'id': item.templateId,
+      'title': item.title,
+      'subtitle': item.subTitle,
+      'icon_code_point': templateIconStorageValue(item.icon),
+      'category': item.category.name,
+      'fields': jsonEncode(item.fields.map((f) => f.toJson()).toList()),
+      'is_custom': item.isCustom ? 1 : 0,
+      'created_at': item.createdAt ?? DateTime.now().millisecondsSinceEpoch,
+      'modified_at': item.modifiedAt ?? DateTime.now().millisecondsSinceEpoch,
+      'last_edited_by': item.lastEditedBy ?? _deviceId,
+      'hlc': item.hlc?.toString(),
+      'version': item.version,
+      'server_version': item.serverVersion,
+      'sync_status': item.syncStatus.index,
+      'is_deleted': item.isDeleted ? 1 : 0,
+      'delete_hlc': item.deleteHlc?.toString(),
+    };
   }
 
   Map<String, dynamic> _totpCredentialRow(TotpCredential credential) {
@@ -1641,19 +1710,10 @@ class SecureStorageService {
     List<TemplateConflictLog> conflictLogs = [];
 
     if (isSyncMerge) {
-      final existing = await loadTemplateById(
-        template.templateId,
-        includeDeleted: true,
-      );
-      if (existing != null) {
-        final mergeResult = CrdtMergeEngine.mergeTemplate(existing, template);
-        itemToSave = mergeResult.template;
-        conflictLogs = mergeResult.conflictLogs;
-      } else {
-        itemToSave = template;
-      }
+      // Caller has already performed CRDT merge; save directly.
+      itemToSave = template;
     } else {
-      final newStamp = Hlc.now(_deviceId);
+      final newStamp = _syncClock!.send();
       final existing = await loadTemplateById(template.templateId);
       if (existing != null) {
         if (existing.hlc != null &&
@@ -1688,7 +1748,9 @@ class SecureStorageService {
       'category': itemToSave.category.name,
       'fields': jsonEncode(itemToSave.fields.map((f) => f.toJson()).toList()),
       'is_custom': itemToSave.isCustom ? 1 : 0,
-      'created_at': DateTime.now().millisecondsSinceEpoch,
+      'created_at': itemToSave.createdAt ?? DateTime.now().millisecondsSinceEpoch,
+      'modified_at': DateTime.now().millisecondsSinceEpoch,
+      'last_edited_by': _deviceId,
       'hlc': itemToSave.hlc?.toString(),
       'version': itemToSave.version,
       'server_version': itemToSave.serverVersion,
@@ -1771,7 +1833,7 @@ class SecureStorageService {
       }
     }
 
-    Hlc stamp = syncDeleteHlc ?? Hlc.now(_deviceId);
+    Hlc stamp = syncDeleteHlc ?? _syncClock!.send();
 
     await _database!.update(
       'templates',
@@ -1814,6 +1876,10 @@ class SecureStorageService {
             )
             .toList(),
         isCustom: isCustom,
+        createdAt: row['created_at'] as int?,
+        modifiedAt: row['modified_at'] as int?,
+        lastEditedBy: row['last_edited_by'] as String?,
+        lastEditedAt: row['modified_at'] as int?,
         hlc: row['hlc'] != null ? Hlc.parse(row['hlc'] as String) : null,
         serverVersion: row['server_version'] as int? ?? 0,
         syncStatus: syncStatusFromJson(
@@ -1942,6 +2008,49 @@ class SecureStorageService {
       );
     } catch (e) {
       AppLogger.d('Failed to record local sync change: $e');
+      rethrow;
+    }
+  }
+
+  /// Creates an approved [LocalSyncChange] for LAN sync merges.
+  ///
+  /// Unlike [recordLocalSyncChange] which creates a pendingReview entry,
+  /// this directly inserts an approved entry so the item is eligible for
+  /// server push without user review.
+  Future<void> createApprovedLocalSyncChange({
+    required String vaultId,
+    required LocalSyncEntityType entityType,
+    required String entityId,
+    required String title,
+    int baseServerVersion = 0,
+  }) async {
+    if (!isOpen) return;
+    try {
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final idStamp = DateTime.now().microsecondsSinceEpoch;
+      final id =
+          'lan-${vaultId.hashCode}-${entityType.name}-$entityId-$idStamp';
+
+      await _database!.insert('local_sync_changes', {
+        'id': id,
+        'vault_id': vaultId,
+        'entity_type': entityType.name,
+        'entity_id': entityId,
+        'action': LocalSyncAction.update.name,
+        'title': title.trim().isEmpty ? entityId : title.trim(),
+        'before_json': null,
+        'after_json': null,
+        'diff_json': jsonEncode({'changed_fields': []}),
+        'base_server_version': baseServerVersion,
+        'status': LocalSyncStatus.approved.name,
+        'created_at': now,
+        'updated_at': now,
+        'approved_at': now,
+        'pushed_at': null,
+        'error_message': null,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    } catch (e) {
+      AppLogger.d('Failed to create approved local sync change: $e');
       rethrow;
     }
   }
@@ -2485,6 +2594,118 @@ class SecureStorageService {
         id: key,
       ),
     );
+  }
+
+  /// Commits a batch of merged items from LAN sync in a single transaction.
+  ///
+  /// For each item:
+  /// - Saves via [saveAccount]/[saveTemplate]/[saveTotpCredential] with
+  ///   [isSyncMerge]=true to skip HLC stamping and outbox recording.
+  /// - If [markForServerPush] is true, records an approved
+  ///   [LocalSyncChange] so the item is eligible for server push.
+  ///
+  /// The [items] list contains tuples of (type, payload).
+  /// Returns the number of items successfully committed.
+  Future<int> commitLanSyncBatch({
+    required String vaultId,
+    required List<({LocalSyncEntityType type, Map<String, dynamic> payload})> items,
+    required bool markForServerPush,
+  }) async {
+    if (!isOpen || items.isEmpty) return 0;
+
+    var committedCount = 0;
+    await _database!.transaction((txn) async {
+      for (final item in items) {
+        try {
+          final payload = item.payload;
+          switch (item.type) {
+            case LocalSyncEntityType.account:
+              final account = AccountItem.fromJson(payload);
+              await txn.insert('accounts', _accountItemToMap(account), conflictAlgorithm: ConflictAlgorithm.replace);
+              if (markForServerPush) {
+                await _insertApprovedChange(
+                  txn: txn,
+                  vaultId: vaultId,
+                  entityType: LocalSyncEntityType.account,
+                  entityId: account.id,
+                  title: account.name,
+                );
+              }
+            case LocalSyncEntityType.template:
+              final template = AccountTemplate.fromJson(payload);
+              await txn.insert('templates', _templateToMap(template), conflictAlgorithm: ConflictAlgorithm.replace);
+              if (markForServerPush) {
+                await _insertApprovedChange(
+                  txn: txn,
+                  vaultId: vaultId,
+                  entityType: LocalSyncEntityType.template,
+                  entityId: template.templateId,
+                  title: template.title,
+                );
+              }
+            case LocalSyncEntityType.totpCredential:
+              final totp = TotpCredential.fromJson(payload);
+              await txn.insert('totp_credentials', _totpCredentialRow(totp), conflictAlgorithm: ConflictAlgorithm.replace);
+              if (markForServerPush) {
+                await _insertApprovedChange(
+                  txn: txn,
+                  vaultId: vaultId,
+                  entityType: LocalSyncEntityType.totpCredential,
+                  entityId: totp.id,
+                  title: totp.label,
+                );
+              }
+          }
+          committedCount++;
+        } catch (e) {
+          AppLogger.d('commitLanSyncBatch item failed: $e');
+          // Continue with remaining items in the batch.
+        }
+      }
+    });
+
+    // Notify listeners once after the transaction.
+    _notifyChange(
+      StorageChangeEvent(
+        type: StorageItemType.account,
+        action: StorageAction.save,
+      ),
+    );
+    await _persistAfterMutation();
+
+    return committedCount;
+  }
+
+  Future<void> _insertApprovedChange({
+    required Transaction txn,
+    required String vaultId,
+    required LocalSyncEntityType entityType,
+    required String entityId,
+    required String title,
+    int baseServerVersion = 0,
+  }) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final idStamp = DateTime.now().microsecondsSinceEpoch;
+    final id = 'lan-$vaultId-${entityType.name}-$entityId-$idStamp';
+
+    await txn.insert('local_sync_changes', {
+      'id': id,
+      'vault_id': vaultId,
+      'entity_type': entityType.name,
+      'entity_id': entityId,
+      'action': LocalSyncAction.update.name,
+      'title': title.trim().isEmpty ? entityId : title.trim(),
+      'before_json': null,
+      'after_json': null,
+      'diff_json': jsonEncode({'changed_fields': []}),
+      'base_server_version': baseServerVersion,
+      'status': LocalSyncStatus.approved.name,
+      'created_at': now,
+      'updated_at': now,
+      'approved_at': now,
+      'pushed_at': null,
+      'error_message': null,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   void _notifyChange(StorageChangeEvent event) {

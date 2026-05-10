@@ -207,8 +207,7 @@ extension SyncServicePull on SyncService {
             remoteCredential,
             isSyncMerge: true,
           );
-        } else if (maybeLocal.syncStatus == SyncStatus.pendingPush ||
-            maybeLocal.syncStatus == SyncStatus.conflict) {
+        } else {
           final merged = TotpCredentialMergeEngine.merge(
             maybeLocal,
             remoteCredential,
@@ -219,11 +218,6 @@ extension SyncServicePull on SyncService {
                   ? SyncStatus.synchronized
                   : SyncStatus.pendingPush,
             ),
-            isSyncMerge: true,
-          );
-        } else {
-          await _storageService.saveTotpCredential(
-            remoteCredential,
             isSyncMerge: true,
           );
         }
@@ -239,8 +233,7 @@ extension SyncServicePull on SyncService {
         );
         if (maybeLocal == null) {
           await _storageService.saveTemplate(remoteTemplate, isSyncMerge: true);
-        } else if (maybeLocal.syncStatus == SyncStatus.pendingPush ||
-            maybeLocal.syncStatus == SyncStatus.conflict) {
+        } else {
           final mergeResult = CrdtMergeEngine.mergeTemplate(
             maybeLocal,
             remoteTemplate,
@@ -249,13 +242,12 @@ extension SyncServicePull on SyncService {
             mergeResult.template,
             isSyncMerge: true,
           );
-          if (mergeResult.conflictLogs.isNotEmpty) {
+          if (mergeResult.conflictLogs.isNotEmpty &&
+              !mergeResult.isPureFastForward) {
             await _storageService.saveTemplateConflictLogs(
               mergeResult.conflictLogs,
             );
           }
-        } else {
-          await _storageService.saveTemplate(remoteTemplate, isSyncMerge: true);
         }
       } else {
         // Default to account
@@ -272,18 +264,16 @@ extension SyncServicePull on SyncService {
 
         if (maybeLocal == null) {
           await _storageService.saveAccount(remoteAccount, isSyncMerge: true);
-        } else if (maybeLocal.syncStatus == SyncStatus.pendingPush ||
-            maybeLocal.syncStatus == SyncStatus.conflict) {
+        } else {
           final mergeResult = CrdtMergeEngine.merge(maybeLocal, remoteAccount);
           await _storageService.saveAccount(
             mergeResult.mergedItem,
             isSyncMerge: true,
           );
-          if (mergeResult.conflictLogs.isNotEmpty) {
+          if (mergeResult.conflictLogs.isNotEmpty &&
+              !mergeResult.isPureFastForward) {
             await _storageService.saveConflictLogs(mergeResult.conflictLogs);
           }
-        } else {
-          await _storageService.saveAccount(remoteAccount, isSyncMerge: true);
         }
       }
       mergedCount++;

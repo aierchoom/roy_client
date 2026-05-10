@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import '../theme/app_design_tokens.dart';
+import '../theme/app_text_styles.dart';
 import '../models/account_item.dart';
 import '../models/account_template.dart';
 import '../services/sensitive_clipboard_service.dart';
@@ -12,6 +13,7 @@ class AccountFieldDisplayData {
   final bool isSecret;
   final bool canCopy;
   final IconData icon;
+  final String? key;
 
   const AccountFieldDisplayData({
     required this.label,
@@ -19,6 +21,7 @@ class AccountFieldDisplayData {
     required this.isSecret,
     this.canCopy = true,
     required this.icon,
+    this.key,
   });
 }
 
@@ -35,6 +38,7 @@ class AccountListTile extends StatefulWidget {
   final VoidCallback onDelete;
   final String Function(BuildContext, String, String) localeText;
   final String? Function(String accountId)? resolveAccountName;
+  final List<String> highlightedFieldKeys;
 
   const AccountListTile({
     super.key,
@@ -48,17 +52,47 @@ class AccountListTile extends StatefulWidget {
     required this.onDelete,
     required this.localeText,
     this.resolveAccountName,
+    this.highlightedFieldKeys = const [],
   });
 
   @override
   State<AccountListTile> createState() => _AccountListTileState();
 }
 
-class _AccountListTileState extends State<AccountListTile> {
+class _AccountListTileState extends State<AccountListTile>
+    with SingleTickerProviderStateMixin {
   bool _isExpanded = false;
+  late AnimationController _expandController;
+  late Animation<double> _expandAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _expandController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 250),
+    );
+    _expandAnimation = CurvedAnimation(
+      parent: _expandController,
+      curve: Curves.easeInOut,
+    );
+  }
+
+  @override
+  void dispose() {
+    _expandController.dispose();
+    super.dispose();
+  }
 
   void _toggleExpanded() {
-    setState(() => _isExpanded = !_isExpanded);
+    setState(() {
+      _isExpanded = !_isExpanded;
+      if (_isExpanded) {
+        _expandController.forward();
+      } else {
+        _expandController.reverse();
+      }
+    });
   }
 
   Future<void> _copyValue(
@@ -163,6 +197,7 @@ class _AccountListTileState extends State<AccountListTile> {
             isSecret: isSecret,
             isReference: isReference,
           ),
+          key: key,
         ),
       );
     }
@@ -304,42 +339,23 @@ class _AccountListTileState extends State<AccountListTile> {
     return theme.colorScheme.primary;
   }
 
-  String _maskedPreview(String value) {
-    final compact = value.replaceAll(RegExp(r'[\s\-]+'), '');
-    if (compact.isEmpty) return '';
-    return '••••';
-  }
+  /// Build a slash-separated summary of up to 5 labelled field values for
+  /// the collapsed state. Secret fields are masked.
+  String _buildCollapsedSummary(List<AccountFieldDisplayData> allFields) {
+    final parts = <String>[];
+    final seen = <String>{};
 
-  /// Build the subtitle: field labels + values (up to 3).
-  String _buildSubtitle(BuildContext context) {
-    final segments = <String>[];
-
-    void addSegment(String label, String value, {bool isSecret = false}) {
-      final trimmed = value.trim();
-      if (trimmed.isEmpty) return;
-      final displayValue = isSecret ? _maskedPreview(trimmed) : trimmed;
-      segments.add('$label: $displayValue');
+    for (final field in allFields) {
+      final trimmed = field.value.trim();
+      if (trimmed.isEmpty) continue;
+      if (seen.contains(trimmed)) continue;
+      final value = field.isSecret ? '••••' : trimmed;
+      parts.add('${field.label}: $value');
+      seen.add(trimmed);
+      if (parts.length >= 5) break;
     }
 
-    if (widget.template != null) {
-      for (final field in widget.template!.fields) {
-        addSegment(
-          field.label,
-          widget.account.data[field.fieldKey]?.toString() ?? '',
-          isSecret: field.attributes.isSecret,
-        );
-        if (segments.length >= 3) break;
-      }
-    }
-
-    if (segments.isEmpty && widget.account.email.isNotEmpty) {
-      addSegment(
-        widget.localeText(context, '邮箱', 'Email'),
-        widget.account.email,
-      );
-    }
-
-    return segments.join('  ·  ');
+    return parts.join(' / ');
   }
 
   /// Build meta info row (created at, sync status, etc.).
@@ -364,15 +380,19 @@ class _AccountListTileState extends State<AccountListTile> {
 
     return Row(
       children: [
-        Icon(Icons.schedule_outlined, size: 14, color: theme.colorScheme.onSurfaceVariant.withAlpha(150)),
-        const SizedBox(width: 6),
+        Icon(
+          Icons.schedule_outlined,
+          size: 13,
+          color: theme.colorScheme.onSurfaceVariant.withAlpha(120),
+        ),
+        const SizedBox(width: 4),
         Text(
           '${widget.localeText(context, '创建于', 'Created')} $dateStr',
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant.withAlpha(150),
+          style: AppTextStyles.caption(context).copyWith(
+            color: theme.colorScheme.onSurfaceVariant.withAlpha(140),
           ),
         ),
-        const SizedBox(width: 16),
+        const SizedBox(width: 12),
         Container(
           width: 6,
           height: 6,
@@ -381,19 +401,18 @@ class _AccountListTileState extends State<AccountListTile> {
             shape: BoxShape.circle,
           ),
         ),
-        const SizedBox(width: 6),
+        const SizedBox(width: 5),
         Text(
           syncLabel,
-          style: theme.textTheme.labelSmall?.copyWith(
+          style: AppTextStyles.caption(context).copyWith(
             color: syncColor.withAlpha(200),
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w600,
           ),
         ),
       ],
     );
   }
 
-  /// Find the primary copyable field value for quick-copy.
   String? _primaryCopyValue() {
     if (widget.template != null) {
       for (final field in widget.template!.fields) {
@@ -410,183 +429,227 @@ class _AccountListTileState extends State<AccountListTile> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final accent = _tileAccent(theme);
     final isSearch = widget.density == AccountListTileDensity.search;
     final fieldEntries = _buildFieldEntries(context);
-    final subtitle = _buildSubtitle(context);
+    final summary = _buildCollapsedSummary(fieldEntries);
     final primaryValue = _primaryCopyValue();
+    final badgeText = widget.template?.badgeText ??
+        templateBadgeText(widget.account.name);
+    final horizontalPadding = isSearch ? AppSpacing.md : AppSpacing.lg;
+    final verticalPadding = isSearch ? AppSpacing.md : 14.0;
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: widget.onEdit,
-        onLongPress: () => _showContextMenu(context),
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeInOut,
+      decoration: BoxDecoration(
+        color: _isExpanded
+            ? colorScheme.surfaceContainerHighest.withAlpha(
+                theme.brightness == Brightness.light ? 60 : 40,
+              )
+            : Colors.transparent,
         borderRadius: BorderRadius.circular(AppRadii.card),
-        child: Padding(
-          padding: EdgeInsets.all(isSearch ? AppSpacing.lg : AppSpacing.md),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // Leading diamond badge
-              Transform.rotate(
-                angle: math.pi / 4,
-                child: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: AppSurfaces.soft(
-                      theme.colorScheme,
-                      tint: accent,
-                      tintAlpha: 18,
-                    ),
-                    borderRadius: BorderRadius.circular(AppRadii.button),
-                    border: Border.all(color: accent.withAlpha(AppAlphas.low)),
-                  ),
-                  alignment: Alignment.center,
-                  child: Transform.rotate(
-                    angle: -math.pi / 4,
-                    child: Text(
-                      widget.template?.badgeText ?? '?',
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        color: accent,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              // Content
-              Expanded(
-                child: Column(
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: widget.onEdit,
+          onLongPress: () => _showContextMenu(context),
+          borderRadius: BorderRadius.circular(AppRadii.card),
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: horizontalPadding,
+              vertical: verticalPadding,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // ── Header row ──
+                Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      widget.account.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: theme.colorScheme.onSurface,
-                        height: 1.3,
+                    _AccountBadge(
+                      badgeText: badgeText,
+                      accent: accent,
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  '${widget.localeText(context, '名称', 'Name')}: ${widget.account.name}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AppTextStyles.bodyLarge(context)
+                                      ?.copyWith(
+                                    fontWeight: FontWeight.w400,
+                                    color: colorScheme.onSurface,
+                                    height: 1.3,
+                                  ),
+                                ),
+                              ),
+                              if (fieldEntries.isNotEmpty) ...[
+                                const SizedBox(width: 8),
+                                _FieldCountTag(
+                                  count: fieldEntries.length,
+                                  label: widget.localeText(
+                                    context,
+                                    '个字段',
+                                    'fields',
+                                  ),
+                                ),
+                              ],
+                              if (widget.linkedTotpCredentialCount > 0) ...[
+                                const SizedBox(width: 8),
+                                _TinyBadge(
+                                  icon: Icons.verified_user_outlined,
+                                  label: widget.localeText(
+                                    context,
+                                    '2FA enabled',
+                                    '2FA enabled',
+                                  ),
+                                  color: colorScheme.primary,
+                                ),
+                              ],
+                            ],
+                          ),
+                          if (!_isExpanded && summary.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Container(
+                                  width: 2,
+                                  height: 14,
+                                  decoration: BoxDecoration(
+                                    color: accent.withAlpha(100),
+                                    borderRadius: BorderRadius.circular(1),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    summary,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: AppTextStyles.bodySmall(context)
+                                        ?.copyWith(
+                                      color: colorScheme.onSurfaceVariant,
+                                      height: 1.35,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
                       ),
                     ),
-                    if (subtitle.isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        subtitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant
-                              .withAlpha(AppAlphas.emphasis),
-                          height: 1.35,
+                    const SizedBox(width: AppSpacing.sm),
+                    // Action buttons
+                    if (primaryValue != null)
+                      _IconButtonCompact(
+                        tooltip: widget.localeText(context, '复制', 'Copy'),
+                        icon: Icons.copy_outlined,
+                        onPressed: () => _copyValue(
+                          context,
+                          widget.localeText(context, '主要字段', 'Primary'),
+                          primaryValue,
                         ),
                       ),
-                    ],
+                    _IconButtonCompact(
+                      tooltip: widget.localeText(context, '详情', 'Details'),
+                      icon: Icons.expand_more_rounded,
+                      onPressed: _toggleExpanded,
+                      rotation: _isExpanded ? 0.5 : 0,
+                    ),
                   ],
                 ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              // Actions
-              if (primaryValue != null)
-                IconButton(
-                  tooltip: widget.localeText(context, '复制', 'Copy'),
-                  onPressed: () => _copyValue(
-                    context,
-                    widget.localeText(context, '主要字段', 'Primary'),
-                    primaryValue,
-                  ),
-                  style: IconButton.styleFrom(
-                    minimumSize: const Size(36, 36),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppRadii.control),
+
+                // ── Expanded content ──
+                SizeTransition(
+                  sizeFactor: _expandAnimation,
+                  child: AnimatedOpacity(
+                    opacity: _isExpanded ? 1.0 : 0.0,
+                    duration: const Duration(milliseconds: 150),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: AppSpacing.md),
+                        // Field section
+                        if (fieldEntries.isNotEmpty) ...[
+                          _SectionLabel(
+                            text: widget.localeText(
+                              context,
+                              '字段详情',
+                              'Field Details',
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.sm),
+                          for (var i = 0; i < fieldEntries.length; i++)
+                            Padding(
+                              padding: EdgeInsets.only(
+                                bottom:
+                                    i == fieldEntries.length - 1 ? 0 : AppSpacing.xs,
+                              ),
+                              child: _FieldRow(
+                                label: fieldEntries[i].label,
+                                value: fieldEntries[i].value,
+                                isSecret: fieldEntries[i].isSecret,
+                                canCopy: fieldEntries[i].canCopy,
+                                icon: fieldEntries[i].icon,
+                                accent: accent,
+                                isHighlighted: widget.highlightedFieldKeys
+                                    .contains(fieldEntries[i].key),
+                                onCopy: () => _copyValue(
+                                  context,
+                                  fieldEntries[i].label,
+                                  fieldEntries[i].value,
+                                ),
+                                copyTooltip: widget.localeText(
+                                  context,
+                                  '复制 ${fieldEntries[i].label}',
+                                  'Copy ${fieldEntries[i].label}',
+                                ),
+                              ),
+                            ),
+                        ],
+
+                        // Divider + meta
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
+                          child: Divider(height: 1),
+                        ),
+                        _buildMetaInfo(context, accent),
+
+                        // Bottom action bar
+                        const SizedBox(height: AppSpacing.md),
+                        _ActionBar(
+                          onEdit: widget.onEdit,
+                          onCopyAll: () => _copyValue(
+                            context,
+                            widget.localeText(context, '全部信息', 'All Information'),
+                            _buildCopyAllText(context),
+                          ),
+                          onDelete: widget.onDelete,
+                          localeText: widget.localeText,
+                        ),
+                      ],
                     ),
                   ),
-                  icon: Icon(
-                    Icons.copy_outlined,
-                    size: 18,
-                    color: theme.colorScheme.onSurfaceVariant
-                        .withAlpha(AppAlphas.medium),
-                  ),
                 ),
-              IconButton(
-                tooltip: widget.localeText(context, '详情', 'Details'),
-                onPressed: _toggleExpanded,
-                style: IconButton.styleFrom(
-                  minimumSize: const Size(36, 36),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppRadii.control),
-                  ),
-                ),
-                icon: AnimatedRotation(
-                  duration: const Duration(milliseconds: 200),
-                  turns: _isExpanded ? 0.5 : 0,
-                  child: Icon(
-                    Icons.expand_more_rounded,
-                    size: 22,
-                    color: theme.colorScheme.onSurfaceVariant
-                        .withAlpha(AppAlphas.medium),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          // Expanded detail fields
-          if (_isExpanded && fieldEntries.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.md),
-            Container(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              decoration: BoxDecoration(
-                color: AppSurfaces.soft(theme.colorScheme, tint: accent, tintAlpha: 8),
-                borderRadius: BorderRadius.circular(AppRadii.control),
-                border: Border.all(
-                  color: theme.colorScheme.outlineVariant.withAlpha(AppAlphas.subtle),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  for (var i = 0; i < fieldEntries.length; i++)
-                    Padding(
-                      padding: EdgeInsets.only(
-                        bottom: i == fieldEntries.length - 1 ? 0 : AppSpacing.sm,
-                      ),
-                      child: AccountFieldRow(
-                        label: fieldEntries[i].label,
-                        value: fieldEntries[i].value,
-                        isSecret: fieldEntries[i].isSecret,
-                        canCopy: fieldEntries[i].canCopy,
-                        icon: fieldEntries[i].icon,
-                        accent: accent,
-                        onCopy: () => _copyValue(
-                          context,
-                          fieldEntries[i].label,
-                          fieldEntries[i].value,
-                        ),
-                        copyTooltip: widget.localeText(
-                          context,
-                          '复制 ${fieldEntries[i].label}',
-                          'Copy ${fieldEntries[i].label}',
-                        ),
-                      ),
-                    ),
-                  const Divider(height: AppSpacing.xl),
-                  _buildMetaInfo(context, accent),
-                ],
-              ),
+              ],
             ),
-          ],
-        ],
-      ),
-    ),
+          ),
+        ),
       ),
     );
   }
@@ -639,6 +702,443 @@ class _AccountListTileState extends State<AccountListTile> {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  Sub-widgets
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _AccountBadge extends StatelessWidget {
+  final String badgeText;
+  final Color accent;
+
+  const _AccountBadge({
+    required this.badgeText,
+    required this.accent,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      width: 48,
+      height: 48,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            accent.withAlpha(40),
+            accent.withAlpha(80),
+          ],
+        ),
+        shape: BoxShape.circle,
+        border: Border.all(color: accent.withAlpha(50)),
+      ),
+      child: Text(
+        badgeText,
+        style: theme.textTheme.titleMedium?.copyWith(
+          color: accent,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+}
+
+class _FieldCountTag extends StatelessWidget {
+  final int count;
+  final String label;
+
+  const _FieldCountTag({required this.count, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primary.withAlpha(
+          theme.brightness == Brightness.light ? 12 : 18,
+        ),
+        borderRadius: BorderRadius.circular(AppRadii.chip),
+        border: Border.all(
+          color: theme.colorScheme.primary.withAlpha(
+            theme.brightness == Brightness.light ? 40 : 30,
+          ),
+          width: 0.5,
+        ),
+      ),
+      child: Text(
+        '$count $label',
+        style: AppTextStyles.caption(context).copyWith(
+          color: theme.colorScheme.primary,
+          fontWeight: FontWeight.w600,
+          height: 1.2,
+        ),
+      ),
+    );
+  }
+}
+
+class _TinyBadge extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _TinyBadge({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withAlpha(16),
+        borderRadius: BorderRadius.circular(AppRadii.chip),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 11, color: color),
+          const SizedBox(width: 3),
+          Text(
+            label,
+            style: AppTextStyles.caption(context).copyWith(
+              color: color,
+              fontWeight: FontWeight.w600,
+              fontSize: 10,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _IconButtonCompact extends StatelessWidget {
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback onPressed;
+  final double rotation;
+
+  const _IconButtonCompact({
+    required this.tooltip,
+    required this.icon,
+    required this.onPressed,
+    this.rotation = 0,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return IconButton(
+      tooltip: tooltip,
+      onPressed: onPressed,
+      style: IconButton.styleFrom(
+        minimumSize: const Size(36, 36),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.control),
+        ),
+      ),
+      icon: AnimatedRotation(
+        duration: const Duration(milliseconds: 200),
+        turns: rotation,
+        child: Icon(
+          icon,
+          size: 20,
+          color: colorScheme.onSurfaceVariant.withAlpha(AppAlphas.medium),
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionLabel extends StatelessWidget {
+  final String text;
+
+  const _SectionLabel({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Text(
+      text,
+      style: AppTextStyles.labelSmall(context)?.copyWith(
+        color: theme.colorScheme.onSurfaceVariant.withAlpha(168),
+        fontWeight: FontWeight.w700,
+        letterSpacing: 0.5,
+      ),
+    );
+  }
+}
+
+class _FieldRow extends StatefulWidget {
+  final String label;
+  final String value;
+  final bool isSecret;
+  final bool canCopy;
+  final IconData icon;
+  final Color accent;
+  final bool isHighlighted;
+  final VoidCallback onCopy;
+  final String copyTooltip;
+
+  const _FieldRow({
+    required this.label,
+    required this.value,
+    required this.isSecret,
+    this.canCopy = true,
+    required this.icon,
+    required this.accent,
+    this.isHighlighted = false,
+    required this.onCopy,
+    required this.copyTooltip,
+  });
+
+  @override
+  State<_FieldRow> createState() => _FieldRowState();
+}
+
+class _FieldRowState extends State<_FieldRow> {
+  bool _isRevealed = false;
+
+  String _maskSecret(String value) {
+    final length = value.length;
+    final count = math.max(4, math.min(length, 10));
+    return List.filled(count, '*').join();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final displayValue = widget.isSecret && !_isRevealed
+        ? _maskSecret(widget.value)
+        : widget.value;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: widget.isHighlighted
+            ? Colors.red.withAlpha(
+                theme.brightness == Brightness.light ? 20 : 30,
+              )
+            : null,
+        borderRadius: BorderRadius.circular(AppRadii.control),
+        border: widget.isHighlighted
+            ? Border.all(color: Colors.red.withAlpha(80))
+            : null,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Field icon
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: widget.accent.withAlpha(12),
+              borderRadius: BorderRadius.circular(7),
+            ),
+            alignment: Alignment.center,
+            child: Icon(widget.icon, size: 14, color: widget.accent),
+          ),
+          const SizedBox(width: 10),
+          // Label (fixed width)
+          SizedBox(
+            width: 72,
+            child: Text(
+              widget.label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.labelSmall(context)?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant.withAlpha(160),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Value
+          Expanded(
+            child: Text(
+              displayValue,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.bodyMedium(context)?.copyWith(
+                color: theme.colorScheme.onSurface.withAlpha(230),
+                fontWeight: FontWeight.w500,
+                height: 1.35,
+                fontFamily: widget.isSecret
+                    ? 'RobotoMono'
+                    : null,
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+          // Actions
+          if (widget.isSecret)
+            _FieldActionButton(
+              tooltip: _isRevealed ? 'Hide secret' : 'Show secret',
+              icon: _isRevealed
+                  ? Icons.visibility_off_outlined
+                  : Icons.visibility_outlined,
+              onPressed: () => setState(() => _isRevealed = !_isRevealed),
+              accent: widget.accent,
+            ),
+          if (widget.canCopy && (!widget.isSecret || _isRevealed))
+            _FieldActionButton(
+              tooltip: widget.copyTooltip,
+              icon: Icons.content_copy_outlined,
+              onPressed: widget.onCopy,
+              accent: widget.accent,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FieldActionButton extends StatelessWidget {
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback onPressed;
+  final Color accent;
+
+  const _FieldActionButton({
+    required this.tooltip,
+    required this.icon,
+    required this.onPressed,
+    required this.accent,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      tooltip: tooltip,
+      onPressed: onPressed,
+      visualDensity: VisualDensity.compact,
+      iconSize: 18,
+      padding: const EdgeInsets.all(6),
+      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+      icon: Icon(
+        icon,
+        size: 16,
+        color: accent.withAlpha(180),
+      ),
+    );
+  }
+}
+
+class _ActionBar extends StatelessWidget {
+  final VoidCallback onEdit;
+  final VoidCallback onCopyAll;
+  final VoidCallback onDelete;
+  final String Function(BuildContext, String, String) localeText;
+
+  const _ActionBar({
+    required this.onEdit,
+    required this.onCopyAll,
+    required this.onDelete,
+    required this.localeText,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Row(
+      children: [
+        Expanded(
+          child: _ActionButton(
+            icon: Icons.edit_outlined,
+            label: localeText(context, '编辑', 'Edit'),
+            onPressed: onEdit,
+            foregroundColor: colorScheme.primary,
+            backgroundColor: colorScheme.primary.withAlpha(12),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: _ActionButton(
+            icon: Icons.copy_all_outlined,
+            label: localeText(context, '复制全部', 'Copy all'),
+            onPressed: onCopyAll,
+            foregroundColor: colorScheme.onSurfaceVariant,
+            backgroundColor: colorScheme.surfaceContainerHighest.withAlpha(
+              theme.brightness == Brightness.light ? 100 : 60,
+            ),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: _ActionButton(
+            icon: Icons.delete_outline,
+            label: localeText(context, '删除', 'Delete'),
+            onPressed: onDelete,
+            foregroundColor: colorScheme.error,
+            backgroundColor: colorScheme.error.withAlpha(12),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ActionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onPressed;
+  final Color foregroundColor;
+  final Color backgroundColor;
+
+  const _ActionButton({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+    required this.foregroundColor,
+    required this.backgroundColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: backgroundColor,
+      borderRadius: BorderRadius.circular(AppRadii.control),
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(AppRadii.control),
+        child: Container(
+          height: 36,
+          alignment: Alignment.center,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 16, color: foregroundColor.withAlpha(200)),
+              const SizedBox(width: 5),
+              Text(
+                label,
+                style: AppTextStyles.labelSmall(context)?.copyWith(
+                  color: foregroundColor.withAlpha(220),
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// Legacy public exports for backward compatibility.
+// These redirect to the new private implementations.
 class AccountFieldRow extends StatelessWidget {
   final String label;
   final String value;
@@ -646,6 +1146,7 @@ class AccountFieldRow extends StatelessWidget {
   final bool canCopy;
   final IconData icon;
   final Color accent;
+  final bool isHighlighted;
   final VoidCallback onCopy;
   final String copyTooltip;
 
@@ -657,19 +1158,21 @@ class AccountFieldRow extends StatelessWidget {
     this.canCopy = true,
     required this.icon,
     required this.accent,
+    this.isHighlighted = false,
     required this.onCopy,
     required this.copyTooltip,
   });
 
   @override
   Widget build(BuildContext context) {
-    return AccountFieldRowBody(
+    return _FieldRow(
       label: label,
       value: value,
       isSecret: isSecret,
       canCopy: canCopy,
       icon: icon,
       accent: accent,
+      isHighlighted: isHighlighted,
       onCopy: onCopy,
       copyTooltip: copyTooltip,
     );
@@ -683,6 +1186,7 @@ class AccountFieldRowBody extends StatefulWidget {
   final bool canCopy;
   final IconData icon;
   final Color accent;
+  final bool isHighlighted;
   final VoidCallback onCopy;
   final String copyTooltip;
 
@@ -694,6 +1198,7 @@ class AccountFieldRowBody extends StatefulWidget {
     this.canCopy = true,
     required this.icon,
     required this.accent,
+    this.isHighlighted = false,
     required this.onCopy,
     required this.copyTooltip,
   });
@@ -719,28 +1224,32 @@ class _AccountFieldRowBodyState extends State<AccountFieldRowBody> {
         : widget.value;
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
+      padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface.withAlpha(
-          theme.brightness == Brightness.light ? 180 : 80,
-        ),
+        color: widget.isHighlighted
+            ? Colors.red.withAlpha(theme.brightness == Brightness.light ? 20 : 30)
+            : theme.colorScheme.surfaceContainerHighest.withAlpha(
+                theme.brightness == Brightness.light ? 120 : 60,
+              ),
         borderRadius: BorderRadius.circular(AppRadii.control),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
+        border: widget.isHighlighted
+            ? Border.all(color: Colors.red.withAlpha(80))
+            : null,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 28,
-            height: 28,
+            width: 32,
+            height: 32,
             decoration: BoxDecoration(
               color: widget.accent.withAlpha(14),
               borderRadius: BorderRadius.circular(8),
             ),
             alignment: Alignment.center,
-            child: Icon(widget.icon, size: 15, color: widget.accent),
+            child: Icon(widget.icon, size: 16, color: widget.accent),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -753,13 +1262,13 @@ class _AccountFieldRowBodyState extends State<AccountFieldRowBody> {
                     letterSpacing: 0,
                   ),
                 ),
-                const SizedBox(height: 3),
+                const SizedBox(height: 6),
                 Text(
                   displayValue,
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurface.withAlpha(214),
-                    fontWeight: FontWeight.w600,
-                    height: 1.25,
+                    color: theme.colorScheme.onSurface.withAlpha(230),
+                    fontWeight: FontWeight.w500,
+                    height: 1.35,
                   ),
                 ),
               ],
@@ -778,7 +1287,7 @@ class _AccountFieldRowBodyState extends State<AccountFieldRowBody> {
                 color: widget.accent.withAlpha(190),
               ),
             ),
-          if (widget.canCopy)
+          if (widget.canCopy && (!widget.isSecret || _isRevealed))
             IconButton(
               tooltip: widget.copyTooltip,
               onPressed: widget.onCopy,

@@ -1,11 +1,20 @@
 import 'package:flutter/material.dart';
 
 import '../../l10n/app_text_extension.dart';
+import '../../models/account_item.dart';
 import '../../models/vault_health_report.dart';
 import '../../services/service_manager.dart';
 import '../../services/vault_health_calculator.dart';
-import '../../widgets/adaptive_page.dart';
 import '../../theme/app_design_tokens.dart';
+import '../../widgets/adaptive_page.dart';
+import '../../widgets/inbox/inbox_action_card.dart';
+import '../../widgets/inbox/inbox_empty_state.dart';
+import '../../widgets/inbox/inbox_models.dart';
+import '../accounts/account_edit_view.dart';
+import '../accounts/account_subset_view.dart';
+import '../conflict_inbox_view.dart';
+import '../sync/local_sync_queue_view.dart';
+import '../sync_settings_view.dart';
 
 class VaultHealthView extends StatefulWidget {
   const VaultHealthView({super.key});
@@ -108,26 +117,10 @@ class _VaultHealthViewState extends State<VaultHealthView> {
   }
 
   Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(
-            Icons.health_and_safety_outlined,
-            size: 64,
-            color: Colors.grey,
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          Text(context.text('无法计算体检报告', 'Cannot calculate health report'), style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            context.text('请确保保险库已解锁', 'Make sure the vault is unlocked'),
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: Colors.grey),
-          ),
-        ],
-      ),
+    return InboxEmptyState(
+      icon: Icons.health_and_safety_outlined,
+      title: context.text('无法计算体检报告', 'Cannot calculate health report'),
+      subtitle: context.text('请确保保险库已解锁', 'Make sure the vault is unlocked'),
     );
   }
 
@@ -239,15 +232,13 @@ class _VaultHealthViewState extends State<VaultHealthView> {
   Widget _buildItemCard(VaultHealthItem item) {
     final riskColor = _riskColor(item.riskLevel);
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        leading: Icon(
-          item.isPass ? Icons.check_circle : Icons.warning,
-          color: item.isPass ? Colors.green : riskColor,
-        ),
-        title: Text(item.title),
-        subtitle: Text(item.description),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: ActionItemCard(
+        severity: item.isPass ? InboxSeverity.success : _riskToSeverity(item.riskLevel),
+        title: item.title,
+        subtitle: item.description,
+        showChevron: false,
         trailing: Chip(
           label: Text(
             _riskLabel(context, item.riskLevel),
@@ -257,9 +248,17 @@ class _VaultHealthViewState extends State<VaultHealthView> {
           side: BorderSide.none,
           padding: EdgeInsets.zero,
         ),
-        onTap: item.action != null ? () => _handleAction(item.action!) : null,
+        onTap: item.action != null ? () => _handleAction(item.action!, item.id) : null,
       ),
     );
+  }
+
+  static InboxSeverity _riskToSeverity(VaultHealthRiskLevel level) {
+    return switch (level) {
+      VaultHealthRiskLevel.high => InboxSeverity.critical,
+      VaultHealthRiskLevel.medium => InboxSeverity.warning,
+      VaultHealthRiskLevel.low => InboxSeverity.info,
+    };
   }
 
   Widget _buildAllPassBanner() {
@@ -283,27 +282,90 @@ class _VaultHealthViewState extends State<VaultHealthView> {
     );
   }
 
-  void _handleAction(VaultHealthAction action) {
-    // TODO: Wire up navigation when integrated with ServiceManager
+  Future<void> _handleAction(VaultHealthAction action, String itemId) async {
+    final highlightFieldKey = switch (itemId) {
+      'weak_passwords' || 'reused_passwords' => 'password',
+      'incomplete_records' => 'url',
+      _ => null,
+    };
+    final groupByFieldKey = switch (itemId) {
+      'reused_passwords' => 'password',
+      _ => null,
+    };
     switch (action.type) {
       case VaultHealthActionType.navigateToAccountEdit:
-        // Navigator push to account edit or list
+        await _navigateToAccountEdit(
+          action.targetIds,
+          highlightFieldKey: highlightFieldKey,
+          groupByFieldKey: groupByFieldKey,
+        );
         break;
       case VaultHealthActionType.navigateToOutbox:
-        // Navigate to home outbox
+        if (!mounted) return;
+        await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const LocalSyncQueueView()),
+        );
         break;
       case VaultHealthActionType.navigateToConflictInbox:
-        // Navigate to conflict inbox
+        if (!mounted) return;
+        await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const ConflictInboxView()),
+        );
         break;
       case VaultHealthActionType.navigateToExport:
-        // Show export dialog
+        // Export view not yet implemented; fall through to no-op
         break;
       case VaultHealthActionType.navigateToSyncSettings:
-        // Navigate to sync settings
+        if (!mounted) return;
+        await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const SyncSettingsView()),
+        );
         break;
       case VaultHealthActionType.none:
         break;
     }
+  }
+
+  Future<void> _navigateToAccountEdit(
+    List<String> targetIds, {
+    String? highlightFieldKey,
+    String? groupByFieldKey,
+  }) async {
+    if (targetIds.isEmpty) return;
+    final storage = ServiceManager.instance.storageService;
+
+    if (targetIds.length == 1) {
+      final account = await storage.getAccountById(targetIds.first);
+      if (!mounted) return;
+      if (account == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.text('账号不存在或已被删除', 'Account not found or deleted'))),
+        );
+        return;
+      }
+      await Navigator.push<AccountItem>(
+        context,
+        MaterialPageRoute(builder: (_) => AccountEditView(initial: account)),
+      );
+      return;
+    }
+
+    // Multiple accounts: open subset view
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AccountSubsetView(
+          title: context.text('问题账号', 'Problematic Accounts'),
+          accountIds: targetIds,
+          highlightFieldKey: highlightFieldKey,
+          groupByFieldKey: groupByFieldKey,
+        ),
+      ),
+    );
   }
 
   String _formatTime(DateTime time) {

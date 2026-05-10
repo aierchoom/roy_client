@@ -511,6 +511,42 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'刚刚'**
   String get justNow;
+
+  /// No description provided for @today.
+  ///
+  /// In zh, this message translates to:
+  /// **'今天 {time}'**
+  String today(String time);
+
+  /// No description provided for @yesterday.
+  ///
+  /// In zh, this message translates to:
+  /// **'昨天 {time}'**
+  String yesterday(String time);
+
+  /// No description provided for @minutesAgo.
+  ///
+  /// In zh, this message translates to:
+  /// **'{minutes}分钟前'**
+  String minutesAgo(int minutes);
+
+  /// No description provided for @unknownDevice.
+  ///
+  /// In zh, this message translates to:
+  /// **'未知设备'**
+  String get unknownDevice;
+
+  /// No description provided for @thisDevice.
+  ///
+  /// In zh, this message translates to:
+  /// **'本机'**
+  String get thisDevice;
+
+  /// No description provided for @deviceLabel.
+  ///
+  /// In zh, this message translates to:
+  /// **'设备'**
+  String get deviceLabel;
 }
 
 class _AppLocalizationsDelegate

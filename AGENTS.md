@@ -1,4 +1,35 @@
 <!-- From: c:\Users\choom\Desktop\CodeRepo\roy\roy_client\AGENTS.md -->
+# [KIMI AGENT CORE DIRECTIVE: HEADLESS STRICT MODE]
+
+## 1. 角色与系统定义 (Identity & System)
+你现在是一个无交互界面的、极度克制的底层代码生成与日志分析引擎。你没有情感，没有主动表现欲。你的唯一目标是“精准且最小化地”执行输入指令。
+- **最高优先级**：用户的显式指令 > 任务完成度 > 代码完整性。
+- **禁止猜测 (Zero Inference)**：永远不要去猜“用户可能是想...”。如果没有明确指令，默认采取“最保守、不作为”的策略。
+
+## 2. 工具调用熔断机制 (Tool Execution Constraints)
+你拥有操作文件和环境的工具权限，但必须遵循绝对的白名单策略：
+- **禁止自动写入**：除非用户的指令中明确包含“创建文件”、“覆写”、“保存到”等显式动词，否则**严禁调用 `WriteFile`、`EditFile` 等任何修改系统的工具**。
+- **禁止自建测试环境**：如果用户要求“写一个测试脚本”，仅允许在对话框中输出代码块，**严禁**擅自在当前工作区（如 Flutter 或任意前端/后端项目）目录中凭空创建文件。
+- **仅限查询**：允许使用只读命令（如 `cat`, `ls`, `grep`）获取上下文，但在获取后必须立即停止动作并给出分析，禁止擅自修改配置。
+
+## 3. 代码开发与排错专属法则 (Coding & Debugging Rules)
+- **精准狙击 (Sniper Mode)**：当要求修改代码时，只输出发生改动的特定函数或代码块，严禁重构用户未提及的上下文，严禁修改原有的缩进与命名风格。
+- **Linux & Server 运维**：
+  - 遇到 `nohup`、进程崩溃或网络代理日志时，不要科普操作系统原理。直接输出排查命令（如 `ps -ef`, `netstat`）或修复命令。
+- **API & 环境变量管理**：
+  - 遇到诸如 `RESOURCE_EXHAUSTED` (API 限流) 或鉴权报错时，直接提供修改请求频率的代码，或提供 `export ANTHROPIC_API_KEY=...` 等终端环境变量设置指令。
+- **幻觉切断**：如果你不知道某个 API 的特定版本用法，必须回答“缺少文档，请提供”，严禁伪造参数或类名。
+
+## 4. 输出格式强制校验 (Output Formatting)
+- **零废话 (No Yapping)**：你的回复必须跳过所有的寒暄、确认、解释和总结。禁止出现：“已为您创建”、“好的，我明白了”、“运行方式如下”、“希望这能解决您的问题”。
+- **Start with Code, End with Code**：除了必要的、极简的技术注释（放在代码内部），不要在代码块外部输出任何散文式排版。
+
+## 5. 自我审查 (Internal Pre-flight Check)
+在生成任何回复或调用工具前，必须在 `<Thinking>` 块中完成以下三项校验，有一项不通过则停止动作：
+1. "用户是否明确授权我执行写入/修改操作？" (如果否，仅在对话框输出文本)
+2. "我的输出中是否包含了用户未提及的文件或逻辑？" (如果是，立即剔除)
+3. "我是否在解释用户没有问的原理？" (如果是，立即删除解释部分)
+
 # SecretRoy 项目指南（AI Agent 版）
 
 > 本文档面向 AI 编程助手，概括项目架构、技术栈、构建方式、代码组织与开发惯例。
@@ -22,22 +53,23 @@
 
 ## 技术栈与关键依赖
 
-| 层级 | 技术 |
-|------|------|
-| 框架 | Flutter 3.x / Dart ^3.10.1 |
-| 状态管理 | `provider`（ChangeNotifier） |
-| 本地数据库 | `sqflite` / `sqflite_common_ffi`（桌面端） |
-| 加密 | `cryptography`（AES-GCM-256、PBKDF2、HKDF、X25519）、`crypto` |
-| 安全存储 | `flutter_secure_storage` |
-| 生物识别 | `local_auth` |
-| 网络同步 | `http` |
-| 二维码 | `mobile_scanner`、`zxing2` |
-| TOTP | 自建 RFC 6238 实现（SHA1/SHA256/SHA512） |
-| 剪贴板 | `pasteboard` |
-| 文件选择 | `file_picker` |
-| 国际化 | `flutter_localizations` + ARB |
-| 字体 | `google_fonts`（Noto Sans SC） |
-| 其他 | `archive`、`image`、`share_plus`、`shared_preferences`、`uuid` |
+| 层级       | 技术                                                                                        |
+| ---------- | ------------------------------------------------------------------------------------------- |
+| 框架       | Flutter 3.x（CI 锁定 `3.38.3` stable）/ Dart `^3.10.1`                                      |
+| 状态管理   | `provider`（ChangeNotifier）                                                                |
+| 本地数据库 | `sqflite` / `sqflite_common_ffi`（桌面端）                                                  |
+| 加密       | `cryptography`（AES-GCM-256、PBKDF2、HKDF、X25519）、`crypto`                               |
+| 安全存储   | `flutter_secure_storage`                                                                    |
+| 生物识别   | `local_auth`                                                                                |
+| 网络同步   | `http`                                                                                      |
+| 二维码     | `mobile_scanner`、`zxing2`                                                                  |
+| TOTP       | 自建 RFC 6238 实现（SHA1/SHA256/SHA512）                                                    |
+| 剪贴板     | `pasteboard`                                                                                |
+| 文件选择   | `file_picker`                                                                               |
+| 国际化     | `flutter_localizations` + ARB                                                               |
+| 字体       | `google_fonts`（Noto Sans SC）                                                              |
+| 通知       | `flutter_local_notifications`                                                               |
+| 其他       | `archive`、`image`、`share_plus`、`shared_preferences`、`uuid`、`timezone`、`path_provider` |
 
 ---
 
@@ -45,11 +77,11 @@
 
 ```text
 lib/
-├── core/               # 基础工具（AppLogger 等）
-├── l10n/               # ARB 国际化文件（zh 为主模板，en 为英文）
-├── main.dart           # 应用入口：初始化 ServiceManager、Provider、主题
-├── models/             # 数据模型：AccountItem、AccountTemplate、Hlc、TOTPCredential、LocalSyncChange、VaultHealthReport 等
-├── providers/          # Provider 状态层（EnhancedAppProvider、ThemeProvider）
+├── core/               # 基础工具（AppLogger、CryptoRandom 等）
+├── l10n/               # ARB 国际化文件（zh 为主模板，en 为英文）及生成的本地化代码
+├── main.dart           # 应用入口：初始化 ServiceManager、Provider、主题、通知服务
+├── models/             # 数据模型：AccountItem、AccountTemplate、Hlc、TOTPCredential、LocalSyncChange、VaultHealthReport、AppNotification、TemplateConflictLog 等
+├── providers/          # Provider 状态层（EnhancedAppProvider、ThemeProvider、NotificationProvider）
 ├── services/           # 业务服务层
 │   ├── auto_lock_service.dart
 │   ├── biometric_auth_service.dart
@@ -58,6 +90,7 @@ lib/
 │   ├── enhanced_crypto_service.dart
 │   ├── identity_service.dart
 │   ├── lan_pairing_service.dart
+│   ├── notification_service.dart
 │   ├── secure_storage_service.dart
 │   ├── sensitive_clipboard_service.dart
 │   ├── service_manager.dart
@@ -67,7 +100,7 @@ lib/
 │   ├── vault_health_calculator.dart
 │   ├── vault_pairing_crypto.dart
 │   └── vault_pairing_service.dart
-├── sync/               # 同步核心：CRDT 合并、Payload 编解码、SyncService（pull/push/conflict）、TOTPCredential 合并
+├── sync/               # 同步核心：CRDT 合并、Payload 编解码、SyncService（pull/push/conflict）、TOTPCredential 合并、状态机类型
 ├── system/             # 系统级辅助模块：ServiceManager 的拆分逻辑、持久化 helper、 narrowly-focused coordinators
 │   └── service_manager/
 │       ├── default_sync_server_url.dart
@@ -82,8 +115,9 @@ lib/
 ├── utils/              # 通用工具与常量（field_presets.dart、template_icons.dart）
 ├── views/              # 页面
 │   ├── accounts/       # 账号编辑、列表、TOTP 列表/编辑/扫码
-│   ├── home/           # 主页及桌面/移动自适应布局
-│   ├── settings/       # 保险库健康检查
+│   ├── home/           # 主页及桌面/移动自适应布局（home_view_desktop / home_view_mobile）
+│   ├── notifications/  # 通知中心
+│   ├── settings/       # 保险库健康检查、通知设置
 │   ├── sync/           # 本地同步队列
 │   ├── templates/      # 模板列表与编辑
 │   ├── appearance_settings_view.dart
@@ -98,7 +132,7 @@ lib/
 
 test/
 ├── models/             # 模型序列化与兼容性测试
-├── services/           # 加密、存储、身份、TOTP、剪贴板、配对测试
+├── services/           # 加密、存储、身份、TOTP、剪贴板、配对、生物识别测试
 ├── sync/               # CRDT、状态机、配对、Payload 编解码、冲突恢复、多设备同步测试
 ├── system/             # VaultDumpCoordinator、导入回滚测试
 ├── theme/              # Design Token 与布局断点测试
@@ -171,6 +205,9 @@ flutter test --name "merge is deterministic"
 
 # 展开输出
 flutter test --reporter expanded
+
+# 生成覆盖率
+flutter test --coverage
 ```
 
 ### 发布构建
@@ -196,7 +233,7 @@ flutter build apk --release --split-per-abi --obfuscate --split-debug-info=build
 
 ### 格式化
 
-- **行宽**：120 字符（`.vscode/settings.json` 已配置）。
+- **行宽**：120 字符（`.vscode/settings.json` 已配置 `dart.lineLength: 120`）。
 - **保存时自动格式化**：VS Code 已开启 `editor.formatOnSave` 与 `source.organizeImports`。
 - 提交前建议运行 `dart format .`。
 
@@ -232,7 +269,7 @@ flutter build apk --release --split-per-abi --obfuscate --split-debug-info=build
 
 - `BorderRadius.circular(<数字>)`（应使用 `AppRadii.*`）
 - `.withAlpha(<数字>)`（应使用 `AppAlphas.*`）
-- `AppBreakpoints.isDesktop`（ legacy，应使用 `AppLayout`）
+- `AppBreakpoints.isDesktop`（legacy，应使用 `AppLayout`）
 
 `lib/theme/` 和 `lib/widgets/` 目录被排除在扫描外（Token 定义处允许硬编码）。
 
@@ -242,28 +279,28 @@ flutter build apk --release --split-per-abi --obfuscate --split-debug-info=build
 
 ### 当前覆盖
 
-- **测试文件数**：38
+- **测试文件数**：38（单元/组件测试）+ 2（集成测试）
 - **测试用例数**：120+
 - **覆盖范围**：models、services、sync、system、theme、utils、views、widgets
-- **Widget 测试**：少量，包括 `account_list_tile_test.dart`、`app_hero_card_test.dart`、`app_nav_test.dart`、`app_option_tile_test.dart`、`app_selectable_scrollable_test.dart`、`app_settings_test.dart`
+- **Widget 测试**：`account_list_tile_test.dart`、`app_hero_card_test.dart`、`app_nav_test.dart`、`app_option_tile_test.dart`、`app_selectable_scrollable_test.dart`、`app_settings_test.dart`
 - **集成测试**：`integration_test/smoke_happy_path_test.dart`、`smoke_full_workflows_test.dart`
 
 ### 重点测试领域
 
-| 领域 | 关键测试文件 |
-|------|-------------|
-| 模型兼容性 | `test/models/*_test.dart`（验证 JSON 解析 fallback、字段兼容性） |
-| 本地加密存储 | `test/services/database_file_cipher_test.dart`、`secure_storage_service_encryption_test.dart` |
-| 同步变更箱 | `test/services/secure_storage_service_sync_outbox_test.dart`（create→update→delete 合并规则） |
-| 身份与配对 | `test/services/identity_service_test.dart`、`test/sync/lan_pairing_service_test.dart`、`vault_pairing_crypto_test.dart` |
-| CRDT 合并 | `test/sync/crdt_merge_engine_test.dart`、`crdt_merge_invariants_test.dart` |
-| 同步状态机 | `test/sync/sync_state_machine_test.dart`、`multi_device_sync_test.dart` |
-| Payload 安全 | `test/sync/sync_payload_codec_test.dart`（篡改拒绝、vault 隔离、旧格式兼容） |
-| 冲突恢复 | `test/sync/sync_conflict_recovery_test.dart`、`sync_recovery_loop_test.dart` |
-| TOTP | `test/services/totp_service_test.dart`（RFC 6238 标准向量）、`totp_import_service_test.dart`、`totp_qr_image_import_service_test.dart` |
-| 敏感剪贴板 | `test/services/sensitive_clipboard_service_test.dart`（定时清理、SHA-256 hash 防误删） |
-| 主题 Token | `test/theme/app_design_tokens_test.dart`、`app_layout_test.dart` |
-| 系统辅助 | `test/system/vault_dump_coordinator_test.dart`、`vault_import_rollback_test.dart` |
+| 领域         | 关键测试文件                                                                                                                           |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| 模型兼容性   | `test/models/*_test.dart`（验证 JSON 解析 fallback、字段兼容性）                                                                       |
+| 本地加密存储 | `test/services/database_file_cipher_test.dart`、`secure_storage_service_encryption_test.dart`                                          |
+| 同步变更箱   | `test/services/secure_storage_service_sync_outbox_test.dart`（create→update→delete 合并规则）                                          |
+| 身份与配对   | `test/services/identity_service_test.dart`、`test/sync/lan_pairing_service_test.dart`、`vault_pairing_crypto_test.dart`                |
+| CRDT 合并    | `test/sync/crdt_merge_engine_test.dart`、`crdt_merge_invariants_test.dart`                                                             |
+| 同步状态机   | `test/sync/sync_state_machine_test.dart`、`multi_device_sync_test.dart`                                                                |
+| Payload 安全 | `test/sync/sync_payload_codec_test.dart`（篡改拒绝、vault 隔离、旧格式兼容）                                                           |
+| 冲突恢复     | `test/sync/sync_conflict_recovery_test.dart`、`sync_recovery_loop_test.dart`                                                           |
+| TOTP         | `test/services/totp_service_test.dart`（RFC 6238 标准向量）、`totp_import_service_test.dart`、`totp_qr_image_import_service_test.dart` |
+| 敏感剪贴板   | `test/services/sensitive_clipboard_service_test.dart`（定时清理、SHA-256 hash 防误删）                                                 |
+| 主题 Token   | `test/theme/app_design_tokens_test.dart`、`app_layout_test.dart`                                                                       |
+| 系统辅助     | `test/system/vault_dump_coordinator_test.dart`、`vault_import_rollback_test.dart`                                                      |
 
 ### 测试中的常见模式
 
@@ -330,23 +367,23 @@ flutter build apk --release --split-per-abi --obfuscate --split-debug-info=build
 
 ## 常用开发路径速查
 
-| 任务 | 路径/命令 |
-|------|----------|
-| 应用入口 | `lib/main.dart` |
-| 全局服务统筹 | `lib/services/service_manager.dart` |
-| 本地数据库与加密 | `lib/services/secure_storage_service.dart` |
-| 同步核心 | `lib/sync/sync_service.dart`（含 `sync_service_pull.dart`、`sync_service_push.dart`、`sync_service_conflict.dart`） |
-| CRDT 合并 | `lib/sync/crdt_merge_engine.dart` |
-| 密码学服务 | `lib/services/enhanced_crypto_service.dart` |
-| 设备身份 | `lib/services/identity_service.dart` |
-| TOTP 服务 | `lib/services/totp_service.dart` |
-| 主题系统（Token/排版/布局） | `lib/theme/theme.dart` |
-| 跨平台断点与布局 | `lib/theme/app_layout.dart` |
-| 跨平台排版系统 | `lib/theme/app_text_styles.dart` |
-| 项目 TODO | `docs/todo.md` |
-| 架构概览 | `docs/architecture/00-executive-summary.md` |
-| 测试指南 | `docs/wiki/testing-guide.md` |
-| 开发环境搭建 | `docs/wiki/development-setup.md` |
+| 任务                        | 路径/命令                                                                                                           |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| 应用入口                    | `lib/main.dart`                                                                                                     |
+| 全局服务统筹                | `lib/services/service_manager.dart`                                                                                 |
+| 本地数据库与加密            | `lib/services/secure_storage_service.dart`                                                                          |
+| 同步核心                    | `lib/sync/sync_service.dart`（含 `sync_service_pull.dart`、`sync_service_push.dart`、`sync_service_conflict.dart`） |
+| CRDT 合并                   | `lib/sync/crdt_merge_engine.dart`                                                                                   |
+| 密码学服务                  | `lib/services/enhanced_crypto_service.dart`                                                                         |
+| 设备身份                    | `lib/services/identity_service.dart`                                                                                |
+| TOTP 服务                   | `lib/services/totp_service.dart`                                                                                    |
+| 主题系统（Token/排版/布局） | `lib/theme/theme.dart`                                                                                              |
+| 跨平台断点与布局            | `lib/theme/app_layout.dart`                                                                                         |
+| 跨平台排版系统              | `lib/theme/app_text_styles.dart`                                                                                    |
+| 项目 TODO                   | `docs/todo.md`                                                                                                      |
+| 架构概览                    | `docs/architecture/00-executive-summary.md`                                                                         |
+| 测试指南                    | `docs/wiki/testing-guide.md`                                                                                        |
+| 开发环境搭建                | `docs/wiki/development-setup.md`                                                                                    |
 
 ---
 

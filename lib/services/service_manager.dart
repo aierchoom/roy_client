@@ -11,6 +11,7 @@ import '../models/account_item.dart';
 import '../models/account_template.dart';
 import '../models/local_sync_change.dart';
 import '../models/totp_credential.dart';
+import '../sync/lan_sync_coordinator.dart';
 import '../sync/sync_service.dart';
 import '../system/service_manager/default_sync_server_url.dart';
 import '../system/service_manager/password_tools.dart';
@@ -18,6 +19,7 @@ import '../system/service_manager/sync_server_url_store.dart';
 import '../system/service_manager/vault_dump_coordinator.dart';
 import 'auto_lock_service.dart';
 import 'biometric_auth_service.dart';
+import 'device_alias_service.dart';
 import 'enhanced_crypto_service.dart';
 import 'identity_service.dart';
 import 'lan_pairing_service.dart';
@@ -77,11 +79,13 @@ class ServiceManager extends ChangeNotifier {
   late final AutoLockService _autoLockService;
   late final IdentityService _identityService;
   late final SecureStorageService _secureStorageService;
+  late final DeviceAliasService _deviceAliasService;
   late final SyncService _syncService;
   late final VaultPairingService _vaultPairingService;
   late final LanPairingService _lanPairingService;
   late final SyncServerUrlStore _syncServerUrlStore;
   late final VaultDumpCoordinator _vaultDumpCoordinator;
+  late final LanSyncCoordinator _lanSyncCoordinator;
 
   ServiceManagerState _state = ServiceManagerState.uninitialized;
   String? _errorMessage;
@@ -119,6 +123,12 @@ class ServiceManager extends ChangeNotifier {
       identityService: _identityService,
       storageService: _secureStorageService,
     );
+    _lanSyncCoordinator = LanSyncCoordinator(
+      storage: _secureStorageService,
+      identity: _identityService,
+      pairing: _lanPairingService,
+      syncService: _syncService,
+    );
   }
 
   ServiceManagerState get state => _state;
@@ -131,8 +141,10 @@ class ServiceManager extends ChangeNotifier {
   BiometricAuthService get biometricService => _biometricService;
   AutoLockService get autoLockService => _autoLockService;
   IdentityService get identityService => _identityService;
+  DeviceAliasService get deviceAliasService => _deviceAliasService;
   SecureStorageService get storageService => _secureStorageService;
   SyncService get syncService => _syncService;
+  LanSyncCoordinator get lanSyncCoordinator => _lanSyncCoordinator;
 
   Future<void> initialize() async {
     if (_state != ServiceManagerState.uninitialized) return;
@@ -156,6 +168,7 @@ class ServiceManager extends ChangeNotifier {
         unawaited(_closeStorageForLock());
         unawaited(_syncService.disconnect());
         unawaited(_lanPairingService.stopHosting());
+        unawaited(_lanSyncCoordinator.abort());
         _vaultPairingJoinKeysByRequestId.clear();
         _syncService.reset();
         _updateState(ServiceManagerState.locked);
@@ -191,6 +204,7 @@ class ServiceManager extends ChangeNotifier {
       await _identityService.initialize(
         allowGenerateVaultIdentity: !hasDatabase,
       );
+      _deviceAliasService = await DeviceAliasService.create();
       final didUnlock = await _cryptoService.initMasterKey(password);
       if (!didUnlock) {
         await _secureStorageService.close();
@@ -260,6 +274,7 @@ class ServiceManager extends ChangeNotifier {
     unawaited(_closeStorageForLock());
     unawaited(_syncService.disconnect());
     unawaited(_lanPairingService.stopHosting());
+    unawaited(_lanSyncCoordinator.abort());
     _vaultPairingJoinKeysByRequestId.clear();
     _updateState(ServiceManagerState.locked);
   }
@@ -330,6 +345,7 @@ class ServiceManager extends ChangeNotifier {
     _autoLockService.lock();
     await _syncService.disconnect();
     await _lanPairingService.stopHosting();
+    await _lanSyncCoordinator.abort();
     await _secureStorageService.close();
     _secureStorageService.clearDatabaseCipher();
     _cryptoService.logout();
@@ -550,6 +566,7 @@ class ServiceManager extends ChangeNotifier {
 
     await Future.delayed(const Duration(milliseconds: 500));
     await _identityService.initialize();
+    _deviceAliasService = await DeviceAliasService.create();
     await _secureStorageService.initialize(deviceId: _identityService.deviceId);
     await _syncService.initialize();
 
@@ -1152,6 +1169,7 @@ class ServiceManager extends ChangeNotifier {
     _autoLockService.dispose();
     _syncService.dispose();
     _lanPairingService.dispose();
+    _lanSyncCoordinator.dispose();
     unawaited(_closeStorageForLock());
     super.dispose();
   }

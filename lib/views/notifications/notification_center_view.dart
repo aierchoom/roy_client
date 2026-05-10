@@ -2,27 +2,76 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../l10n/app_text_extension.dart';
+import '../../models/account_item.dart';
 import '../../models/app_notification.dart';
+import '../../models/vault_health_report.dart';
 import '../../providers/enhanced_app_provider.dart';
 import '../../providers/notification_provider.dart';
+import '../../services/service_manager.dart';
+import '../../services/vault_health_calculator.dart';
 import '../../theme/app_design_tokens.dart';
 import '../../widgets/adaptive_page.dart';
-import '../../widgets/app_page_header.dart';
+import '../../widgets/inbox/inbox_action_card.dart';
+import '../../widgets/inbox/inbox_empty_state.dart';
+import '../../widgets/inbox/inbox_filter_bar.dart';
+import '../../widgets/inbox/inbox_hero_metrics.dart';
+import '../../widgets/inbox/inbox_models.dart';
+import '../accounts/account_edit_view.dart';
+import '../accounts/account_subset_view.dart';
 import '../conflict_inbox_view.dart';
+import '../settings/vault_health_view.dart';
 import '../sync/local_sync_queue_view.dart';
 
-class NotificationCenterView extends StatelessWidget {
+enum _NotificationCategory { all, health, sync, conflict, notification }
+
+class NotificationCenterView extends StatefulWidget {
   const NotificationCenterView({super.key});
+
+  @override
+  State<NotificationCenterView> createState() => _NotificationCenterViewState();
+}
+
+class _NotificationCenterViewState extends State<NotificationCenterView> {
+  _NotificationCategory _selectedCategory = _NotificationCategory.all;
+  Future<VaultHealthReport>? _healthReportFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshHealthReport();
+  }
+
+  void _refreshHealthReport() {
+    final manager = ServiceManager.instance;
+    final calculator = VaultHealthCalculator(
+      storage: manager.storageService,
+      identity: manager.identityService,
+    );
+    _healthReportFuture = calculator.calculate();
+  }
+
+  Future<void> _navigateToAccountEdit(String accountId) async {
+    final storage = ServiceManager.instance.storageService;
+    final account = await storage.getAccountById(accountId);
+    if (!mounted) return;
+    if (account == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(context.text('账号不存在或已被删除', 'Account not found or deleted')),
+        ),
+      );
+      return;
+    }
+    await Navigator.push<AccountItem>(
+      context,
+      MaterialPageRoute(builder: (_) => AccountEditView(initial: account)),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<NotificationProvider>();
-    final appProvider = context.watch<EnhancedAppProvider>();
-    final theme = Theme.of(context);
-    final accent = theme.colorScheme.primary;
-    final hasSyncChanges = appProvider.localSyncChanges.isNotEmpty;
-    final hasConflicts = appProvider.conflictCount > 0;
-    final hasAlerts = hasSyncChanges || hasConflicts;
+    final accent = Theme.of(context).colorScheme.primary;
 
     return Scaffold(
       appBar: AppBar(
@@ -42,225 +91,302 @@ class NotificationCenterView extends StatelessWidget {
         desktopMaxWidth: 860,
         child: provider.isLoading
             ? const Center(child: CircularProgressIndicator())
-            : provider.notifications.isEmpty && !hasAlerts
-                ? _buildEmptyState(context)
-                : ListView(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-                    children: [
-                      _buildHeroCard(context, provider, appProvider),
-                      const SizedBox(height: 16),
-                      if (hasConflicts) ...[
-                        _buildConflictCard(context, appProvider),
-                        const SizedBox(height: 10),
-                      ],
-                      if (hasSyncChanges) ...[
-                        _buildSyncCard(context, appProvider),
-                        const SizedBox(height: 10),
-                      ],
-                      ...provider.notifications.map(
-                        (n) => Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: _NotificationCard(
-                            notification: n,
-                            onMarkRead: () => provider.markRead(n.id),
-                            onDelete: () => provider.deleteNotification(n.id),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+            : _buildBody(context, provider),
       ),
     );
   }
 
-  Widget _buildHeroCard(BuildContext context, NotificationProvider provider, EnhancedAppProvider appProvider) {
-    final accent = Theme.of(context).colorScheme.primary;
-    final syncCount = appProvider.localSyncChanges.length;
-    final conflictCount = appProvider.conflictCount;
+  Widget _buildBody(BuildContext context, NotificationProvider provider) {
+    final appProvider = context.read<EnhancedAppProvider>();
+    final hasSyncChanges = appProvider.localSyncChanges.isNotEmpty;
+    final hasConflicts = appProvider.conflictCount > 0;
+    final notifications = provider.notifications;
 
-    return AppPageHeader(
-      icon: Icons.notifications_outlined,
-      title: context.text('通知中心', 'Notifications'),
-      subtitle: context.text('安全提醒与待处理变更', 'Security alerts and pending changes'),
-      metrics: [
-        _buildMetricChip(context, '${provider.notifications.length + syncCount + conflictCount}', context.text('条通知', 'Items'), accent),
-        _buildMetricChip(context, '${provider.unreadCount}', context.text('未读', 'Unread'), accent),
-        if (conflictCount > 0)
-          _buildMetricChip(context, '$conflictCount', context.text('冲突', 'Conflicts'), accent),
-        if (syncCount > 0)
-          _buildMetricChip(context, '$syncCount', context.text('待同步', 'Sync'), accent),
+    final hasAnyContent = notifications.isNotEmpty ||
+        hasSyncChanges ||
+        hasConflicts ||
+        _selectedCategory == _NotificationCategory.health ||
+        _selectedCategory == _NotificationCategory.all;
+
+    if (!hasAnyContent) {
+      return _buildEmptyState(context);
+    }
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+      children: [
+        _buildHero(context, provider, appProvider),
+        const SizedBox(height: 12),
+        InboxFilterBar<_NotificationCategory>(
+          categories: const [
+            (_NotificationCategory.all, '全部', 'All'),
+            (_NotificationCategory.health, '体检', 'Health'),
+            (_NotificationCategory.sync, '同步', 'Sync'),
+            (_NotificationCategory.conflict, '冲突', 'Conflicts'),
+            (_NotificationCategory.notification, '通知', 'Notifications'),
+          ],
+          selected: _selectedCategory,
+          onSelected: (cat) => setState(() => _selectedCategory = cat),
+        ),
+        const SizedBox(height: 16),
+        if (_showCategory(_NotificationCategory.health)) ...[
+          _buildHealthSection(context),
+          const SizedBox(height: 10),
+        ],
+        if (_showCategory(_NotificationCategory.conflict) && hasConflicts) ...[
+          _buildConflictCard(context, appProvider),
+          const SizedBox(height: 10),
+        ],
+        if (_showCategory(_NotificationCategory.sync) && hasSyncChanges) ...[
+          _buildSyncCard(context, appProvider),
+          const SizedBox(height: 10),
+        ],
+        if (_showCategory(_NotificationCategory.notification)) ...[
+          ...notifications.map(
+            (n) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _NotificationCard(
+                notification: n,
+                onMarkRead: () => provider.markRead(n.id),
+                onDelete: () => provider.deleteNotification(n.id),
+                onNavigateToAccount: n.accountId != null
+                    ? () => _navigateToAccountEdit(n.accountId!)
+                    : null,
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }
 
-  Widget _buildMetricChip(BuildContext context, String value, String label, Color accent) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: accent.withAlpha(AppAlphas.tint),
-        borderRadius: BorderRadius.circular(AppRadii.panel),
+  bool _showCategory(_NotificationCategory category) {
+    return _selectedCategory == _NotificationCategory.all ||
+        _selectedCategory == category;
+  }
+
+  Widget _buildHero(
+    BuildContext context,
+    NotificationProvider provider,
+    EnhancedAppProvider appProvider,
+  ) {
+    final accent = Theme.of(context).colorScheme.primary;
+    final syncCount = appProvider.localSyncChanges.length;
+    final conflictCount = appProvider.conflictCount;
+
+    return FutureBuilder<VaultHealthReport>(
+      future: _healthReportFuture,
+      builder: (context, snapshot) {
+        final report = snapshot.data;
+        final healthIssues = report?.failedItems.length ?? 0;
+        final totalItems = provider.notifications.length +
+            syncCount +
+            conflictCount +
+            healthIssues;
+
+        final metrics = <MetricData>[
+          MetricData(value: '$totalItems', label: context.text('条通知', 'Items'), color: accent),
+          MetricData(value: '${provider.unreadCount}', label: context.text('未读', 'Unread'), color: accent),
+        ];
+        if (healthIssues > 0) {
+          metrics.add(MetricData(value: '$healthIssues', label: context.text('体检', 'Health'), color: Colors.orange));
+        }
+        if (conflictCount > 0) {
+          metrics.add(MetricData(value: '$conflictCount', label: context.text('冲突', 'Conflicts'), color: Colors.red));
+        }
+        if (syncCount > 0) {
+          metrics.add(MetricData(value: '$syncCount', label: context.text('待同步', 'Sync'), color: accent));
+        }
+
+        return InboxHeroMetrics(
+          icon: Icons.notifications_outlined,
+          title: context.text('通知中心', 'Notifications'),
+          subtitle: context.text('安全提醒与待处理变更', 'Security alerts and pending changes'),
+          metrics: metrics,
+        );
+      },
+    );
+  }
+
+  Widget _buildHealthSection(BuildContext context) {
+    return FutureBuilder<VaultHealthReport>(
+      future: _healthReportFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox(
+            height: 120,
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+        final report = snapshot.data;
+        if (report == null) return const SizedBox.shrink();
+
+        final failed = report.failedItems;
+        final color = _gradeColor(report.grade);
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHealthSummaryCard(context, report, color),
+            if (failed.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              ...failed.map((item) => _buildHealthIssueCard(context, item)),
+            ],
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildHealthSummaryCard(
+    BuildContext context,
+    VaultHealthReport report,
+    Color color,
+  ) {
+    final theme = Theme.of(context);
+    final failedCount = report.failedItems.length;
+
+    return ActionSummaryCard(
+      iconColor: color,
+      title: context.text('Vault 体检', 'Vault Health'),
+      subtitle: failedCount == 0
+          ? context.text('状态良好', 'All good')
+          : context.text('发现 $failedCount 项问题', '$failedCount issue(s) found'),
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const VaultHealthView()),
+        ).then((_) => setState(_refreshHealthReport));
+      },
+      leading: SizedBox(
+        width: 48,
+        height: 48,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            CircularProgressIndicator(
+              value: report.score / 100,
+              strokeWidth: 4,
+              backgroundColor: theme.colorScheme.outlineVariant.withAlpha(60),
+              valueColor: AlwaysStoppedAnimation<Color>(color),
+            ),
+            Text(
+              '${report.score}',
+              style: theme.textTheme.labelSmall?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: color,
+              ),
+            ),
+          ],
+        ),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(value, style: TextStyle(fontWeight: FontWeight.w900, color: accent, fontSize: 14)),
-          const SizedBox(width: 6),
-          Text(label, style: TextStyle(color: accent.withAlpha(190), fontSize: 11, fontWeight: FontWeight.w500)),
-        ],
+    );
+  }
+
+  Widget _buildHealthIssueCard(BuildContext context, VaultHealthItem item) {
+    final targetIds = item.action?.targetIds ?? [];
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: ActionItemCard(
+        severity: _riskToSeverity(item.riskLevel),
+        title: item.title,
+        subtitle: item.description,
+        showChevron: targetIds.isNotEmpty,
+        onTap: targetIds.isNotEmpty
+            ? () async {
+                if (targetIds.length == 1) {
+                  await _navigateToAccountEdit(targetIds.first);
+                } else {
+                  final highlightFieldKey = switch (item.id) {
+                    'weak_passwords' || 'reused_passwords' => 'password',
+                    'incomplete_records' => 'url',
+                    _ => null,
+                  };
+                  final groupByFieldKey = switch (item.id) {
+                    'reused_passwords' => 'password',
+                    _ => null,
+                  };
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => AccountSubsetView(
+                        title: item.title,
+                        subtitle: item.description,
+                        accountIds: targetIds,
+                        highlightFieldKey: highlightFieldKey,
+                        groupByFieldKey: groupByFieldKey,
+                      ),
+                    ),
+                  );
+                }
+              }
+            : null,
       ),
     );
   }
 
   Widget _buildConflictCard(BuildContext context, EnhancedAppProvider appProvider) {
-    final theme = Theme.of(context);
-    final errorColor = theme.colorScheme.error;
+    final errorColor = Theme.of(context).colorScheme.error;
     final count = appProvider.conflictCount;
 
-    return Material(
-      color: theme.colorScheme.errorContainer.withAlpha(60),
-      borderRadius: BorderRadius.circular(AppRadii.panel),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(AppRadii.panel),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const ConflictInboxView()),
-          );
-        },
-        child: Container(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(AppRadii.panel),
-            border: Border.all(color: errorColor.withAlpha(AppAlphas.low)),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: errorColor.withAlpha(15),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                alignment: Alignment.center,
-                child: Icon(Icons.merge_type_outlined, size: 20, color: errorColor),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      context.text('发现 $count 个同步冲突', '$count sync conflict(s) detected'),
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: theme.colorScheme.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      context.text('点击查看并手动解决冲突字段', 'Tap to review and resolve field conflicts'),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Icon(Icons.chevron_right, size: 20, color: theme.colorScheme.onSurfaceVariant),
-            ],
-          ),
-        ),
-      ),
+    return ActionSummaryCard(
+      icon: Icons.merge_type_outlined,
+      iconColor: errorColor,
+      backgroundColor: Theme.of(context).colorScheme.errorContainer.withAlpha(60),
+      title: context.text('发现 $count 个同步冲突', '$count sync conflict(s) detected'),
+      subtitle: context.text('点击查看并手动解决冲突字段', 'Tap to review and resolve field conflicts'),
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const ConflictInboxView()),
+        );
+      },
     );
   }
 
   Widget _buildSyncCard(BuildContext context, EnhancedAppProvider appProvider) {
-    final theme = Theme.of(context);
-    final accent = theme.colorScheme.primary;
+    final accent = Theme.of(context).colorScheme.primary;
     final changes = appProvider.localSyncChanges;
 
-    return Material(
-      color: theme.colorScheme.primaryContainer.withAlpha(60),
-      borderRadius: BorderRadius.circular(AppRadii.panel),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(AppRadii.panel),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const LocalSyncQueueView()),
-          );
-        },
-        child: Container(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(AppRadii.panel),
-            border: Border.all(color: accent.withAlpha(AppAlphas.low)),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: accent.withAlpha(15),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                alignment: Alignment.center,
-                child: Icon(Icons.cloud_upload_outlined, size: 20, color: accent),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      context.text('待同步变更 ${changes.length} 项', '${changes.length} change(s) waiting to sync'),
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: theme.colorScheme.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      context.text('点击查看并推送到其他设备', 'Tap to review and push to other devices'),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Icon(Icons.chevron_right, size: 20, color: theme.colorScheme.onSurfaceVariant),
-            ],
-          ),
-        ),
-      ),
+    return ActionSummaryCard(
+      icon: Icons.cloud_upload_outlined,
+      iconColor: accent,
+      backgroundColor: Theme.of(context).colorScheme.primaryContainer.withAlpha(60),
+      title: context.text('待同步变更 ${changes.length} 项', '${changes.length} change(s) waiting to sync'),
+      subtitle: context.text('点击查看并推送到其他设备', 'Tap to review and push to other devices'),
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const LocalSyncQueueView()),
+        );
+      },
     );
   }
 
   Widget _buildEmptyState(BuildContext context) {
-    final theme = Theme.of(context);
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.notifications_none_rounded, size: 64, color: theme.colorScheme.outlineVariant),
-          const SizedBox(height: 16),
-          Text(
-            context.text('暂无通知', 'No notifications'),
-            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            context.text('安全提醒与待处理变更会在这里显示', 'Security alerts and pending changes will appear here'),
-            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-          ),
-        ],
-      ),
+    return InboxEmptyState(
+      icon: Icons.notifications_none_rounded,
+      title: context.text('暂无通知', 'No notifications'),
+      subtitle: context.text('安全提醒与待处理变更会在这里显示', 'Security alerts and pending changes will appear here'),
     );
+  }
+
+  static Color _gradeColor(VaultHealthGrade grade) {
+    return switch (grade) {
+      VaultHealthGrade.excellent => Colors.green,
+      VaultHealthGrade.good => Colors.lightGreen,
+      VaultHealthGrade.warning => Colors.orange,
+      VaultHealthGrade.critical => Colors.red,
+    };
+  }
+
+  static InboxSeverity _riskToSeverity(VaultHealthRiskLevel level) {
+    return switch (level) {
+      VaultHealthRiskLevel.high => InboxSeverity.critical,
+      VaultHealthRiskLevel.medium => InboxSeverity.warning,
+      VaultHealthRiskLevel.low => InboxSeverity.info,
+    };
   }
 }
 
@@ -268,11 +394,13 @@ class _NotificationCard extends StatelessWidget {
   final AppNotification notification;
   final VoidCallback onMarkRead;
   final VoidCallback onDelete;
+  final VoidCallback? onNavigateToAccount;
 
   const _NotificationCard({
     required this.notification,
     required this.onMarkRead,
     required this.onDelete,
+    this.onNavigateToAccount,
   });
 
   IconData _typeIcon() {
@@ -306,12 +434,13 @@ class _NotificationCard extends StatelessWidget {
     final isUnread = !notification.isRead;
 
     return Material(
-      color: isUnread
-          ? color.withAlpha(8)
-          : theme.colorScheme.surface,
+      color: isUnread ? color.withAlpha(8) : theme.colorScheme.surface,
       borderRadius: BorderRadius.circular(AppRadii.panel),
       child: InkWell(
-        onTap: isUnread ? onMarkRead : null,
+        onTap: () {
+          if (isUnread) onMarkRead();
+          if (onNavigateToAccount != null) onNavigateToAccount!();
+        },
         borderRadius: BorderRadius.circular(AppRadii.panel),
         child: Container(
           padding: const EdgeInsets.all(AppSpacing.lg),

@@ -49,15 +49,25 @@ class ConflictLog {
 class MergeResult {
   final AccountItem mergedItem;
   final List<ConflictLog> conflictLogs;
+  final bool isPureFastForward;
 
-  MergeResult(this.mergedItem, this.conflictLogs);
+  MergeResult(
+    this.mergedItem,
+    this.conflictLogs, {
+    this.isPureFastForward = false,
+  });
 }
 
 class TemplateMergeResult {
   final AccountTemplate template;
   final List<TemplateConflictLog> conflictLogs;
+  final bool isPureFastForward;
 
-  TemplateMergeResult(this.template, this.conflictLogs);
+  TemplateMergeResult(
+    this.template,
+    this.conflictLogs, {
+    this.isPureFastForward = false,
+  });
 }
 
 class CrdtMergeEngine {
@@ -297,7 +307,7 @@ class CrdtMergeEngine {
       isDeleted: false,
     );
 
-    return MergeResult(resultItem, logs);
+    return MergeResult(resultItem, logs, isPureFastForward: isPureFastForward);
   }
 
   static Hlc _getMaxHlc(AccountItem item) {
@@ -679,6 +689,7 @@ class CrdtMergeEngine {
         deleteHlc: null,
       ),
       logs,
+      isPureFastForward: isPureFastForward,
     );
   }
 

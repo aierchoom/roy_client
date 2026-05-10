@@ -16,6 +16,7 @@ import '../../widgets/adaptive_page.dart';
 import '../../widgets/green_add_button.dart';
 import '../../widgets/password_generator_sheet.dart';
 import '../../widgets/account_edit_widgets.dart';
+import '../../widgets/edit_metadata_row.dart';
 import 'account_edit_utils.dart';
 import 'totp_credential_edit_view.dart';
 
@@ -564,6 +565,9 @@ class _AccountEditViewState extends State<AccountEditView> {
       data: data,
       createdAt:
           widget.initial?.createdAt ?? DateTime.now().millisecondsSinceEpoch,
+      modifiedAt: widget.initial?.modifiedAt ?? 0,
+      lastEditedBy: widget.initial?.lastEditedBy,
+      lastEditedAt: widget.initial?.lastEditedAt,
       nameHlc: widget.initial?.nameHlc ?? Hlc.zero('local'),
       emailHlc: widget.initial?.emailHlc ?? Hlc.zero('local'),
       dataHlc: widget.initial?.dataHlc ?? {},
@@ -900,6 +904,13 @@ class _AccountEditViewState extends State<AccountEditView> {
                 ),
             ],
           ),
+          if (widget.initial != null) ...[
+            const SizedBox(height: 10),
+            EditMetadataRow(
+              editedAt: widget.initial!.lastEditedAt ?? widget.initial!.modifiedAt,
+              editedBy: widget.initial!.lastEditedBy,
+            ),
+          ],
           const SizedBox(height: 18),
           Container(
             width: double.infinity,

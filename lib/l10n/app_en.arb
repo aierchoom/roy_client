@@ -106,5 +106,14 @@
             "hours": { "type": "int" }
         }
     },
-    "justNow": "Just now"
+    "justNow": "Just now",
+    "today": "Today {time}",
+    "@today": { "placeholders": { "time": { "type": "String" } } },
+    "yesterday": "Yesterday {time}",
+    "@yesterday": { "placeholders": { "time": { "type": "String" } } },
+    "minutesAgo": "{minutes}m ago",
+    "@minutesAgo": { "placeholders": { "minutes": { "type": "int" } } },
+    "unknownDevice": "Unknown device",
+    "thisDevice": "This device",
+    "deviceLabel": "Device"
 }

@@ -226,4 +226,28 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get justNow => '刚刚';
+
+  @override
+  String today(String time) {
+    return '今天 $time';
+  }
+
+  @override
+  String yesterday(String time) {
+    return '昨天 $time';
+  }
+
+  @override
+  String minutesAgo(int minutes) {
+    return '$minutes分钟前';
+  }
+
+  @override
+  String get unknownDevice => '未知设备';
+
+  @override
+  String get thisDevice => '本机';
+
+  @override
+  String get deviceLabel => '设备';
 }

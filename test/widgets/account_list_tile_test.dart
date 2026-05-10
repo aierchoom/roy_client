@@ -74,7 +74,7 @@ void main() {
     expect(find.textContaining('otpauth://'), findsNothing);
     expect(find.textContaining('JBSWY3DPEHPK3PXP'), findsNothing);
 
-    await tester.tap(find.byTooltip('Toggle details'));
+    await tester.tap(find.byTooltip('Details'));
     await tester.pumpAndSettle();
 
     expect(find.text('Field Details'), findsOneWidget);
@@ -82,5 +82,47 @@ void main() {
     expect(find.text('2FA enabled'), findsOneWidget);
     expect(find.textContaining('otpauth://'), findsNothing);
     expect(find.textContaining('JBSWY3DPEHPK3PXP'), findsNothing);
+  });
+
+  testWidgets('collapsed summary shows slash-separated fields with masked secrets', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: AccountListTile(
+            account: account(),
+            template: websiteTemplate(),
+            hasMissingTemplate: false,
+            legacyFieldCount: 0,
+            onEdit: () {},
+            onDelete: () {},
+            localeText: localeText,
+          ),
+        ),
+      ),
+    );
+
+    // Account badge shows template badge text.
+    expect(find.text('WE'), findsOneWidget);
+
+    // Collapsed summary contains labelled fields joined by ' / '.
+    expect(
+      find.textContaining('Email: alice@example.com / Username: alice / Password: ••••'),
+      findsOneWidget,
+    );
+
+    // Field count tag shows '3 fields' in the test locale.
+    expect(find.text('3 fields'), findsOneWidget);
+
+    // Expand to reveal field details.
+    await tester.tap(find.byTooltip('Details'));
+    await tester.pumpAndSettle();
+
+    // Collapsed summary should disappear.
+    expect(
+      find.textContaining('Email: alice@example.com / Username: alice / Password: ••••'),
+      findsNothing,
+    );
   });
 }

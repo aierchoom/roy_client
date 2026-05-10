@@ -6,6 +6,7 @@ import '../providers/enhanced_app_provider.dart';
 import '../services/service_manager.dart';
 import '../sync/crdt_merge_engine.dart';
 import '../theme/app_design_tokens.dart';
+import '../widgets/inbox/inbox_empty_state.dart';
 
 class ConflictInboxView extends StatefulWidget {
   const ConflictInboxView({super.key});
@@ -124,7 +125,10 @@ class _ConflictInboxViewState extends State<ConflictInboxView> {
                 ),
                 if (_groups.isEmpty)
                   SliverFillRemaining(
-                    child: _EmptyState(text: _t('没有冲突记录', 'No conflicts')),
+                    child: InboxEmptyState(
+                      icon: Icons.check_circle_outline,
+                      title: _t('没有冲突记录', 'No conflicts'),
+                    ),
                   )
                 else
                   SliverList(
@@ -523,32 +527,4 @@ class _ValueChip extends StatelessWidget {
   }
 }
 
-class _EmptyState extends StatelessWidget {
-  final String text;
 
-  const _EmptyState({required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.check_circle_outline,
-            size: 64,
-            color: theme.colorScheme.primary.withAlpha(AppAlphas.divider),
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          Text(
-            text,
-            style: theme.textTheme.bodyLarge?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}

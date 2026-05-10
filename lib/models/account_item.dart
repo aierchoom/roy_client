@@ -73,6 +73,8 @@ class AccountItem {
   final Map<String, AccountFieldMeta> fieldMeta;
   final int createdAt;
   final int modifiedAt;
+  final String? lastEditedBy;
+  final int? lastEditedAt;
 
   // Sync specific fields
   final Hlc nameHlc;
@@ -93,6 +95,8 @@ class AccountItem {
     this.fieldMeta = const {},
     required this.createdAt,
     this.modifiedAt = 0,
+    this.lastEditedBy,
+    this.lastEditedAt,
     required this.nameHlc,
     required this.emailHlc,
     required this.dataHlc,
@@ -127,6 +131,9 @@ class AccountItem {
           const {},
       createdAt:
           json['createdAt'] as int? ?? DateTime.now().millisecondsSinceEpoch,
+      modifiedAt: json['modifiedAt'] as int? ?? 0,
+      lastEditedBy: json['lastEditedBy'] as String?,
+      lastEditedAt: json['lastEditedAt'] as int?,
       nameHlc: json['nameHlc'] != null ? Hlc.parse(json['nameHlc']) : dummyHlc,
       emailHlc: json['emailHlc'] != null
           ? Hlc.parse(json['emailHlc'])
@@ -156,6 +163,9 @@ class AccountItem {
       'data': data,
       'fieldMeta': fieldMeta.map((k, v) => MapEntry(k, v.toJson())),
       'createdAt': createdAt,
+      'modifiedAt': modifiedAt,
+      'lastEditedBy': lastEditedBy,
+      'lastEditedAt': lastEditedAt,
       'nameHlc': nameHlc.toString(),
       'emailHlc': emailHlc.toString(),
       'dataHlc': dataHlc.map((k, v) => MapEntry(k, v.toString())),
@@ -186,6 +196,8 @@ class AccountItem {
     Map<String, AccountFieldMeta>? fieldMeta,
     int? createdAt,
     int? modifiedAt,
+    String? lastEditedBy,
+    int? lastEditedAt,
     Hlc? nameHlc,
     Hlc? emailHlc,
     Map<String, Hlc>? dataHlc,
@@ -204,6 +216,8 @@ class AccountItem {
       fieldMeta: fieldMeta ?? this.fieldMeta,
       createdAt: createdAt ?? this.createdAt,
       modifiedAt: modifiedAt ?? this.modifiedAt,
+      lastEditedBy: lastEditedBy ?? this.lastEditedBy,
+      lastEditedAt: lastEditedAt ?? this.lastEditedAt,
       nameHlc: nameHlc ?? this.nameHlc,
       emailHlc: emailHlc ?? this.emailHlc,
       dataHlc: dataHlc ?? this.dataHlc,

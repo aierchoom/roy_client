@@ -6,6 +6,8 @@ import 'dart:math';
 import 'package:secret_roy/core/app_logger.dart';
 import 'package:http/http.dart' as http;
 
+import '../sync/lan_sync_host_handler.dart';
+import '../sync/lan_sync_session.dart';
 import 'vault_pairing_crypto.dart';
 
 class LanPairingServiceException implements Exception {
@@ -31,13 +33,22 @@ class LanPairingHostSession {
   });
 }
 
+/// Information about a discovered LAN host.
+class LanPairingHostInfo {
+  final InternetAddress address;
+  final int port;
+
+  const LanPairingHostInfo({required this.address, required this.port});
+}
+
 class LanPairingService {
-  static const int _discoveryPort = 48653;
+  static const int defaultDiscoveryPort = 48653;
   static const String _advertisementKind = 'sroy_lan_pairing';
   static const String _claimPath = '/lan-pairing/claim';
   static const int _maxFailedClaims = 5;
 
   final Random _random;
+  final int _discoveryPort;
 
   HttpServer? _hostServer;
   List<RawDatagramSocket>? _hostSockets;
@@ -49,8 +60,13 @@ class LanPairingService {
   DateTime? _hostExpiresAt;
   bool _hostClaimed = false;
   int _hostFailedClaims = 0;
+  LanSyncHostHandler? _syncHandler;
 
-  LanPairingService({Random? random}) : _random = random ?? Random.secure();
+  LanPairingService({
+    Random? random,
+    int discoveryPort = defaultDiscoveryPort,
+  })  : _random = random ?? Random.secure(),
+        _discoveryPort = discoveryPort;
 
   bool get isHosting => _hostServer != null;
 
@@ -159,6 +175,23 @@ class LanPairingService {
     );
   }
 
+  void attachSyncHandler(LanSyncHostHandler handler) {
+    _syncHandler = handler;
+  }
+
+  void detachSyncHandler() {
+    _syncHandler = null;
+  }
+
+  void _extendHostingForSync() {
+    // 延长 Server 生命周期 5 分钟供同步使用
+    _hostExpiryTimer?.cancel();
+    _hostExpiryTimer = Timer(const Duration(minutes: 5), () {
+      AppLogger.d('[LAN] Sync hosting TTL expired. Stopping server.');
+      unawaited(stopHosting());
+    });
+  }
+
   Future<void> stopHosting() async {
     _hostBroadcastTimer?.cancel();
     _hostBroadcastTimer = null;
@@ -171,6 +204,9 @@ class LanPairingService {
         s.close();
       }
     }
+
+    _syncHandler?.dispose();
+    _syncHandler = null;
 
     await _hostSubscription?.cancel();
     _hostSubscription = null;
@@ -300,6 +336,71 @@ class LanPairingService {
     }
   }
 
+  /// Discovers a LAN host by listening for UDP broadcast advertisements.
+  ///
+  /// Returns the first host found, or null if no host is discovered within
+  /// the [timeout].
+  Future<LanPairingHostInfo?> discoverHost({
+    Duration timeout = const Duration(seconds: 8),
+  }) async {
+    final socket = await RawDatagramSocket.bind(
+      InternetAddress.anyIPv4,
+      _discoveryPort,
+      reuseAddress: true,
+    );
+
+    final completer = Completer<LanPairingHostInfo?>();
+    late final Timer timer;
+    late final StreamSubscription<RawSocketEvent> subscription;
+
+    void completeWithNull() {
+      if (!completer.isCompleted) {
+        completer.complete(null);
+      }
+    }
+
+    timer = Timer(timeout, completeWithNull);
+
+    subscription = socket.listen((event) {
+      if (event != RawSocketEvent.read || completer.isCompleted) return;
+
+      final datagram = socket.receive();
+      if (datagram == null) return;
+
+      String raw;
+      try {
+        raw = utf8.decode(datagram.data);
+      } catch (e) {
+        return;
+      }
+
+      final advertisement = _decodeJson(raw);
+      if (advertisement['kind'] != _advertisementKind) return;
+
+      final advertisedPort = advertisement['port'];
+      final port = switch (advertisedPort) {
+        int value => value,
+        String value => int.tryParse(value) ?? -1,
+        _ => -1,
+      };
+      if (port <= 0 || port > 65535) return;
+
+      if (!completer.isCompleted) {
+        completer.complete(
+          LanPairingHostInfo(address: datagram.address, port: port),
+        );
+      }
+    });
+
+    try {
+      return await completer.future;
+    } finally {
+      timer.cancel();
+      await subscription.cancel();
+      socket.close();
+    }
+  }
+
   void dispose() {
     unawaited(stopHosting());
   }
@@ -329,6 +430,12 @@ class LanPairingService {
       response.statusCode = HttpStatus.forbidden;
       response.write(jsonEncode({'error': 'Only local network connections are accepted.'}));
       await response.close();
+      return;
+    }
+
+    // 处理 LAN 同步端点
+    if (_syncHandler != null && request.uri.path.startsWith('/lan-sync/')) {
+      await _handleSyncRequest(request);
       return;
     }
 
@@ -421,11 +528,17 @@ class LanPairingService {
     );
     await response.close();
 
-    unawaited(
-      Future<void>.delayed(
-        const Duration(milliseconds: 250),
-      ).then((_) => stopHosting()),
-    );
+    // 如果存在 sync handler，延长 Server 生命周期以支持数据同步
+    if (_syncHandler != null) {
+      AppLogger.d('[LAN] Pairing approved. Extending server for sync session.');
+      _extendHostingForSync();
+    } else {
+      unawaited(
+        Future<void>.delayed(
+          const Duration(milliseconds: 250),
+        ).then((_) => stopHosting()),
+      );
+    }
   }
 
   Future<String?> _claimEndpoint({
@@ -482,6 +595,122 @@ class LanPairingService {
     throw const LanPairingServiceException(
       'Host did not return an encrypted transfer code.',
     );
+  }
+
+  Future<void> _handleSyncRequest(HttpRequest request) async {
+    final response = request.response;
+    response.headers.contentType = ContentType.json;
+
+    final remoteAddress = request.connectionInfo?.remoteAddress;
+    if (remoteAddress != null &&
+        !_isLocalNetworkAddress(remoteAddress.address)) {
+      response.statusCode = HttpStatus.forbidden;
+      response.write(jsonEncode({'error': 'Only local network connections are accepted.'}));
+      await response.close();
+      return;
+    }
+
+    final handler = _syncHandler;
+    if (handler == null) {
+      response.statusCode = HttpStatus.serviceUnavailable;
+      response.write(jsonEncode({'error': 'Sync not available.'}));
+      await response.close();
+      return;
+    }
+
+    try {
+      final path = request.uri.path;
+      final body = await _decodeRequestBody(request);
+
+      switch (path) {
+        case '/lan-sync/start':
+          if (request.method != 'POST') {
+            response.statusCode = HttpStatus.methodNotAllowed;
+            break;
+          }
+          final peerDeviceId = (body['device_id'] as String?) ?? '';
+          final result = await handler.handleStart(peerDeviceId);
+          response.statusCode = HttpStatus.ok;
+          response.write(jsonEncode(result));
+          break;
+
+        case '/lan-sync/push':
+          if (request.method != 'POST') {
+            response.statusCode = HttpStatus.methodNotAllowed;
+            break;
+          }
+          final sessionId = body['session_id'] as String? ?? '';
+          final page = (body['page'] as int?) ?? 0;
+          final items = (body['items'] as List<dynamic>?)
+                  ?.map((e) => e as String)
+                  .toList() ??
+              [];
+          final result = await handler.handlePush(sessionId, page, items);
+          response.statusCode = HttpStatus.ok;
+          response.write(jsonEncode(result));
+          break;
+
+        case '/lan-sync/result':
+          if (request.method != 'GET' && request.method != 'POST') {
+            response.statusCode = HttpStatus.methodNotAllowed;
+            break;
+          }
+          final querySessionId = request.uri.queryParameters['session_id'] ??
+              (body['session_id'] as String?) ??
+              '';
+          final result = await handler.handleResultQuery(querySessionId);
+          response.statusCode = HttpStatus.ok;
+          response.write(jsonEncode(result));
+          break;
+
+        case '/lan-sync/pull':
+          if (request.method != 'POST') {
+            response.statusCode = HttpStatus.methodNotAllowed;
+            break;
+          }
+          final sessionId = body['session_id'] as String? ?? '';
+          final result = await handler.handlePull(sessionId);
+          response.statusCode = HttpStatus.ok;
+          response.write(jsonEncode(result));
+          break;
+
+        case '/lan-sync/abort':
+          if (request.method != 'POST') {
+            response.statusCode = HttpStatus.methodNotAllowed;
+            break;
+          }
+          final sessionId = body['session_id'] as String? ?? '';
+          await handler.handleAbort(sessionId);
+          response.statusCode = HttpStatus.ok;
+          response.write(jsonEncode({'aborted': true}));
+          break;
+
+        default:
+          response.statusCode = HttpStatus.notFound;
+          response.write(jsonEncode({'error': 'Unknown sync endpoint'}));
+      }
+    } on LanSyncException catch (e) {
+      response.statusCode = HttpStatus.badRequest;
+      response.write(jsonEncode({'error': e.message}));
+    } catch (e) {
+      AppLogger.d('[LAN] Sync request failed: $e');
+      response.statusCode = HttpStatus.internalServerError;
+      response.write(jsonEncode({'error': 'Internal error'}));
+    }
+
+    await response.close();
+  }
+
+  Future<Map<String, dynamic>> _decodeRequestBody(HttpRequest request) async {
+    try {
+      final body = await utf8.decoder.bind(request).join();
+      if (body.isEmpty) return {};
+      final decoded = jsonDecode(body);
+      if (decoded is Map<String, dynamic>) return decoded;
+      return {};
+    } catch (e) {
+      return {};
+    }
   }
 
   bool _isHostExpired() {

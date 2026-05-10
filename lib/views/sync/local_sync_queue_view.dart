@@ -7,6 +7,7 @@ import '../../providers/enhanced_app_provider.dart';
 import '../../sync/sync_service.dart';
 import '../../theme/app_design_tokens.dart';
 import '../../widgets/adaptive_page.dart';
+import '../../widgets/inbox/inbox_empty_state.dart';
 
 class LocalSyncQueueView extends StatelessWidget {
   const LocalSyncQueueView({super.key});
@@ -208,7 +209,11 @@ class LocalSyncQueueView extends StatelessWidget {
       ),
       body: AdaptivePage(
         child: changes.isEmpty
-            ? _EmptyState(textBuilder: (zh, en) => context.text( zh, en))
+            ? InboxEmptyState(
+                icon: Icons.cloud_done_outlined,
+                title: context.text('没有待同步的变更', 'No pending sync changes'),
+                subtitle: context.text('所有本地变更已同步', 'All local changes have been synced'),
+              )
             : ListView.separated(
                 padding: const EdgeInsets.all(AppSpacing.lg),
                 itemCount: changes.length,
@@ -328,51 +333,6 @@ class _ChangeCard extends StatelessWidget {
                 ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _EmptyState extends StatelessWidget {
-  final String Function(String zh, String en) textBuilder;
-
-  const _EmptyState({required this.textBuilder});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xxl),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.cloud_done_outlined,
-              size: 48,
-              color: theme.colorScheme.outline,
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            Text(
-              textBuilder('没有待同步变更', 'No pending changes'),
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              textBuilder(
-                '本机编辑和删除会出现在这里，确认后才会同步给其他设备。',
-                'Local edits and deletes appear here until you approve them.',
-              ),
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
         ),
       ),
     );

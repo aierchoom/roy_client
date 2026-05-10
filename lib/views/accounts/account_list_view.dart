@@ -477,10 +477,9 @@ class _AccountListViewState extends State<AccountListView> {
         ),
       ),
       builder: (context, controller, child) {
-        return InkWell(
+        return GestureDetector(
           onTap: () =>
               controller.isOpen ? controller.close() : controller.open(),
-          borderRadius: BorderRadius.circular(AppRadii.card),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(

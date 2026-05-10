@@ -12,6 +12,7 @@ import '../../services/secure_storage_service.dart' hide TemplateInUseException;
 import '../../services/service_manager.dart';
 import '../../theme/app_design_tokens.dart';
 import '../../theme/app_layout.dart';
+import '../../utils/relative_time_formatter.dart';
 import '../../widgets/adaptive_page.dart';
 import '../../widgets/app_page_header.dart';
 import '../../widgets/app_selectable_scrollable.dart';
@@ -781,6 +782,15 @@ class _TemplateCardContent extends StatelessWidget {
           _InfoChip(
             icon: Icons.inventory_2_outlined,
             label: '已使用 $usageCount 次',
+            tint: accent,
+          ),
+        if (template.lastEditedAt != null || template.modifiedAt != null)
+          _InfoChip(
+            icon: Icons.history,
+            label: RelativeTimeFormatter.format(
+              context,
+              template.lastEditedAt ?? template.modifiedAt,
+            ),
             tint: accent,
           ),
       ],

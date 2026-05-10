@@ -229,4 +229,28 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get justNow => 'Just now';
+
+  @override
+  String today(String time) {
+    return 'Today $time';
+  }
+
+  @override
+  String yesterday(String time) {
+    return 'Yesterday $time';
+  }
+
+  @override
+  String minutesAgo(int minutes) {
+    return '${minutes}m ago';
+  }
+
+  @override
+  String get unknownDevice => 'Unknown device';
+
+  @override
+  String get thisDevice => 'This device';
+
+  @override
+  String get deviceLabel => 'Device';
 }
