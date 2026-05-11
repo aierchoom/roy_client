@@ -50,8 +50,16 @@ jobs:
       - name: Style Token Check
         run: python3 tool/check_style_tokens.py
 
-      - name: Test
-        run: flutter test
+      - name: Test with coverage
+        run: flutter test --coverage
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-lcov
+          path: coverage/lcov.info
+          if-no-files-found: error
+          retention-days: 14
 
   android-minimal-apk:
     name: Android Minimal APK
@@ -94,6 +102,44 @@ jobs:
           path: build/app/outputs/flutter-apk/*-release.apk
           if-no-files-found: error
           retention-days: 14
+
+  integration-test:
+    name: Integration Test
+    needs: validate
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: ${{ env.FLUTTER_CHANNEL }}
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Integration Test (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+          flutter config --enable-linux-desktop
+          xvfb-run flutter test integration_test/ --reporter expanded
+
+      - name: Integration Test (Windows)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          flutter config --enable-windows-desktop
+          .\tool\run_regression.ps1 -IntegrationOnly
 
   windows-portable:
     name: Windows Portable
