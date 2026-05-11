@@ -3,6 +3,7 @@
 import '../l10n/app_text_extension.dart';
 import '../services/auto_lock_service.dart';
 import '../services/biometric_auth_service.dart';
+import '../system/service_manager/vault_unlock_coordinator.dart';
 import '../services/service_manager.dart';
 import '../widgets/adaptive_page.dart';
 import '../theme/app_design_tokens.dart';
@@ -15,6 +16,9 @@ class SecuritySettingsView extends StatefulWidget {
 }
 
 class _SecuritySettingsViewState extends State<SecuritySettingsView> {
+  final VaultUnlockCoordinator _vaultUnlockCoordinator = ServiceManager.instance.vaultUnlockCoordinator;
+  final AutoLockService _autoLockService = ServiceManager.instance.autoLockService;
+  final BiometricAuthService _biometricService = ServiceManager.instance.biometricService;
   final _serviceManager = ServiceManager.instance;
 
   bool _isLoading = false;
@@ -51,16 +55,16 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
   Future<void> _loadSettings() async {
     setState(() => _isLoading = true);
 
-    final biometricStatus = await _serviceManager.getBiometricStatus();
-    final biometricName = await _serviceManager.getBiometricName();
+    final biometricStatus = await _vaultUnlockCoordinator.getBiometricStatus();
+    final biometricName = await _biometricService.getBiometricName();
 
-    final noPasswordMode = await _serviceManager.isNoPasswordMode();
+    final noPasswordMode = await _vaultUnlockCoordinator.isNoPasswordMode();
 
     if (!mounted) return;
     setState(() {
       _biometricStatus = biometricStatus;
       _biometricName = biometricName;
-      _autoLockDuration = _serviceManager.autoLockDuration;
+      _autoLockDuration = _autoLockService.duration;
       _isNoPasswordMode = noPasswordMode;
       _isLoading = false;
     });
@@ -70,7 +74,7 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
     final messenger = ScaffoldMessenger.of(context);
 
     if (!enabled) {
-      await _serviceManager.disableBiometric();
+      await _vaultUnlockCoordinator.disableBiometric();
       if (!mounted) return;
       setState(() => _biometricStatus = BiometricAuthStatus.available);
       messenger.showSnackBar(
@@ -92,7 +96,7 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
     if (!mounted) return;
     setState(() => _isLoading = true);
 
-    final result = await _serviceManager.enableBiometric(password);
+    final result = await _vaultUnlockCoordinator.enableBiometric(password);
 
     if (!mounted) return;
     setState(() => _isLoading = false);
@@ -173,7 +177,7 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
   }
 
   Future<void> _setAutoLockDuration(AutoLockDuration duration) async {
-    await _serviceManager.setAutoLockDuration(duration);
+    await _autoLockService.setDuration(duration);
     if (!mounted) return;
     setState(() => _autoLockDuration = duration);
   }
@@ -539,7 +543,7 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
 
     if (result == true) {
       setState(() => _isLoading = true);
-      final success = await _serviceManager.changeMasterPassword(
+      final success = await _vaultUnlockCoordinator.changeMasterPassword(
         _isNoPasswordMode ? '' : oldPasswordController.text,
         newPasswordController.text,
       );
@@ -547,7 +551,7 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
       if (mounted) {
         setState(() => _isLoading = false);
         if (success) {
-          final noPassword = await _serviceManager.isNoPasswordMode();
+          final noPassword = await _vaultUnlockCoordinator.isNoPasswordMode();
           if (!mounted) return;
           final messenger = ScaffoldMessenger.of(context);
           setState(() => _isNoPasswordMode = noPassword);

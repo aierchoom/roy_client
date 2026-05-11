@@ -127,7 +127,9 @@ class _VaultHealthViewState extends State<VaultHealthView> {
   }
 
   Widget _buildReport(VaultHealthReport report) {
-    return ListView(
+    return RefreshIndicator(
+      onRefresh: _calculate,
+      child: ListView(
       padding: const EdgeInsets.all(AppSpacing.lg),
       children: [
         _buildScoreCard(report),
@@ -164,6 +166,7 @@ class _VaultHealthViewState extends State<VaultHealthView> {
           ),
         ),
       ],
+    ),
     );
   }
 

@@ -165,7 +165,6 @@ void main() {
     );
 
     test('normal password unlock bypasses pseudo-key resolution', () async {
-      const secureStorage = FlutterSecureStorage();
       // Even if no_password_mode is false, a non-empty password should
       // be passed through directly.
 

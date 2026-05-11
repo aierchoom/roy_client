@@ -112,7 +112,9 @@ class _NotificationCenterViewState extends State<NotificationCenterView> {
       return _buildEmptyState(context);
     }
 
-    return ListView(
+    return RefreshIndicator(
+      onRefresh: () async => setState(_refreshHealthReport),
+      child: ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
       children: [
         _buildHero(context, provider, appProvider),
@@ -157,6 +159,7 @@ class _NotificationCenterViewState extends State<NotificationCenterView> {
           ),
         ],
       ],
+    ),
     );
   }
 

@@ -1,7 +1,7 @@
 ﻿import 'package:flutter/material.dart';
 
 import '../l10n/app_text_extension.dart';
-import '../services/service_manager.dart';
+import '../system/service_manager/password_tools.dart';
 import '../services/sensitive_clipboard_service.dart';
 import '../widgets/adaptive_page.dart';
 import '../widgets/password_generator_sheet.dart';
@@ -218,7 +218,7 @@ class _PasswordToolsViewState extends State<PasswordToolsView> {
       );
     }
 
-    final strength = ServiceManager.calculatePasswordStrength(password);
+    final strength = ServiceManagerPasswordTools.calculatePasswordStrength(password);
 
     return _buildSectionCard(
       context: context,

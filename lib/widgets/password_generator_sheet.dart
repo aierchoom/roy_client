@@ -2,7 +2,8 @@
 
 import '../l10n/app_text_extension.dart';
 import '../theme/app_design_tokens.dart';
-import '../services/service_manager.dart';
+import '../services/enhanced_crypto_service.dart';
+import '../system/service_manager/password_tools.dart';
 import '../services/sensitive_clipboard_service.dart';
 
 class PasswordGeneratorResult {
@@ -151,41 +152,41 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
     includeSpecial: _includeSpecial,
   );
 
-  int get _strengthScore => ServiceManager.calculatePasswordStrength(_password);
+  int get _strengthScore => ServiceManagerPasswordTools.calculatePasswordStrength(_password);
 
   String get _strengthLabel {
     final score = _strengthScore;
     if (Localizations.localeOf(context).languageCode == 'zh') {
-      if (score >= ServiceManager.passwordStrengthThresholdVeryStrong) {
+      if (score >= EnhancedCryptoService.strengthThresholdVeryStrong) {
         return '非常强';
       }
-      if (score >= ServiceManager.passwordStrengthThresholdStrong) {
+      if (score >= EnhancedCryptoService.strengthThresholdStrong) {
         return '强';
       }
-      if (score >= ServiceManager.passwordStrengthThresholdMedium) {
+      if (score >= EnhancedCryptoService.strengthThresholdMedium) {
         return '中等';
       }
-      if (score >= ServiceManager.passwordStrengthThresholdWeak) {
+      if (score >= EnhancedCryptoService.strengthThresholdWeak) {
         return '弱';
       }
       return '很弱';
     }
-    return ServiceManager.getPasswordStrengthLevel(score);
+    return ServiceManagerPasswordTools.getPasswordStrengthLevel(score);
   }
 
   Color _strengthColor(ThemeData theme) {
     final vt = theme.extension<AppVisualTokens>()!;
     final score = _strengthScore;
-    if (score >= ServiceManager.passwordStrengthThresholdVeryStrong) {
+    if (score >= EnhancedCryptoService.strengthThresholdVeryStrong) {
       return vt.success;
     }
-    if (score >= ServiceManager.passwordStrengthThresholdStrong) {
+    if (score >= EnhancedCryptoService.strengthThresholdStrong) {
       return theme.colorScheme.primary;
     }
-    if (score >= ServiceManager.passwordStrengthThresholdMedium) {
+    if (score >= EnhancedCryptoService.strengthThresholdMedium) {
       return vt.warning;
     }
-    if (score >= ServiceManager.passwordStrengthThresholdWeak) {
+    if (score >= EnhancedCryptoService.strengthThresholdWeak) {
       return theme.colorScheme.tertiary;
     }
     return theme.colorScheme.error;
@@ -225,7 +226,7 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
   }
 
   String _generatePassword() {
-    return ServiceManager.generatePassword(
+    return ServiceManagerPasswordTools.generatePassword(
       length: _length,
       includeUppercase: _includeUppercase,
       includeLowercase: _includeLowercase,

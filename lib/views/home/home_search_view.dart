@@ -118,7 +118,6 @@ class _HomeSearchViewState extends State<HomeSearchView> {
   ) {
     final activeTemplateIds = _activeSelectedTemplateIds(provider.allTemplates);
     final filtered = accounts.where((account) {
-      final template = provider.getTemplate(account.templateId);
       final matchesTemplate =
           activeTemplateIds.isEmpty ||
           activeTemplateIds.contains(account.templateId);
@@ -127,7 +126,7 @@ class _HomeSearchViewState extends State<HomeSearchView> {
           _query.isEmpty ||
           account.name.toLowerCase().contains(_query) ||
           account.email.toLowerCase().contains(_query) ||
-          (template?.title.toLowerCase().contains(_query) ?? false) ||
+          (provider.getTemplate(account.templateId)?.title.toLowerCase().contains(_query) ?? false) ||
           account.data.values.any(
             (value) => value.toLowerCase().contains(_query),
           );
@@ -136,7 +135,9 @@ class _HomeSearchViewState extends State<HomeSearchView> {
     }).toList();
 
     if (_query.isEmpty) {
-      return [];
+      // Show recent accounts when no query is entered
+      filtered.sort((a, b) => b.modifiedAt.compareTo(a.modifiedAt));
+      return filtered.take(6).toList();
     }
 
     return filtered;
@@ -542,13 +543,12 @@ class _HomeSearchViewState extends State<HomeSearchView> {
                     child: _buildHeroCard(context, provider, results),
                   ),
                   const SizedBox(height: 18),
-                  if (_query.isNotEmpty)
-                    Expanded(
-                      child: AdaptiveSection(
-                        maxWidth: AppSectionWidths.panel,
-                        child: _buildSearchPanel(context, results, provider),
-                      ),
+                  Expanded(
+                    child: AdaptiveSection(
+                      maxWidth: AppSectionWidths.panel,
+                      child: _buildSearchPanel(context, results, provider),
                     ),
+                  ),
                 ],
               );
             },

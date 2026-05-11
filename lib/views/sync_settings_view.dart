@@ -9,6 +9,9 @@ import '../providers/enhanced_app_provider.dart';
 import '../services/identity_service.dart';
 import '../services/lan_pairing_service.dart';
 import '../services/service_manager.dart';
+import '../system/service_manager/sync_coordinator.dart';
+import '../system/service_manager/vault_import_export_coordinator.dart';
+import '../system/service_manager/vault_pairing_coordinator.dart';
 import '../services/sensitive_clipboard_service.dart';
 import '../services/vault_pairing_service.dart';
 import '../sync/sync_service.dart';
@@ -28,6 +31,9 @@ enum _SyncSettingsSection { sync, linking, diagnostics }
 
 class _SyncSettingsViewState extends State<SyncSettingsView> {
   final _serviceManager = ServiceManager.instance;
+  final SyncCoordinator _syncCoordinator = ServiceManager.instance.syncCoordinator;
+  final VaultPairingCoordinator _vaultPairingCoordinator = ServiceManager.instance.vaultPairingCoordinator;
+  final VaultImportExportCoordinator _vaultImportExportCoordinator = ServiceManager.instance.vaultImportExportCoordinator;
 
   _SyncSettingsSection _activeSection = _SyncSettingsSection.sync;
   bool _isLoading = false;
@@ -235,7 +241,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
   Future<void> _loadSettings() async {
     setState(() => _isLoading = true);
     final syncServerUrl =
-        await _serviceManager.getSyncServerUrl() ??
+        await _syncCoordinator.getServerUrl() ??
         ServiceManager.defaultSyncServerUrl;
 
     if (!mounted) return;
@@ -280,7 +286,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
     navigator.push(progressRoute);
 
     try {
-      final result = await _serviceManager.syncNow();
+      final result = await _syncCoordinator.syncNow();
       if (!mounted) return;
 
       if (result.success) {
@@ -378,7 +384,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
 
     setState(() => _isSavingSyncServer = true);
     try {
-      await _serviceManager.setSyncServerUrl(normalizedUrl);
+      await _syncCoordinator.setServerUrl(normalizedUrl);
       if (!mounted) return;
       setState(() => _syncServerUrl = normalizedUrl);
       messenger.showSnackBar(
@@ -413,8 +419,8 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
     final provider = context.read<EnhancedAppProvider>();
     return provider.allAccounts.isNotEmpty ||
         provider.customTemplates.isNotEmpty ||
-        _serviceManager.syncVersion > 0 ||
-        _serviceManager.hasDirtyData;
+        _syncCoordinator.localVersion > 0 ||
+        _syncCoordinator.isDirty;
   }
 
   Future<bool> _confirmOverwriteLocalData() async {
@@ -460,7 +466,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
 
     setState(() => _isLanPairingBusy = true);
     try {
-      final session = await _serviceManager.startLanVaultPairingHost();
+      final session = await _vaultPairingCoordinator.startLanHost();
       if (!mounted) return;
 
       await _showGeneratedCodeDialog(
@@ -481,7 +487,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
         context.text('启动面对面链接失败: $e', 'Failed to start face-to-face linking: $e'),
       );
     } finally {
-      await _serviceManager.stopLanVaultPairingHost();
+      await _vaultPairingCoordinator.stopLanHost();
       if (mounted) {
         setState(() {
           _isLanPairingBusy = false;
@@ -518,7 +524,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
 
     setState(() => _isLanPairingBusy = true);
     try {
-      await _serviceManager.joinLanVaultPairingWithCode(
+      await _vaultPairingCoordinator.joinLanWithCode(
         pairingCode,
         forceOverwrite: forceOverwrite,
       );
@@ -602,7 +608,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
     setState(() => _isPairingBusy = true);
 
     try {
-      final session = await _serviceManager.createVaultPairingSession();
+      final session = await _vaultPairingCoordinator.createSession();
       await SensitiveClipboardService.copy(
         text: session.pairingCode,
         level: ClipboardRiskLevel.high,
@@ -641,7 +647,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
 
     setState(() => _isPairingBusy = true);
     try {
-      final status = await _serviceManager.getVaultPairingSessionStatus(
+      final status = await _vaultPairingCoordinator.getSessionStatus(
         session.sessionId,
       );
       if (!mounted) return;
@@ -686,7 +692,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
 
     setState(() => _isPairingBusy = true);
     try {
-      await _serviceManager.approveVaultPairingRequest(
+      await _vaultPairingCoordinator.approveRequest(
         sessionId: session.sessionId,
         requestId: pendingRequest.requestId,
       );
@@ -739,7 +745,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
 
     setState(() => _isPairingBusy = true);
     try {
-      final joinResult = await _serviceManager.joinVaultPairingSession(
+      final joinResult = await _vaultPairingCoordinator.joinSession(
         pairingCode,
       );
       if (!mounted) return;
@@ -778,8 +784,8 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
 
     setState(() => _isPairingBusy = true);
     try {
-      final bundleResult = await _serviceManager
-          .fetchAndImportVaultPairingBundle(
+      final bundleResult = await _vaultPairingCoordinator
+          .fetchAndImportBundle(
             sessionId: joinResult.sessionId,
             requestId: joinResult.requestId,
             forceOverwrite: _joinPairingForceOverwrite,
@@ -897,9 +903,10 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
       );
       if (password == null) return;
 
-      final code = await _serviceManager.exportSecureVaultLinkCode(
+      final code = await _vaultImportExportCoordinator.exportSecureVaultLinkCode(
         password,
         includeData: includeData,
+        resolveSyncServerUrl: () => _syncCoordinator.resolveServerUrl(allowEmpty: true),
       );
       await SensitiveClipboardService.copy(
         text: code,
@@ -951,7 +958,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
     try {
       setState(() => _isPairingBusy = true);
 
-      final preview = await _serviceManager.previewSecureVaultLinkCode(
+      final preview = await _vaultImportExportCoordinator.previewSecureVaultLinkCode(
         code,
         password,
       );
@@ -961,7 +968,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
       if (confirmed != true) return;
 
       if (!mounted) return;
-      await _serviceManager.importSecureVaultLinkCode(
+      await _vaultImportExportCoordinator.importSecureVaultLinkCode(
         code,
         password,
         forceOverwrite: preview.hasLocalData,
@@ -1277,9 +1284,9 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
     final navigator = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
     final provider = context.read<EnhancedAppProvider>();
-    final hasDirtyData = _serviceManager.hasDirtyData;
-    final syncState = _serviceManager.syncState;
-    final syncNote = _serviceManager.syncStatusNote;
+    final hasDirtyData = _syncCoordinator.isDirty;
+    final syncState = _syncCoordinator.state;
+    final syncNote = _syncCoordinator.statusNote;
     final statusTone = _syncStatusTone(context, syncState);
     final statusDescription = _syncStatusDescription(
       syncState,
@@ -1331,7 +1338,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                 children: [
                   SyncInfoChip(
                     label: context.text(
-                      '版本 V${_serviceManager.syncVersion}',
+                      '版本 V${_syncCoordinator.localVersion}',
                       'Version V${_serviceManager.syncVersion}',
                     ),
                   ),
@@ -1405,7 +1412,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                         label: Text(context.text('修改 Server', 'Edit Server')),
                       ),
                     if (!showsInlineServerEditAction &&
-                        !_serviceManager.syncService.isSyncing)
+                        !_syncCoordinator.syncService.isSyncing)
                       FilledButton.icon(
                         onPressed: () =>
                             _runSync(navigator, messenger, provider),
@@ -1437,7 +1444,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
             const SizedBox(width: AppSpacing.md),
             Expanded(
               child: FilledButton.icon(
-                onPressed: _serviceManager.syncService.isSyncing
+                onPressed: _syncCoordinator.syncService.isSyncing
                     ? null
                     : () => _runSync(navigator, messenger, provider),
                 icon: const Icon(Icons.sync_outlined),
@@ -1675,7 +1682,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
 
   Widget _buildDiagnosticSection(BuildContext context) {
     final identity = _serviceManager.identityService;
-    final lastSync = _serviceManager.syncService.lastSyncTime;
+    final lastSync = _syncCoordinator.syncService.lastSyncTime;
     final lastSyncStr = lastSync == null
         ? context.text('从未同步', 'Never')
         : '${lastSync.hour.toString().padLeft(2, '0')}:${lastSync.minute.toString().padLeft(2, '0')}:${lastSync.second.toString().padLeft(2, '0')}';

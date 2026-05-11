@@ -178,7 +178,9 @@ class _ConflictInboxViewState extends State<ConflictInboxView> {
     return Scaffold(
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : CustomScrollView(
+          : RefreshIndicator(
+              onRefresh: _load,
+              child: CustomScrollView(
               slivers: [
                 SliverAppBar.large(
                   title: Text(_t('冲突收件箱', 'Conflict Inbox')),
@@ -226,6 +228,7 @@ class _ConflictInboxViewState extends State<ConflictInboxView> {
                 const SliverPadding(padding: EdgeInsets.only(bottom: 120)),
               ],
             ),
+          ),
     );
   }
 }

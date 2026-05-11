@@ -1,10 +1,6 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
 
-import 'package:flutter/foundation.dart';
 import 'package:secret_roy/core/app_logger.dart';
-import 'package:secret_roy/core/crypto_random.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -17,52 +13,29 @@ import '../sync/lan_sync_coordinator.dart';
 import '../sync/sync_service.dart';
 import '../system/service_manager/default_sync_server_url.dart';
 import '../system/service_manager/password_tools.dart';
+import '../system/service_manager/sync_coordinator.dart';
 import '../system/service_manager/sync_server_url_store.dart';
+import '../system/service_manager/vault_data_repository.dart';
 import '../system/service_manager/vault_dump_coordinator.dart';
+import '../system/service_manager/vault_import_export_coordinator.dart';
+import '../system/service_manager/vault_import_types.dart';
+import '../system/service_manager/vault_pairing_coordinator.dart';
+import '../system/service_manager/vault_unlock_coordinator.dart';
+
+export '../system/service_manager/vault_data_repository.dart' show TemplateInUseException;
+export '../system/service_manager/vault_import_types.dart';
 import 'auto_lock_service.dart';
 import 'biometric_auth_service.dart';
 import 'device_alias_service.dart';
 import 'enhanced_crypto_service.dart';
 import 'identity_service.dart';
 import 'lan_pairing_service.dart';
-import 'vault_pairing_crypto.dart';
 import 'secure_storage_service.dart';
 import 'vault_pairing_service.dart';
 
 enum ServiceManagerState { uninitialized, locked, unlocking, unlocked, error }
 
-class VaultImportPreviewSummary {
-  final String vaultId;
-  final bool vaultIdMatchesCurrent;
-  final int accountCount;
-  final int templateCount;
-  final bool hasLocalData;
-  final bool includesDataSnapshot;
 
-  const VaultImportPreviewSummary({
-    required this.vaultId,
-    required this.vaultIdMatchesCurrent,
-    required this.accountCount,
-    required this.templateCount,
-    required this.hasLocalData,
-    required this.includesDataSnapshot,
-  });
-}
-
-/// 独立备份包的验证结果，不暴露解析后的原始对象。
-class VaultBackupTestResult {
-  final bool valid;
-  final String? errorMessage;
-  final int accountCount;
-  final int templateCount;
-
-  const VaultBackupTestResult({
-    required this.valid,
-    this.errorMessage,
-    required this.accountCount,
-    required this.templateCount,
-  });
-}
 
 class ServiceManager extends ChangeNotifier {
   static ServiceManager? _instance;
@@ -88,12 +61,17 @@ class ServiceManager extends ChangeNotifier {
   late final SyncServerUrlStore _syncServerUrlStore;
   late final VaultDumpCoordinator _vaultDumpCoordinator;
   late final LanSyncCoordinator _lanSyncCoordinator;
+  late final VaultUnlockCoordinator _vaultUnlockCoordinator;
+  late final VaultDataRepository _vaultDataRepository;
+  late final SyncCoordinator _syncCoordinator;
+  late final VaultImportExportCoordinator _vaultImportExportCoordinator;
+  late final VaultPairingCoordinator _vaultPairingCoordinator;
 
   ServiceManagerState _state = ServiceManagerState.uninitialized;
   String? _errorMessage;
   AutoLockObserver? _autoLockObserver;
   VoidCallback? _autoLockListener;
-  final Map<String, VaultPairingKeyPair> _vaultPairingJoinKeysByRequestId = {};
+
   bool _disposed = false;
 
   void _notify() {
@@ -131,6 +109,41 @@ class ServiceManager extends ChangeNotifier {
       pairing: _lanPairingService,
       syncService: _syncService,
     );
+    _vaultUnlockCoordinator = VaultUnlockCoordinator(
+      cryptoService: _cryptoService,
+      secureStorageService: _secureStorageService,
+      identityService: _identityService,
+      autoLockService: _autoLockService,
+      syncService: _syncService,
+      biometricService: _biometricService,
+      lanPairingService: _lanPairingService,
+      lanSyncCoordinator: _lanSyncCoordinator,
+    );
+    _vaultDataRepository = VaultDataRepository(
+      storage: _secureStorageService,
+      identity: _identityService,
+      sync: _syncService,
+    );
+    _syncCoordinator = SyncCoordinator(
+      syncService: _syncService,
+      identityService: _identityService,
+      secureStorageService: _secureStorageService,
+      syncServerUrlStore: _syncServerUrlStore,
+    );
+    _vaultImportExportCoordinator = VaultImportExportCoordinator(
+      dumpCoordinator: _vaultDumpCoordinator,
+      identityService: _identityService,
+      storageService: _secureStorageService,
+      syncService: _syncService,
+      syncServerUrlStore: _syncServerUrlStore,
+    );
+    _vaultPairingCoordinator = VaultPairingCoordinator(
+      vaultPairingService: _vaultPairingService,
+      lanPairingService: _lanPairingService,
+      identityService: _identityService,
+      syncCoordinator: _syncCoordinator,
+      importExportCoordinator: _vaultImportExportCoordinator,
+    );
   }
 
   @visibleForTesting
@@ -147,6 +160,11 @@ class ServiceManager extends ChangeNotifier {
     SyncServerUrlStore? syncServerUrlStore,
     VaultDumpCoordinator? vaultDumpCoordinator,
     LanSyncCoordinator? lanSyncCoordinator,
+    VaultUnlockCoordinator? vaultUnlockCoordinator,
+    VaultDataRepository? vaultDataRepository,
+    SyncCoordinator? syncCoordinator,
+    VaultImportExportCoordinator? vaultImportExportCoordinator,
+    VaultPairingCoordinator? vaultPairingCoordinator,
     ServiceManagerState initialState = ServiceManagerState.uninitialized,
   }) {
     const secureStorage = FlutterSecureStorage();
@@ -185,6 +203,46 @@ class ServiceManager extends ChangeNotifier {
           pairing: _lanPairingService,
           syncService: _syncService,
         );
+    _vaultUnlockCoordinator = vaultUnlockCoordinator ??
+        VaultUnlockCoordinator(
+          cryptoService: _cryptoService,
+          secureStorageService: _secureStorageService,
+          identityService: _identityService,
+          autoLockService: _autoLockService,
+          syncService: _syncService,
+          biometricService: _biometricService,
+          lanPairingService: _lanPairingService,
+          lanSyncCoordinator: _lanSyncCoordinator,
+        );
+    _vaultDataRepository = vaultDataRepository ??
+        VaultDataRepository(
+          storage: _secureStorageService,
+          identity: _identityService,
+          sync: _syncService,
+        );
+    _syncCoordinator = syncCoordinator ??
+        SyncCoordinator(
+          syncService: _syncService,
+          identityService: _identityService,
+          secureStorageService: _secureStorageService,
+          syncServerUrlStore: _syncServerUrlStore,
+        );
+    _vaultImportExportCoordinator = vaultImportExportCoordinator ??
+        VaultImportExportCoordinator(
+          dumpCoordinator: _vaultDumpCoordinator,
+          identityService: _identityService,
+          storageService: _secureStorageService,
+          syncService: _syncService,
+          syncServerUrlStore: _syncServerUrlStore,
+        );
+    _vaultPairingCoordinator = vaultPairingCoordinator ??
+        VaultPairingCoordinator(
+          vaultPairingService: _vaultPairingService,
+          lanPairingService: _lanPairingService,
+          identityService: _identityService,
+          syncCoordinator: _syncCoordinator,
+          importExportCoordinator: _vaultImportExportCoordinator,
+        );
     _state = initialState;
   }
 
@@ -212,6 +270,11 @@ class ServiceManager extends ChangeNotifier {
   SecureStorageService get storageService => _secureStorageService;
   SyncService get syncService => _syncService;
   LanSyncCoordinator get lanSyncCoordinator => _lanSyncCoordinator;
+  VaultUnlockCoordinator get vaultUnlockCoordinator => _vaultUnlockCoordinator;
+  VaultDataRepository get vaultDataRepository => _vaultDataRepository;
+  SyncCoordinator get syncCoordinator => _syncCoordinator;
+  VaultImportExportCoordinator get vaultImportExportCoordinator => _vaultImportExportCoordinator;
+  VaultPairingCoordinator get vaultPairingCoordinator => _vaultPairingCoordinator;
 
   Future<void> initialize() async {
     if (_state != ServiceManagerState.uninitialized) return;
@@ -232,11 +295,8 @@ class ServiceManager extends ChangeNotifier {
 
     _autoLockListener = () {
       if (_autoLockService.isLocked && _state == ServiceManagerState.unlocked) {
-        unawaited(_closeStorageForLock());
-        unawaited(_syncService.disconnect());
-        unawaited(_lanPairingService.stopHosting());
-        unawaited(_lanSyncCoordinator.abort());
-        _vaultPairingJoinKeysByRequestId.clear();
+        unawaited(_vaultUnlockCoordinator.performStorageCleanup());
+        _vaultPairingCoordinator.clearJoinKeys();
         _syncService.reset();
         _updateState(ServiceManagerState.locked);
       }
@@ -262,43 +322,26 @@ class ServiceManager extends ChangeNotifier {
     }
 
     _updateState(ServiceManagerState.unlocking);
-    final effectivePassword = await _resolveEffectivePassword(password);
-    return _completeUnlock(effectivePassword);
+    final effectivePassword = await _vaultUnlockCoordinator.resolveEffectivePassword(password);
+    return _performUnlock(effectivePassword);
   }
 
-  Future<UnlockResult> _completeUnlock(String password) async {
+  Future<UnlockResult> _performUnlock(String password) async {
     try {
-      final hasDatabase = await _secureStorageService.isDatabaseInitialized();
-      await _identityService.initialize(
-        allowGenerateVaultIdentity: !hasDatabase,
-      );
-      _deviceAliasService = await DeviceAliasService.create();
-      final didUnlock = await _cryptoService.initMasterKey(password);
-      if (!didUnlock) {
-        await _secureStorageService.close();
-        _secureStorageService.clearDatabaseCipher();
-        await _syncService.disconnect();
+      final cipher = await _vaultUnlockCoordinator.initializeAndUnlock(password);
+      if (cipher == null) {
         _updateState(ServiceManagerState.locked);
         return UnlockResult.invalidPassword;
       }
-      _secureStorageService.setDatabaseCipher(
-        _cryptoService.createDatabaseFileCipher(),
-      );
-      await _secureStorageService.initialize(
-        deviceId: _identityService.deviceId,
-      );
-      _autoLockService.unlock();
-      await _syncService.initialize();
-      await _secureStorageService.ensurePendingSyncOutboxEntries(
-        _identityService.vaultId,
-      );
+
+      _deviceAliasService = await DeviceAliasService.create();
 
       // Auto-migrate legacy no-password users to pseudo-key
-      if (await isNoPasswordMode() && await _readNoPasswordPseudoKey() == null) {
-        unawaited(_migrateNoPasswordToPseudoKey());
+      if (await _vaultUnlockCoordinator.isNoPasswordMode() &&
+          await _vaultUnlockCoordinator.readNoPasswordPseudoKey() == null) {
+        unawaited(_vaultUnlockCoordinator.migrateNoPasswordToPseudoKey());
       }
 
-      unawaited(_syncService.connect());
       _updateState(ServiceManagerState.unlocked);
       return UnlockResult.success;
     } on IdentityCorruptedException catch (e, stack) {
@@ -321,7 +364,7 @@ class ServiceManager extends ChangeNotifier {
       return UnlockResult.alreadyInProgress;
     }
 
-    final biometricStatus = await _biometricService.getStatus();
+    final biometricStatus = await _vaultUnlockCoordinator.getBiometricStatus();
     if (biometricStatus != BiometricAuthStatus.enabled) {
       return UnlockResult.biometricNotEnabled;
     }
@@ -329,13 +372,13 @@ class ServiceManager extends ChangeNotifier {
     _updateState(ServiceManagerState.unlocking);
 
     try {
-      final password = await _biometricService.unlockWithBiometric();
+      final password = await _vaultUnlockCoordinator.unlockWithBiometric();
       if (password == null) {
         _updateState(ServiceManagerState.locked);
         return UnlockResult.biometricFailed;
       }
 
-      return _completeUnlock(password);
+      return _performUnlock(password);
     } catch (e) {
       _setError('Biometric unlock failed: $e');
       return UnlockResult.error;
@@ -343,139 +386,36 @@ class ServiceManager extends ChangeNotifier {
   }
 
   void lock() {
-    _autoLockService.lock();
-    unawaited(_closeStorageForLock());
-    unawaited(_syncService.disconnect());
-    unawaited(_lanPairingService.stopHosting());
-    unawaited(_lanSyncCoordinator.abort());
-    _vaultPairingJoinKeysByRequestId.clear();
+    unawaited(_vaultUnlockCoordinator.lock());
+    _vaultPairingCoordinator.clearJoinKeys();
     _updateState(ServiceManagerState.locked);
   }
 
-  Future<void> _closeStorageForLock() async {
-    try {
-      await _secureStorageService.close();
-    } catch (e) {
-      AppLogger.d('Failed to close encrypted storage while locking: $e');
-    } finally {
-      _secureStorageService.clearDatabaseCipher();
-    }
-  }
-
   Future<void> logout() async {
-    lock();
-    _cryptoService.logout();
+    await _vaultUnlockCoordinator.logout();
+    _updateState(ServiceManagerState.locked);
   }
 
   Future<void> enableNoPasswordMode({String? preGeneratedPseudoKey}) async {
-    const secureStorage = FlutterSecureStorage();
-    await secureStorage.write(key: 'no_password_mode', value: 'true');
-    // Biometric unlock with an empty password offers no security benefit;
-    // disable it when entering no-password mode.
-    await disableBiometric();
-
-    final pseudoPassword = preGeneratedPseudoKey ?? _generateNoPasswordPseudoKey();
-    await secureStorage.write(key: _noPasswordPseudoKey, value: pseudoPassword);
-
+    final pseudoPassword = await _vaultUnlockCoordinator.enableNoPasswordMode(
+      preGeneratedPseudoKey: preGeneratedPseudoKey,
+    );
     await unlockWithPassword(pseudoPassword);
   }
 
   Future<bool> isNoPasswordMode() async {
-    if (Platform.environment['SECRETROY_TEST_DISABLE_NO_PASSWORD'] == '1') {
-      return false;
-    }
-    const secureStorage = FlutterSecureStorage();
-    return await secureStorage.read(key: 'no_password_mode') == 'true';
+    return _vaultUnlockCoordinator.isNoPasswordMode();
   }
 
   Future<void> disableNoPasswordMode() async {
-    const secureStorage = FlutterSecureStorage();
-    await secureStorage.delete(key: 'no_password_mode');
-    await secureStorage.delete(key: _noPasswordPseudoKey);
+    await _vaultUnlockCoordinator.disableNoPasswordMode();
   }
 
   Future<bool> changeMasterPassword(
     String oldPassword,
     String newPassword,
   ) async {
-    final effectiveNewPassword = newPassword.isEmpty
-        ? _generateNoPasswordPseudoKey()
-        : newPassword;
-
-    final success = await _cryptoService.updateMasterPassword(
-      oldPassword,
-      effectiveNewPassword,
-    );
-    if (success) {
-      await _secureStorageService.rotateDatabaseCipher(
-        _cryptoService.createDatabaseFileCipher(),
-      );
-      if (newPassword.isNotEmpty) {
-        await disableNoPasswordMode();
-      } else {
-        const secureStorage = FlutterSecureStorage();
-        await secureStorage.write(key: 'no_password_mode', value: 'true');
-        await disableBiometric();
-        await secureStorage.write(
-          key: _noPasswordPseudoKey,
-          value: effectiveNewPassword,
-        );
-      }
-    }
-    return success;
-  }
-
-  static const String _noPasswordPseudoKey = 'no_password_pseudo_key';
-
-  static String _generateNoPasswordPseudoKey() {
-    return base64Encode(CryptoRandom.bytes(32));
-  }
-
-  Future<String> _resolveEffectivePassword(String inputPassword) async {
-    if (inputPassword.isNotEmpty) return inputPassword;
-
-    if (!await isNoPasswordMode()) return inputPassword;
-
-    final pseudoKey = await _readNoPasswordPseudoKey();
-    if (pseudoKey != null && pseudoKey.isNotEmpty) {
-      return pseudoKey;
-    }
-
-    // Legacy: old no-password mode without pseudo key
-    return inputPassword;
-  }
-
-  Future<String?> _readNoPasswordPseudoKey() async {
-    const secureStorage = FlutterSecureStorage();
-    return secureStorage.read(key: _noPasswordPseudoKey);
-  }
-
-  Future<void> _migrateNoPasswordToPseudoKey() async {
-    try {
-      final pseudoPassword = _generateNoPasswordPseudoKey();
-      final success = await _cryptoService.updateMasterPassword(
-        '',
-        pseudoPassword,
-      );
-      if (success) {
-        const secureStorage = FlutterSecureStorage();
-        await secureStorage.write(
-          key: _noPasswordPseudoKey,
-          value: pseudoPassword,
-        );
-        AppLogger.d('[ServiceManager] Migrated no-password mode to pseudo-key');
-      } else {
-        AppLogger.d(
-          '[ServiceManager] No-password pseudo-key migration failed: '
-          'updateMasterPassword returned false',
-        );
-      }
-    } catch (e, stack) {
-      AppLogger.d(
-        '[ServiceManager] No-password pseudo-key migration failed: $e',
-      );
-      AppLogger.d(stack.toString());
-    }
+    return _vaultUnlockCoordinator.changeMasterPassword(oldPassword, newPassword);
   }
 
   Future<bool> checkIdentityExists() async {
@@ -491,7 +431,7 @@ class ServiceManager extends ChangeNotifier {
     _secureStorageService.clearDatabaseCipher();
     _cryptoService.logout();
     await _secureStorageService.deleteDatabaseFile();
-    _vaultPairingJoinKeysByRequestId.clear();
+    _vaultPairingCoordinator.clearJoinKeys();
 
     // Clear Secure Storage (Identity, Master Password mode, etc)
     const secureStorage = FlutterSecureStorage();
@@ -505,24 +445,15 @@ class ServiceManager extends ChangeNotifier {
   }
 
   Future<BiometricSetupResult> enableBiometric(String currentPassword) async {
-    if (await isNoPasswordMode()) {
-      return BiometricSetupResult.noPasswordMode;
-    }
-    final isValidPassword = await _cryptoService.verifyMasterPassword(
-      currentPassword,
-    );
-    if (!isValidPassword) {
-      return BiometricSetupResult.invalidPassword;
-    }
-    return _biometricService.enableBiometric(currentPassword);
+    return _vaultUnlockCoordinator.enableBiometric(currentPassword);
   }
 
   Future<void> disableBiometric() async {
-    await _biometricService.disableBiometric();
+    await _vaultUnlockCoordinator.disableBiometric();
   }
 
   Future<BiometricAuthStatus> getBiometricStatus() async {
-    return _biometricService.getStatus();
+    return _vaultUnlockCoordinator.getBiometricStatus();
   }
 
   Future<String> getBiometricName() async {
@@ -531,197 +462,56 @@ class ServiceManager extends ChangeNotifier {
 
   Future<void> saveAccount(AccountItem account) async {
     if (!isUnlocked) return;
-    final before = await _secureStorageService.getAccountById(
-      account.id,
-      includeDeleted: true,
-    );
-    await _secureStorageService.saveAccount(account);
-    final after = await _secureStorageService.getAccountById(
-      account.id,
-      includeDeleted: true,
-    );
-    if (after != null) {
-      await _secureStorageService.recordLocalSyncChange(
-        vaultId: _identityService.vaultId,
-        entityType: LocalSyncEntityType.account,
-        entityId: after.id,
-        action: before == null
-            ? LocalSyncAction.create
-            : LocalSyncAction.update,
-        title: after.name,
-        beforeSnapshot: before?.toJson(),
-        afterSnapshot: after.toJson(),
-        baseServerVersion: before?.serverVersion ?? after.serverVersion,
-      );
-    }
-    await _syncService.reconcileDirtyState();
+    await _vaultDataRepository.saveAccount(account);
   }
 
   Future<void> deleteAccount(String id) async {
     if (!isUnlocked) return;
-    final before = await _secureStorageService.getAccountById(
-      id,
-      includeDeleted: true,
-    );
-    await _secureStorageService.deleteAccount(id);
-    final after = await _secureStorageService.getAccountById(
-      id,
-      includeDeleted: true,
-    );
-    await _secureStorageService.recordLocalSyncChange(
-      vaultId: _identityService.vaultId,
-      entityType: LocalSyncEntityType.account,
-      entityId: id,
-      action: LocalSyncAction.delete,
-      title: before?.name ?? after?.name ?? id,
-      beforeSnapshot: before?.toJson(),
-      afterSnapshot: after?.toJson(),
-      baseServerVersion: before?.serverVersion ?? after?.serverVersion ?? 0,
-    );
-    await _syncService.reconcileDirtyState();
+    await _vaultDataRepository.deleteAccount(id);
   }
 
   Future<void> togglePin(String id) async {
     if (!isUnlocked) return;
-    final before = await _secureStorageService.getAccountById(
-      id,
-      includeDeleted: true,
-    );
-    await _secureStorageService.togglePin(id);
-    final after = await _secureStorageService.getAccountById(
-      id,
-      includeDeleted: true,
-    );
-    await _secureStorageService.recordLocalSyncChange(
-      vaultId: _identityService.vaultId,
-      entityType: LocalSyncEntityType.account,
-      entityId: id,
-      action: LocalSyncAction.update,
-      title: before?.name ?? after?.name ?? id,
-      beforeSnapshot: before?.toJson(),
-      afterSnapshot: after?.toJson(),
-      baseServerVersion: before?.serverVersion ?? after?.serverVersion ?? 0,
-    );
-    await _syncService.reconcileDirtyState();
+    await _vaultDataRepository.togglePin(id);
   }
 
   Future<AccountItem?> getAccountById(String id) async {
     if (!isUnlocked) return null;
-    return _secureStorageService.getAccountById(id);
+    return _vaultDataRepository.getAccountById(id);
   }
 
   Future<void> saveTotpCredential(TotpCredential credential) async {
     if (!isUnlocked) return;
-    final before = await _secureStorageService.getTotpCredentialById(
-      credential.id,
-      includeDeleted: true,
-    );
-    await _secureStorageService.saveTotpCredential(credential);
-    final after = await _secureStorageService.getTotpCredentialById(
-      credential.id,
-      includeDeleted: true,
-    );
-    if (after != null) {
-      await _secureStorageService.recordLocalSyncChange(
-        vaultId: _identityService.vaultId,
-        entityType: LocalSyncEntityType.totpCredential,
-        entityId: after.id,
-        action: before == null
-            ? LocalSyncAction.create
-            : LocalSyncAction.update,
-        title: after.displayLabel,
-        beforeSnapshot: before?.toJson(),
-        afterSnapshot: after.toJson(),
-        baseServerVersion: before?.serverVersion ?? after.serverVersion,
-      );
-    }
-    await _syncService.reconcileDirtyState();
+    await _vaultDataRepository.saveTotpCredential(credential);
   }
 
   Future<void> deleteTotpCredential(String id) async {
     if (!isUnlocked) return;
-    final before = await _secureStorageService.getTotpCredentialById(
-      id,
-      includeDeleted: true,
-    );
-    await _secureStorageService.deleteTotpCredential(id);
-    final after = await _secureStorageService.getTotpCredentialById(
-      id,
-      includeDeleted: true,
-    );
-    await _secureStorageService.recordLocalSyncChange(
-      vaultId: _identityService.vaultId,
-      entityType: LocalSyncEntityType.totpCredential,
-      entityId: id,
-      action: LocalSyncAction.delete,
-      title: before?.displayLabel ?? after?.displayLabel ?? id,
-      beforeSnapshot: before?.toJson(),
-      afterSnapshot: after?.toJson(),
-      baseServerVersion: before?.serverVersion ?? after?.serverVersion ?? 0,
-    );
-    await _syncService.reconcileDirtyState();
+    await _vaultDataRepository.deleteTotpCredential(id);
   }
 
   Future<int> countAccountsByTemplate(String templateId) async {
     if (!isUnlocked) return 0;
-    return _secureStorageService.countAccountsByTemplate(templateId);
+    return _vaultDataRepository.countAccountsByTemplate(templateId);
   }
 
   Future<void> saveTemplate(AccountTemplate template) async {
     if (!isUnlocked) return;
-    final before = await _secureStorageService.loadTemplateById(
-      template.templateId,
-    );
-    await _secureStorageService.saveTemplate(template);
-    final after = await _secureStorageService.loadTemplateById(
-      template.templateId,
-    );
-    if (after != null && after.isCustom) {
-      await _secureStorageService.recordLocalSyncChange(
-        vaultId: _identityService.vaultId,
-        entityType: LocalSyncEntityType.template,
-        entityId: after.templateId,
-        action: before == null
-            ? LocalSyncAction.create
-            : LocalSyncAction.update,
-        title: after.title,
-        beforeSnapshot: before?.toJson(),
-        afterSnapshot: after.toJson(),
-        baseServerVersion: before?.serverVersion ?? after.serverVersion,
-      );
-    }
-    await _syncService.reconcileDirtyState();
+    await _vaultDataRepository.saveTemplate(template);
   }
 
   Future<void> deleteTemplate(String id) async {
     if (!isUnlocked) return;
-    final usageCount = await _secureStorageService.countAccountsByTemplate(id);
-    if (usageCount > 0) {
-      throw TemplateInUseException(templateId: id, usageCount: usageCount);
-    }
-    final before = await _secureStorageService.loadTemplateById(id);
-    await _secureStorageService.deleteTemplate(id);
-    final after = await _secureStorageService.loadTemplateById(id);
-    await _secureStorageService.recordLocalSyncChange(
-      vaultId: _identityService.vaultId,
-      entityType: LocalSyncEntityType.template,
-      entityId: id,
-      action: LocalSyncAction.delete,
-      title: before?.title ?? after?.title ?? id,
-      beforeSnapshot: before?.toJson(),
-      afterSnapshot: after?.toJson(),
-      baseServerVersion: before?.serverVersion ?? after?.serverVersion ?? 0,
-    );
-    await _syncService.reconcileDirtyState();
+    await _vaultDataRepository.deleteTemplate(id);
   }
 
   Future<bool> connectToSyncServer() async {
     if (!isUnlocked) return false;
-    return _syncService.connect();
+    return _syncCoordinator.connect();
   }
 
   Future<void> disconnectFromSyncServer() async {
-    await _syncService.disconnect();
+    await _syncCoordinator.disconnect();
   }
 
   Future<SyncResult> syncNow() async {
@@ -729,38 +519,19 @@ class ServiceManager extends ChangeNotifier {
       return SyncResult.failure('Vault is locked.');
     }
 
-    final result = await _syncService.syncNow();
-    if (!result.success || !result.pulled) {
-      return result;
+    final result = await _syncCoordinator.syncNow();
+    if (result.success && result.pulled) {
+      _deviceAliasService = await DeviceAliasService.create();
+      _notify();
     }
-
-    await Future.delayed(const Duration(milliseconds: 500));
-    await _identityService.initialize();
-    _deviceAliasService = await DeviceAliasService.create();
-    await _secureStorageService.initialize(deviceId: _identityService.deviceId);
-    await _syncService.initialize();
-
-    _notify();
-
-    return SyncResult.success(
-      pulled: result.pulled,
-      pushed: result.pushed,
-      version: _syncService.localVersion,
-      conflictCount: result.conflictCount,
-      notice: result.notice,
-    );
+    return result;
   }
 
   Future<List<LocalSyncChange>> loadOpenLocalSyncChanges() async {
     if (!isUnlocked || !_identityService.hasIdentity) {
       return const <LocalSyncChange>[];
     }
-    await _secureStorageService.ensurePendingSyncOutboxEntries(
-      _identityService.vaultId,
-    );
-    return _secureStorageService.loadOpenLocalSyncChanges(
-      vaultId: _identityService.vaultId,
-    );
+    return _vaultDataRepository.loadOpenLocalSyncChanges();
   }
 
   Future<SyncResult> approveAndSyncLocalChanges({
@@ -770,11 +541,7 @@ class ServiceManager extends ChangeNotifier {
       return SyncResult.failure('Vault is locked.');
     }
 
-    await _secureStorageService.approveLocalSyncChanges(
-      vaultId: _identityService.vaultId,
-      ids: changeIds,
-    );
-    await _syncService.markDirty();
+    await _vaultDataRepository.approveLocalSyncChanges(ids: changeIds);
     final result = await syncNow();
     _notify();
     return result;
@@ -783,71 +550,26 @@ class ServiceManager extends ChangeNotifier {
   Future<void> discardLocalSyncChange(String changeId) async {
     if (!isUnlocked || !_identityService.hasIdentity) return;
 
-    final change = await _secureStorageService.getLocalSyncChange(changeId);
-    if (change == null) return;
-
-    final before = change.beforeSnapshot;
-    switch (change.entityType) {
-      case LocalSyncEntityType.account:
-        if (before == null) {
-          await _secureStorageService.hardDeleteAccount(change.entityId);
-        } else {
-          await _secureStorageService.saveAccount(
-            AccountItem.fromJson(before),
-            isSyncMerge: true,
-          );
-        }
-        break;
-      case LocalSyncEntityType.template:
-        if (before == null) {
-          await _secureStorageService.hardDeleteTemplate(change.entityId);
-        } else {
-          await _secureStorageService.saveTemplate(
-            AccountTemplate.fromJson(before),
-            isSyncMerge: true,
-          );
-        }
-        break;
-      case LocalSyncEntityType.totpCredential:
-        if (before == null) {
-          await _secureStorageService.hardDeleteTotpCredential(change.entityId);
-        } else {
-          await _secureStorageService.saveTotpCredential(
-            TotpCredential.fromJson(before),
-            isSyncMerge: true,
-          );
-        }
-        break;
-    }
-
-    await _secureStorageService.deleteLocalSyncChange(changeId);
-    await _syncService.reconcileDirtyState();
+    await _vaultDataRepository.discardLocalSyncChange(changeId);
     _notify();
   }
 
-  SyncState get syncState => _syncService.state;
-  String? get syncErrorMessage => _syncService.errorMessage;
-  String? get syncStatusNote => _syncService.statusNote;
-  bool get isSyncConnected => _syncService.isConnected;
-  int get syncVersion => _syncService.localVersion;
-  bool get hasDirtyData => _syncService.isDirty;
+  SyncState get syncState => _syncCoordinator.state;
+  String? get syncErrorMessage => _syncCoordinator.errorMessage;
+  String? get syncStatusNote => _syncCoordinator.statusNote;
+  bool get isSyncConnected => _syncCoordinator.isConnected;
+  int get syncVersion => _syncCoordinator.localVersion;
+  bool get hasDirtyData => _syncCoordinator.isDirty;
 
   Future<String?> getSyncServerUrl() async {
-    return _syncServerUrlStore.read(
-      vaultId: _identityService.hasIdentity ? _identityService.vaultId : null,
-    );
+    return _syncCoordinator.getServerUrl();
   }
 
   Future<void> setSyncServerUrl(String url) async {
     if (!isUnlocked) return;
 
-    await _syncServerUrlStore.write(url, vaultId: _identityService.vaultId);
-    await disconnectFromSyncServer();
+    await _syncCoordinator.setServerUrl(url);
     _notify();
-  }
-
-  Future<String?> _exportEncryptedVaultDump() async {
-    return _vaultDumpCoordinator.exportEncryptedVaultDump();
   }
 
   /// 导出独立备份包（不包含身份密钥的加密数据快照）。
@@ -858,51 +580,31 @@ class ServiceManager extends ChangeNotifier {
     if (!isUnlocked) {
       throw StateError('Vault is locked.');
     }
-    return await _exportEncryptedVaultDump();
+    return await _vaultImportExportCoordinator.exportEncryptedVaultDump();
   }
 
-  /// 测试恢复独立备份包，验证其能否被正确解密和解析。
-  ///
-  /// 本方法**不会**修改当前 vault 身份、不会写入本地数据库、不会切换 vault。
-  /// 失败时返回 [VaultBackupTestResult.valid] == false 并附带错误信息。
   Future<VaultBackupTestResult> testRecoverBackupPackage(
     String vaultDumpJson, {
     required String vaultId,
     required String privateKey,
     required String symmetricKey,
   }) async {
-    try {
-      final plan = await _vaultDumpCoordinator.validateEncryptedVaultDump(
-        vaultDumpJson: vaultDumpJson,
-        vaultId: vaultId,
-        privateKey: privateKey,
-        symmetricKey: symmetricKey,
-      );
-      return VaultBackupTestResult(
-        valid: true,
-        accountCount: plan.accounts.length,
-        templateCount: plan.templates.length,
-      );
-    } on VaultDumpImportException catch (error) {
-      return VaultBackupTestResult(
-        valid: false,
-        errorMessage: error.message,
-        accountCount: 0,
-        templateCount: 0,
-      );
-    }
+    return _vaultImportExportCoordinator.testRecoverBackupPackage(
+      vaultDumpJson,
+      vaultId: vaultId,
+      privateKey: privateKey,
+      symmetricKey: symmetricKey,
+    );
   }
 
   Future<String> exportSecureVaultLinkCode(
     String password, {
     bool includeData = false,
   }) async {
-    final serverUrl = await _resolveSyncServerUrl(allowEmpty: true);
-    final vaultDump = includeData ? await _exportEncryptedVaultDump() : null;
-    return _identityService.exportSecureLinkCode(
+    return _vaultImportExportCoordinator.exportSecureVaultLinkCode(
       password,
-      syncServerUrl: serverUrl.isEmpty ? null : serverUrl,
-      vaultDump: vaultDump,
+      includeData: includeData,
+      resolveSyncServerUrl: () => _resolveSyncServerUrl(allowEmpty: true),
     );
   }
 
@@ -912,27 +614,7 @@ class ServiceManager extends ChangeNotifier {
     if (!isUnlocked) {
       throw StateError('Vault is locked.');
     }
-
-    final VaultDumpImportPlan? dumpPlan;
-    try {
-      dumpPlan = await _validateIncomingVaultDump(preview);
-    } on VaultDumpImportException catch (error) {
-      throw VaultImportException(error.message);
-    }
-
-    final hasLocalData = await _hasLocalVaultDataForImport();
-    final currentVaultId = _identityService.hasIdentity
-        ? _identityService.vaultId
-        : null;
-
-    return VaultImportPreviewSummary(
-      vaultId: preview.vaultId,
-      vaultIdMatchesCurrent: currentVaultId == preview.vaultId,
-      accountCount: dumpPlan?.accounts.length ?? 0,
-      templateCount: dumpPlan?.templates.length ?? 0,
-      hasLocalData: hasLocalData,
-      includesDataSnapshot: dumpPlan != null && dumpPlan.hasData,
-    );
+    return _vaultImportExportCoordinator.previewVaultImport(preview);
   }
 
   Future<VaultImportPreviewSummary> previewSecureVaultLinkCode(
@@ -942,11 +624,10 @@ class ServiceManager extends ChangeNotifier {
     if (!isUnlocked) {
       throw StateError('Vault is locked.');
     }
-    final preview = await _identityService.previewSecureLinkCode(
+    return _vaultImportExportCoordinator.previewSecureVaultLinkCode(
       secureCode,
       password,
     );
-    return previewVaultImport(preview);
   }
 
   Future<void> importVaultLinkCode(
@@ -957,8 +638,11 @@ class ServiceManager extends ChangeNotifier {
       throw StateError('Vault is locked.');
     }
 
-    final preview = await _identityService.previewTransferCode(code);
-    await _importVaultIdentityPreview(preview, forceOverwrite: forceOverwrite);
+    await _vaultImportExportCoordinator.importVaultLinkCode(
+      code,
+      forceOverwrite: forceOverwrite,
+    );
+    _notify();
   }
 
   Future<void> importSecureVaultLinkCode(
@@ -970,11 +654,12 @@ class ServiceManager extends ChangeNotifier {
       throw StateError('Vault is locked.');
     }
 
-    final preview = await _identityService.previewSecureLinkCode(
+    await _vaultImportExportCoordinator.importSecureVaultLinkCode(
       secureCode,
       password,
+      forceOverwrite: forceOverwrite,
     );
-    await _importVaultIdentityPreview(preview, forceOverwrite: forceOverwrite);
+    _notify();
   }
 
   Future<void> importVaultIdentityPreview(
@@ -984,98 +669,11 @@ class ServiceManager extends ChangeNotifier {
     if (!isUnlocked) {
       throw StateError('Vault is locked.');
     }
-    await _importVaultIdentityPreview(preview, forceOverwrite: forceOverwrite);
-  }
-
-  Future<void> _importVaultIdentityPreview(
-    VaultIdentityImportPreview preview, {
-    required bool forceOverwrite,
-  }) async {
-    final VaultDumpImportPlan? dumpPlan;
-    try {
-      dumpPlan = await _validateIncomingVaultDump(preview);
-    } on VaultDumpImportException catch (error) {
-      throw VaultImportException(error.message);
-    }
-    final hadLocalData = await _hasLocalVaultDataForImport();
-    if (hadLocalData && !forceOverwrite) {
-      throw const VaultImportPreconditionException(
-        'This device already has local vault data. Confirm overwrite before importing.',
-      );
-    }
-
-    final previousIdentity = _identityService.hasIdentity
-        ? _identityService.currentImportPreview()
-        : null;
-    var identityApplied = false;
-
-    try {
-      await _syncService.disconnect();
-      await _identityService.applyImportPreview(preview);
-      identityApplied = true;
-
-      if (dumpPlan != null) {
-        if (dumpPlan.hasData) {
-          await _vaultDumpCoordinator.importValidatedVaultDump(dumpPlan);
-        } else if (hadLocalData) {
-          await _secureStorageService.clearAllData();
-        }
-      } else if (hadLocalData) {
-        await _secureStorageService.clearAllData();
-      }
-
-      final syncServerUrl = preview.syncServerUrl;
-      if (syncServerUrl != null && syncServerUrl.isNotEmpty) {
-        await _syncServerUrlStore.write(
-          syncServerUrl,
-          vaultId: preview.vaultId,
-        );
-      }
-
-      await _syncService.initialize();
-      _notify();
-    } on VaultDumpImportException catch (error) {
-      if (identityApplied && previousIdentity != null) {
-        await _identityService.applyImportPreview(previousIdentity);
-        await _syncService.initialize();
-      }
-      throw VaultImportException(error.message);
-    } catch (error) {
-      if (identityApplied && previousIdentity != null) {
-        await _identityService.applyImportPreview(previousIdentity);
-        await _syncService.initialize();
-      }
-      throw VaultImportException('Vault import failed: $error');
-    }
-  }
-
-  Future<VaultDumpImportPlan?> _validateIncomingVaultDump(
-    VaultIdentityImportPreview preview,
-  ) async {
-    final vaultDump = preview.vaultDump;
-    if (vaultDump == null || vaultDump.isEmpty) {
-      return null;
-    }
-
-    return await _vaultDumpCoordinator.validateEncryptedVaultDump(
-      vaultDumpJson: vaultDump,
-      vaultId: preview.vaultId,
-      privateKey: preview.privateKey,
-      symmetricKey: preview.symmetricKey,
+    await _vaultImportExportCoordinator.importVaultIdentityPreview(
+      preview,
+      forceOverwrite: forceOverwrite,
     );
-  }
-
-  Future<bool> _hasLocalVaultDataForImport() async {
-    final accounts = await _secureStorageService.loadAccounts(
-      includeDeleted: true,
-    );
-    final templates = await _secureStorageService.loadCustomTemplates(
-      includeDeleted: true,
-    );
-    return accounts.isNotEmpty ||
-        templates.isNotEmpty ||
-        _syncService.localVersion > 0 ||
-        _syncService.isDirty;
+    _notify();
   }
 
   Future<PairingSessionInfo> createVaultPairingSession({
@@ -1084,14 +682,7 @@ class ServiceManager extends ChangeNotifier {
     if (!isUnlocked) {
       throw StateError('Vault is locked.');
     }
-
-    final serverUrl = await _resolveSyncServerUrl();
-    return _vaultPairingService.createSession(
-      serverUrl: serverUrl,
-      vaultId: _identityService.vaultId,
-      hostDeviceId: _identityService.deviceId,
-      ttl: ttl,
-    );
+    return _vaultPairingCoordinator.createSession(ttl: ttl);
   }
 
   Future<PairingSessionStatus> getVaultPairingSessionStatus(
@@ -1100,13 +691,7 @@ class ServiceManager extends ChangeNotifier {
     if (!isUnlocked) {
       throw StateError('Vault is locked.');
     }
-
-    final serverUrl = await _resolveSyncServerUrl();
-    return _vaultPairingService.getHostSessionStatus(
-      serverUrl: serverUrl,
-      sessionId: sessionId,
-      hostDeviceId: _identityService.deviceId,
-    );
+    return _vaultPairingCoordinator.getSessionStatus(sessionId);
   }
 
   Future<void> approveVaultPairingRequest({
@@ -1116,44 +701,9 @@ class ServiceManager extends ChangeNotifier {
     if (!isUnlocked) {
       throw StateError('Vault is locked.');
     }
-
-    final serverUrl = await _resolveSyncServerUrl();
-    final status = await _vaultPairingService.getHostSessionStatus(
-      serverUrl: serverUrl,
+    await _vaultPairingCoordinator.approveRequest(
       sessionId: sessionId,
-      hostDeviceId: _identityService.deviceId,
-    );
-    final pendingRequest = status.pendingRequest;
-    if (pendingRequest == null || pendingRequest.requestId != requestId) {
-      throw const VaultPairingServiceException(
-        'Pairing request is no longer pending. Refresh and try again.',
-      );
-    }
-    if (pendingRequest.requesterPublicKey.isEmpty) {
-      throw const VaultPairingServiceException(
-        'Pairing request is missing the requester public key.',
-      );
-    }
-
-    final vaultDump = await _exportEncryptedVaultDump();
-    // LAN pairing encrypts with the requester's public key, so the cleartext
-    // transfer code is safe in transit — unlike exportSecureLinkCode which
-    // uses password-derived encryption.
-    // ignore: deprecated_member_use_from_same_package
-    final transferCode = _identityService.exportTransferCode(
-      syncServerUrl: serverUrl.isEmpty ? null : serverUrl,
-      vaultDump: vaultDump,
-    );
-    final wrappedVaultBundle = await VaultPairingCrypto.encryptBundle(
-      plainBundle: transferCode,
-      requesterPublicKey: pendingRequest.requesterPublicKey,
-    );
-    await _vaultPairingService.approveSession(
-      serverUrl: serverUrl,
-      sessionId: sessionId,
-      hostDeviceId: _identityService.deviceId,
       requestId: requestId,
-      wrappedVaultBundle: wrappedVaultBundle,
     );
   }
 
@@ -1161,17 +711,7 @@ class ServiceManager extends ChangeNotifier {
     if (!isUnlocked) {
       throw StateError('Vault is locked.');
     }
-
-    final serverUrl = await _resolveSyncServerUrl();
-    final keyPair = await VaultPairingCrypto.createKeyPair();
-    final joinResult = await _vaultPairingService.joinSession(
-      serverUrl: serverUrl,
-      pairingCode: pairingCode.trim(),
-      requesterDeviceId: _identityService.deviceId,
-      requesterPublicKey: keyPair.publicKey,
-    );
-    _vaultPairingJoinKeysByRequestId[joinResult.requestId] = keyPair;
-    return joinResult;
+    return _vaultPairingCoordinator.joinSession(pairingCode);
   }
 
   Future<PairingBundleResult> fetchAndImportVaultPairingBundle({
@@ -1182,37 +722,15 @@ class ServiceManager extends ChangeNotifier {
     if (!isUnlocked) {
       throw StateError('Vault is locked.');
     }
-
-    final serverUrl = await _resolveSyncServerUrl();
-    final bundleResult = await _vaultPairingService.getBundle(
-      serverUrl: serverUrl,
+    final result = await _vaultPairingCoordinator.fetchAndImportBundle(
       sessionId: sessionId,
       requestId: requestId,
-      requesterDeviceId: _identityService.deviceId,
+      forceOverwrite: forceOverwrite,
     );
-
-    if (bundleResult.status == 'approved') {
-      final wrappedBundle = bundleResult.wrappedVaultBundle;
-      if (wrappedBundle == null || wrappedBundle.isEmpty) {
-        throw const VaultPairingServiceException(
-          'Pairing bundle is empty. Retry the approval flow.',
-        );
-      }
-      final keyPair = _vaultPairingJoinKeysByRequestId[requestId];
-      if (keyPair == null) {
-        throw const VaultPairingServiceException(
-          'Pairing key expired locally. Rejoin the pairing session.',
-        );
-      }
-      final transferCode = await VaultPairingCrypto.decryptBundle(
-        wrappedBundle: wrappedBundle,
-        keyPair: keyPair,
-      );
-      await importVaultLinkCode(transferCode, forceOverwrite: forceOverwrite);
-      _vaultPairingJoinKeysByRequestId.remove(requestId);
+    if (result.status == 'approved') {
+      _notify();
     }
-
-    return bundleResult;
+    return result;
   }
 
   Future<LanPairingHostSession> startLanVaultPairingHost({
@@ -1221,30 +739,11 @@ class ServiceManager extends ChangeNotifier {
     if (!isUnlocked) {
       throw StateError('Vault is locked.');
     }
-    if (kIsWeb) {
-      throw const LanPairingServiceException(
-        'LAN direct pairing is not supported on web builds.',
-      );
-    }
-
-    final serverUrl = await _resolveSyncServerUrl(allowEmpty: true);
-    final vaultDump = await _exportEncryptedVaultDump();
-    // LAN pairing encrypts with the requester's public key, so the cleartext
-    // transfer code is safe in transit — unlike exportSecureLinkCode which
-    // uses password-derived encryption.
-    // ignore: deprecated_member_use_from_same_package
-    final transferCode = _identityService.exportTransferCode(
-      syncServerUrl: serverUrl.isEmpty ? null : serverUrl,
-      vaultDump: vaultDump,
-    );
-    return _lanPairingService.startHosting(
-      transferCode: transferCode,
-      ttl: ttl,
-    );
+    return _vaultPairingCoordinator.startLanHost(ttl: ttl);
   }
 
   Future<void> stopLanVaultPairingHost() async {
-    await _lanPairingService.stopHosting();
+    await _vaultPairingCoordinator.stopLanHost();
   }
 
   Future<void> joinLanVaultPairingWithCode(
@@ -1254,17 +753,11 @@ class ServiceManager extends ChangeNotifier {
     if (!isUnlocked) {
       throw StateError('Vault is locked.');
     }
-    if (kIsWeb) {
-      throw const LanPairingServiceException(
-        'LAN direct pairing is not supported on web builds.',
-      );
-    }
-
-    final transferCode = await _lanPairingService.claimTransferCodeByCode(
-      pairingCode: pairingCode,
-      requesterDeviceId: _identityService.deviceId,
+    await _vaultPairingCoordinator.joinLanWithCode(
+      pairingCode,
+      forceOverwrite: forceOverwrite,
     );
-    await importVaultLinkCode(transferCode, forceOverwrite: forceOverwrite);
+    _notify();
   }
 
   Future<void> setAutoLockDuration(AutoLockDuration duration) async {
@@ -1275,10 +768,7 @@ class ServiceManager extends ChangeNotifier {
   AutoLockDuration get autoLockDuration => _autoLockService.duration;
 
   Future<String> _resolveSyncServerUrl({bool allowEmpty = false}) async {
-    return _syncServerUrlStore.resolve(
-      vaultId: _identityService.hasIdentity ? _identityService.vaultId : null,
-      allowEmpty: allowEmpty,
-    );
+    return _syncCoordinator.resolveServerUrl(allowEmpty: allowEmpty);
   }
 
   static String generatePassword({
@@ -1335,7 +825,7 @@ class ServiceManager extends ChangeNotifier {
     _syncService.dispose();
     _lanPairingService.dispose();
     _lanSyncCoordinator.dispose();
-    unawaited(_closeStorageForLock());
+    unawaited(_vaultUnlockCoordinator.closeStorage());
     super.dispose();
   }
 }
@@ -1349,35 +839,6 @@ enum UnlockResult {
   error,
 }
 
-class TemplateInUseException implements Exception {
-  final String templateId;
-  final int usageCount;
 
-  const TemplateInUseException({
-    required this.templateId,
-    required this.usageCount,
-  });
 
-  @override
-  String toString() {
-    return 'TemplateInUseException(templateId: $templateId, usageCount: $usageCount)';
-  }
-}
 
-class VaultImportPreconditionException implements Exception {
-  final String message;
-
-  const VaultImportPreconditionException(this.message);
-
-  @override
-  String toString() => 'VaultImportPreconditionException($message)';
-}
-
-class VaultImportException implements Exception {
-  final String message;
-
-  const VaultImportException(this.message);
-
-  @override
-  String toString() => 'VaultImportException($message)';
-}

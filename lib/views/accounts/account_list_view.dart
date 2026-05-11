@@ -941,7 +941,9 @@ class _AccountListViewState extends State<AccountListView> {
                                     ).copyWith(
                                       physics: const ClampingScrollPhysics(),
                                     ),
-                                    child: ListView(
+                                    child: RefreshIndicator(
+                                      onRefresh: () => provider.refresh(),
+                                      child: ListView(
                                       padding: EdgeInsets.fromLTRB(
                                         16,
                                         0,
@@ -957,6 +959,7 @@ class _AccountListViewState extends State<AccountListView> {
                                             provider,
                                           ),
                                       ],
+                                    ),
                                     ),
                                   ),
                                   // Bottom Fade interaction hint
