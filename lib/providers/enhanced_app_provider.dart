@@ -121,6 +121,9 @@ class EnhancedAppProvider extends ChangeNotifier {
         .toList(growable: false);
   }
 
+  @visibleForTesting
+  ServiceManager get serviceManager => _serviceManager;
+
   SyncState get syncState => _serviceManager.syncState;
   bool get isSyncConnected => _serviceManager.isSyncConnected;
 
@@ -263,6 +266,18 @@ class EnhancedAppProvider extends ChangeNotifier {
     } finally {
       _setLoading(false);
     }
+  }
+
+  Future<void> togglePin(String id) async {
+    await _serviceManager.togglePin(id);
+    final updated = await _serviceManager.getAccountById(id);
+    if (updated != null) {
+      final idx = _accounts.indexWhere((a) => a.id == id);
+      if (idx != -1) {
+        _accounts[idx] = updated;
+      }
+    }
+    _notify();
   }
 
   Future<void> addTotpCredential(TotpCredential credential) async {

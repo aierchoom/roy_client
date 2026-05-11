@@ -11,6 +11,9 @@ class DeviceAliasService {
 
   DeviceAliasService._(this._prefs);
 
+  /// Test-only constructor that avoids SharedPreferences initialization.
+  DeviceAliasService.testable() : _prefs = null;
+
   static Future<DeviceAliasService> create() async {
     final prefs = await SharedPreferences.getInstance();
     return DeviceAliasService._(prefs);

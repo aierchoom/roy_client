@@ -79,7 +79,7 @@ class ServiceManager extends ChangeNotifier {
   late final AutoLockService _autoLockService;
   late final IdentityService _identityService;
   late final SecureStorageService _secureStorageService;
-  late final DeviceAliasService _deviceAliasService;
+  late DeviceAliasService _deviceAliasService;
   late final SyncService _syncService;
   late final VaultPairingService _vaultPairingService;
   late final LanPairingService _lanPairingService;
@@ -129,6 +129,71 @@ class ServiceManager extends ChangeNotifier {
       pairing: _lanPairingService,
       syncService: _syncService,
     );
+  }
+
+  @visibleForTesting
+  ServiceManager.testable({
+    EnhancedCryptoService? cryptoService,
+    BiometricAuthService? biometricService,
+    AutoLockService? autoLockService,
+    IdentityService? identityService,
+    SecureStorageService? secureStorageService,
+    DeviceAliasService? deviceAliasService,
+    SyncService? syncService,
+    VaultPairingService? vaultPairingService,
+    LanPairingService? lanPairingService,
+    SyncServerUrlStore? syncServerUrlStore,
+    VaultDumpCoordinator? vaultDumpCoordinator,
+    LanSyncCoordinator? lanSyncCoordinator,
+    ServiceManagerState initialState = ServiceManagerState.uninitialized,
+  }) {
+    const secureStorage = FlutterSecureStorage();
+    _cryptoService = cryptoService ??
+        EnhancedCryptoService(secureStorage: secureStorage);
+    _biometricService = biometricService ?? BiometricAuthService();
+    _autoLockService = autoLockService ??
+        AutoLockService(
+          cryptoService: _cryptoService,
+          secureStorage: secureStorage,
+        );
+    _identityService = identityService ??
+        IdentityService(
+          secureStorage: const FlutterSecureKeyValueStore(secureStorage),
+        );
+    _secureStorageService = secureStorageService ?? SecureStorageService();
+    _deviceAliasService = deviceAliasService ?? DeviceAliasService.testable();
+    _syncService = syncService ??
+        SyncService(
+          storageService: _secureStorageService,
+          identityService: _identityService,
+          config: SyncConfig(serverUrl: defaultSyncServerUrl),
+        );
+    _vaultPairingService = vaultPairingService ?? VaultPairingService();
+    _lanPairingService = lanPairingService ?? LanPairingService();
+    _syncServerUrlStore = syncServerUrlStore ?? const SyncServerUrlStore();
+    _vaultDumpCoordinator = vaultDumpCoordinator ??
+        VaultDumpCoordinator(
+          identityService: _identityService,
+          storageService: _secureStorageService,
+        );
+    _lanSyncCoordinator = lanSyncCoordinator ??
+        LanSyncCoordinator(
+          storage: _secureStorageService,
+          identity: _identityService,
+          pairing: _lanPairingService,
+          syncService: _syncService,
+        );
+    _state = initialState;
+  }
+
+  @visibleForTesting
+  static void setInstanceForTesting(ServiceManager instance) {
+    _instance = instance;
+  }
+
+  @visibleForTesting
+  static void resetInstance() {
+    _instance = null;
   }
 
   ServiceManagerState get state => _state;
@@ -438,6 +503,35 @@ class ServiceManager extends ChangeNotifier {
       baseServerVersion: before?.serverVersion ?? after?.serverVersion ?? 0,
     );
     await _syncService.reconcileDirtyState();
+  }
+
+  Future<void> togglePin(String id) async {
+    if (!isUnlocked) return;
+    final before = await _secureStorageService.getAccountById(
+      id,
+      includeDeleted: true,
+    );
+    await _secureStorageService.togglePin(id);
+    final after = await _secureStorageService.getAccountById(
+      id,
+      includeDeleted: true,
+    );
+    await _secureStorageService.recordLocalSyncChange(
+      vaultId: _identityService.vaultId,
+      entityType: LocalSyncEntityType.account,
+      entityId: id,
+      action: LocalSyncAction.update,
+      title: before?.name ?? after?.name ?? id,
+      beforeSnapshot: before?.toJson(),
+      afterSnapshot: after?.toJson(),
+      baseServerVersion: before?.serverVersion ?? after?.serverVersion ?? 0,
+    );
+    await _syncService.reconcileDirtyState();
+  }
+
+  Future<AccountItem?> getAccountById(String id) async {
+    if (!isUnlocked) return null;
+    return _secureStorageService.getAccountById(id);
   }
 
   Future<void> saveTotpCredential(TotpCredential credential) async {
