@@ -4,124 +4,23 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:secret_roy/models/account_item.dart';
-import 'package:secret_roy/models/account_template.dart';
 import 'package:secret_roy/models/hlc.dart';
 import 'package:secret_roy/models/local_sync_change.dart';
 import 'package:secret_roy/models/totp_credential.dart';
 import 'package:secret_roy/services/identity_service.dart';
-import 'package:secret_roy/services/secure_storage_service.dart';
 import 'package:secret_roy/services/totp_service.dart';
 import 'package:secret_roy/sync/sync_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class _MemorySecureKeyValueStore implements SecureKeyValueStore {
-  final Map<String, String> values;
+import 'sync_server_test_harness.dart';
 
-  _MemorySecureKeyValueStore(this.values);
-
-  @override
-  Future<String?> read({required String key}) async => values[key];
-
-  @override
-  Future<void> write({required String key, required String value}) async {
-    values[key] = value;
-  }
-
-  @override
-  Future<void> delete({required String key}) async {
-    values.remove(key);
-  }
-}
-
-class _FakeSecureStorageService extends SecureStorageService {
-  final Map<String, String> settings = {};
-  final Map<String, AccountItem> accounts = {};
-  final Map<String, AccountTemplate> templates = {};
-  final Map<String, TotpCredential> totpCredentials = {};
+/// 扩展 [FakeSecureStorageService]，增加状态机测试所需的观察与控制字段。
+class _FakeSecureStorageService extends FakeSecureStorageService {
   final List<String> pushedLocalSyncChangeIds = [];
   final Map<String, int> refreshedBaseVersions = {};
   FutureOr<void> Function(Iterable<String> ids)? onMarkPushing;
   List<LocalSyncChange>? approvedChangesOverride;
   bool autoApprovePending = true;
-
-  @override
-  bool get isOpen => true;
-
-  @override
-  Future<String?> getSetting(String key) async => settings[key];
-
-  @override
-  Future<void> setSetting(String key, String value) async {
-    settings[key] = value;
-  }
-
-  @override
-  Future<List<AccountItem>> loadPendingSyncAccounts() async {
-    return accounts.values
-        .where((item) => item.syncStatus == SyncStatus.pendingPush)
-        .toList();
-  }
-
-  @override
-  Future<AccountItem?> getAccountById(
-    String id, {
-    bool includeDeleted = false,
-  }) async {
-    final item = accounts[id];
-    if (item == null) {
-      return null;
-    }
-    if (!includeDeleted && item.isDeleted) {
-      return null;
-    }
-    return item;
-  }
-
-  @override
-  Future<void> saveAccount(
-    AccountItem account, {
-    bool isSyncMerge = false,
-  }) async {
-    accounts[account.id] = account;
-  }
-
-  @override
-  Future<List<AccountTemplate>> loadDirtyTemplates() async {
-    return templates.values
-        .where(
-          (item) => item.isCustom && item.syncStatus != SyncStatus.synchronized,
-        )
-        .toList();
-  }
-
-  @override
-  Future<List<TotpCredential>> loadDirtyTotpCredentials() async {
-    return totpCredentials.values
-        .where((item) => item.syncStatus != SyncStatus.synchronized)
-        .toList();
-  }
-
-  @override
-  Future<TotpCredential?> getTotpCredentialById(
-    String id, {
-    bool includeDeleted = false,
-  }) async {
-    final item = totpCredentials[id];
-    if (item == null) return null;
-    if (!includeDeleted && item.isDeleted) return null;
-    return item;
-  }
-
-  @override
-  Future<void> saveTotpCredential(
-    TotpCredential credential, {
-    bool isSyncMerge = false,
-  }) async {
-    totpCredentials[credential.id] = credential;
-  }
-
-  @override
-  Future<void> ensurePendingSyncOutboxEntries(String vaultId) async {}
 
   @override
   Future<List<LocalSyncChange>> loadApprovedLocalSyncChanges({
@@ -131,25 +30,20 @@ class _FakeSecureStorageService extends SecureStorageService {
       return approvedChangesOverride!;
     }
     if (!autoApprovePending) return [];
-    return [
-      ...accounts.values
-          .where((item) => item.syncStatus == SyncStatus.pendingPush)
-          .map((item) => _approvedChange(vaultId, item)),
-      ...totpCredentials.values
-          .where((item) => item.syncStatus == SyncStatus.pendingPush)
-          .map((item) => _approvedTotpChange(vaultId, item)),
-    ];
+    return super.loadApprovedLocalSyncChanges(vaultId: vaultId);
   }
 
   @override
   Future<bool> hasOpenLocalSyncChanges(String vaultId) async {
-    return !autoApprovePending &&
-        (accounts.values.any(
-              (item) => item.syncStatus == SyncStatus.pendingPush,
-            ) ||
-            totpCredentials.values.any(
-              (item) => item.syncStatus == SyncStatus.pendingPush,
-            ));
+    if (!autoApprovePending) {
+      return accounts.values.any(
+            (item) => item.syncStatus == SyncStatus.pendingPush,
+          ) ||
+          totpCredentials.values.any(
+            (item) => item.syncStatus == SyncStatus.pendingPush,
+          );
+    }
+    return super.hasOpenLocalSyncChanges(vaultId);
   }
 
   @override
@@ -166,18 +60,6 @@ class _FakeSecureStorageService extends SecureStorageService {
   }
 
   @override
-  Future<void> markLocalSyncChangesFailed(
-    Iterable<String> ids,
-    String errorMessage,
-  ) async {}
-
-  @override
-  Future<void> markLocalSyncChangesConflict(
-    Iterable<String> ids,
-    String errorMessage,
-  ) async {}
-
-  @override
   Future<void> refreshOpenLocalSyncChangeBaseVersion({
     required String vaultId,
     required LocalSyncEntityType entityType,
@@ -188,84 +70,40 @@ class _FakeSecureStorageService extends SecureStorageService {
   }
 }
 
-LocalSyncChange _approvedChange(String vaultId, AccountItem item) {
-  return LocalSyncChange(
-    id: 'change_${item.id}',
-    vaultId: vaultId,
-    entityType: LocalSyncEntityType.account,
-    entityId: item.id,
-    action: item.isDeleted ? LocalSyncAction.delete : LocalSyncAction.update,
-    title: item.name,
-    beforeJson: null,
-    afterJson: null,
-    diff: const {
-      'changed_fields': ['record.updated'],
-    },
-    baseServerVersion: item.serverVersion,
-    status: LocalSyncStatus.approved,
-    createdAt: 1,
-    updatedAt: 1,
-    approvedAt: 1,
+AccountItem _pendingItem() {
+  return baseItem(
+    id: 'account_1',
+    name: 'Local Name',
+    email: 'owner@example.com',
+    password: 'secret',
+    version: 0,
+    syncStatus: SyncStatus.pendingPush,
+    nameHlc: const Hlc(10, 0, 'device_abcdef123456'),
+    emailHlc: const Hlc(10, 1, 'device_abcdef123456'),
+    passwordHlc: const Hlc(10, 2, 'device_abcdef123456'),
   );
 }
 
-LocalSyncChange _approvedTotpChange(String vaultId, TotpCredential item) {
-  return LocalSyncChange(
-    id: 'change_${item.id}',
-    vaultId: vaultId,
-    entityType: LocalSyncEntityType.totpCredential,
-    entityId: item.id,
-    action: item.isDeleted ? LocalSyncAction.delete : LocalSyncAction.update,
-    title: item.displayLabel,
-    beforeJson: null,
-    afterJson: null,
-    diff: const {
-      'changed_fields': ['record.updated'],
-    },
-    baseServerVersion: item.serverVersion,
-    status: LocalSyncStatus.approved,
-    createdAt: 1,
-    updatedAt: 1,
-    approvedAt: 1,
+TotpCredential _pendingTotpCredential({required String config}) {
+  return baseTotpCredential(
+    id: 'totp_1',
+    label: 'Example',
+    config: config,
+    version: 0,
+    syncStatus: SyncStatus.pendingPush,
+    labelHlc: const Hlc(10, 0, 'device_abcdef123456'),
+    configHlc: const Hlc(10, 1, 'device_abcdef123456'),
+    linksHlc: const Hlc(10, 2, 'device_abcdef123456'),
   );
 }
 
-LocalSyncChange _approvedTemplateChange(String vaultId, String templateId) {
-  return LocalSyncChange(
-    id: 'template_change_$templateId',
-    vaultId: vaultId,
-    entityType: LocalSyncEntityType.template,
-    entityId: templateId,
-    action: LocalSyncAction.update,
-    title: 'Template',
-    beforeJson: null,
-    afterJson: null,
-    diff: const {
-      'changed_fields': ['record.updated'],
-    },
-    baseServerVersion: 0,
-    status: LocalSyncStatus.approved,
-    createdAt: 1,
-    updatedAt: 1,
-    approvedAt: 1,
-  );
-}
-
-AccountTemplate _cleanTemplateWithId(String templateId) {
-  return AccountTemplate(
-    templateId: templateId,
-    title: 'Template',
-    subTitle: 'Test template',
-    category: TemplateCategory.login,
-    fields: const [],
-    isCustom: true,
-    syncStatus: SyncStatus.synchronized,
-  );
+String _totpConfig() {
+  return totpConfig(secret: 'JBSWY3DPEHPK3PXP');
 }
 
 IdentityService _identityService() {
   return IdentityService(
-    secureStorage: _MemorySecureKeyValueStore({
+    secureStorage: MemorySecureKeyValueStore({
       'device_id': 'device_abcdef123456',
       'vault_id': 'vault_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
       'private_key':
@@ -273,46 +111,6 @@ IdentityService _identityService() {
       'symmetric_key':
           'sym_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
     }),
-  );
-}
-
-AccountItem _pendingItem() {
-  final data = {'password': 'secret'};
-  final dataHlc = {'password': const Hlc(10, 2, 'device_abcdef123456')};
-
-  return AccountItem(
-    id: 'account_1',
-    name: 'Local Name',
-    email: 'owner@example.com',
-    templateId: 'web_account',
-    data: data,
-    createdAt: 1,
-    nameHlc: const Hlc(10, 0, 'device_abcdef123456'),
-    emailHlc: const Hlc(10, 1, 'device_abcdef123456'),
-    dataHlc: dataHlc,
-    serverVersion: 0,
-    syncStatus: SyncStatus.pendingPush,
-  );
-}
-
-TotpCredential _pendingTotpCredential({required String config}) {
-  return TotpCredential(
-    id: 'totp_1',
-    label: 'Example',
-    config: TotpService.parseConfig(config),
-    linkedAccountIds: const ['account_1'],
-    createdAt: 1,
-    labelHlc: const Hlc(10, 0, 'device_abcdef123456'),
-    configHlc: const Hlc(10, 1, 'device_abcdef123456'),
-    linksHlc: const Hlc(10, 2, 'device_abcdef123456'),
-    serverVersion: 0,
-    syncStatus: SyncStatus.pendingPush,
-  );
-}
-
-String _totpConfig({String account = 'owner@example.com'}) {
-  return TotpService.encodeConfig(
-    'otpauth://totp/Example:$account?secret=JBSWY3DPEHPK3PXP&issuer=Example',
   );
 }
 
@@ -819,10 +617,10 @@ void main() {
       final account = _pendingItem();
       final storage = _FakeSecureStorageService()
         ..accounts[account.id] = account
-        ..templates[account.id] = _cleanTemplateWithId(account.id)
+        ..templates[account.id] = cleanTemplateWithId(account.id)
         ..approvedChangesOverride = [
-          _approvedChange(vaultId, account),
-          _approvedTemplateChange(vaultId, account.id),
+          approvedChange(vaultId, account),
+          approvedTemplateChange(vaultId, cleanTemplateWithId(account.id)),
         ];
       final server = await _SyncProbeServer.start(
         postBody: jsonEncode({

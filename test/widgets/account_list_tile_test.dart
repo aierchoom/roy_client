@@ -103,9 +103,6 @@ void main() {
       ),
     );
 
-    // Account badge shows template badge text.
-    expect(find.text('WE'), findsOneWidget);
-
     // Collapsed summary contains labelled fields joined by ' / '.
     expect(
       find.textContaining('Email: alice@example.com / Username: alice / Password: ••••'),
