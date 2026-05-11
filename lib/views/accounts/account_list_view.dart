@@ -14,6 +14,7 @@ import '../../theme/app_design_tokens.dart';
 import '../../theme/app_layout.dart';
 import '../../widgets/adaptive_page.dart';
 import '../../widgets/app_page_header.dart';
+import '../../widgets/inbox/inbox_hero_metrics.dart';
 import '../../widgets/green_add_button.dart';
 import '../../widgets/account_list_tile.dart';
 import 'account_edit_view.dart';
@@ -1122,50 +1123,6 @@ class _AccountGroup {
   const _AccountGroup({required this.template, required this.accounts});
 }
 
-class _StatChip extends StatelessWidget {
-  final String value;
-  final String label;
-  final Color onColor;
-
-  const _StatChip({
-    required this.value,
-    required this.label,
-    required this.onColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: onColor.withAlpha(AppAlphas.tint),
-        borderRadius: BorderRadius.circular(AppRadii.panel),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            value,
-            style: TextStyle(
-              fontWeight: FontWeight.w900,
-              color: onColor,
-              fontSize: 14,
-            ),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              color: onColor.withAlpha(190),
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class _GroupCountChip extends StatelessWidget {
   final int count;
