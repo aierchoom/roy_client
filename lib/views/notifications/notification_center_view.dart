@@ -171,6 +171,7 @@ class _NotificationCenterViewState extends State<NotificationCenterView> {
     EnhancedAppProvider appProvider,
   ) {
     final accent = Theme.of(context).colorScheme.primary;
+    final vt = Theme.of(context).extension<AppVisualTokens>()!;
     final syncCount = appProvider.localSyncChanges.length;
     final conflictCount = appProvider.conflictCount;
 
@@ -189,10 +190,10 @@ class _NotificationCenterViewState extends State<NotificationCenterView> {
           MetricData(value: '${provider.unreadCount}', label: context.text('未读', 'Unread'), color: accent),
         ];
         if (healthIssues > 0) {
-          metrics.add(MetricData(value: '$healthIssues', label: context.text('体检', 'Health'), color: Colors.orange));
+          metrics.add(MetricData(value: '$healthIssues', label: context.text('体检', 'Health'), color: vt.warning));
         }
         if (conflictCount > 0) {
-          metrics.add(MetricData(value: '$conflictCount', label: context.text('冲突', 'Conflicts'), color: Colors.red));
+          metrics.add(MetricData(value: '$conflictCount', label: context.text('冲突', 'Conflicts'), color: vt.warning));
         }
         if (syncCount > 0) {
           metrics.add(MetricData(value: '$syncCount', label: context.text('待同步', 'Sync'), color: accent));
@@ -373,11 +374,12 @@ class _NotificationCenterViewState extends State<NotificationCenterView> {
   }
 
   static Color _gradeColor(VaultHealthGrade grade) {
+    final vt = AppVisualTokens.fromBrightness(WidgetsBinding.instance.platformDispatcher.platformBrightness);
     return switch (grade) {
-      VaultHealthGrade.excellent => Colors.green,
-      VaultHealthGrade.good => Colors.lightGreen,
-      VaultHealthGrade.warning => Colors.orange,
-      VaultHealthGrade.critical => Colors.red,
+      VaultHealthGrade.excellent => vt.success,
+      VaultHealthGrade.good => vt.success,
+      VaultHealthGrade.warning => vt.warning,
+      VaultHealthGrade.critical => vt.warning,
     };
   }
 
@@ -407,6 +409,8 @@ class _NotificationCard extends StatelessWidget {
     switch (notification.type) {
       case AppNotificationType.passwordExpiry:
         return Icons.lock_clock_outlined;
+      case AppNotificationType.weakPassword:
+        return Icons.shield_outlined;
     }
   }
 
@@ -414,6 +418,8 @@ class _NotificationCard extends StatelessWidget {
     switch (notification.type) {
       case AppNotificationType.passwordExpiry:
         return theme.colorScheme.error;
+      case AppNotificationType.weakPassword:
+        return AppVisualTokens.fromBrightness(theme.brightness).warning;
     }
   }
 

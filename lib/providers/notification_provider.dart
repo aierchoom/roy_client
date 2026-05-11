@@ -62,6 +62,10 @@ class NotificationProvider extends ChangeNotifier {
         templates: templates,
         expiryDays: _expiryDays,
       );
+      await _notificationService.generateWeakPasswordNotifications(
+        accounts: accounts,
+        templates: templates,
+      );
       await loadNotifications();
     } catch (e) {
       AppLogger.d('Failed to generate notifications: $e');

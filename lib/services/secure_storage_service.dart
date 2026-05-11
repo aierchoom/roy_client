@@ -35,7 +35,7 @@ class SecureStorageService {
   static const String _databaseName = 'secret_roy_vault.db';
   static const String _encryptedDatabaseName = 'secret_roy_vault.db.enc';
   static const String _workingDatabaseName = 'secret_roy_vault.runtime.db';
-  static const int _databaseVersion = 10;
+  static const int _databaseVersion = 11;
 
   DatabaseFileCipher? _databaseCipher;
 
@@ -323,6 +323,8 @@ class SecureStorageService {
         'sync_status': account.syncStatus.index,
         'is_deleted': account.isDeleted ? 1 : 0,
         'delete_hlc': account.deleteHlc?.toString(),
+        'is_pinned': account.isPinned ? 1 : 0,
+        'pin_hlc': account.pinHlc?.toString(),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
 
@@ -614,7 +616,9 @@ class SecureStorageService {
         server_version INTEGER DEFAULT 0,
         sync_status INTEGER DEFAULT 1,
         is_deleted INTEGER DEFAULT 0,
-        delete_hlc TEXT
+        delete_hlc TEXT,
+        is_pinned INTEGER DEFAULT 0,
+        pin_hlc TEXT
       )
     ''');
 
@@ -793,6 +797,13 @@ class SecureStorageService {
       await db.execute('ALTER TABLE templates ADD COLUMN modified_at INTEGER');
       await db.execute('ALTER TABLE templates ADD COLUMN last_edited_by TEXT');
     }
+
+    if (oldVersion < 11) {
+      await db.execute(
+        'ALTER TABLE accounts ADD COLUMN is_pinned INTEGER DEFAULT 0',
+      );
+      await db.execute('ALTER TABLE accounts ADD COLUMN pin_hlc TEXT');
+    }
   }
 
   Future<void> _createTotpCredentialsTable(Database db) async {
@@ -961,6 +972,7 @@ class SecureStorageService {
         if (old != null) {
           final nHlc = account.name != old.name ? newStamp : old.nameHlc;
           final eHlc = account.email != old.email ? newStamp : old.emailHlc;
+          final pHlc = account.isPinned != old.isPinned ? newStamp : old.pinHlc;
 
           final Map<String, Hlc> dHlc = Map.from(old.dataHlc);
           account.data.forEach((k, v) {
@@ -973,6 +985,7 @@ class SecureStorageService {
             nameHlc: nHlc,
             emailHlc: eHlc,
             dataHlc: dHlc,
+            pinHlc: pHlc,
             fieldMeta: newFieldMeta,
             templateVersion: newTemplateVersion,
             syncStatus: SyncStatus.pendingPush,
@@ -1020,6 +1033,8 @@ class SecureStorageService {
       'sync_status': itemToSave.syncStatus.index,
       'is_deleted': itemToSave.isDeleted ? 1 : 0,
       'delete_hlc': itemToSave.deleteHlc?.toString(),
+      'is_pinned': itemToSave.isPinned ? 1 : 0,
+      'pin_hlc': itemToSave.pinHlc?.toString(),
     }, conflictAlgorithm: ConflictAlgorithm.replace);
 
     await _persistAfterMutation();
@@ -1059,6 +1074,36 @@ class SecureStorageService {
       StorageChangeEvent(
         type: StorageItemType.account,
         action: StorageAction.delete,
+        id: id,
+      ),
+    );
+  }
+
+  Future<void> togglePin(String id) async {
+    if (!isOpen) return;
+    final rows = await _query('accounts', where: 'id = ?', whereArgs: [id]);
+    if (rows.isEmpty) return;
+    final account = _mapToAccountItem(rows.first);
+    if (account == null) return;
+
+    final newPinned = !account.isPinned;
+    final stamp = _syncClock!.send();
+    await _database!.update(
+      'accounts',
+      {
+        'is_pinned': newPinned ? 1 : 0,
+        'pin_hlc': stamp.toString(),
+        'sync_status': SyncStatus.pendingPush.index,
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+
+    await _persistAfterMutation();
+    _notifyChange(
+      StorageChangeEvent(
+        type: StorageItemType.account,
+        action: StorageAction.update,
         id: id,
       ),
     );
@@ -1512,6 +1557,10 @@ class SecureStorageService {
         deleteHlc: row['delete_hlc'] != null
             ? Hlc.parse(row['delete_hlc'])
             : null,
+        isPinned: row['is_pinned'] == 1,
+        pinHlc: row['pin_hlc'] != null
+            ? Hlc.parse(row['pin_hlc'])
+            : null,
       );
     } catch (e) {
       AppLogger.d('Skipping unreadable account row: $e');
@@ -1542,6 +1591,8 @@ class SecureStorageService {
       'sync_status': item.syncStatus.index,
       'is_deleted': item.isDeleted ? 1 : 0,
       'delete_hlc': item.deleteHlc?.toString(),
+      'is_pinned': item.isPinned ? 1 : 0,
+      'pin_hlc': item.pinHlc?.toString(),
     };
   }
 
@@ -2721,7 +2772,7 @@ class StorageChangeEvent {
   StorageChangeEvent({required this.type, required this.action, this.id});
 }
 
-enum StorageAction { save, delete }
+enum StorageAction { save, update, delete }
 
 class StorageOpenException implements Exception {
   final String originalError;

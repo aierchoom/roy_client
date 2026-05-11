@@ -1,4 +1,4 @@
-enum AppNotificationType { passwordExpiry }
+enum AppNotificationType { passwordExpiry, weakPassword }
 
 class AppNotification {
   final String id;

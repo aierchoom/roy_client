@@ -1,5 +1,3 @@
-﻿import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -14,7 +12,6 @@ import '../../theme/app_design_tokens.dart';
 import '../../theme/app_layout.dart';
 import '../../utils/relative_time_formatter.dart';
 import '../../widgets/adaptive_page.dart';
-import '../../widgets/app_page_header.dart';
 import '../../widgets/app_selectable_scrollable.dart';
 
 import 'template_edit_view.dart';
@@ -60,7 +57,7 @@ class _TemplateListBodyState extends State<TemplateListBody> {
       final shouldReload = await showDialog<bool>(
         context: context,
         builder: (dialogContext) => AlertDialog(
-          title: Text(context.text( '模板已被更新', 'Template Updated')),
+          title: Text(context.text('模板已被更新', 'Template Updated')),
           content: Text(
             context.text(
               '该模板已被同步更新，你的本地编辑已过期。是否重载最新版本后继续编辑？',
@@ -74,7 +71,7 @@ class _TemplateListBodyState extends State<TemplateListBody> {
             ),
             FilledButton(
               onPressed: () => Navigator.pop(dialogContext, true),
-              child: Text(context.text( '重载', 'Reload')),
+              child: Text(context.text('重载', 'Reload')),
             ),
           ],
         ),
@@ -150,7 +147,7 @@ class _TemplateListBodyState extends State<TemplateListBody> {
       builder: (dialogContext) => AlertDialog(
         title: const Text('删除模板'),
         content: Text(
-          '确认删除“${template.title}”吗？',
+          '确认删除"${template.title}"吗？',
         ),
         actions: [
           TextButton(
@@ -378,35 +375,112 @@ class _TemplateListBodyState extends State<TemplateListBody> {
         .map((account) => account.templateId)
         .toSet()
         .length;
-    return AppPageHeader(
-      icon: Icons.view_list_outlined,
-      title: context.text( '模板中心', 'Template Hub'),
-      subtitle: context.text('为账户页统一设计字段结构与录入体验',
-        'Design field structures and editing experiences for account pages',
+    final heroEdge = theme.colorScheme.primary.withAlpha(42);
+    final heroSurface = AppSurfaces.soft(
+      theme.colorScheme,
+      tint: theme.colorScheme.primary,
+      tintAlpha: 12,
+    );
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.xl),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Color.alphaBlend(
+              theme.colorScheme.primary.withAlpha(22),
+              heroSurface,
+            ),
+            Color.alphaBlend(
+              theme.colorScheme.tertiary.withAlpha(16),
+              theme.colorScheme.tertiaryContainer,
+            ),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(AppRadii.xxl),
+        border: Border.all(color: heroEdge),
+        boxShadow: AppShadows.card(theme, depth: 1.05),
       ),
-      metrics: [
-        _buildToneChip(
-          context,
-          icon: Icons.dashboard_customize_outlined,
-          label:
-              '$totalTemplates ${context.text( '个模板', 'Templates')}',
-          tint: theme.colorScheme.primary,
-        ),
-        _buildToneChip(
-          context,
-          icon: Icons.tune_outlined,
-          label:
-              '$customTemplates ${context.text( '个自定义', 'Custom')}',
-          tint: theme.colorScheme.primary,
-        ),
-        _buildToneChip(
-          context,
-          icon: Icons.inventory_2_outlined,
-          label:
-              '$usedTemplates ${context.text( '个在用', 'In Use')}',
-          tint: theme.colorScheme.primary,
-        ),
-      ],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surface.withAlpha(228),
+                  borderRadius: BorderRadius.circular(AppRadii.panel),
+                  border: Border.all(color: heroEdge.withAlpha(90)),
+                  boxShadow: AppShadows.card(theme, depth: 0.45),
+                ),
+                child: Icon(
+                  Icons.view_list_outlined,
+                  size: 28,
+                  color: theme.colorScheme.primary,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      context.text('模板中心', 'Template Hub'),
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: theme.colorScheme.onPrimaryContainer,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      context.text(
+                        '为账户页统一设计字段结构与录入体验',
+                        'Design field structures and editing experiences for account pages',
+                      ),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onPrimaryContainer.withAlpha(
+                          AppAlphas.emphasis,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              _buildToneChip(
+                context,
+                icon: Icons.dashboard_customize_outlined,
+                label:
+                    '$totalTemplates ${context.text('个模板', 'Templates')}',
+                tint: theme.colorScheme.onPrimaryContainer,
+              ),
+              _buildToneChip(
+                context,
+                icon: Icons.tune_outlined,
+                label:
+                    '$customTemplates ${context.text('个自定义', 'Custom')}',
+                tint: theme.colorScheme.onPrimaryContainer,
+              ),
+              _buildToneChip(
+                context,
+                icon: Icons.inventory_2_outlined,
+                label:
+                    '$usedTemplates ${context.text('个在用', 'In Use')}',
+                tint: theme.colorScheme.onPrimaryContainer,
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -416,61 +490,62 @@ class _TemplateListBodyState extends State<TemplateListBody> {
     required bool isCustomSection,
   }) {
     final provider = context.watch<EnhancedAppProvider>();
-    final theme = Theme.of(context);
 
     if (templates.isEmpty) {
+      final theme = Theme.of(context);
       final accent = isCustomSection
           ? theme.colorScheme.primary
           : theme.colorScheme.secondary;
 
       return Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(AppSpacing.xl),
+        padding: const EdgeInsets.all(AppSpacing.xxl),
         decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
-          borderRadius: BorderRadius.circular(AppRadii.panel),
-          border: Border.all(
-            color: theme.colorScheme.outlineVariant.withAlpha(60),
-          ),
-          boxShadow: AppShadows.card(theme, depth: 0.3),
+          color: AppSurfaces.soft(theme.colorScheme, tint: accent, tintAlpha: 8),
+          borderRadius: BorderRadius.circular(AppRadii.dialog),
+          border: Border.all(color: accent.withAlpha(34)),
+          boxShadow: AppShadows.card(theme, depth: 0.64),
         ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              width: 56,
-              height: 56,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
-                color: accent.withAlpha(14),
-                shape: BoxShape.circle,
+                color: AppSurfaces.soft(
+                  theme.colorScheme,
+                  tint: accent,
+                  tintAlpha: 14,
+                ),
+                borderRadius: BorderRadius.circular(AppRadii.button),
+                border: Border.all(color: accent.withAlpha(44)),
               ),
               alignment: Alignment.center,
               child: Icon(
                 Icons.layers_clear_outlined,
-                size: 28,
-                color: accent.withAlpha(180),
+                size: 24,
+                color: accent,
               ),
             ),
-            const SizedBox(height: AppSpacing.lg),
+            const SizedBox(height: 12),
             Text(
               isCustomSection
                   ? '还没有自定义模板'
                   : '当前没有可展示的内置模板',
               style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w600,
               ),
-              textAlign: TextAlign.center,
             ),
-            const SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: 6),
             Text(
               isCustomSection
                   ? '创建后会立即出现在这里，作为可复用的模板卡片。'
                   : '内置模板会自动展示在这里。',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
-                height: 1.4,
+                height: 1.3,
               ),
-              textAlign: TextAlign.center,
             ),
           ],
         ),
@@ -479,46 +554,40 @@ class _TemplateListBodyState extends State<TemplateListBody> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final layout = AppLayout.of(context);
-        final crossAxisCount = layout.isCompact ? 1 : 2;
+        const spacing = 16.0;
+        final width = constraints.maxWidth;
+        final columns = width >= 1180
+            ? 3
+            : width >= 760
+            ? 2
+            : 1;
+        final itemWidth = columns == 1
+            ? width
+            : (width - (spacing * (columns - 1))) / columns;
 
-        final cards = [
-          for (final template in templates)
-            _TemplateCard(
-              template: template,
-              usageCount: _usageCount(provider, template),
-              onOpen: template.isCustom
-                  ? () => _openEditor(context, initial: template)
-                  : null,
-              onExport: template.isCustom
-                  ? () => _exportSingle(context, template)
-                  : null,
-              onDelete: template.isCustom
-                  ? () => _deleteTemplate(context, template)
-                  : null,
-            ),
-        ];
-
-        return crossAxisCount == 1
-            ? Column(
-                children: [
-                  for (var i = 0; i < cards.length; i++) ...[
-                    cards[i],
-                    if (i < cards.length - 1)
-                      const SizedBox(height: AppSpacing.md),
-                  ],
-                ],
-              )
-            : GridView.count(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                crossAxisCount: crossAxisCount,
-                childAspectRatio: 1.65,
-                padding: const EdgeInsets.all(AppSpacing.xl),
-                crossAxisSpacing: AppSpacing.xl,
-                mainAxisSpacing: AppSpacing.xl,
-                children: cards,
-              );
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: [
+            for (final template in templates)
+              SizedBox(
+                width: itemWidth,
+                child: _TemplateCard(
+                  template: template,
+                  usageCount: _usageCount(provider, template),
+                  onOpen: template.isCustom
+                      ? () => _openEditor(context, initial: template)
+                      : null,
+                  onExport: template.isCustom
+                      ? () => _exportSingle(context, template)
+                      : null,
+                  onDelete: template.isCustom
+                      ? () => _deleteTemplate(context, template)
+                      : null,
+                ),
+              ),
+          ],
+        );
       },
     );
   }
@@ -531,78 +600,121 @@ class _TemplateListBodyState extends State<TemplateListBody> {
         .where((template) => !template.isCustom)
         .toList();
     final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
 
-    return AppSelectableScrollable(
-      controller: _scrollController,
-      child: ListView(
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color.alphaBlend(
+              theme.colorScheme.primary.withAlpha(10),
+              theme.scaffoldBackgroundColor,
+            ),
+            theme.scaffoldBackgroundColor,
+          ],
+        ),
+      ),
+      child: AppSelectableScrollable(
         controller: _scrollController,
-        padding: const EdgeInsets.fromLTRB(0, 16, 0, 120),
-        children: [
+        child: ListView(
+          controller: _scrollController,
+          padding: const EdgeInsets.fromLTRB(8, 16, 8, 120),
+          children: [
             _buildHeroCard(context, provider),
             const SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 8,
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                FilledButton.icon(
+                  onPressed: () => _openEditor(context),
+                  icon: const Icon(Icons.add, size: 18),
+                  label: Text(l10n.addTemplate),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () => _openImportDialog(context),
+                  icon: const Icon(Icons.download_outlined, size: 18),
+                  label: Text(l10n.importTemplate),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () => _openBatchExportDialog(context),
+                  icon: const Icon(Icons.upload_outlined, size: 18),
+                  label: Text(l10n.exportTemplate),
+                ),
+              ],
+            ),
+            const SizedBox(height: 22),
+            Container(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+              decoration: BoxDecoration(
+                color: AppSurfaces.soft(
+                  theme.colorScheme,
+                  tint: theme.colorScheme.primary,
+                  tintAlpha: 8,
+                ),
+                borderRadius: BorderRadius.circular(AppRadii.dialog),
+                border: Border.all(
+                  color: theme.colorScheme.primary.withAlpha(30),
+                ),
+                boxShadow: AppShadows.card(theme, depth: 0.56),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  FilledButton.icon(
-                    onPressed: () => _openEditor(context),
-                    icon: const Icon(Icons.add, size: 18),
-                    label: Text(l10n.addTemplate),
+                  _buildSectionHeader(
+                    context,
+                    title: '自定义模板',
+                    subtitle:
+                        '按你的使用习惯组织字段，做成真正可复用的模板卡片。',
                   ),
-                  OutlinedButton.icon(
-                    onPressed: () => _openImportDialog(context),
-                    icon: const Icon(Icons.download_outlined, size: 18),
-                    label: Text(l10n.importTemplate),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: () => _openBatchExportDialog(context),
-                    icon: const Icon(Icons.upload_outlined, size: 18),
-                    label: Text(l10n.exportTemplate),
+                  const SizedBox(height: 14),
+                  _buildTemplateGrid(
+                    context,
+                    templates: customTemplates,
+                    isCustomSection: true,
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 22),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildSectionHeader(
-                  context,
-                  title: '自定义模板',
-                  subtitle:
-                      '按你的使用习惯组织字段，做成真正可复用的模板卡片。',
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+              decoration: BoxDecoration(
+                color: AppSurfaces.soft(
+                  theme.colorScheme,
+                  tint: theme.colorScheme.secondary,
+                  tintAlpha: 8,
                 ),
-                const SizedBox(height: AppSpacing.md),
-                _buildTemplateGrid(
-                  context,
-                  templates: customTemplates,
-                  isCustomSection: true,
+                borderRadius: BorderRadius.circular(AppRadii.dialog),
+                border: Border.all(
+                  color: theme.colorScheme.secondary.withAlpha(30),
                 ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.xl),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildSectionHeader(
-                  context,
-                  title: '内置模板',
-                  subtitle:
-                      '常见账户与身份信息的默认模板，可直接作为起点使用。',
-                ),
-                const SizedBox(height: AppSpacing.md),
-                _buildTemplateGrid(
-                  context,
-                  templates: builtinTemplates,
-                  isCustomSection: false,
-                ),
-              ],
+                boxShadow: AppShadows.card(theme, depth: 0.56),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildSectionHeader(
+                    context,
+                    title: '内置模板',
+                    subtitle:
+                        '常见账户与身份信息的默认模板，可直接作为起点使用。',
+                  ),
+                  const SizedBox(height: 14),
+                  _buildTemplateGrid(
+                    context,
+                    templates: builtinTemplates,
+                    isCustomSection: false,
+                  ),
+                ],
+              ),
             ),
           ],
         ),
-      );
+      ),
+    );
   }
 }
 
@@ -624,90 +736,186 @@ class _TemplateCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDesktop = AppLayout.isExpanded(context);
+    final edgeColor = template.isCustom
+        ? theme.colorScheme.primary.withAlpha(34)
+        : theme.colorScheme.secondary.withAlpha(34);
     final accent = template.isCustom
         ? theme.colorScheme.primary
         : theme.colorScheme.secondary;
+    final compactHeader = !isDesktop;
 
-    return Material(
-      color: Colors.transparent,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          InkWell(
-            onTap: onOpen,
-            borderRadius: BorderRadius.circular(AppRadii.panel),
-            child: Container(
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surface,
-                borderRadius: BorderRadius.circular(AppRadii.panel),
-                border: Border.all(
-                  color: theme.colorScheme.outlineVariant.withAlpha(50),
-                ),
-                boxShadow: AppShadows.card(theme, depth: 0.4),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.lg),
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final isCompact = constraints.maxWidth < 720;
-                    final content = _TemplateCardContent(
+    return Stack(
+      children: [
+        Container(
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: AppSurfaces.soft(theme.colorScheme, tint: accent, tintAlpha: 6),
+            borderRadius: BorderRadius.circular(AppRadii.xl),
+            border: Border.all(color: edgeColor),
+            boxShadow: AppShadows.card(theme, depth: 0.7),
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onOpen,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: EdgeInsets.all(isDesktop ? AppSpacing.xl : AppSpacing.lg),
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Color.alphaBlend(
+                            accent.withAlpha(18),
+                            theme.colorScheme.primaryContainer,
+                          ),
+                          Color.alphaBlend(
+                            theme.colorScheme.tertiary.withAlpha(14),
+                            theme.colorScheme.tertiaryContainer,
+                          ),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      border: Border(bottom: BorderSide(color: edgeColor)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (template.isCustom)
+                          Transform.rotate(
+                            angle: -0.1,
+                            child: Container(
+                              width: isDesktop ? 44 : 38,
+                              height: isDesktop ? 44 : 38,
+                              decoration: BoxDecoration(
+                                color: accent.withAlpha(255),
+                                borderRadius: BorderRadius.circular(AppRadii.sm),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: accent.withAlpha(100),
+                                    blurRadius: 10,
+                                    offset: const Offset(-2, 4),
+                                  ),
+                                ],
+                                border: Border.all(
+                                  color: Colors.white,
+                                  width: 2,
+                                ),
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                template.badgeText,
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.white,
+                                  fontSize: isDesktop ? 15 : 13,
+                                ),
+                              ),
+                            ),
+                          )
+                        else
+                          Transform.rotate(
+                            angle: -0.1,
+                            child: Container(
+                              width: isDesktop ? 44 : 38,
+                              height: isDesktop ? 44 : 38,
+                              decoration: BoxDecoration(
+                                color: AppSurfaces.soft(
+                                  theme.colorScheme,
+                                  tint: accent,
+                                  tintAlpha: 12,
+                                ),
+                                borderRadius: BorderRadius.circular(AppRadii.sm),
+                                border: Border.all(
+                                  color: accent.withAlpha(70),
+                                  width: 1.4,
+                                ),
+                                boxShadow: AppShadows.card(theme, depth: 0.34),
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                template.badgeText,
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w900,
+                                  color: accent,
+                                  fontSize: isDesktop ? 15 : 13,
+                                ),
+                              ),
+                            ),
+                          ),
+                        SizedBox(height: isDesktop ? AppSpacing.lg : AppSpacing.md),
+                        Padding(
+                          padding: EdgeInsets.only(
+                            right: template.isCustom
+                                ? (compactHeader ? 0 : 112)
+                                : (compactHeader ? 0 : 66),
+                          ),
+                          child: Text.rich(
+                            TextSpan(
+                              children: [
+                                TextSpan(
+                                  text: context.text('名称：', 'Name: '),
+                                  style: const TextStyle(fontWeight: FontWeight.w900),
+                                ),
+                                TextSpan(
+                                  text: template.title,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              color: theme.colorScheme.onPrimaryContainer,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${context.text('模板描述：', 'Description: ')}${template.subTitle.isEmpty ? context.text('暂无模板描述', 'No description') : template.subTitle}',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onPrimaryContainer
+                                .withAlpha(AppAlphas.emphasis),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding: EdgeInsets.all(isDesktop ? AppSpacing.xl : AppSpacing.lg),
+                    child: _TemplateCardContent(
                       template: template,
                       usageCount: usageCount,
                       accent: accent,
                       onOpen: onOpen,
                       onExport: onExport,
                       onDelete: onDelete,
-                      compact: isCompact,
-                    );
-                    if (isCompact) return content;
-                    return Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _TemplateBadge(template: template, accent: accent),
-                        const SizedBox(width: AppSpacing.lg),
-                        Expanded(child: content),
-                      ],
-                    );
-                  },
-                ),
+                      compact: compactHeader,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
-          if (template.isCustom)
-            Positioned(
-              top: 12,
-              right: -2,
-              child: Transform.rotate(
-                angle: math.pi / 4,
-                child: Container(
-                  width: 48,
-                  height: 16,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primary,
-                    boxShadow: [
-                      BoxShadow(
-                        color: theme.colorScheme.primary.withAlpha(60),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Text(
-                    '自定义',
-                    style: TextStyle(
-                      color: theme.colorScheme.onPrimary,
-                      fontSize: 8,
-                      fontWeight: FontWeight.w900,
-                      height: 1,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
+        ),
+        Positioned(
+          top: template.isCustom ? (compactHeader ? 10 : 12) : 14,
+          right: template.isCustom ? (compactHeader ? -6 : -8) : 14,
+          child: _TemplateStatusBadge(
+            template: template,
+            accent: accent,
+            compact: compactHeader,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -735,215 +943,147 @@ class _TemplateCardContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    final header = Column(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
+        Wrap(
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.sm,
           children: [
-            Expanded(
-              child: Text(
-                template.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  color: theme.colorScheme.onSurface,
-                  letterSpacing: -0.2,
-                ),
-              ),
+            _InfoChip(
+              icon: Icons.tune_outlined,
+              label: '${template.fields.length} ${context.text('字段', 'fields')}',
+              tint: accent,
             ),
-            const SizedBox(width: AppSpacing.sm),
-            _TemplateTypeChip(template: template, accent: accent),
+            _InfoChip(
+              icon: Icons.inventory_2_outlined,
+              label: '${context.text('已使用', 'Used')} $usageCount ${context.text('次', 'times')}',
+              tint: accent,
+            ),
+            if (template.lastEditedAt != null || template.modifiedAt != null)
+              _InfoChip(
+                icon: Icons.history,
+                label: RelativeTimeFormatter.format(
+                  context,
+                  template.lastEditedAt ?? template.modifiedAt,
+                ),
+                tint: accent,
+              ),
           ],
         ),
-        const SizedBox(height: AppSpacing.xs),
+        const SizedBox(height: AppSpacing.lg),
         Text(
-          template.subTitle.isEmpty ? '暂无模板描述' : template.subTitle,
-          maxLines: compact ? 2 : 1,
-          overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.bodySmall?.copyWith(
+          context.text('字段预览', 'Field Preview'),
+          style: theme.textTheme.labelLarge?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
-            height: 1.4,
+            fontWeight: FontWeight.w700,
           ),
         ),
-      ],
-    );
-
-    final meta = Wrap(
-      spacing: AppSpacing.sm,
-      runSpacing: AppSpacing.sm,
-      children: [
-        _InfoChip(
-          icon: Icons.tune_outlined,
-          label: '${template.fields.length} 字段',
-          tint: accent,
-        ),
-        if (usageCount > 0)
-          _InfoChip(
-            icon: Icons.inventory_2_outlined,
-            label: '已使用 $usageCount 次',
-            tint: accent,
-          ),
-        if (template.lastEditedAt != null || template.modifiedAt != null)
-          _InfoChip(
-            icon: Icons.history,
-            label: RelativeTimeFormatter.format(
-              context,
-              template.lastEditedAt ?? template.modifiedAt,
-            ),
-            tint: accent,
-          ),
-      ],
-    );
-
-    final actions = template.isCustom
-        ? Row(
-            mainAxisSize: MainAxisSize.min,
+        const SizedBox(height: AppSpacing.sm),
+        _FieldPreviewTags(template: template, accent: accent),
+        if (template.isCustom) ...[
+          const SizedBox(height: AppSpacing.xl),
+          Row(
             children: [
-              _IconActionButton(
-                icon: Icons.edit_outlined,
-                tooltip: '编辑模板',
-                onTap: onOpen,
-                accent: accent,
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: onOpen,
+                  icon: const Icon(Icons.edit_outlined),
+                  label: Text(context.text('编辑', 'Edit')),
+                ),
               ),
-              const SizedBox(width: AppSpacing.xs),
+              const SizedBox(width: AppSpacing.sm),
               _IconActionButton(
                 icon: Icons.upload_outlined,
-                tooltip: '导出模板',
+                tooltip: context.text('导出模板', 'Export Template'),
                 onTap: onExport,
                 accent: accent,
               ),
               const SizedBox(width: AppSpacing.xs),
               _IconActionButton(
                 icon: Icons.delete_outline,
-                tooltip: '删除模板',
+                tooltip: context.text('删除模板', 'Delete Template'),
                 onTap: onDelete,
                 accent: accent,
                 isDestructive: true,
               ),
             ],
-          )
-        : const SizedBox.shrink();
-
-    final bottomActions = template.isCustom
-        ? actions
-        : _BuiltinTemplateFooter(accent: accent);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (compact) ...[
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _TemplateBadge(template: template, accent: accent),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(child: header),
-            ],
           ),
-        ] else
-          header,
-        const SizedBox(height: AppSpacing.lg),
-        if (compact) ...[
-          meta,
-          const SizedBox(height: AppSpacing.md),
-          _FieldPreviewTags(template: template, accent: accent),
-          const SizedBox(height: AppSpacing.lg),
-          bottomActions,
         ] else ...[
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    meta,
-                    const SizedBox(height: AppSpacing.md),
-                    _FieldPreviewTags(
-                      template: template,
-                      accent: accent,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: AppSpacing.xl),
-              Padding(
-                padding: const EdgeInsets.only(top: 2),
-                child: bottomActions,
-              ),
-            ],
-          ),
+          const SizedBox(height: AppSpacing.xl),
+          _BuiltinTemplateFooter(accent: accent),
         ],
       ],
     );
   }
 }
 
-class _TemplateBadge extends StatelessWidget {
+class _TemplateStatusBadge extends StatelessWidget {
   final AccountTemplate template;
   final Color accent;
+  final bool compact;
 
-  const _TemplateBadge({required this.template, required this.accent});
+  const _TemplateStatusBadge({
+    required this.template,
+    required this.accent,
+    this.compact = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Container(
-      width: 52,
-      height: 52,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            accent.withAlpha(40),
-            accent.withAlpha(80),
-          ],
+    if (!template.isCustom) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: accent.withAlpha(15),
+          borderRadius: BorderRadius.circular(AppRadii.sm),
+          border: Border.all(color: accent.withAlpha(50)),
         ),
-        shape: BoxShape.circle,
-        border: Border.all(color: accent.withAlpha(50)),
+        child: Text(
+          context.text('内置模板', 'Built-in'),
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: accent,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      );
+    }
+
+    final badge = Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 12 : 14,
+        vertical: compact ? 5 : 6,
+      ),
+      decoration: BoxDecoration(
+        color: accent.withAlpha(240),
+        borderRadius: BorderRadius.circular(4),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(compact ? 38 : 60),
+            blurRadius: compact ? 6 : 8,
+            offset: Offset(2, compact ? 3 : 4),
+          ),
+        ],
+        border: Border.all(
+          color: Colors.white.withAlpha(compact ? 110 : 120),
+          width: compact ? 1.2 : 1.5,
+        ),
       ),
       child: Text(
-        template.badgeText,
-        style: theme.textTheme.titleMedium?.copyWith(
-          color: accent,
-          fontWeight: FontWeight.w900,
-          letterSpacing: 0.5,
-        ),
-      ),
-    );
-  }
-}
-
-class _TemplateTypeChip extends StatelessWidget {
-  final AccountTemplate template;
-  final Color accent;
-
-  const _TemplateTypeChip({required this.template, required this.accent});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: accent.withAlpha(18),
-        borderRadius: BorderRadius.circular(AppRadii.pill),
-        border: Border.all(color: accent.withAlpha(40)),
-      ),
-      child: Text(
-        template.isCustom ? '自定义' : '内置',
+        'CUSTOM / ${context.text('自定义', 'Custom')}',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
         style: theme.textTheme.labelSmall?.copyWith(
-          color: accent,
-          fontWeight: FontWeight.w800,
-          fontSize: 10,
-          letterSpacing: 0.3,
+          color: Colors.white,
+          fontWeight: FontWeight.w900,
+          letterSpacing: compact ? 0.4 : 0.8,
         ),
       ),
     );
+
+    return Transform.rotate(angle: compact ? 0.12 : 0.15, child: badge);
   }
 }
 
@@ -953,44 +1093,77 @@ class _FieldPreviewTags extends StatelessWidget {
 
   const _FieldPreviewTags({required this.template, required this.accent});
 
+  IconData _fieldTypeIcon(AccountFieldType type) {
+    switch (type) {
+      case AccountFieldType.text:
+        return Icons.text_fields_rounded;
+      case AccountFieldType.password:
+        return Icons.password_rounded;
+      case AccountFieldType.number:
+        return Icons.numbers_rounded;
+      case AccountFieldType.email:
+        return Icons.email_rounded;
+      case AccountFieldType.phone:
+        return Icons.phone_android_rounded;
+      case AccountFieldType.url:
+        return Icons.link_rounded;
+      case AccountFieldType.time:
+        return Icons.event_note_rounded;
+      case AccountFieldType.custom:
+        return Icons.extension_rounded;
+      case AccountFieldType.accountLink:
+        return Icons.account_tree_rounded;
+      case AccountFieldType.longText:
+        return Icons.notes_rounded;
+      case AccountFieldType.list:
+        return Icons.format_list_bulleted_rounded;
+      case AccountFieldType.unknown:
+        return Icons.help_outline_rounded;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final displayFields = template.fields.take(5).toList();
-    final remaining = template.fields.length - displayFields.length;
 
     return Wrap(
-      spacing: 6,
-      runSpacing: 6,
+      spacing: AppSpacing.sm,
+      runSpacing: AppSpacing.sm,
       children: [
-        for (final field in displayFields)
+        for (final field in template.fields)
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: accent.withAlpha(12),
-              borderRadius: BorderRadius.circular(AppRadii.pill),
-              border: Border.all(
-                color: accent.withAlpha(50),
-              ),
+              color: AppSurfaces.soft(theme.colorScheme, tint: accent, tintAlpha: 10),
+              borderRadius: BorderRadius.circular(AppRadii.button),
+              border: Border.all(color: accent.withAlpha(38)),
             ),
-            child: Text(
-              field.label,
-              style: theme.textTheme.labelSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: accent.withAlpha(200),
-                height: 1.1,
-              ),
-            ),
-          ),
-        if (remaining > 0)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            child: Text(
-              '+$remaining',
-              style: theme.textTheme.labelSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: accent,
-              ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  _fieldTypeIcon(field.attributes.type),
+                  size: 13,
+                  color: accent.withAlpha(200),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  field.label,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: accent,
+                    height: 1.1,
+                  ),
+                ),
+                if (field.attributes.isSecret) ...[
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.lock_rounded,
+                    size: 11,
+                    color: accent.withAlpha(160),
+                  ),
+                ],
+              ],
             ),
           ),
       ],
@@ -1014,21 +1187,21 @@ class _InfoChip extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: tint.withAlpha(16),
-        borderRadius: BorderRadius.circular(AppRadii.pill),
-        border: Border.all(color: tint.withAlpha(50)),
+        color: AppSurfaces.soft(theme.colorScheme, tint: tint, tintAlpha: 12),
+        borderRadius: BorderRadius.circular(AppRadii.button),
+        border: Border.all(color: tint.withAlpha(34)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: tint.withAlpha(180)),
+          Icon(icon, size: 16, color: tint),
           const SizedBox(width: 6),
           Text(
             label,
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: tint.withAlpha(220),
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: tint,
               fontWeight: FontWeight.w600,
             ),
           ),

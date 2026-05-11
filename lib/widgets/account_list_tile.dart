@@ -36,6 +36,7 @@ class AccountListTile extends StatefulWidget {
   final AccountListTileDensity density;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final VoidCallback? onTogglePin;
   final String Function(BuildContext, String, String) localeText;
   final String? Function(String accountId)? resolveAccountName;
   final List<String> highlightedFieldKeys;
@@ -50,6 +51,7 @@ class AccountListTile extends StatefulWidget {
     this.density = AccountListTileDensity.library,
     required this.onEdit,
     required this.onDelete,
+    this.onTogglePin,
     required this.localeText,
     this.resolveAccountName,
     this.highlightedFieldKeys = const [],
@@ -426,6 +428,18 @@ class _AccountListTileState extends State<AccountListTile>
     return null;
   }
 
+  String? _passwordCopyValue() {
+    if (widget.template == null) return null;
+    for (final field in widget.template!.fields) {
+      if (field.attributes.type == AccountFieldType.password ||
+          field.attributes.isSecret) {
+        final v = widget.account.data[field.fieldKey]?.toString().trim();
+        if (v != null && v.isNotEmpty) return v;
+      }
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -435,8 +449,7 @@ class _AccountListTileState extends State<AccountListTile>
     final fieldEntries = _buildFieldEntries(context);
     final summary = _buildCollapsedSummary(fieldEntries);
     final primaryValue = _primaryCopyValue();
-    final badgeText = widget.template?.badgeText ??
-        templateBadgeText(widget.account.name);
+    final passwordValue = _passwordCopyValue();
     final horizontalPadding = isSearch ? AppSpacing.md : AppSpacing.lg;
     final verticalPadding = isSearch ? AppSpacing.md : 14.0;
 
@@ -470,11 +483,6 @@ class _AccountListTileState extends State<AccountListTile>
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _AccountBadge(
-                      badgeText: badgeText,
-                      accent: accent,
-                    ),
-                    const SizedBox(width: AppSpacing.md),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -483,6 +491,14 @@ class _AccountListTileState extends State<AccountListTile>
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
+                              if (widget.account.isPinned) ...[
+                                Icon(
+                                  Icons.push_pin,
+                                  size: 14,
+                                  color: accent,
+                                ),
+                                const SizedBox(width: 4),
+                              ],
                               Expanded(
                                 child: Text(
                                   '${widget.localeText(context, '名称', 'Name')}: ${widget.account.name}',
@@ -563,6 +579,16 @@ class _AccountListTileState extends State<AccountListTile>
                           context,
                           widget.localeText(context, '主要字段', 'Primary'),
                           primaryValue,
+                        ),
+                      ),
+                    if (passwordValue != null)
+                      _IconButtonCompact(
+                        tooltip: widget.localeText(context, '复制密码', 'Copy password'),
+                        icon: Icons.key_outlined,
+                        onPressed: () => _copyValue(
+                          context,
+                          widget.localeText(context, '密码', 'Password'),
+                          passwordValue,
                         ),
                       ),
                     _IconButtonCompact(
@@ -669,6 +695,23 @@ class _AccountListTileState extends State<AccountListTile>
                 widget.onEdit();
               },
             ),
+            if (widget.onTogglePin != null)
+              ListTile(
+                leading: Icon(
+                  widget.account.isPinned
+                      ? Icons.push_pin
+                      : Icons.push_pin_outlined,
+                ),
+                title: Text(
+                  widget.account.isPinned
+                      ? widget.localeText(context, '取消置顶', 'Unpin')
+                      : widget.localeText(context, '置顶', 'Pin'),
+                ),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  widget.onTogglePin!();
+                },
+              ),
             ListTile(
               leading: const Icon(Icons.copy_all_outlined),
               title: Text(widget.localeText(context, '复制全部', 'Copy all')),
@@ -681,6 +724,19 @@ class _AccountListTileState extends State<AccountListTile>
                 );
               },
             ),
+            if (_passwordCopyValue() != null)
+              ListTile(
+                leading: const Icon(Icons.key_outlined),
+                title: Text(widget.localeText(context, '复制密码', 'Copy password')),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _copyValue(
+                    context,
+                    widget.localeText(context, '密码', 'Password'),
+                    _passwordCopyValue()!,
+                  );
+                },
+              ),
             ListTile(
               leading: Icon(
                 Icons.delete_outline,
@@ -705,46 +761,6 @@ class _AccountListTileState extends State<AccountListTile>
 // ─────────────────────────────────────────────────────────────────────────────
 //  Sub-widgets
 // ─────────────────────────────────────────────────────────────────────────────
-
-class _AccountBadge extends StatelessWidget {
-  final String badgeText;
-  final Color accent;
-
-  const _AccountBadge({
-    required this.badgeText,
-    required this.accent,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      width: 48,
-      height: 48,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            accent.withAlpha(40),
-            accent.withAlpha(80),
-          ],
-        ),
-        shape: BoxShape.circle,
-        border: Border.all(color: accent.withAlpha(50)),
-      ),
-      child: Text(
-        badgeText,
-        style: theme.textTheme.titleMedium?.copyWith(
-          color: accent,
-          fontWeight: FontWeight.w900,
-          letterSpacing: 0.5,
-        ),
-      ),
-    );
-  }
-}
 
 class _FieldCountTag extends StatelessWidget {
   final int count;
@@ -924,13 +940,13 @@ class _FieldRowState extends State<_FieldRow> {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: widget.isHighlighted
-            ? Colors.red.withAlpha(
+            ? theme.colorScheme.error.withAlpha(
                 theme.brightness == Brightness.light ? 20 : 30,
               )
             : null,
         borderRadius: BorderRadius.circular(AppRadii.control),
         border: widget.isHighlighted
-            ? Border.all(color: Colors.red.withAlpha(80))
+            ? Border.all(color: theme.colorScheme.error.withAlpha(80))
             : null,
       ),
       child: Row(
@@ -1227,13 +1243,13 @@ class _AccountFieldRowBodyState extends State<AccountFieldRowBody> {
       padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
       decoration: BoxDecoration(
         color: widget.isHighlighted
-            ? Colors.red.withAlpha(theme.brightness == Brightness.light ? 20 : 30)
+            ? theme.colorScheme.error.withAlpha(theme.brightness == Brightness.light ? 20 : 30)
             : theme.colorScheme.surfaceContainerHighest.withAlpha(
                 theme.brightness == Brightness.light ? 120 : 60,
               ),
         borderRadius: BorderRadius.circular(AppRadii.control),
         border: widget.isHighlighted
-            ? Border.all(color: Colors.red.withAlpha(80))
+            ? Border.all(color: theme.colorScheme.error.withAlpha(80))
             : null,
       ),
       child: Row(

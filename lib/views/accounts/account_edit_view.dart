@@ -1,5 +1,6 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 
@@ -40,6 +41,7 @@ class _AccountEditViewState extends State<AccountEditView> {
 
   final Map<String, TextEditingController> _fieldCtrls = {};
   final Map<String, bool> _fieldVisibility = {};
+  final Map<String, bool> _fieldMarkdownPreview = {};
   final Map<String, String> _draftData = {};
   final Map<String, String> _removedLegacyData = {};
   final Set<String> _pendingNewAccountTotpLinkIds = {};
@@ -1492,6 +1494,7 @@ class _AccountEditViewState extends State<AccountEditView> {
     final accent = _fieldAccentColor(theme, field);
     final isSecret = field.attributes.isSecret;
     final isVisible = !isSecret || (_fieldVisibility[field.fieldKey] ?? false);
+    final isPreview = _fieldMarkdownPreview[field.fieldKey] ?? false;
 
     return Container(
       decoration: BoxDecoration(
@@ -1544,6 +1547,24 @@ class _AccountEditViewState extends State<AccountEditView> {
                     ],
                   ),
                 ),
+                // Markdown preview toggle
+                if (isVisible)
+                  IconButton(
+                    onPressed: () => setState(
+                      () => _fieldMarkdownPreview[field.fieldKey] = !isPreview,
+                    ),
+                    icon: Icon(
+                      isPreview ? Icons.edit_outlined : Icons.visibility_outlined,
+                      size: 20,
+                    ),
+                    tooltip: isPreview
+                        ? _text('编辑', 'Edit')
+                        : _text('预览', 'Preview'),
+                    style: IconButton.styleFrom(
+                      minimumSize: const Size(36, 36),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
               ],
             ),
             const SizedBox(height: 14),
@@ -1583,6 +1604,18 @@ class _AccountEditViewState extends State<AccountEditView> {
                         ),
                       ),
                     ],
+                  ),
+                ),
+              )
+            else if (isPreview)
+              MarkdownBody(
+                data: controller?.text ?? '',
+                selectable: true,
+                styleSheet: MarkdownStyleSheet.fromTheme(theme).copyWith(
+                  p: theme.textTheme.bodyMedium,
+                  code: theme.textTheme.bodySmall?.copyWith(
+                    fontFamily: 'monospace',
+                    backgroundColor: theme.colorScheme.surfaceContainerHighest,
                   ),
                 ),
               )
@@ -2756,6 +2789,9 @@ class _ListFieldEditor extends StatefulWidget {
 
 class _ListFieldEditorState extends State<_ListFieldEditor> {
   late List<String> _items;
+  bool _mnemonicObscured = true;
+
+  static const _validMnemonicLengths = {12, 15, 18, 21, 24};
 
   @override
   void initState() {
@@ -2801,12 +2837,15 @@ class _ListFieldEditorState extends State<_ListFieldEditor> {
   }
 
   void _handlePaste(String pasted) {
-    final words = pasted.trim().split(RegExp(r'\s+'));
+    final words = pasted.trim().split(RegExp(r'[\s,;，；]+'));
     final filtered = words.where((w) => w.isNotEmpty).toList();
     if (filtered.isEmpty) return;
     setState(() => _items = filtered);
     _updateController();
   }
+
+  bool get _isMnemonicValid =>
+      _items.isNotEmpty && _validMnemonicLengths.contains(_items.length);
 
   @override
   Widget build(BuildContext context) {
@@ -2819,6 +2858,9 @@ class _ListFieldEditorState extends State<_ListFieldEditor> {
   }
 
   Widget _buildMnemonicEditor(ThemeData theme) {
+    final accent = theme.colorScheme.primary;
+    final errorColor = theme.colorScheme.error;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2827,7 +2869,7 @@ class _ListFieldEditorState extends State<_ListFieldEditor> {
             decoration: InputDecoration(
               hintText:
                   widget.hint ??
-                  '粘贴 12 或 24 个单词，自动分词',
+                  '粘贴助记词，支持空格/换行/逗号分隔',
               prefixIcon: const Icon(Icons.paste_outlined),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -2843,7 +2885,63 @@ class _ListFieldEditorState extends State<_ListFieldEditor> {
               color: theme.colorScheme.onSurfaceVariant,
             ),
           )
-        else
+        else ...[
+          // Word count + validation badge
+          Row(
+            children: [
+              Text(
+                '${_items.length} 个单词',
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(width: 8),
+              if (_isMnemonicValid)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withAlpha(20),
+                    borderRadius: BorderRadius.circular(AppRadii.chip),
+                  ),
+                  child: Text(
+                    '有效',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: Colors.green,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                )
+              else
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: errorColor.withAlpha(20),
+                    borderRadius: BorderRadius.circular(AppRadii.chip),
+                  ),
+                  child: Text(
+                    '应为 ${_validMnemonicLengths.toList().join('/')} 个',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: errorColor,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              const Spacer(),
+              // Reveal/obscure toggle
+              IconButton(
+                onPressed: () => setState(() => _mnemonicObscured = !_mnemonicObscured),
+                icon: Icon(
+                  _mnemonicObscured ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                  size: 20,
+                ),
+                style: IconButton.styleFrom(
+                  minimumSize: const Size(32, 32),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -2874,20 +2972,32 @@ class _ListFieldEditorState extends State<_ListFieldEditor> {
                       ),
                       const SizedBox(width: 4),
                       Expanded(
-                        child: TextField(
-                          controller: TextEditingController(text: value),
-                          onChanged: (v) => _updateItem(index, v),
-                          readOnly: widget.readOnly,
-                          style: const TextStyle(
-                            fontFamily: 'monospace',
-                            fontSize: 12,
-                          ),
-                          decoration: const InputDecoration(
-                            isDense: true,
-                            contentPadding: EdgeInsets.zero,
-                            border: InputBorder.none,
-                          ),
-                        ),
+                        child: _mnemonicObscured && !widget.readOnly
+                            ? GestureDetector(
+                                onTap: () => setState(() => _mnemonicObscured = false),
+                                child: Text(
+                                  '••••',
+                                  style: TextStyle(
+                                    fontFamily: 'monospace',
+                                    fontSize: 12,
+                                    color: accent,
+                                  ),
+                                ),
+                              )
+                            : TextField(
+                                controller: TextEditingController(text: value),
+                                onChanged: (v) => _updateItem(index, v),
+                                readOnly: widget.readOnly,
+                                style: const TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 12,
+                                ),
+                                decoration: const InputDecoration(
+                                  isDense: true,
+                                  contentPadding: EdgeInsets.zero,
+                                  border: InputBorder.none,
+                                ),
+                              ),
                       ),
                     ],
                   ),
@@ -2895,25 +3005,26 @@ class _ListFieldEditorState extends State<_ListFieldEditor> {
               );
             }).toList(),
           ),
-        if (!widget.readOnly && _items.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            children: [
-              TextButton.icon(
-                onPressed: _items.length < 24 ? _addItem : null,
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('添加单词'),
-              ),
-              TextButton.icon(
-                onPressed: _items.isNotEmpty
-                    ? () => _removeItem(_items.length - 1)
-                    : null,
-                icon: const Icon(Icons.remove, size: 18),
-                label: const Text('删除末尾'),
-              ),
-            ],
-          ),
+          if (!widget.readOnly && _items.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              children: [
+                TextButton.icon(
+                  onPressed: _items.length < 24 ? _addItem : null,
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('添加单词'),
+                ),
+                TextButton.icon(
+                  onPressed: _items.isNotEmpty
+                      ? () => _removeItem(_items.length - 1)
+                      : null,
+                  icon: const Icon(Icons.remove, size: 18),
+                  label: const Text('删除末尾'),
+                ),
+              ],
+            ),
+          ],
         ],
       ],
     );

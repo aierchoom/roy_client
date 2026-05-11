@@ -108,7 +108,7 @@ class _AccountListViewState extends State<AccountListView> {
             onPressed: () => Navigator.pop(dialogContext, true),
             child: Text(
               context.text( '删除', 'Delete'),
-              style: const TextStyle(color: Colors.red),
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
           ),
         ],
@@ -158,6 +158,11 @@ class _AccountListViewState extends State<AccountListView> {
 
   List<_AccountGroup> _buildGroups(EnhancedAppProvider provider) {
     final filtered = _categoryFilteredAccounts(provider);
+    // Pinned items first within each group
+    filtered.sort((a, b) {
+      if (a.isPinned != b.isPinned) return a.isPinned ? -1 : 1;
+      return 0;
+    });
     final templates = provider.allTemplates;
     final groups = <_AccountGroup>[];
 
@@ -234,16 +239,8 @@ class _AccountListViewState extends State<AccountListView> {
         title: title,
         subtitle: subtitle,
         metrics: [
-          _StatChip(
-            value: '${credentials.length}',
-            label: countLabel,
-            onColor: theme.colorScheme.primary,
-          ),
-          _StatChip(
-            value: '$linkedCount',
-            label: context.text( '关联', 'Links'),
-            onColor: theme.colorScheme.primary,
-          ),
+          MetricChip(value: '${credentials.length}', label: countLabel, color: theme.colorScheme.primary),
+          MetricChip(value: '$linkedCount', label: context.text( '关联', 'Links'), color: theme.colorScheme.primary),
         ],
       );
     }
@@ -253,21 +250,9 @@ class _AccountListViewState extends State<AccountListView> {
       title: title,
       subtitle: subtitle,
       metrics: [
-        _StatChip(
-          value: '$totalItems',
-          label: countLabel,
-          onColor: theme.colorScheme.primary,
-        ),
-        _StatChip(
-          value: '$usedTemplates',
-          label: context.text( '个模板', 'Templates'),
-          onColor: theme.colorScheme.primary,
-        ),
-        _StatChip(
-          value: '$secretItems',
-          label: context.text( '个保密', 'Secrets'),
-          onColor: theme.colorScheme.primary,
-        ),
+        MetricChip(value: '$totalItems', label: countLabel, color: theme.colorScheme.primary),
+        MetricChip(value: '$usedTemplates', label: context.text( '个模板', 'Templates'), color: theme.colorScheme.primary),
+        MetricChip(value: '$secretItems', label: context.text( '个保密', 'Secrets'), color: theme.colorScheme.primary),
       ],
     );
   }
@@ -609,6 +594,55 @@ class _AccountListViewState extends State<AccountListView> {
             children: [
               Row(
                 children: [
+                  if (template != null) ...[
+                    Transform.rotate(
+                      angle: -0.1,
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: template.isCustom
+                              ? theme.colorScheme.primary
+                              : theme.colorScheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: template.isCustom
+                                ? Colors.white.withAlpha(180)
+                                : theme.colorScheme.primary.withAlpha(60),
+                            width: template.isCustom ? 1.5 : 1,
+                          ),
+                          boxShadow: template.isCustom
+                              ? [
+                                  BoxShadow(
+                                    color: theme.colorScheme.primary
+                                        .withAlpha(100),
+                                    blurRadius: 8,
+                                    offset: const Offset(-1, 3),
+                                  ),
+                                ]
+                              : [
+                                  BoxShadow(
+                                    color: theme.colorScheme.primary
+                                        .withAlpha(30),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          template.badgeText,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            fontWeight: FontWeight.w900,
+                            color: template.isCustom
+                                ? Colors.white
+                                : theme.colorScheme.primary,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                  ],
                   Text(
                     title,
                     style: theme.textTheme.titleSmall?.copyWith(
@@ -668,6 +702,7 @@ class _AccountListViewState extends State<AccountListView> {
                         .length,
                     onEdit: () => _openEditor(context, initial: account),
                     onDelete: () => _deleteAccount(context, account),
+                    onTogglePin: () => provider.togglePin(account.id),
                     localeText: (ctx, zh, en) => ctx.text(zh, en),
                     resolveAccountName: (id) => provider.resolveAccountName(id),
                   ),
@@ -735,7 +770,7 @@ class _AccountListViewState extends State<AccountListView> {
             onPressed: () => Navigator.pop(dialogContext, true),
             child: Text(
               context.text('删除', 'Delete'),
-              style: const TextStyle(color: Colors.red),
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
           ),
         ],

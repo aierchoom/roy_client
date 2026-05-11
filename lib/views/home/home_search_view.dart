@@ -100,7 +100,7 @@ class _HomeSearchViewState extends State<HomeSearchView> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            style: TextButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.error),
             child: Text(context.text('删除', 'Delete')),
           ),
         ],
@@ -481,6 +481,7 @@ class _HomeSearchViewState extends State<HomeSearchView> {
                             density: AccountListTileDensity.search,
                             onEdit: () => _openAccount(context, account),
                             onDelete: () => _deleteAccount(context, account),
+                            onTogglePin: () => provider.togglePin(account.id),
                             localeText: (ctx, zh, en) => context.text(zh, en),
                             resolveAccountName: (id) =>
                                 provider.resolveAccountName(id),

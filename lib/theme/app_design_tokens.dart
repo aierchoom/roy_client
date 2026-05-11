@@ -25,6 +25,7 @@ abstract final class AppRadii {
   static const double button = 12;
   static const double card = 12;
   static const double panel = 16;
+  static const double lg = 18;
   static const double dialog = 20;
   static const double sheet = 20;
   static const double nav = 20;
@@ -35,9 +36,13 @@ abstract final class AppRadii {
 
 abstract final class AppSpacing {
   static const double xs = 4;
+  static const double sm2 = 6;
   static const double sm = 8;
+  static const double md2 = 10;
   static const double md = 12;
+  static const double lg2 = 14;
   static const double lg = 16;
+  static const double xl2 = 18;
   static const double xl = 20;
   static const double xxl = 24;
 }

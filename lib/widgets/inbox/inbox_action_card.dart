@@ -53,11 +53,16 @@ class ActionSummaryCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      title,
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: theme.colorScheme.onSurface,
+                    Text.rich(
+                      TextSpan(
+                        children: _highlightNumbers(
+                          title,
+                          effectiveIconColor,
+                          baseStyle: theme.textTheme.bodyLarge?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color: theme.colorScheme.onSurface,
+                          ),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -90,6 +95,7 @@ class ActionItemCard extends StatelessWidget {
   final InboxSeverity severity;
   final String title;
   final String subtitle;
+  final String? meta;
   final bool showChevron;
   final VoidCallback? onTap;
   final Widget? trailing;
@@ -99,17 +105,19 @@ class ActionItemCard extends StatelessWidget {
     required this.severity,
     required this.title,
     required this.subtitle,
+    this.meta,
     this.showChevron = true,
     this.onTap,
     this.trailing,
   });
 
   static Color _severityColor(InboxSeverity severity, ThemeData theme) {
+    final vt = theme.extension<AppVisualTokens>()!;
     return switch (severity) {
-      InboxSeverity.critical => Colors.red,
-      InboxSeverity.warning => Colors.orange,
+      InboxSeverity.critical => theme.colorScheme.error,
+      InboxSeverity.warning => vt.warning,
       InboxSeverity.info => theme.colorScheme.primary,
-      InboxSeverity.success => Colors.green,
+      InboxSeverity.success => vt.success,
     };
   }
 
@@ -180,6 +188,39 @@ class ActionItemCard extends StatelessWidget {
       ),
     );
   }
+}
+
+List<TextSpan> _highlightNumbers(
+  String text,
+  Color highlightColor, {
+  TextStyle? baseStyle,
+}) {
+  final spans = <TextSpan>[];
+  final regex = RegExp(r'(\d+)');
+  var lastEnd = 0;
+  for (final match in regex.allMatches(text)) {
+    if (match.start > lastEnd) {
+      spans.add(TextSpan(
+        text: text.substring(lastEnd, match.start),
+        style: baseStyle,
+      ));
+    }
+    spans.add(TextSpan(
+      text: match.group(0),
+      style: baseStyle?.copyWith(
+        color: highlightColor,
+        fontWeight: FontWeight.w900,
+      ),
+    ));
+    lastEnd = match.end;
+  }
+  if (lastEnd < text.length) {
+    spans.add(TextSpan(
+      text: text.substring(lastEnd),
+      style: baseStyle,
+    ));
+  }
+  return spans;
 }
 
 class _IconContainer extends StatelessWidget {

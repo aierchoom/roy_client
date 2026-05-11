@@ -84,6 +84,8 @@ class AccountItem {
   final SyncStatus syncStatus;
   final bool isDeleted;
   final Hlc? deleteHlc;
+  final bool isPinned;
+  final Hlc? pinHlc;
 
   AccountItem({
     required this.id,
@@ -104,6 +106,8 @@ class AccountItem {
     this.syncStatus = SyncStatus.pendingPush,
     this.isDeleted = false,
     this.deleteHlc,
+    this.isPinned = false,
+    this.pinHlc,
   });
 
   factory AccountItem.fromJson(Map<String, dynamic> json) {
@@ -149,6 +153,8 @@ class AccountItem {
       deleteHlc: json['deleteHlc'] != null
           ? Hlc.parse(json['deleteHlc'])
           : null,
+      isPinned: json['isPinned'] == 1 || json['isPinned'] == true,
+      pinHlc: json['pinHlc'] != null ? Hlc.parse(json['pinHlc']) : null,
     );
   }
 
@@ -173,6 +179,8 @@ class AccountItem {
       'syncStatus': syncStatus.name,
       'isDeleted': isDeleted,
       'deleteHlc': deleteHlc?.toString(),
+      'isPinned': isPinned,
+      'pinHlc': pinHlc?.toString(),
     };
   }
 
@@ -205,6 +213,8 @@ class AccountItem {
     SyncStatus? syncStatus,
     bool? isDeleted,
     Hlc? deleteHlc,
+    bool? isPinned,
+    Hlc? pinHlc,
   }) {
     return AccountItem(
       id: id ?? this.id,
@@ -225,6 +235,8 @@ class AccountItem {
       syncStatus: syncStatus ?? this.syncStatus,
       isDeleted: isDeleted ?? this.isDeleted,
       deleteHlc: deleteHlc ?? this.deleteHlc,
+      isPinned: isPinned ?? this.isPinned,
+      pinHlc: pinHlc ?? this.pinHlc,
     );
   }
 }

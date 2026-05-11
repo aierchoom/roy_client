@@ -81,7 +81,8 @@ class CrdtMergeEngine {
     // a zero-timestamp HLC from always losing LWW comparisons.
     final remoteCorrupted = remote.nameHlc.isCorrupted ||
         remote.emailHlc.isCorrupted ||
-        remote.dataHlc.values.any((h) => h.isCorrupted);
+        remote.dataHlc.values.any((h) => h.isCorrupted) ||
+        (remote.pinHlc?.isCorrupted ?? false);
     if (remoteCorrupted) {
       return MergeResult(
         local.copyWith(
@@ -259,6 +260,19 @@ class CrdtMergeEngine {
       }
     }
 
+    // --- 2b. isPinned LWW merge ---
+    final localPinHlc = local.pinHlc ?? Hlc.zero('local');
+    final remotePinHlc = remote.pinHlc ?? Hlc.zero('remote');
+    late final bool mergedIsPinned;
+    late final Hlc mergedPinHlc;
+    if (remotePinHlc.compareTo(localPinHlc) > 0) {
+      mergedIsPinned = remote.isPinned;
+      mergedPinHlc = remotePinHlc;
+    } else {
+      mergedIsPinned = local.isPinned;
+      mergedPinHlc = localPinHlc;
+    }
+
     // --- 3. 分析收敛状态 ---
     bool isPureFastForward = true;
     if (mergedNameHlc.compareTo(remote.nameHlc) != 0) {
@@ -275,6 +289,9 @@ class CrdtMergeEngine {
         isPureFastForward = false;
         break;
       }
+    }
+    if (mergedPinHlc.compareTo(remote.pinHlc ?? Hlc.zero('remote')) != 0) {
+      isPureFastForward = false;
     }
 
     SyncStatus finalStatus;
@@ -302,9 +319,11 @@ class CrdtMergeEngine {
       nameHlc: mergedNameHlc,
       emailHlc: mergedEmailHlc,
       dataHlc: mergedDataHlc,
-      serverVersion: unifiedServerVersion, // 统一取最大版本号，避免 Tombstone 后 push 409
+      serverVersion: unifiedServerVersion,
       syncStatus: finalStatus,
       isDeleted: false,
+      isPinned: mergedIsPinned,
+      pinHlc: mergedPinHlc,
     );
 
     return MergeResult(resultItem, logs, isPureFastForward: isPureFastForward);

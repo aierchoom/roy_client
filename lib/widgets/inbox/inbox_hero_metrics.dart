@@ -40,19 +40,20 @@ class InboxHeroMetrics extends StatelessWidget {
       title: title,
       subtitle: subtitle,
       metrics: metrics
-          .map((m) => _MetricChip(value: m.value, label: m.label, color: m.color))
+          .map((m) => MetricChip(value: m.value, label: m.label, color: m.color))
           .toList(),
       trailing: trailing,
     );
   }
 }
 
-class _MetricChip extends StatelessWidget {
+class MetricChip extends StatelessWidget {
   final String value;
   final String label;
   final Color color;
 
-  const _MetricChip({
+  const MetricChip({
+    super.key,
     required this.value,
     required this.label,
     required this.color,
@@ -61,7 +62,7 @@ class _MetricChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg2, vertical: AppSpacing.sm),
       decoration: BoxDecoration(
         color: color.withAlpha(AppAlphas.tint),
         borderRadius: BorderRadius.circular(AppRadii.panel),
@@ -77,7 +78,7 @@ class _MetricChip extends StatelessWidget {
               fontSize: 14,
             ),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: AppSpacing.sm2),
           Text(
             label,
             style: TextStyle(

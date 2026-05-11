@@ -58,11 +58,12 @@ class _VaultHealthViewState extends State<VaultHealthView> {
   }
 
   Color _gradeColor(VaultHealthGrade grade) {
+    final vt = Theme.of(context).extension<AppVisualTokens>()!;
     return switch (grade) {
-      VaultHealthGrade.excellent => Colors.green,
-      VaultHealthGrade.good => Colors.lightGreen,
-      VaultHealthGrade.warning => Colors.orange,
-      VaultHealthGrade.critical => Colors.red,
+      VaultHealthGrade.excellent => vt.success,
+      VaultHealthGrade.good => vt.success,
+      VaultHealthGrade.warning => vt.warning,
+      VaultHealthGrade.critical => vt.warning,
     };
   }
 
@@ -76,10 +77,11 @@ class _VaultHealthViewState extends State<VaultHealthView> {
   }
 
   Color _riskColor(VaultHealthRiskLevel level) {
+    final vt = Theme.of(context).extension<AppVisualTokens>()!;
     return switch (level) {
-      VaultHealthRiskLevel.high => Colors.red,
-      VaultHealthRiskLevel.medium => Colors.orange,
-      VaultHealthRiskLevel.low => Colors.blue,
+      VaultHealthRiskLevel.high => vt.warning,
+      VaultHealthRiskLevel.medium => vt.warning,
+      VaultHealthRiskLevel.low => vt.info,
     };
   }
 
@@ -262,18 +264,19 @@ class _VaultHealthViewState extends State<VaultHealthView> {
   }
 
   Widget _buildAllPassBanner() {
+    final vt = Theme.of(context).extension<AppVisualTokens>()!;
     return Card(
-      color: Colors.green.shade50,
+      color: vt.successContainer,
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.lg),
         child: Row(
           children: [
-            const Icon(Icons.verified, color: Colors.green),
+            Icon(Icons.verified, color: vt.success),
             const SizedBox(width: AppSpacing.md),
             Expanded(
               child: Text(
                 context.text('所有体检项均已通过，继续保持！', 'All health checks passed. Keep it up!'),
-                style: const TextStyle(color: Colors.green),
+                style: TextStyle(color: vt.success),
               ),
             ),
           ],

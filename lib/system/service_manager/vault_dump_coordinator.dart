@@ -1,5 +1,6 @@
 import '../../models/account_item.dart';
 import '../../models/account_template.dart';
+import '../../models/totp_credential.dart';
 import '../../services/identity_service.dart';
 import '../../services/secure_storage_service.dart';
 import '../../sync/sync_payload_codec.dart';
@@ -16,10 +17,16 @@ class VaultDumpImportException implements Exception {
 class VaultDumpImportPlan {
   final List<AccountTemplate> templates;
   final List<AccountItem> accounts;
+  final List<TotpCredential> totpCredentials;
 
-  const VaultDumpImportPlan({required this.templates, required this.accounts});
+  const VaultDumpImportPlan({
+    required this.templates,
+    required this.accounts,
+    this.totpCredentials = const [],
+  });
 
-  bool get hasData => templates.isNotEmpty || accounts.isNotEmpty;
+  bool get hasData =>
+      templates.isNotEmpty || accounts.isNotEmpty || totpCredentials.isNotEmpty;
 }
 
 /// Vault dump 协调器：负责加密导出和验证导入。
@@ -55,10 +62,14 @@ class VaultDumpCoordinator {
       includeDeleted: true,
     );
     final templatesList = await storageService.loadAllTemplates();
+    final totpList = await storageService.loadTotpCredentials(
+      includeDeleted: true,
+    );
 
     final payloadJson = {
       'accounts': accountsList.map((account) => account.toJson()).toList(),
       'templates': templatesList.map((template) => template.toJson()).toList(),
+      'totp_credentials': totpList.map((c) => c.toJson()).toList(),
     };
 
     return await SyncPayloadCodec.encodePayload(
@@ -106,6 +117,7 @@ class VaultDumpCoordinator {
 
       final accountsList = _readOptionalList(payloadJson, 'accounts');
       final templatesList = _readOptionalList(payloadJson, 'templates');
+      final totpList = _readOptionalList(payloadJson, 'totp_credentials');
 
       return VaultDumpImportPlan(
         templates: templatesList
@@ -113,6 +125,9 @@ class VaultDumpCoordinator {
             .toList(growable: false),
         accounts: accountsList
             .map((accountJson) => AccountItem.fromJson(accountJson))
+            .toList(growable: false),
+        totpCredentials: totpList
+            .map((json) => TotpCredential.fromJson(json))
             .toList(growable: false),
       );
     } on VaultDumpImportException {
@@ -131,6 +146,7 @@ class VaultDumpCoordinator {
       await storageService.replaceAllDataForImport(
         templates: plan.templates,
         accounts: plan.accounts,
+        totpCredentials: plan.totpCredentials,
       );
     } catch (error) {
       throw VaultDumpImportException('Failed to write vault dump: $error');

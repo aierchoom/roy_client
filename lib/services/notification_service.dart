@@ -7,6 +7,7 @@ import '../core/app_logger.dart';
 import '../models/account_item.dart';
 import '../models/account_template.dart';
 import '../models/app_notification.dart';
+import 'enhanced_crypto_service.dart';
 import 'secure_storage_service.dart';
 
 class NotificationService {
@@ -74,6 +75,63 @@ class NotificationService {
         type: AppNotificationType.passwordExpiry,
         title: '密码过期提醒',
         body: '「${account.name}」的密码已 $daysSince 天未修改，建议尽快更新。',
+        accountId: account.id,
+        createdAt: now,
+      );
+
+      await _storage.saveNotification(notification);
+      created.add(notification);
+    }
+
+    return created;
+  }
+
+  Future<List<AppNotification>> generateWeakPasswordNotifications({
+    required List<AccountItem> accounts,
+    required List<AccountTemplate> templates,
+    int strengthThreshold = 40,
+  }) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final existing = await _storage.loadNotifications();
+    final existingAccountIds = existing
+        .where((n) => n.type == AppNotificationType.weakPassword)
+        .map((n) => n.accountId)
+        .toSet();
+
+    final created = <AppNotification>[];
+
+    for (final account in accounts) {
+      if (existingAccountIds.contains(account.id)) continue;
+
+      final template = templates.where(
+        (t) => t.templateId == account.templateId,
+      ).firstOrNull;
+      if (template == null) continue;
+
+      String? weakPasswordValue;
+      for (final field in template.fields) {
+        if (field.attributes.type == AccountFieldType.password ||
+            field.attributes.isSecret) {
+          final v = account.data[field.fieldKey]?.toString().trim();
+          if (v != null && v.isNotEmpty) {
+            final score = EnhancedCryptoService.calculatePasswordStrength(v);
+            if (score < strengthThreshold) {
+              weakPasswordValue = v;
+              break;
+            }
+          }
+        }
+      }
+      if (weakPasswordValue == null) continue;
+
+      final score =
+          EnhancedCryptoService.calculatePasswordStrength(weakPasswordValue);
+      final level = EnhancedCryptoService.getPasswordStrengthLevel(score);
+      final notification = AppNotification(
+        id: const Uuid().v4(),
+        type: AppNotificationType.weakPassword,
+        title: '弱密码提醒',
+        body: '「${account.name}」的密码强度为 $level（$score/100），建议尽快更新。',
         accountId: account.id,
         createdAt: now,
       );
