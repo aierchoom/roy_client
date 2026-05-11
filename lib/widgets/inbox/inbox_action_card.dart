@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../theme/app_design_tokens.dart';
+import '../../utils/text_highlight.dart';
 import 'inbox_models.dart';
 
 /// A large tappable summary card with a leading icon container,
