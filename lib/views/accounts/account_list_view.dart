@@ -35,7 +35,7 @@ class AccountListView extends StatefulWidget {
   State<AccountListView> createState() => _AccountListViewState();
 }
 
-enum _VaultCategoryFilter { all, accounts, secureNotes, totp }
+enum _VaultCategoryFilter { all, totp }
 
 class _AccountListViewState extends State<AccountListView> {
   String? _activeTemplateId;
@@ -132,29 +132,7 @@ class _AccountListViewState extends State<AccountListView> {
       account.legacyFieldCount(template);
 
   List<AccountItem> _categoryFilteredAccounts(EnhancedAppProvider provider) {
-    final base = _filteredAccounts(provider.allAccounts);
-    switch (_categoryFilter) {
-      case _VaultCategoryFilter.accounts:
-        return base
-            .where(
-              (a) =>
-                  provider.getTemplate(a.templateId)?.category !=
-                  TemplateCategory.note,
-            )
-            .toList();
-      case _VaultCategoryFilter.secureNotes:
-        return base
-            .where(
-              (a) =>
-                  provider.getTemplate(a.templateId)?.category ==
-                  TemplateCategory.note,
-            )
-            .toList();
-      case _VaultCategoryFilter.all:
-        return base;
-      case _VaultCategoryFilter.totp:
-        return base;
-    }
+    return _filteredAccounts(provider.allAccounts);
   }
 
   List<_AccountGroup> _buildGroups(EnhancedAppProvider provider) {
@@ -199,20 +177,6 @@ class _AccountListViewState extends State<AccountListView> {
     String subtitle;
     String countLabel;
     switch (_categoryFilter) {
-      case _VaultCategoryFilter.accounts:
-        title = context.text( '账号中心', 'Account Hub');
-        subtitle = context.text(
-          '你的登录凭证和网站账号',
-          'Your login credentials',
-        );
-        countLabel = context.text( '个账号', 'Accounts');
-      case _VaultCategoryFilter.secureNotes:
-        title = context.text( '安全笔记', 'Secure Notes');
-        subtitle = context.text(
-          '加密存储的敏感文本和密钥',
-          'Encrypted sensitive text and keys',
-        );
-        countLabel = context.text( '个笔记', 'Notes');
       case _VaultCategoryFilter.all:
         title = context.text( '保险库', 'Vault');
         subtitle = context.text(
@@ -263,21 +227,6 @@ class _AccountListViewState extends State<AccountListView> {
     String title;
     String message;
     switch (_categoryFilter) {
-      case _VaultCategoryFilter.secureNotes:
-        title = context.text(
-          '暂无安全笔记',
-          'No Secure Notes',
-        );
-        message = context.text(
-          '尚未创建任何安全笔记，点击右下角按钮新建。',
-          'No secure notes yet. Tap the button to create one.',
-        );
-      case _VaultCategoryFilter.accounts:
-        title = context.text( '暂无账号', 'No Accounts');
-        message = context.text(
-          '当前模板筛选下没有可显示的账号，可以切换模板或新建账号。',
-          'No accounts are available under the current template filter.',
-        );
       case _VaultCategoryFilter.all:
         title = context.text( '暂无条目', 'No Items');
         message = context.text(
@@ -332,16 +281,6 @@ class _AccountListViewState extends State<AccountListView> {
           icon: const Icon(Icons.dashboard_outlined, size: 16),
         ),
         ButtonSegment(
-          value: _VaultCategoryFilter.accounts,
-          label: Text(context.text( '账号', 'Accounts')),
-          icon: const Icon(Icons.lock_outline, size: 16),
-        ),
-        ButtonSegment(
-          value: _VaultCategoryFilter.secureNotes,
-          label: Text(context.text( '安全笔记', 'Notes')),
-          icon: const Icon(Icons.note_outlined, size: 16),
-        ),
-        ButtonSegment(
           value: _VaultCategoryFilter.totp,
           label: const Text('2FA'),
           icon: const Icon(Icons.verified_user_outlined, size: 16),
@@ -392,46 +331,6 @@ class _AccountListViewState extends State<AccountListView> {
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
     );
-  }
-
-  Future<void> _showAddMenu(BuildContext context) async {
-    final choice = await showModalBottomSheet<String>(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.lock_outline),
-              title: Text(context.text( '新建账号', 'New Account')),
-              subtitle: Text(
-                context.text(
-                  '存储网站、App 或服务登录信息',
-                  'Store website, app or service credentials',
-                ),
-              ),
-              onTap: () => Navigator.pop(ctx, 'account'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.note_outlined),
-              title: Text(context.text( '新建安全笔记', 'New Secure Note')),
-              subtitle: Text(
-                context.text(
-                  '存储 API Key、助记词、私钥等敏感文本',
-                  'Store API keys, mnemonics, private keys',
-                ),
-              ),
-              onTap: () => Navigator.pop(ctx, 'note'),
-            ),
-          ],
-        ),
-      ),
-    );
-    if (choice == null || !context.mounted) return;
-    if (choice == 'note') {
-      setState(() => _categoryFilter = _VaultCategoryFilter.secureNotes);
-    }
-    await _openEditor(context);
   }
 
   Widget _buildModernTemplateDropdown(
@@ -605,7 +504,7 @@ class _AccountListViewState extends State<AccountListView> {
                           color: template.isCustom
                               ? theme.colorScheme.primary
                               : theme.colorScheme.primaryContainer,
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(AppRadii.sm),
                           border: Border.all(
                             color: template.isCustom
                                 ? Colors.white.withAlpha(180)
@@ -1103,7 +1002,7 @@ class _AccountListViewState extends State<AccountListView> {
                           : 'add-account-fab',
                       onPressed: _categoryFilter == _VaultCategoryFilter.totp
                           ? () => _openTotpEditor(context)
-                          : () => _showAddMenu(context),
+                          : () => _openEditor(context),
                       tooltip: context.text( '新建', 'Add'),
                     ),
                   ),

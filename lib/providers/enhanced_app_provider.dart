@@ -44,12 +44,7 @@ class EnhancedAppProvider extends ChangeNotifier {
     ..._customTemplates,
   ];
   List<AccountItem> get allAccounts => _accounts;
-  List<AccountItem> get accountItems => _accounts
-      .where((a) => _templateCategoryOf(a.templateId) != TemplateCategory.note)
-      .toList();
-  List<AccountItem> get secureNoteItems => _accounts
-      .where((a) => _templateCategoryOf(a.templateId) == TemplateCategory.note)
-      .toList();
+  List<AccountItem> get accountItems => _accounts;
   List<TotpCredential> get totpCredentials => _totpCredentials;
   List<AccountTemplate> get customTemplates => _customTemplates;
   List<LocalSyncChange> get localSyncChanges => _localSyncChanges;
@@ -85,9 +80,6 @@ class EnhancedAppProvider extends ChangeNotifier {
     return null;
   }
 
-  TemplateCategory _templateCategoryOf(String templateId) {
-    return getTemplate(templateId)?.category ?? TemplateCategory.custom;
-  }
 
   AccountItem? getAccount(String id) {
     try {

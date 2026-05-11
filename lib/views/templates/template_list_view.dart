@@ -158,7 +158,7 @@ class _TemplateListBodyState extends State<TemplateListBody> {
             onPressed: () => Navigator.pop(dialogContext, true),
             child: Text(
               AppLocalizations.of(context)!.delete,
-              style: const TextStyle(color: Colors.red),
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
           ),
         ],
@@ -1058,7 +1058,7 @@ class _TemplateStatusBadge extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         color: accent.withAlpha(240),
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(AppRadii.chip),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withAlpha(compact ? 38 : 60),

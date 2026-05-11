@@ -1,6 +1,7 @@
 ﻿import 'package:flutter/material.dart';
 
 import '../l10n/app_text_extension.dart';
+import '../theme/app_design_tokens.dart';
 import '../services/service_manager.dart';
 import '../services/sensitive_clipboard_service.dart';
 
@@ -173,18 +174,19 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
   }
 
   Color _strengthColor(ThemeData theme) {
+    final vt = theme.extension<AppVisualTokens>()!;
     final score = _strengthScore;
     if (score >= ServiceManager.passwordStrengthThresholdVeryStrong) {
-      return Colors.green.shade700;
+      return vt.success;
     }
     if (score >= ServiceManager.passwordStrengthThresholdStrong) {
-      return Colors.teal.shade700;
+      return theme.colorScheme.primary;
     }
     if (score >= ServiceManager.passwordStrengthThresholdMedium) {
-      return Colors.orange.shade700;
+      return vt.warning;
     }
     if (score >= ServiceManager.passwordStrengthThresholdWeak) {
-      return Colors.deepOrange.shade700;
+      return theme.colorScheme.tertiary;
     }
     return theme.colorScheme.error;
   }
@@ -299,7 +301,7 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: BorderRadius.circular(AppRadii.xl),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -358,7 +360,7 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
                         ),
                         decoration: BoxDecoration(
                           color: theme.colorScheme.surface.withAlpha(200),
-                          borderRadius: BorderRadius.circular(999),
+                          borderRadius: BorderRadius.circular(AppRadii.pill),
                         ),
                         child: Text(
                           '$_strengthScore / 100',
@@ -372,7 +374,7 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
                   ),
                   const SizedBox(height: 12),
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(999),
+                    borderRadius: BorderRadius.circular(AppRadii.pill),
                     child: LinearProgressIndicator(
                       value: _strengthScore / 100,
                       minHeight: 8,
@@ -407,7 +409,7 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
                           ),
                           decoration: BoxDecoration(
                             color: theme.colorScheme.primaryContainer,
-                            borderRadius: BorderRadius.circular(999),
+                            borderRadius: BorderRadius.circular(AppRadii.pill),
                           ),
                           child: Text(
                             '$_length',

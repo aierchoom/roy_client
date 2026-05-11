@@ -98,7 +98,7 @@ class _ConflictInboxViewState extends State<ConflictInboxView> {
             )
           : _t('已恢复该版本并准备推送', 'Value restored and queued for push');
       messenger.showSnackBar(
-        SnackBar(content: Text(message), backgroundColor: Theme.of(context).extension<AppVisualTokens>()?.success ?? Colors.green),
+        SnackBar(content: Text(message), backgroundColor: Theme.of(context).extension<AppVisualTokens>()?.success ?? Theme.of(context).colorScheme.primary),
       );
     }
 

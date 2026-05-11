@@ -756,7 +756,7 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
             onPressed: () => Navigator.pop(ctx, false),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error),
             child: Text(context.text('确认销毁', 'Confirm Destruction')),
             onPressed: () => Navigator.pop(ctx, true),
           ),
@@ -773,7 +773,7 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          backgroundColor: Colors.red,
+          backgroundColor: Theme.of(context).colorScheme.error,
           duration: const Duration(seconds: 5),
           content: Text(
             context.text('数据已销毁，请手动重启应用。', 'Data destroyed. Please restart the app.'),

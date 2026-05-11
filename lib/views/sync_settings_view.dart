@@ -307,7 +307,9 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                       '$message (version: ${result.version})',
                     ),
             ),
-            backgroundColor: hasConflicts ? Colors.orange : Colors.green,
+            backgroundColor: hasConflicts
+                ? Theme.of(context).colorScheme.tertiary
+                : Theme.of(context).colorScheme.primary,
           ),
         );
 
@@ -320,7 +322,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
             content: Text(
               context.text('同步失败：${result.error}', 'Sync failed: ${result.error}'),
             ),
-            backgroundColor: Colors.red,
+            backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
       }
@@ -329,7 +331,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
       messenger.showSnackBar(
         SnackBar(
           content: Text(context.text('发生未预期的同步错误：$e', 'Unexpected sync error: $e')),
-          backgroundColor: Colors.red,
+          backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
     } finally {
@@ -1022,11 +1024,11 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                 trailing: preview.vaultIdMatchesCurrent
                     ? Chip(
                         label: Text(context.text('与当前匹配', 'Matches current')),
-                        backgroundColor: Colors.green.shade50,
+                        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
                       )
                     : Chip(
                         label: Text(context.text('与当前不同', 'Different')),
-                        backgroundColor: Colors.orange.shade50,
+                        backgroundColor: Theme.of(context).colorScheme.tertiaryContainer,
                       ),
               ),
               const SizedBox(height: AppSpacing.md),

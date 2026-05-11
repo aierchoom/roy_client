@@ -322,34 +322,33 @@ class LanSyncHostHandler {
 
   Future<void> _commitToDatabase(LanSyncHostSession session) async {
     final merged = session.mergedItems ?? [];
-
-    for (final item in merged) {
-      if (item is AccountItem) {
-        final toSave = item.copyWith(syncStatus: SyncStatus.pendingPush);
-        await _storage.saveAccount(toSave, isSyncMerge: true);
-        await _ensureApprovedLocalSyncChange(
-          entityType: LocalSyncEntityType.account,
-          entityId: item.id,
-          title: item.name,
-        );
-      } else if (item is AccountTemplate) {
-        final toSave = item.copyWith(syncStatus: SyncStatus.pendingPush);
-        await _storage.saveTemplate(toSave, isSyncMerge: true);
-        await _ensureApprovedLocalSyncChange(
-          entityType: LocalSyncEntityType.template,
-          entityId: item.templateId,
-          title: item.title,
-        );
-      } else if (item is TotpCredential) {
-        final toSave = item.copyWith(syncStatus: SyncStatus.pendingPush);
-        await _storage.saveTotpCredential(toSave, isSyncMerge: true);
-        await _ensureApprovedLocalSyncChange(
-          entityType: LocalSyncEntityType.totpCredential,
-          entityId: item.id,
-          title: item.label,
-        );
-      }
+    if (merged.isEmpty) {
+      await _storage.setSetting(
+        'lan_sync_last_${_identity.vaultId}',
+        DateTime.now().toIso8601String(),
+      );
+      return;
     }
+
+    final items = merged.map((item) {
+      final payload = _itemToPayloadJson(item);
+      final type = payload['_type'] as String;
+      return (
+        type: switch (type) {
+          'account' => LocalSyncEntityType.account,
+          'template' => LocalSyncEntityType.template,
+          'totp_credential' => LocalSyncEntityType.totpCredential,
+          _ => throw ArgumentError('Unknown payload type: $type'),
+        },
+        payload: payload,
+      );
+    }).toList();
+
+    await _storage.commitLanSyncBatch(
+      vaultId: _identity.vaultId,
+      items: items,
+      markForServerPush: true,
+    );
 
     if (session.conflictCount != null && session.conflictCount! > 0) {
       // 冲突日志已在 merging 时生成，但预览版不包含完整 ConflictLog
@@ -361,19 +360,6 @@ class LanSyncHostHandler {
     await _storage.setSetting(
       'lan_sync_last_${_identity.vaultId}',
       DateTime.now().toIso8601String(),
-    );
-  }
-
-  Future<void> _ensureApprovedLocalSyncChange({
-    required LocalSyncEntityType entityType,
-    required String entityId,
-    required String title,
-  }) async {
-    await _storage.createApprovedLocalSyncChange(
-      vaultId: _identity.vaultId,
-      entityType: entityType,
-      entityId: entityId,
-      title: title,
     );
   }
 

@@ -2,10 +2,12 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:secret_roy/core/app_logger.dart';
 import 'package:secret_roy/models/account_item.dart';
 import 'package:secret_roy/models/account_template.dart';
+import 'package:secret_roy/models/local_sync_change.dart';
 import 'package:secret_roy/models/totp_credential.dart';
 import 'package:secret_roy/services/identity_service.dart';
 import 'package:secret_roy/services/secure_storage_service.dart';
@@ -256,19 +258,45 @@ class LanSyncClient {
     return decrypted;
   }
 
+  @visibleForTesting
+  Future<void> commitLocalForTest(List<dynamic> mergedItems) => _commitLocal(mergedItems);
+
   Future<void> _commitLocal(List<dynamic> mergedItems) async {
-    for (final item in mergedItems) {
-      if (item is AccountItem) {
-        final toSave = item.copyWith(syncStatus: SyncStatus.pendingPush);
-        await _storage.saveAccount(toSave, isSyncMerge: true);
-      } else if (item is AccountTemplate) {
-        final toSave = item.copyWith(syncStatus: SyncStatus.pendingPush);
-        await _storage.saveTemplate(toSave, isSyncMerge: true);
-      } else if (item is TotpCredential) {
-        final toSave = item.copyWith(syncStatus: SyncStatus.pendingPush);
-        await _storage.saveTotpCredential(toSave, isSyncMerge: true);
-      }
+    if (mergedItems.isEmpty) {
+      await _storage.setSetting(
+        'lan_sync_last_${_identity.vaultId}',
+        DateTime.now().toIso8601String(),
+      );
+      AppLogger.d('[LAN-Client] Committed 0 items');
+      return;
     }
+
+    final items = mergedItems.map((item) {
+      final payload = (item as dynamic).toJson() as Map<String, dynamic>;
+      if (item is AccountItem) {
+        payload['_type'] = 'account';
+      } else if (item is AccountTemplate) {
+        payload['_type'] = 'template';
+      } else if (item is TotpCredential) {
+        payload['_type'] = 'totp_credential';
+      }
+      final type = payload['_type'] as String;
+      return (
+        type: switch (type) {
+          'account' => LocalSyncEntityType.account,
+          'template' => LocalSyncEntityType.template,
+          'totp_credential' => LocalSyncEntityType.totpCredential,
+          _ => throw ArgumentError('Unknown payload type: $type'),
+        },
+        payload: payload,
+      );
+    }).toList();
+
+    await _storage.commitLanSyncBatch(
+      vaultId: _identity.vaultId,
+      items: items,
+      markForServerPush: true,
+    );
 
     await _storage.setSetting(
       'lan_sync_last_${_identity.vaultId}',

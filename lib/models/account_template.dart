@@ -39,7 +39,6 @@ enum TemplateCategory {
   work,
   shopping,
   finance,
-  note,
   custom,
 }
 
@@ -73,8 +72,6 @@ IconData templateCategoryIcon(TemplateCategory category) {
       return Icons.shopping_bag_outlined;
     case TemplateCategory.finance:
       return Icons.account_balance_outlined;
-    case TemplateCategory.note:
-      return Icons.sticky_note_2_outlined;
     case TemplateCategory.custom:
       return Icons.widgets_outlined;
   }
@@ -94,10 +91,6 @@ TemplateCategory inferTemplateCategory({
   switch (templateId) {
     case 'generic_info':
       return TemplateCategory.custom;
-    case 'builtin_secure_note':
-    case 'builtin_mnemonic':
-    case 'builtin_api_service':
-      return TemplateCategory.note;
   }
 
   if (iconCodePoint == Icons.credit_card_outlined.codePoint) {
@@ -167,16 +160,6 @@ TemplateCategory inferTemplateCategory({
       normalizedTitle.contains('购物')) {
     return TemplateCategory.shopping;
   }
-  if (normalizedTitle.contains('note') ||
-      normalizedTitle.contains('mnemonic') ||
-      normalizedTitle.contains('助记词') ||
-      normalizedTitle.contains('笔记') ||
-      normalizedTitle.contains('密钥') ||
-      normalizedTitle.contains('api key') ||
-      normalizedTitle.contains('私钥')) {
-    return TemplateCategory.note;
-  }
-
   final sourceFields = fields ?? const <AccountField>[];
   final hasEmailLike = sourceFields.any(
     (field) =>
@@ -195,14 +178,8 @@ TemplateCategory inferTemplateCategory({
         normalized.contains('支付') ||
         normalized.contains('银行卡');
   });
-  final hasNoteLike = sourceFields.any((field) {
-    return field.attributes.type == AccountFieldType.longText ||
-        field.attributes.type == AccountFieldType.list;
-  });
-
   if (hasPaymentLike) return TemplateCategory.payment;
   if (hasPhoneLike) return TemplateCategory.contact;
-  if (hasNoteLike) return TemplateCategory.note;
   if (hasEmailLike) return TemplateCategory.login;
 
   return TemplateCategory.custom;
@@ -552,7 +529,7 @@ final AccountTemplate secureNoteGenericTemplate = AccountTemplate(
   subTitle:
       '存储助记词、API Key、私钥等敏感文本',
   iconCodePoint: Icons.note_outlined.codePoint,
-  category: TemplateCategory.note,
+  category: TemplateCategory.custom,
   fields: [
     AccountField(
       fieldKey: 'content',
@@ -580,7 +557,7 @@ final AccountTemplate secureNoteMnemonicTemplate = AccountTemplate(
   title: '助记词',
   subTitle: '加密存储 12/24 个孝复词',
   iconCodePoint: Icons.vpn_key_outlined.codePoint,
-  category: TemplateCategory.note,
+  category: TemplateCategory.custom,
   fields: [
     AccountField(
       fieldKey: 'mnemonic_words',
@@ -609,7 +586,7 @@ final AccountTemplate apiServiceTemplate = AccountTemplate(
   title: 'API 服务',
   subTitle: '存储 API Key、Token 和端点信息',
   iconCodePoint: Icons.code_outlined.codePoint,
-  category: TemplateCategory.note,
+  category: TemplateCategory.custom,
   fields: [
     AccountField(
       fieldKey: 'service_name',

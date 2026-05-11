@@ -1,6 +1,7 @@
 ﻿import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
+import '../theme/app_design_tokens.dart';
 import '../models/account_template.dart';
 import '../utils/field_presets.dart';
 
@@ -79,7 +80,7 @@ class EditorMetric extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         color: theme.colorScheme.onPrimaryContainer.withAlpha(18),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadii.panel),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

@@ -129,7 +129,7 @@ class _AccountListTileState extends State<AccountListTile>
       SnackBar(
         behavior: SnackBarBehavior.floating,
         width: 220,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.card)),
         content: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -1260,7 +1260,7 @@ class _AccountFieldRowBodyState extends State<AccountFieldRowBody> {
             height: 32,
             decoration: BoxDecoration(
               color: widget.accent.withAlpha(14),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(AppRadii.sm),
             ),
             alignment: Alignment.center,
             child: Icon(widget.icon, size: 16, color: widget.accent),

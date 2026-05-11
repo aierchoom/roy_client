@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/app_design_tokens.dart';
+
 /// A styled chip widget used for displaying tags and status indicators.
 class ToneChip extends StatelessWidget {
   final IconData icon;
@@ -22,7 +24,7 @@ class ToneChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
         color: _softSurface(theme, tint: accent, tintAlpha: 16),
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(AppRadii.pill),
         border: Border.all(color: accent.withAlpha(48)),
       ),
       child: Row(
@@ -84,7 +86,7 @@ class SectionHeader extends StatelessWidget {
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
             color: color.withAlpha(20),
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(AppRadii.control),
           ),
           child: Icon(icon, size: 20, color: color),
         ),
@@ -149,9 +151,9 @@ class EmptyStatePlaceholder extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerHighest.withAlpha(60),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadii.dialog),
         border: Border.all(
-          color: theme.colorScheme.outlineVariant.withAlpha(80),
+          color: theme.colorScheme.outlineVariant.withAlpha(AppAlphas.low),
           style: BorderStyle.solid,
         ),
       ),

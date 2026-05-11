@@ -7,9 +7,15 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 // ignore: depend_on_referenced_packages
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
+import 'package:secret_roy/models/account_item.dart';
+import 'package:secret_roy/models/account_template.dart';
+import 'package:secret_roy/models/hlc.dart';
+import 'package:secret_roy/models/local_sync_change.dart';
+import 'package:secret_roy/models/totp_credential.dart';
 import 'package:secret_roy/services/database_file_cipher.dart';
 import 'package:secret_roy/services/identity_service.dart';
 import 'package:secret_roy/services/secure_storage_service.dart';
+import 'package:secret_roy/services/totp_service.dart';
 import 'package:secret_roy/sync/lan_sync_client.dart';
 import 'package:secret_roy/sync/lan_sync_session.dart';
 import 'package:secret_roy/sync/sync_service.dart';
@@ -189,6 +195,145 @@ void main() {
       // We verify the guard logic exists by checking the source behavior
       // through a direct state check instead.
       expect(client.isBusy, isFalse);
+    });
+  });
+
+  group('commitLocal creates approved sync changes', () {
+    test('creates approved LocalSyncChange for accounts', () async {
+      final client = LanSyncClient(
+        storage: storage,
+        identity: identity,
+        syncService: syncService,
+      );
+
+      final account = AccountItem(
+        id: 'acc-1',
+        name: 'Test Account',
+        email: 'test@test.com',
+        templateId: 'template_default',
+        data: const {'username': 'test_user'},
+        createdAt: DateTime.now().millisecondsSinceEpoch,
+        nameHlc: Hlc.now('device_test'),
+        emailHlc: Hlc.now('device_test'),
+        dataHlc: {'username': Hlc.now('device_test')},
+      );
+
+      await client.commitLocalForTest([account]);
+
+      final approved = await storage.loadApprovedLocalSyncChanges(
+        vaultId: identity.vaultId,
+      );
+      expect(approved.length, 1);
+      expect(approved.first.entityType, LocalSyncEntityType.account);
+      expect(approved.first.entityId, account.id);
+      expect(approved.first.title, account.name);
+      expect(approved.first.status, LocalSyncStatus.approved);
+    });
+
+    test('creates approved LocalSyncChange for templates', () async {
+      final client = LanSyncClient(
+        storage: storage,
+        identity: identity,
+        syncService: syncService,
+      );
+
+      final template = const AccountTemplate(
+        templateId: 'tpl-1',
+        title: 'Test Template',
+        subTitle: '',
+        category: TemplateCategory.login,
+        fields: [],
+      );
+
+      await client.commitLocalForTest([template]);
+
+      final approved = await storage.loadApprovedLocalSyncChanges(
+        vaultId: identity.vaultId,
+      );
+      expect(approved.length, 1);
+      expect(approved.first.entityType, LocalSyncEntityType.template);
+      expect(approved.first.entityId, template.templateId);
+      expect(approved.first.title, template.title);
+      expect(approved.first.status, LocalSyncStatus.approved);
+    });
+
+    test('creates approved LocalSyncChange for TOTP credentials', () async {
+      final client = LanSyncClient(
+        storage: storage,
+        identity: identity,
+        syncService: syncService,
+      );
+
+      final totp = TotpCredential(
+        id: 'totp-1',
+        label: 'Test TOTP',
+        config: const TotpConfig(secret: 'JBSWY3DPEHPK3PXP'),
+        linkedAccountIds: const [],
+        createdAt: DateTime.now().millisecondsSinceEpoch,
+        labelHlc: Hlc.now('device_test'),
+        configHlc: Hlc.now('device_test'),
+        linksHlc: Hlc.now('device_test'),
+      );
+
+      await client.commitLocalForTest([totp]);
+
+      final approved = await storage.loadApprovedLocalSyncChanges(
+        vaultId: identity.vaultId,
+      );
+      expect(approved.length, 1);
+      expect(approved.first.entityType, LocalSyncEntityType.totpCredential);
+      expect(approved.first.entityId, totp.id);
+      expect(approved.first.title, totp.label);
+      expect(approved.first.status, LocalSyncStatus.approved);
+    });
+
+    test('creates approved entries for mixed item types', () async {
+      final client = LanSyncClient(
+        storage: storage,
+        identity: identity,
+        syncService: syncService,
+      );
+
+      final account = AccountItem(
+        id: 'acc-2',
+        name: 'Mixed Account',
+        email: 'mixed@test.com',
+        templateId: 'template_default',
+        data: const {},
+        createdAt: DateTime.now().millisecondsSinceEpoch,
+        nameHlc: Hlc.now('device_test'),
+        emailHlc: Hlc.now('device_test'),
+        dataHlc: {},
+      );
+      final template = const AccountTemplate(
+        templateId: 'tpl-2',
+        title: 'Mixed Template',
+        subTitle: '',
+        category: TemplateCategory.custom,
+        fields: [],
+      );
+      final totp = TotpCredential(
+        id: 'totp-2',
+        label: 'Mixed TOTP',
+        config: const TotpConfig(secret: 'JBSWY3DPEHPK3PXP'),
+        linkedAccountIds: const [],
+        createdAt: DateTime.now().millisecondsSinceEpoch,
+        labelHlc: Hlc.now('device_test'),
+        configHlc: Hlc.now('device_test'),
+        linksHlc: Hlc.now('device_test'),
+      );
+
+      await client.commitLocalForTest([account, template, totp]);
+
+      final approved = await storage.loadApprovedLocalSyncChanges(
+        vaultId: identity.vaultId,
+      );
+      expect(approved.length, 3);
+
+      final types = approved.map((c) => c.entityType).toSet();
+      expect(types, contains(LocalSyncEntityType.account));
+      expect(types, contains(LocalSyncEntityType.template));
+      expect(types, contains(LocalSyncEntityType.totpCredential));
     });
   });
 }

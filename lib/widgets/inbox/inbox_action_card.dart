@@ -56,7 +56,7 @@ class ActionSummaryCard extends StatelessWidget {
                   children: [
                     Text.rich(
                       TextSpan(
-                        children: _highlightNumbers(
+                        children: highlightNumbers(
                           title,
                           effectiveIconColor,
                           baseStyle: theme.textTheme.bodyLarge?.copyWith(
@@ -189,39 +189,6 @@ class ActionItemCard extends StatelessWidget {
       ),
     );
   }
-}
-
-List<TextSpan> _highlightNumbers(
-  String text,
-  Color highlightColor, {
-  TextStyle? baseStyle,
-}) {
-  final spans = <TextSpan>[];
-  final regex = RegExp(r'(\d+)');
-  var lastEnd = 0;
-  for (final match in regex.allMatches(text)) {
-    if (match.start > lastEnd) {
-      spans.add(TextSpan(
-        text: text.substring(lastEnd, match.start),
-        style: baseStyle,
-      ));
-    }
-    spans.add(TextSpan(
-      text: match.group(0),
-      style: baseStyle?.copyWith(
-        color: highlightColor,
-        fontWeight: FontWeight.w900,
-      ),
-    ));
-    lastEnd = match.end;
-  }
-  if (lastEnd < text.length) {
-    spans.add(TextSpan(
-      text: text.substring(lastEnd),
-      style: baseStyle,
-    ));
-  }
-  return spans;
 }
 
 class _IconContainer extends StatelessWidget {

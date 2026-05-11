@@ -286,7 +286,7 @@ class _HomeSearchViewState extends State<HomeSearchView> {
     final theme = Theme.of(context);
 
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(AppSpacing.xl2),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(AppRadii.panel),
@@ -419,7 +419,7 @@ class _HomeSearchViewState extends State<HomeSearchView> {
         ),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.all(AppSpacing.xl2),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

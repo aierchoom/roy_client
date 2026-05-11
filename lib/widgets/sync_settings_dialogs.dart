@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../l10n/app_text_extension.dart';
+import '../theme/app_design_tokens.dart';
 
 /// A styled info chip widget for displaying sync status information.
 class SyncInfoChip extends StatelessWidget {
@@ -17,7 +18,7 @@ class SyncInfoChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(AppRadii.pill),
         border: Border.all(color: theme.colorScheme.outlineVariant),
       ),
       child: Text(
@@ -72,7 +73,7 @@ class _LanPairingCodeDialogState extends State<LanPairingCodeDialog> {
     final theme = Theme.of(context);
 
     return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.xl)),
       title: Text(
         widget.title,
         style: theme.textTheme.titleLarge?.copyWith(
@@ -174,7 +175,7 @@ class _VaultLinkCodeDialogState extends State<VaultLinkCodeDialog> {
     final theme = Theme.of(context);
 
     return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.xxl)),
       title: Text(
         widget.title,
         style: theme.textTheme.titleLarge?.copyWith(
@@ -268,7 +269,7 @@ class _SyncServerDialogState extends State<SyncServerDialog> {
     final theme = Theme.of(context);
 
     return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.xxl)),
       titlePadding: EdgeInsets.zero,
       contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
       title: Column(
@@ -314,11 +315,11 @@ class _SyncServerDialogState extends State<SyncServerDialog> {
                 50,
               ),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(AppRadii.panel),
                 borderSide: BorderSide.none,
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(AppRadii.panel),
                 borderSide: BorderSide(
                   color: theme.colorScheme.primary,
                   width: 2,
@@ -331,7 +332,7 @@ class _SyncServerDialogState extends State<SyncServerDialog> {
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: theme.colorScheme.surfaceContainerHighest.withAlpha(100),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppRadii.card),
             ),
             child: Row(
               children: [
@@ -371,7 +372,7 @@ class _SyncServerDialogState extends State<SyncServerDialog> {
             style: FilledButton.styleFrom(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadii.card),
               ),
             ),
             child: Text(widget.saveLabel),

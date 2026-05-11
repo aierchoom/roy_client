@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/app_design_tokens.dart';
+
 /// A reusable section card with title, subtitle, and child content.
 class SectionCard extends StatelessWidget {
   final String title;
@@ -14,8 +16,8 @@ class SectionCard extends StatelessWidget {
     required this.title,
     this.subtitle,
     required this.child,
-    this.padding = const EdgeInsets.all(18),
-    this.childGap = 16,
+    this.padding = const EdgeInsets.all(AppSpacing.xl2),
+    this.childGap = AppSpacing.lg,
     this.useOutlinedBorder = false,
   });
 
@@ -36,7 +38,7 @@ class SectionCard extends StatelessWidget {
             ),
           ),
           if (subtitle != null && subtitle!.isNotEmpty) ...[
-            const SizedBox(height: 6),
+            const SizedBox(height: AppSpacing.sm2),
             Text(
               subtitle!,
               style: theme.textTheme.bodyMedium?.copyWith(
@@ -54,9 +56,9 @@ class SectionCard extends StatelessWidget {
       content = Container(
         decoration: BoxDecoration(
           color: theme.colorScheme.surface,
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(AppRadii.lg),
           border: Border.all(
-            color: theme.colorScheme.outlineVariant.withAlpha(80),
+            color: theme.colorScheme.outlineVariant.withAlpha(AppAlphas.low),
           ),
         ),
         child: content,

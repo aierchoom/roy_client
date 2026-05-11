@@ -48,7 +48,7 @@ void main() {
       final mnemonic = secureNoteMnemonicTemplate;
       final apiService = apiServiceTemplate;
 
-      expect(secureNote.category, TemplateCategory.note);
+      expect(secureNote.category, TemplateCategory.custom);
       expect(
         secureNote.fields.first.attributes.type,
         AccountFieldType.longText,

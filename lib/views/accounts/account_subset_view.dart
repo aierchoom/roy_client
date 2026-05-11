@@ -178,7 +178,7 @@ class _GroupCard extends StatelessWidget {
                   height: 32,
                   decoration: BoxDecoration(
                     color: errorColor.withAlpha(20),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(AppRadii.control),
                   ),
                   alignment: Alignment.center,
                   child: Icon(Icons.key_outlined,
@@ -303,7 +303,7 @@ class _AccountCardState extends State<_AccountCard> {
       SnackBar(
         behavior: SnackBarBehavior.floating,
         width: 220,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.card)),
         content: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -346,7 +346,7 @@ class _AccountCardState extends State<_AccountCard> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            style: TextButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.error),
             child: Text(context.text('删除', 'Delete')),
           ),
         ],
@@ -380,7 +380,7 @@ class _AccountCardState extends State<_AccountCard> {
                     height: 44,
                     decoration: BoxDecoration(
                       color: accent.withAlpha(18),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadii.card),
                     ),
                     alignment: Alignment.center,
                     child: Text(
@@ -521,13 +521,13 @@ class _FieldRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: entry.isHighlighted
-            ? Colors.red.withAlpha(
+            ? theme.colorScheme.error.withAlpha(
                 theme.brightness == Brightness.light ? 20 : 30)
             : theme.colorScheme.surface.withAlpha(
                 theme.brightness == Brightness.light ? 120 : 60),
         borderRadius: BorderRadius.circular(AppRadii.control),
         border: entry.isHighlighted
-            ? Border.all(color: Colors.red.withAlpha(80))
+            ? Border.all(color: theme.colorScheme.error.withAlpha(80))
             : null,
       ),
       child: Row(

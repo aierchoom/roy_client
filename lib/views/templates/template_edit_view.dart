@@ -246,7 +246,7 @@ class _TemplateEditViewState extends State<TemplateEditView> {
             onPressed: () => Navigator.pop(dialogContext, true),
             child: Text(
               AppLocalizations.of(context)!.delete,
-              style: const TextStyle(color: Colors.red),
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
           ),
         ],

@@ -1,4 +1,6 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:async';
+
+import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:provider/provider.dart';
@@ -6,6 +8,7 @@ import 'package:intl/intl.dart';
 
 import '../../theme/app_design_tokens.dart';
 
+import '../../l10n/app_text_extension.dart';
 import '../../models/account_item.dart';
 import '../../models/account_template.dart';
 import '../../models/hlc.dart';
@@ -812,7 +815,7 @@ class _AccountEditViewState extends State<AccountEditView> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(AppRadii.xl),
         border: Border.all(color: heroEdge),
         boxShadow: AppShadows.card(theme, depth: 1.15),
       ),
@@ -828,7 +831,7 @@ class _AccountEditViewState extends State<AccountEditView> {
                   height: 58,
                   decoration: BoxDecoration(
                     color: theme.colorScheme.surface.withAlpha(232),
-                    borderRadius: BorderRadius.circular(18),
+                    borderRadius: BorderRadius.circular(AppRadii.lg),
                     boxShadow: AppShadows.card(theme, depth: 0.45),
                   ),
                   alignment: Alignment.center,
@@ -919,7 +922,7 @@ class _AccountEditViewState extends State<AccountEditView> {
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               color: heroBase.withAlpha(230),
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(AppRadii.lg),
               border: Border.all(color: heroEdge.withAlpha(90)),
             ),
             child: Row(
@@ -962,7 +965,7 @@ class _AccountEditViewState extends State<AccountEditView> {
                   height: 52,
                   decoration: BoxDecoration(
                     color: theme.colorScheme.surface.withAlpha(214),
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(AppRadii.panel),
                   ),
                   alignment: Alignment.center,
                   child: Icon(
@@ -1006,7 +1009,7 @@ class _AccountEditViewState extends State<AccountEditView> {
           tint: theme.colorScheme.primary,
           tintAlpha: 8,
         ),
-        borderRadius: BorderRadius.circular(26),
+        borderRadius: BorderRadius.circular(AppRadii.xxl),
         border: Border.all(
           color: theme.colorScheme.outlineVariant.withAlpha(88),
         ),
@@ -1153,7 +1156,7 @@ class _AccountEditViewState extends State<AccountEditView> {
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
                   color: theme.colorScheme.errorContainer.withAlpha(92),
-                  borderRadius: BorderRadius.circular(18),
+                  borderRadius: BorderRadius.circular(AppRadii.lg),
                   border: Border.all(
                     color: theme.colorScheme.error.withAlpha(72),
                   ),
@@ -1189,7 +1192,7 @@ class _AccountEditViewState extends State<AccountEditView> {
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
                   color: selectedTemplateAccent,
-                  borderRadius: BorderRadius.circular(18),
+                  borderRadius: BorderRadius.circular(AppRadii.lg),
                   border: Border.all(
                     color: theme.colorScheme.primary.withAlpha(44),
                   ),
@@ -1202,7 +1205,7 @@ class _AccountEditViewState extends State<AccountEditView> {
                       height: 52,
                       decoration: BoxDecoration(
                         color: theme.colorScheme.surface.withAlpha(232),
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(AppRadii.panel),
                       ),
                       alignment: Alignment.center,
                       child: Text(
@@ -1301,7 +1304,7 @@ class _AccountEditViewState extends State<AccountEditView> {
     return Container(
       decoration: BoxDecoration(
         color: AppSurfaces.soft(theme.colorScheme, tint: accent, tintAlpha: 5),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(AppRadii.xl),
         border: Border.all(color: accent.withAlpha(38)),
         boxShadow: AppShadows.card(theme, depth: 0.7),
       ),
@@ -1322,7 +1325,7 @@ class _AccountEditViewState extends State<AccountEditView> {
                       tint: accent,
                       tintAlpha: 18,
                     ),
-                    borderRadius: BorderRadius.circular(15),
+                    borderRadius: BorderRadius.circular(AppRadii.button),
                   ),
                   child: Icon(
                     field.attributes.isSecret
@@ -1402,7 +1405,7 @@ class _AccountEditViewState extends State<AccountEditView> {
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: previewSurface,
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(AppRadii.lg),
                 border: Border.all(color: accent.withAlpha(34)),
               ),
               child: Column(
@@ -1499,7 +1502,7 @@ class _AccountEditViewState extends State<AccountEditView> {
     return Container(
       decoration: BoxDecoration(
         color: AppSurfaces.soft(theme.colorScheme, tint: accent, tintAlpha: 5),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(AppRadii.xl),
         border: Border.all(color: accent.withAlpha(38)),
         boxShadow: AppShadows.card(theme, depth: 0.7),
       ),
@@ -1519,7 +1522,7 @@ class _AccountEditViewState extends State<AccountEditView> {
                       tint: accent,
                       tintAlpha: 18,
                     ),
-                    borderRadius: BorderRadius.circular(15),
+                    borderRadius: BorderRadius.circular(AppRadii.button),
                   ),
                   child: Icon(
                     isSecret ? Icons.key_outlined : Icons.notes_outlined,
@@ -1572,7 +1575,7 @@ class _AccountEditViewState extends State<AccountEditView> {
               InkWell(
                 onTap: () =>
                     setState(() => _fieldVisibility[field.fieldKey] = true),
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(AppRadii.lg),
                 child: Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(14),
@@ -1582,7 +1585,7 @@ class _AccountEditViewState extends State<AccountEditView> {
                       tint: accent,
                       tintAlpha: 5,
                     ),
-                    borderRadius: BorderRadius.circular(18),
+                    borderRadius: BorderRadius.circular(AppRadii.lg),
                     border: Border.all(color: accent.withAlpha(34)),
                   ),
                   child: Row(
@@ -1657,7 +1660,7 @@ class _AccountEditViewState extends State<AccountEditView> {
     return Container(
       decoration: BoxDecoration(
         color: AppSurfaces.soft(theme.colorScheme, tint: accent, tintAlpha: 5),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(AppRadii.xl),
         border: Border.all(color: accent.withAlpha(38)),
         boxShadow: AppShadows.card(theme, depth: 0.7),
       ),
@@ -1677,7 +1680,7 @@ class _AccountEditViewState extends State<AccountEditView> {
                       tint: accent,
                       tintAlpha: 18,
                     ),
-                    borderRadius: BorderRadius.circular(15),
+                    borderRadius: BorderRadius.circular(AppRadii.button),
                   ),
                   child: Icon(
                     isMnemonic ? Icons.vpn_key_outlined : Icons.list_outlined,
@@ -1711,6 +1714,7 @@ class _AccountEditViewState extends State<AccountEditView> {
             _ListFieldEditor(
               controller: controller,
               isMnemonic: isMnemonic,
+              isSecret: field.attributes.isSecret,
               readOnly: !_isEditing || !field.attributes.isEditable,
               hint: field.attributes.hint,
             ),
@@ -1843,7 +1847,7 @@ class _AccountEditViewState extends State<AccountEditView> {
           tint: theme.colorScheme.primary,
           tintAlpha: 10,
         ),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(AppRadii.xl),
         border: Border.all(
           color: theme.colorScheme.outlineVariant.withAlpha(88),
         ),
@@ -1961,7 +1965,7 @@ class _AccountEditViewState extends State<AccountEditView> {
           tint: theme.colorScheme.primary,
           tintAlpha: 10,
         ),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(AppRadii.xl),
         border: Border.all(
           color: theme.colorScheme.outlineVariant.withAlpha(88),
         ),
@@ -2071,7 +2075,7 @@ class _AccountEditViewState extends State<AccountEditView> {
 
     return Material(
       color: theme.colorScheme.surfaceContainerHighest.withAlpha(80),
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(AppRadii.panel),
       child: InkWell(
         onTap: () {
           Navigator.push(
@@ -2081,7 +2085,7 @@ class _AccountEditViewState extends State<AccountEditView> {
             ),
           );
         },
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadii.panel),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           child: Row(
@@ -2176,7 +2180,7 @@ class _AccountEditViewState extends State<AccountEditView> {
           tint: theme.colorScheme.secondary,
           tintAlpha: 10,
         ),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(AppRadii.xl),
         border: Border.all(
           color: theme.colorScheme.outlineVariant.withAlpha(88),
         ),
@@ -2273,7 +2277,7 @@ class _AccountEditViewState extends State<AccountEditView> {
           tint: theme.colorScheme.secondary,
           tintAlpha: 12,
         ),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(AppRadii.xl),
         border: Border.all(
           color: theme.colorScheme.outlineVariant.withAlpha(90),
         ),
@@ -2289,7 +2293,7 @@ class _AccountEditViewState extends State<AccountEditView> {
               height: 54,
               decoration: BoxDecoration(
                 color: theme.colorScheme.surface.withAlpha(236),
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(AppRadii.lg),
               ),
               alignment: Alignment.center,
               child: Icon(
@@ -2361,7 +2365,7 @@ class _AccountEditViewState extends State<AccountEditView> {
                     color: theme.colorScheme.surfaceContainerHighest.withAlpha(
                       90,
                     ),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppRadii.card),
                     border: Border.all(
                       color: theme.colorScheme.outlineVariant.withAlpha(120),
                     ),
@@ -2479,7 +2483,7 @@ class _AccountEditViewState extends State<AccountEditView> {
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: theme.colorScheme.errorContainer.withAlpha(60),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadii.card),
                       border: Border.all(
                         color: theme.colorScheme.error.withAlpha(70),
                       ),
@@ -2773,12 +2777,14 @@ class _AccountEditViewState extends State<AccountEditView> {
 class _ListFieldEditor extends StatefulWidget {
   final TextEditingController controller;
   final bool isMnemonic;
+  final bool isSecret;
   final bool readOnly;
   final String? hint;
 
   const _ListFieldEditor({
     required this.controller,
     this.isMnemonic = false,
+    this.isSecret = false,
     this.readOnly = false,
     this.hint,
   });
@@ -2790,6 +2796,7 @@ class _ListFieldEditor extends StatefulWidget {
 class _ListFieldEditorState extends State<_ListFieldEditor> {
   late List<String> _items;
   bool _mnemonicObscured = true;
+  Timer? _autoHideTimer;
 
   static const _validMnemonicLengths = {12, 15, 18, 21, 24};
 
@@ -2797,6 +2804,12 @@ class _ListFieldEditorState extends State<_ListFieldEditor> {
   void initState() {
     super.initState();
     _items = _parseItems(widget.controller.text);
+  }
+
+  @override
+  void dispose() {
+    _autoHideTimer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -2844,6 +2857,39 @@ class _ListFieldEditorState extends State<_ListFieldEditor> {
     _updateController();
   }
 
+  Future<void> _copyAllItems() async {
+    if (_items.isEmpty) return;
+    final separator = widget.isMnemonic ? ' ' : '\n';
+    await SensitiveClipboardService.copy(
+      text: _items.join(separator),
+      level: ClipboardRiskLevel.high,
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        width: 220,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.card)),
+        content: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.check_rounded, size: 16),
+            const SizedBox(width: 8),
+            Text(context.text('已复制全部', 'Copied all')),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _revealWithAutoHide() {
+    setState(() => _mnemonicObscured = false);
+    _autoHideTimer?.cancel();
+    _autoHideTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted) setState(() => _mnemonicObscured = true);
+    });
+  }
+
   bool get _isMnemonicValid =>
       _items.isNotEmpty && _validMnemonicLengths.contains(_items.length);
 
@@ -2872,7 +2918,7 @@ class _ListFieldEditorState extends State<_ListFieldEditor> {
                   '粘贴助记词，支持空格/换行/逗号分隔',
               prefixIcon: const Icon(Icons.paste_outlined),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadii.card),
               ),
             ),
             onSubmitted: _handlePaste,
@@ -2900,13 +2946,13 @@ class _ListFieldEditorState extends State<_ListFieldEditor> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: Colors.green.withAlpha(20),
+                    color: theme.colorScheme.primary.withAlpha(20),
                     borderRadius: BorderRadius.circular(AppRadii.chip),
                   ),
                   child: Text(
                     '有效',
                     style: theme.textTheme.labelSmall?.copyWith(
-                      color: Colors.green,
+                      color: theme.colorScheme.primary,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -2927,9 +2973,25 @@ class _ListFieldEditorState extends State<_ListFieldEditor> {
                   ),
                 ),
               const Spacer(),
+              if (_items.isNotEmpty)
+                IconButton(
+                  onPressed: _copyAllItems,
+                  icon: const Icon(Icons.copy_outlined, size: 20),
+                  style: IconButton.styleFrom(
+                    minimumSize: const Size(32, 32),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
               // Reveal/obscure toggle
               IconButton(
-                onPressed: () => setState(() => _mnemonicObscured = !_mnemonicObscured),
+                onPressed: () {
+                  if (_mnemonicObscured) {
+                    _revealWithAutoHide();
+                  } else {
+                    _autoHideTimer?.cancel();
+                    setState(() => _mnemonicObscured = true);
+                  }
+                },
                 icon: Icon(
                   _mnemonicObscured ? Icons.visibility_outlined : Icons.visibility_off_outlined,
                   size: 20,
@@ -2974,7 +3036,7 @@ class _ListFieldEditorState extends State<_ListFieldEditor> {
                       Expanded(
                         child: _mnemonicObscured && !widget.readOnly
                             ? GestureDetector(
-                                onTap: () => setState(() => _mnemonicObscured = false),
+                                onTap: _revealWithAutoHide,
                                 child: Text(
                                   '••••',
                                   style: TextStyle(
@@ -3034,6 +3096,19 @@ class _ListFieldEditorState extends State<_ListFieldEditor> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (_items.isNotEmpty)
+          Align(
+            alignment: Alignment.centerRight,
+            child: IconButton(
+              onPressed: _copyAllItems,
+              icon: const Icon(Icons.copy_outlined, size: 18),
+              tooltip: context.text('复制全部', 'Copy all'),
+              style: IconButton.styleFrom(
+                minimumSize: const Size(32, 32),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
+          ),
         ..._items.asMap().entries.map((entry) {
           final index = entry.key;
           return Padding(
@@ -3045,6 +3120,7 @@ class _ListFieldEditorState extends State<_ListFieldEditor> {
                     controller: TextEditingController(text: entry.value),
                     onChanged: (v) => _updateItem(index, v),
                     readOnly: widget.readOnly,
+                    obscureText: widget.isSecret && _mnemonicObscured,
                     style: const TextStyle(
                       fontFamily: 'monospace',
                       fontSize: 13,
@@ -3070,6 +3146,26 @@ class _ListFieldEditorState extends State<_ListFieldEditor> {
             ),
           );
         }),
+        if (widget.isSecret && _items.isNotEmpty)
+          TextButton.icon(
+            onPressed: () {
+              if (_mnemonicObscured) {
+                _revealWithAutoHide();
+              } else {
+                _autoHideTimer?.cancel();
+                setState(() => _mnemonicObscured = true);
+              }
+            },
+            icon: Icon(
+              _mnemonicObscured ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+              size: 18,
+            ),
+            label: Text(
+              _mnemonicObscured
+                  ? context.text('显示', 'Reveal')
+                  : context.text('隐藏', 'Hide'),
+            ),
+          ),
         if (!widget.readOnly)
           TextButton.icon(
             onPressed: _addItem,
@@ -3143,7 +3239,7 @@ class _AccountPickerDialogState extends State<_AccountPickerDialog> {
                   ),
                   prefixIcon: const Icon(Icons.search_outlined),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppRadii.card),
                   ),
                   contentPadding: const EdgeInsets.symmetric(vertical: 10),
                 ),
