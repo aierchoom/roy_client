@@ -72,11 +72,16 @@ class LanSyncClient {
     try {
       // 1. Start session
       onProgress(LanSyncPhase.connecting, null);
+      final localRecordIds = await _loadLocalRecordIds();
       final startResp = await _post('$_hostUrl/lan-sync/start', {
         'device_id': _identity.deviceId,
+        'record_ids': localRecordIds,
       });
       _sessionId = startResp['session_id'] as String;
-      AppLogger.d('[LAN-Client] Session started: $_sessionId');
+      AppLogger.d(
+        '[LAN-Client] Session started: $_sessionId '
+        '(${localRecordIds.length} local record IDs sent)',
+      );
 
       // 2. Push local pending data
       _phase = LanSyncPhase.receiving;
@@ -260,6 +265,18 @@ class LanSyncClient {
 
   @visibleForTesting
   Future<void> commitLocalForTest(List<dynamic> mergedItems) => _commitLocal(mergedItems);
+
+  Future<List<String>> _loadLocalRecordIds() async {
+    final accounts = await _storage.loadAccounts(includeDeleted: true);
+    final templates = await _storage.loadAllTemplates(includeDeleted: true);
+    final totps = await _storage.loadTotpCredentials(includeDeleted: true);
+
+    return [
+      ...accounts.map((a) => a.id),
+      ...templates.map((t) => t.templateId),
+      ...totps.map((t) => t.id),
+    ];
+  }
 
   Future<void> _commitLocal(List<dynamic> mergedItems) async {
     if (mergedItems.isEmpty) {

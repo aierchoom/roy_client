@@ -73,10 +73,14 @@ class NotificationService {
       final notification = AppNotification(
         id: const Uuid().v4(),
         type: AppNotificationType.passwordExpiry,
-        title: '密码过期提醒',
-        body: '「${account.name}」的密码已 $daysSince 天未修改，建议尽快更新。',
+        title: '',
+        body: '',
         accountId: account.id,
         createdAt: now,
+        params: {
+          'accountName': account.name,
+          'daysSince': daysSince,
+        },
       );
 
       await _storage.saveNotification(notification);
@@ -130,10 +134,15 @@ class NotificationService {
       final notification = AppNotification(
         id: const Uuid().v4(),
         type: AppNotificationType.weakPassword,
-        title: '弱密码提醒',
-        body: '「${account.name}」的密码强度为 $level（$score/100），建议尽快更新。',
+        title: '',
+        body: '',
         accountId: account.id,
         createdAt: now,
+        params: {
+          'accountName': account.name,
+          'score': score,
+          'level': level,
+        },
       );
 
       await _storage.saveNotification(notification);

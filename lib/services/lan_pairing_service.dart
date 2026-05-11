@@ -629,7 +629,13 @@ class LanPairingService {
             break;
           }
           final peerDeviceId = (body['device_id'] as String?) ?? '';
-          final result = await handler.handleStart(peerDeviceId);
+          final peerRecordIds = (body['record_ids'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList();
+          final result = await handler.handleStart(
+            peerDeviceId,
+            peerRecordIds: peerRecordIds,
+          );
           response.statusCode = HttpStatus.ok;
           response.write(jsonEncode(result));
           break;

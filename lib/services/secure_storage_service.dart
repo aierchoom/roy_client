@@ -35,7 +35,7 @@ class SecureStorageService {
   static const String _databaseName = 'secret_roy_vault.db';
   static const String _encryptedDatabaseName = 'secret_roy_vault.db.enc';
   static const String _workingDatabaseName = 'secret_roy_vault.runtime.db';
-  static const int _databaseVersion = 11;
+  static const int _databaseVersion = 12;
 
   DatabaseFileCipher? _databaseCipher;
 
@@ -787,7 +787,8 @@ class SecureStorageService {
           body TEXT NOT NULL,
           account_id TEXT,
           created_at INTEGER NOT NULL,
-          is_read INTEGER DEFAULT 0
+          is_read INTEGER DEFAULT 0,
+          params TEXT
         )
       ''');
     }
@@ -803,6 +804,12 @@ class SecureStorageService {
         'ALTER TABLE accounts ADD COLUMN is_pinned INTEGER DEFAULT 0',
       );
       await db.execute('ALTER TABLE accounts ADD COLUMN pin_hlc TEXT');
+    }
+
+    if (oldVersion < 12) {
+      await db.execute(
+        'ALTER TABLE notifications ADD COLUMN params TEXT',
+      );
     }
   }
 
@@ -1427,15 +1434,7 @@ class SecureStorageService {
     try {
       await _database!.insert(
         'notifications',
-        {
-          'id': notification.id,
-          'type': notification.type.name,
-          'title': notification.title,
-          'body': notification.body,
-          'account_id': notification.accountId,
-          'created_at': notification.createdAt,
-          'is_read': notification.isRead ? 1 : 0,
-        },
+        notification.toRow(),
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
     } catch (e) {

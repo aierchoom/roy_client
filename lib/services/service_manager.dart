@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:secret_roy/core/app_logger.dart';
+import 'package:secret_roy/core/crypto_random.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -260,7 +262,8 @@ class ServiceManager extends ChangeNotifier {
     }
 
     _updateState(ServiceManagerState.unlocking);
-    return _completeUnlock(password);
+    final effectivePassword = await _resolveEffectivePassword(password);
+    return _completeUnlock(effectivePassword);
   }
 
   Future<UnlockResult> _completeUnlock(String password) async {
@@ -289,6 +292,11 @@ class ServiceManager extends ChangeNotifier {
       await _secureStorageService.ensurePendingSyncOutboxEntries(
         _identityService.vaultId,
       );
+
+      // Auto-migrate legacy no-password users to pseudo-key
+      if (await isNoPasswordMode() && await _readNoPasswordPseudoKey() == null) {
+        unawaited(_migrateNoPasswordToPseudoKey());
+      }
 
       unawaited(_syncService.connect());
       _updateState(ServiceManagerState.unlocked);
@@ -359,13 +367,17 @@ class ServiceManager extends ChangeNotifier {
     _cryptoService.logout();
   }
 
-  Future<void> enableNoPasswordMode() async {
+  Future<void> enableNoPasswordMode({String? preGeneratedPseudoKey}) async {
     const secureStorage = FlutterSecureStorage();
     await secureStorage.write(key: 'no_password_mode', value: 'true');
     // Biometric unlock with an empty password offers no security benefit;
     // disable it when entering no-password mode.
     await disableBiometric();
-    await unlockWithPassword('');
+
+    final pseudoPassword = preGeneratedPseudoKey ?? _generateNoPasswordPseudoKey();
+    await secureStorage.write(key: _noPasswordPseudoKey, value: pseudoPassword);
+
+    await unlockWithPassword(pseudoPassword);
   }
 
   Future<bool> isNoPasswordMode() async {
@@ -379,15 +391,20 @@ class ServiceManager extends ChangeNotifier {
   Future<void> disableNoPasswordMode() async {
     const secureStorage = FlutterSecureStorage();
     await secureStorage.delete(key: 'no_password_mode');
+    await secureStorage.delete(key: _noPasswordPseudoKey);
   }
 
   Future<bool> changeMasterPassword(
     String oldPassword,
     String newPassword,
   ) async {
+    final effectiveNewPassword = newPassword.isEmpty
+        ? _generateNoPasswordPseudoKey()
+        : newPassword;
+
     final success = await _cryptoService.updateMasterPassword(
       oldPassword,
-      newPassword,
+      effectiveNewPassword,
     );
     if (success) {
       await _secureStorageService.rotateDatabaseCipher(
@@ -396,10 +413,69 @@ class ServiceManager extends ChangeNotifier {
       if (newPassword.isNotEmpty) {
         await disableNoPasswordMode();
       } else {
-        await enableNoPasswordMode();
+        const secureStorage = FlutterSecureStorage();
+        await secureStorage.write(key: 'no_password_mode', value: 'true');
+        await disableBiometric();
+        await secureStorage.write(
+          key: _noPasswordPseudoKey,
+          value: effectiveNewPassword,
+        );
       }
     }
     return success;
+  }
+
+  static const String _noPasswordPseudoKey = 'no_password_pseudo_key';
+
+  static String _generateNoPasswordPseudoKey() {
+    return base64Encode(CryptoRandom.bytes(32));
+  }
+
+  Future<String> _resolveEffectivePassword(String inputPassword) async {
+    if (inputPassword.isNotEmpty) return inputPassword;
+
+    if (!await isNoPasswordMode()) return inputPassword;
+
+    final pseudoKey = await _readNoPasswordPseudoKey();
+    if (pseudoKey != null && pseudoKey.isNotEmpty) {
+      return pseudoKey;
+    }
+
+    // Legacy: old no-password mode without pseudo key
+    return inputPassword;
+  }
+
+  Future<String?> _readNoPasswordPseudoKey() async {
+    const secureStorage = FlutterSecureStorage();
+    return secureStorage.read(key: _noPasswordPseudoKey);
+  }
+
+  Future<void> _migrateNoPasswordToPseudoKey() async {
+    try {
+      final pseudoPassword = _generateNoPasswordPseudoKey();
+      final success = await _cryptoService.updateMasterPassword(
+        '',
+        pseudoPassword,
+      );
+      if (success) {
+        const secureStorage = FlutterSecureStorage();
+        await secureStorage.write(
+          key: _noPasswordPseudoKey,
+          value: pseudoPassword,
+        );
+        AppLogger.d('[ServiceManager] Migrated no-password mode to pseudo-key');
+      } else {
+        AppLogger.d(
+          '[ServiceManager] No-password pseudo-key migration failed: '
+          'updateMasterPassword returned false',
+        );
+      }
+    } catch (e, stack) {
+      AppLogger.d(
+        '[ServiceManager] No-password pseudo-key migration failed: $e',
+      );
+      AppLogger.d(stack.toString());
+    }
   }
 
   Future<bool> checkIdentityExists() async {
@@ -817,17 +893,6 @@ class ServiceManager extends ChangeNotifier {
     }
   }
 
-  @Deprecated('Use exportSecureVaultLinkCode instead.')
-  Future<String> exportVaultLinkCode() async {
-    final serverUrl = await _resolveSyncServerUrl(allowEmpty: true);
-    final vaultDump = await _exportEncryptedVaultDump();
-    // ignore: deprecated_member_use_from_same_package
-    return _identityService.exportTransferCode(
-      syncServerUrl: serverUrl.isEmpty ? null : serverUrl,
-      vaultDump: vaultDump,
-    );
-  }
-
   Future<String> exportSecureVaultLinkCode(
     String password, {
     bool includeData = false,
@@ -1071,6 +1136,9 @@ class ServiceManager extends ChangeNotifier {
     }
 
     final vaultDump = await _exportEncryptedVaultDump();
+    // LAN pairing encrypts with the requester's public key, so the cleartext
+    // transfer code is safe in transit — unlike exportSecureLinkCode which
+    // uses password-derived encryption.
     // ignore: deprecated_member_use_from_same_package
     final transferCode = _identityService.exportTransferCode(
       syncServerUrl: serverUrl.isEmpty ? null : serverUrl,
@@ -1161,6 +1229,9 @@ class ServiceManager extends ChangeNotifier {
 
     final serverUrl = await _resolveSyncServerUrl(allowEmpty: true);
     final vaultDump = await _exportEncryptedVaultDump();
+    // LAN pairing encrypts with the requester's public key, so the cleartext
+    // transfer code is safe in transit — unlike exportSecureLinkCode which
+    // uses password-derived encryption.
     // ignore: deprecated_member_use_from_same_package
     final transferCode = _identityService.exportTransferCode(
       syncServerUrl: serverUrl.isEmpty ? null : serverUrl,

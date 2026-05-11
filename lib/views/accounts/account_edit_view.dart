@@ -2721,9 +2721,9 @@ class _AccountEditViewState extends State<AccountEditView> {
                             DateFormat('yy-MM-dd HH:mm').format(
                               DateTime.fromMillisecondsSinceEpoch(log.savedAt),
                             ),
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
-                              color: Colors.grey,
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
                             ),
                           ),
                         ],

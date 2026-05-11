@@ -37,7 +37,10 @@ class LanSyncHostHandler {
         _config = config ?? const LanSyncConfig();
 
   /// HTTP Server 收到 /lan-sync/start 时调用
-  Future<Map<String, dynamic>> handleStart(String peerDeviceId) async {
+  Future<Map<String, dynamic>> handleStart(
+    String peerDeviceId, {
+    List<String>? peerRecordIds,
+  }) async {
     _startCleanupTimer();
 
     // 如果已有该设备的活跃会话，先清理
@@ -55,10 +58,14 @@ class LanSyncHostHandler {
       peerDeviceId: peerDeviceId,
       startedAt: now,
       expiresAt: now.add(_config.sessionTtl),
+      peerRecordIds: peerRecordIds?.toSet(),
     );
     _sessions[sessionId] = session;
 
-    AppLogger.d('[LAN-Host] Session started: $sessionId for $peerDeviceId');
+    AppLogger.d(
+      '[LAN-Host] Session started: $sessionId for $peerDeviceId '
+      '(${peerRecordIds?.length ?? 0} peer record IDs)',
+    );
     return {
       'session_id': sessionId,
       'ttl_seconds': _config.sessionTtl.inSeconds,
@@ -151,11 +158,17 @@ class LanSyncHostHandler {
       items.add(cipher);
     }
 
-    // 同时把 Host 自己的全部数据也推给 B（包含 B 没有的数据）
+    // 同时把 Host 有但 B 没有的数据推给 B（增量传输）
     final hostItems = await _loadHostItems();
+    final peerRecordIds = session.peerRecordIds;
     for (final item in hostItems) {
       // 如果已经在 merged 中，跳过
       if (_containsItem(merged, item)) continue;
+
+      // 增量过滤：如果 B 已经有这条记录，跳过
+      if (peerRecordIds.isNotEmpty && peerRecordIds.contains(_itemId(item))) {
+        continue;
+      }
 
       final payloadJson = _itemToPayloadJson(item);
       final cipher = await SyncPayloadCodec.encodePayload(

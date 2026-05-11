@@ -160,7 +160,7 @@ class _VaultHealthViewState extends State<VaultHealthView> {
             ),
             style: Theme.of(
               context,
-            ).textTheme.bodySmall?.copyWith(color: Colors.grey),
+            ).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
           ),
         ),
       ],
@@ -168,6 +168,7 @@ class _VaultHealthViewState extends State<VaultHealthView> {
   }
 
   Widget _buildScoreCard(VaultHealthReport report) {
+    final theme = Theme.of(context);
     final color = _gradeColor(report.grade);
 
     return Card(
@@ -184,7 +185,7 @@ class _VaultHealthViewState extends State<VaultHealthView> {
                   child: CircularProgressIndicator(
                     value: report.score / 100,
                     strokeWidth: 10,
-                    backgroundColor: Colors.grey.shade200,
+                    backgroundColor: theme.colorScheme.surfaceContainerHighest,
                     valueColor: AlwaysStoppedAnimation<Color>(color),
                   ),
                 ),
@@ -318,7 +319,11 @@ class _VaultHealthViewState extends State<VaultHealthView> {
         );
         break;
       case VaultHealthActionType.navigateToExport:
-        // Export view not yet implemented; fall through to no-op
+        if (!mounted) return;
+        await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const SyncSettingsView()),
+        );
         break;
       case VaultHealthActionType.navigateToSyncSettings:
         if (!mounted) return;
@@ -330,6 +335,7 @@ class _VaultHealthViewState extends State<VaultHealthView> {
       case VaultHealthActionType.none:
         break;
     }
+    if (mounted && action.type != VaultHealthActionType.none) _calculate();
   }
 
   Future<void> _navigateToAccountEdit(

@@ -121,6 +121,17 @@ void main() {
           LanSyncPhase.interrupted);
       expect(allSessions.where((s) => s.phase == LanSyncPhase.receiving).length, 1);
     });
+
+    test('stores peer record IDs when provided', () async {
+      await handler.handleStart(
+        'peer_device_1',
+        peerRecordIds: ['acc-1', 'tpl-1', 'totp-1'],
+      );
+      final sessions = handler.getSessions();
+      expect(sessions.first.peerRecordIds, contains('acc-1'));
+      expect(sessions.first.peerRecordIds, contains('tpl-1'));
+      expect(sessions.first.peerRecordIds, contains('totp-1'));
+    });
   });
 
   group('handleAbort', () {

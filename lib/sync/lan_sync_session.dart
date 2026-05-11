@@ -58,6 +58,7 @@ class LanSyncHostSession {
   List<Map<String, dynamic>>? conflictPreview;
   int? conflictCount;
   String? failureReason;
+  final Set<String> peerRecordIds;
 
   LanSyncHostSession({
     required this.sessionId,
@@ -70,7 +71,9 @@ class LanSyncHostSession {
     this.conflictPreview,
     this.conflictCount,
     this.failureReason,
-  }) : peerPayloads = peerPayloads ?? [];
+    Set<String>? peerRecordIds,
+  })  : peerPayloads = peerPayloads ?? [],
+        peerRecordIds = peerRecordIds ?? <String>{};
 
   bool get isExpired => DateTime.now().isAfter(expiresAt);
 }

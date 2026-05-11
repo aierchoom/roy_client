@@ -49,6 +49,74 @@ class _ConflictInboxViewState extends State<ConflictInboxView> {
     });
   }
 
+  Future<void> _acceptAll() async {
+    final totalLogs = _groups.fold<int>(0, (sum, g) => sum + g.logs.length);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(_t('全部接受', 'Accept All')),
+        content: Text(
+          _t(
+            '确认接受所有 $totalLogs 个冲突项的本地版本？此操作将覆盖所有远端冲突值。',
+            'Accept local version for all $totalLogs conflict items? This will overwrite all remote conflict values.',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(_t('取消', 'Cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(_t('确认', 'Confirm')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    for (final group in _groups) {
+      for (final log in group.logs) {
+        await _acceptLog(group.account, log);
+      }
+    }
+  }
+
+  Future<void> _dismissAll() async {
+    final totalLogs = _groups.fold<int>(0, (sum, g) => sum + g.logs.length);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(_t('全部忽略', 'Dismiss All')),
+        content: Text(
+          _t(
+            '确认忽略所有 $totalLogs 个冲突项？当前值将保持不变。',
+            'Dismiss all $totalLogs conflict items? Current values will remain unchanged.',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(_t('取消', 'Cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(_t('确认', 'Confirm')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final storage = ServiceManager.instance.storageService;
+    for (final group in _groups) {
+      for (final log in group.logs) {
+        await storage.deleteConflictLog(log.id);
+      }
+    }
+    await _load();
+  }
+
   Future<void> _dismissLog(String logId) async {
     await ServiceManager.instance.storageService.deleteConflictLog(logId);
     await _load();
@@ -115,6 +183,18 @@ class _ConflictInboxViewState extends State<ConflictInboxView> {
                 SliverAppBar.large(
                   title: Text(_t('冲突收件箱', 'Conflict Inbox')),
                   actions: [
+                    if (_groups.isNotEmpty) ...[
+                      IconButton(
+                        icon: const Icon(Icons.done_all),
+                        tooltip: _t('全部接受', 'Accept All'),
+                        onPressed: _acceptAll,
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.clear_all),
+                        tooltip: _t('全部忽略', 'Dismiss All'),
+                        onPressed: _dismissAll,
+                      ),
+                    ],
                     if (_groups.isNotEmpty)
                       IconButton(
                         icon: const Icon(Icons.refresh_outlined),

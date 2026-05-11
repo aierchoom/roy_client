@@ -223,7 +223,7 @@ class _NotificationCenterViewState extends State<NotificationCenterView> {
         if (report == null) return const SizedBox.shrink();
 
         final failed = report.failedItems;
-        final color = _gradeColor(report.grade);
+        final color = _gradeColor(report.grade, Theme.of(context).brightness);
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -373,8 +373,8 @@ class _NotificationCenterViewState extends State<NotificationCenterView> {
     );
   }
 
-  static Color _gradeColor(VaultHealthGrade grade) {
-    final vt = AppVisualTokens.fromBrightness(WidgetsBinding.instance.platformDispatcher.platformBrightness);
+  static Color _gradeColor(VaultHealthGrade grade, Brightness brightness) {
+    final vt = AppVisualTokens.fromBrightness(brightness);
     return switch (grade) {
       VaultHealthGrade.excellent => vt.success,
       VaultHealthGrade.good => vt.success,
@@ -488,7 +488,9 @@ class _NotificationCard extends StatelessWidget {
                         ],
                         Expanded(
                           child: Text(
-                            notification.title,
+                            notification.localizedTitle(
+                              Localizations.localeOf(context).languageCode == 'zh',
+                            ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.bodyLarge?.copyWith(
@@ -501,7 +503,9 @@ class _NotificationCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      notification.body,
+                      notification.localizedBody(
+                        Localizations.localeOf(context).languageCode == 'zh',
+                      ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.bodySmall?.copyWith(
