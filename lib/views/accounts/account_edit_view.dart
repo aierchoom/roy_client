@@ -2946,7 +2946,7 @@ class _ListFieldEditorState extends State<_ListFieldEditor> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withAlpha(20),
+                    color: theme.colorScheme.primary.withAlpha(AppAlphas.tint),
                     borderRadius: BorderRadius.circular(AppRadii.chip),
                   ),
                   child: Text(

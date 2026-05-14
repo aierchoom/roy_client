@@ -527,7 +527,7 @@ class _FieldRow extends StatelessWidget {
                 theme.brightness == Brightness.light ? 120 : 60),
         borderRadius: BorderRadius.circular(AppRadii.control),
         border: entry.isHighlighted
-            ? Border.all(color: theme.colorScheme.error.withAlpha(80))
+            ? Border.all(color: theme.colorScheme.error.withAlpha(AppAlphas.high))
             : null,
       ),
       child: Row(

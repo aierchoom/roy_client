@@ -505,7 +505,7 @@ class _ExpandableSectionState extends State<_ExpandableSection> {
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest.withAlpha(60),
+                color: theme.colorScheme.surfaceContainerHighest.withAlpha(AppAlphas.medium),
                 borderRadius: BorderRadius.vertical(
                   top: const Radius.circular(AppRadii.panel),
                 ),
@@ -604,7 +604,7 @@ class _InboxCard extends StatelessWidget {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: item.color.withAlpha(15),
+                  color: item.color.withAlpha(AppAlphas.tint),
                   borderRadius: BorderRadius.circular(AppRadii.card),
                 ),
                 alignment: Alignment.center,
