@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import 'package:secret_roy/l10n/app_localizations.dart';
 import 'package:secret_roy/models/account_item.dart';
 import 'package:secret_roy/models/hlc.dart';
+import 'package:secret_roy/models/totp_credential.dart';
+import 'package:secret_roy/services/totp_service.dart';
 import 'package:secret_roy/providers/enhanced_app_provider.dart';
 import 'package:secret_roy/services/service_manager.dart';
 import 'package:secret_roy/views/accounts/account_list_view.dart';
@@ -100,20 +102,26 @@ void main() {
         dataHlc: const {},
         syncStatus: SyncStatus.synchronized,
       );
-      final note = AccountItem(
-        id: 'acc_2',
-        name: 'My Note',
-        email: '',
-        templateId: 'builtin_secure_note',
-        data: const {},
+      final totp = TotpCredential(
+        id: 'totp_1',
+        label: 'My TOTP',
+        config: const TotpConfig(
+          issuer: 'Example',
+          account: 'user@example.com',
+          secret: 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ',
+          algorithm: TotpAlgorithm.sha1,
+          digits: 6,
+          period: 30,
+        ),
+        linkedAccountIds: const [],
         createdAt: DateTime.now().millisecondsSinceEpoch,
-        nameHlc: Hlc.zero('local'),
-        emailHlc: Hlc.zero('local'),
-        dataHlc: const {},
+        labelHlc: Hlc.zero('local'),
+        configHlc: Hlc.zero('local'),
+        linksHlc: Hlc.zero('local'),
         syncStatus: SyncStatus.synchronized,
       );
       storage.accounts[account.id] = account;
-      storage.accounts[note.id] = note;
+      storage.totpCredentials[totp.id] = totp;
 
       final manager = ServiceManager.testable(
         secureStorageService: storage,
@@ -126,27 +134,19 @@ void main() {
       final provider = EnhancedAppProvider(storage, manager);
       await _pumpAccountListView(tester, const AccountListView(), provider: provider);
 
-      // Both visible under "All" tab.
+      // Account visible under "All" tab.
       expect(find.textContaining('My Account'), findsOneWidget);
-      expect(find.textContaining('My Note'), findsOneWidget);
 
-      // Switch to "Accounts" tab (账号).
-      await tester.tap(find.text('账号'));
-      await tester.pump(const Duration(milliseconds: 400));
-      expect(find.textContaining('My Account'), findsOneWidget);
-      expect(find.textContaining('My Note'), findsNothing);
-
-      // Switch to "Secure Notes" tab (安全笔记).
-      await tester.tap(find.text('安全笔记'));
+      // Switch to "2FA" tab.
+      await tester.tap(find.text('2FA'));
       await tester.pump(const Duration(milliseconds: 400));
       expect(find.textContaining('My Account'), findsNothing);
-      expect(find.textContaining('My Note'), findsOneWidget);
+      expect(find.textContaining('My TOTP'), findsOneWidget);
 
       // Switch back to "All" tab.
       await tester.tap(find.text('全部'));
       await tester.pump(const Duration(milliseconds: 400));
       expect(find.textContaining('My Account'), findsOneWidget);
-      expect(find.textContaining('My Note'), findsOneWidget);
     });
 
     testWidgets('shows delete confirmation and removes account on confirm', (tester) async {
@@ -229,12 +229,12 @@ void main() {
       final provider = EnhancedAppProvider(storage, manager);
       await _pumpAccountListView(tester, const AccountListView(), provider: provider);
 
-      // Switch to "Secure Notes" tab where there are no items.
-      await tester.tap(find.text('安全笔记'));
+      // Switch to "2FA" tab where there are no TOTP credentials.
+      await tester.tap(find.text('2FA'));
       await tester.pump(const Duration(milliseconds: 400));
 
       expect(find.textContaining('My Account'), findsNothing);
-      expect(find.text('暂无安全笔记'), findsOneWidget);
+      expect(find.text('暂无 2FA'), findsOneWidget);
     });
   });
 }
