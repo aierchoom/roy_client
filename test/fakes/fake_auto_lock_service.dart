@@ -3,6 +3,7 @@ import 'package:secret_roy/services/enhanced_crypto_service.dart';
 
 class FakeAutoLockService extends AutoLockService {
   bool _locked = false;
+  AutoLockDuration _duration = AutoLockDuration.oneMinute;
 
   FakeAutoLockService()
       : super(
@@ -12,6 +13,9 @@ class FakeAutoLockService extends AutoLockService {
 
   @override
   bool get isLocked => _locked;
+
+  @override
+  AutoLockDuration get duration => _duration;
 
   @override
   void lock() {
@@ -27,4 +31,10 @@ class FakeAutoLockService extends AutoLockService {
 
   @override
   Future<void> initialize() async {}
+
+  @override
+  Future<void> setDuration(AutoLockDuration duration) async {
+    _duration = duration;
+    notifyListeners();
+  }
 }

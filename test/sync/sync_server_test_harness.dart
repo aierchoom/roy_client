@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:secret_roy/models/account_item.dart';
 import 'package:secret_roy/models/account_template.dart';
+import 'package:secret_roy/models/app_notification.dart';
 import 'package:secret_roy/models/hlc.dart';
 import 'package:secret_roy/models/local_sync_change.dart';
 import 'package:secret_roy/models/template_conflict_log.dart';
@@ -45,6 +46,7 @@ class FakeSecureStorageService extends SecureStorageService {
   final Map<String, AccountTemplate> templates = {};
   final Map<String, TotpCredential> totpCredentials = {};
   final Map<String, List<ConflictLog>> conflictLogs = {};
+  final List<LocalSyncChange> syncChanges = [];
   final StreamController<StorageChangeEvent> _changeController =
       StreamController<StorageChangeEvent>.broadcast();
 
@@ -127,6 +129,14 @@ class FakeSecureStorageService extends SecureStorageService {
     bool isSyncMerge = false,
   }) async {
     totpCredentials[credential.id] = credential;
+  }
+
+  @override
+  Future<void> saveTemplate(
+    AccountTemplate template, {
+    bool isSyncMerge = false,
+  }) async {
+    templates[template.templateId] = template;
   }
 
   @override
@@ -215,7 +225,7 @@ class FakeSecureStorageService extends SecureStorageService {
   Future<List<LocalSyncChange>> loadOpenLocalSyncChanges({
     required String vaultId,
   }) async {
-    return [];
+    return syncChanges.where((c) => c.vaultId == vaultId && c.status != LocalSyncStatus.pushed).toList();
   }
 
   @override
@@ -276,7 +286,124 @@ class FakeSecureStorageService extends SecureStorageService {
     required Map<String, dynamic>? afterSnapshot,
     required int baseServerVersion,
     bool skipIfUnchanged = false,
-  }) async {}
+  }) async {
+    syncChanges.add(LocalSyncChange(
+      id: 'sync_${syncChanges.length}',
+      vaultId: vaultId,
+      entityType: entityType,
+      entityId: entityId,
+      action: action,
+      title: title,
+      beforeJson: beforeSnapshot != null ? jsonEncode(beforeSnapshot) : null,
+      afterJson: afterSnapshot != null ? jsonEncode(afterSnapshot) : null,
+      diff: const {},
+      baseServerVersion: baseServerVersion,
+      status: LocalSyncStatus.pendingReview,
+      createdAt: DateTime.now().millisecondsSinceEpoch,
+      updatedAt: DateTime.now().millisecondsSinceEpoch,
+    ));
+  }
+
+  final List<AppNotification> notifications = [];
+
+  @override
+  @override
+  Future<List<AppNotification>> loadNotifications() async => List.from(notifications);
+
+  @override
+  Future<void> saveNotification(AppNotification notification) async {
+    final idx = notifications.indexWhere((n) => n.id == notification.id);
+    if (idx >= 0) {
+      notifications[idx] = notification;
+    } else {
+      notifications.add(notification);
+    }
+  }
+
+  @override
+  Future<void> markNotificationRead(String id) async {
+    final idx = notifications.indexWhere((n) => n.id == id);
+    if (idx >= 0) {
+      notifications[idx] = notifications[idx].copyWith(isRead: true);
+    }
+  }
+
+  @override
+  Future<void> markAllNotificationsRead() async {
+    for (var i = 0; i < notifications.length; i++) {
+      notifications[i] = notifications[i].copyWith(isRead: true);
+    }
+  }
+
+  @override
+  Future<void> deleteNotification(String id) async {
+    notifications.removeWhere((n) => n.id == id);
+  }
+
+  @override
+  Future<int> getUnreadNotificationCount() async {
+    return notifications.where((n) => !n.isRead).length;
+  }
+
+  @override
+  Future<void> deleteAllNotifications() async {
+    notifications.clear();
+  }
+
+  @override
+  Future<AccountTemplate?> loadTemplateById(String id, {bool includeDeleted = false}) async {
+    return templates[id];
+  }
+
+  @override
+  Future<void> deleteTemplate(String id, {bool isSyncMerge = false, Hlc? syncDeleteHlc}) async {
+    templates.remove(id);
+  }
+
+  @override
+  Future<void> hardDeleteTemplate(String id) async {
+    templates.remove(id);
+  }
+
+  @override
+  Future<void> togglePin(String id) async {
+    final account = accounts[id];
+    if (account != null) {
+      accounts[id] = account.copyWith(isPinned: !account.isPinned);
+    }
+  }
+
+  @override
+  Future<int> countAccountsByTemplate(String templateId) async {
+    return accounts.values.where((a) => a.templateId == templateId && !a.isDeleted).length;
+  }
+
+  @override
+  Future<void> hardDeleteAccount(String id) async {
+    accounts.remove(id);
+  }
+
+  @override
+  Future<void> hardDeleteTotpCredential(String id) async {
+    totpCredentials.remove(id);
+  }
+
+  @override
+  Future<void> deleteTotpCredential(String id, {bool isSyncMerge = false, Hlc? syncDeleteHlc}) async {
+    final item = totpCredentials[id];
+    if (item != null) {
+      totpCredentials[id] = item.copyWith(isDeleted: true);
+    }
+  }
+
+  @override
+  Future<void> approveLocalSyncChanges({required String vaultId, Iterable<String>? ids}) async {}
+
+  @override
+  Future<LocalSyncChange?> getLocalSyncChange(String id) async => null;
+
+  @override
+  Future<void> deleteLocalSyncChange(String id) async {}
 }
 
 /// 内存中的 Vault 同步服务器，用于单台设备模拟多设备同步场景。
