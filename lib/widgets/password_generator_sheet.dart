@@ -175,16 +175,16 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
   }
 
   Color _strengthColor(ThemeData theme) {
-    final vt = theme.extension<AppVisualTokens>()!;
+    final vt = theme.extension<AppVisualTokens>();
     final score = _strengthScore;
     if (score >= EnhancedCryptoService.strengthThresholdVeryStrong) {
-      return vt.success;
+      return vt?.success ?? Colors.green;
     }
     if (score >= EnhancedCryptoService.strengthThresholdStrong) {
       return theme.colorScheme.primary;
     }
     if (score >= EnhancedCryptoService.strengthThresholdMedium) {
-      return vt.warning;
+      return vt?.warning ?? Colors.orange;
     }
     if (score >= EnhancedCryptoService.strengthThresholdWeak) {
       return theme.colorScheme.tertiary;
