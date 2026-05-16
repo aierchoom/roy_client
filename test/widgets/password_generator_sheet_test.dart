@@ -6,8 +6,8 @@ import 'package:secret_roy/widgets/password_generator_sheet.dart';
 
 void main() {
   group('PasswordGeneratorSheet', () {
-    Future<void> _openSheet(WidgetTester tester) async {
-      await tester.view.physicalSize;
+    Future<void> openSheet(WidgetTester tester) async {
+      tester.view.physicalSize;
       tester.view.physicalSize = const Size(1200, 2000);
       tester.view.devicePixelRatio = 1.0;
       await tester.pumpWidget(
@@ -35,7 +35,7 @@ void main() {
     }
 
     testWidgets('renders title and generated password', (tester) async {
-      await _openSheet(tester);
+      await openSheet(tester);
 
       expect(find.text('密码生成器'), findsOneWidget);
       expect(find.byType(SelectableText), findsOneWidget);
@@ -45,7 +45,7 @@ void main() {
     });
 
     testWidgets('can toggle character options', (tester) async {
-      await _openSheet(tester);
+      await openSheet(tester);
 
       expect(find.text('大写字母'), findsOneWidget);
 
@@ -59,7 +59,7 @@ void main() {
     });
 
     testWidgets('copy button does not throw', (tester) async {
-      await _openSheet(tester);
+      await openSheet(tester);
 
       await tester.tap(find.text('复制'));
       await tester.pump();

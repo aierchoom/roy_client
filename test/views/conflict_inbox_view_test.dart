@@ -17,7 +17,7 @@ import '../sync/sync_server_test_harness.dart';
 
 void main() {
   group('ConflictInboxView', () {
-    Future<void> _pumpView(WidgetTester tester, {EnhancedAppProvider? provider}) async {
+    Future<void> pumpView(WidgetTester tester, {EnhancedAppProvider? provider}) async {
       final p = provider ?? EnhancedAppProvider(
         FakeSecureStorageService(),
         ServiceManager.testable(
@@ -48,7 +48,7 @@ void main() {
     }
 
     testWidgets('renders empty state when no conflicts', (tester) async {
-      await _pumpView(tester);
+      await pumpView(tester);
       await tester.pumpAndSettle(const Duration(milliseconds: 500));
 
       expect(find.byType(ConflictInboxView), findsOneWidget);
@@ -90,7 +90,7 @@ void main() {
       );
       final provider = EnhancedAppProvider(storage, manager);
 
-      await _pumpView(tester, provider: provider);
+      await pumpView(tester, provider: provider);
       await tester.pumpAndSettle();
 
       expect(find.text('GitHub'), findsOneWidget);

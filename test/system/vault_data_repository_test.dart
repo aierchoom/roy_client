@@ -3,7 +3,6 @@ import 'package:secret_roy/models/account_item.dart';
 import 'package:secret_roy/models/account_template.dart';
 import 'package:secret_roy/models/hlc.dart';
 import 'package:secret_roy/models/local_sync_change.dart';
-import 'package:secret_roy/models/account_template.dart';
 import 'package:secret_roy/models/totp_credential.dart';
 import 'package:secret_roy/services/totp_service.dart';
 import 'package:secret_roy/system/service_manager/vault_data_repository.dart';

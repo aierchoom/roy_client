@@ -3,9 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:secret_roy/services/biometric_auth_service.dart';
 import 'package:secret_roy/services/enhanced_crypto_service.dart';
 import 'package:secret_roy/services/lan_pairing_service.dart';
-import 'package:secret_roy/services/secure_storage_service.dart';
 import 'package:secret_roy/sync/lan_sync_coordinator.dart';
-import 'package:secret_roy/sync/sync_service.dart';
 import 'package:secret_roy/system/service_manager/vault_unlock_coordinator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -38,6 +36,7 @@ class _FakeBiometricService extends FakeBiometricAuthService {
   @override
   Future<BiometricAuthStatus> getStatus() async => _status;
 
+  @override
   void setStatus(BiometricAuthStatus status) => _status = status;
 
   @override

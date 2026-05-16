@@ -1,6 +1,4 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:secret_roy/services/identity_service.dart';
-import 'package:secret_roy/services/secure_storage_service.dart';
 import 'package:secret_roy/sync/sync_service.dart';
 import 'package:secret_roy/system/service_manager/sync_coordinator.dart';
 import 'package:secret_roy/system/service_manager/sync_server_url_store.dart';

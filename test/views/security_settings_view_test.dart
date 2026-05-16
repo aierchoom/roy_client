@@ -23,7 +23,7 @@ void main() {
   });
 
   group('SecuritySettingsView', () {
-    Future<void> _pumpView(WidgetTester tester) async {
+    Future<void> pumpView(WidgetTester tester) async {
       final manager = ServiceManager.testable(
         secureStorageService: FakeSecureStorageService(),
         identityService: FakeIdentityService(),
@@ -48,7 +48,7 @@ void main() {
     }
 
     testWidgets('renders without crashing', (tester) async {
-      await _pumpView(tester);
+      await pumpView(tester);
       await tester.pumpAndSettle();
 
       expect(find.byType(SecuritySettingsView), findsOneWidget);
@@ -56,14 +56,14 @@ void main() {
     });
 
     testWidgets('shows auto lock section', (tester) async {
-      await _pumpView(tester);
+      await pumpView(tester);
       await tester.pumpAndSettle();
 
       expect(find.textContaining('自动锁定'), findsWidgets);
     });
 
     testWidgets('shows biometric section', (tester) async {
-      await _pumpView(tester);
+      await pumpView(tester);
       await tester.pumpAndSettle();
 
       expect(find.textContaining('生物识别'), findsWidgets);

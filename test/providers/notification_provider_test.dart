@@ -5,7 +5,6 @@ import 'package:secret_roy/models/app_notification.dart';
 import 'package:secret_roy/models/hlc.dart';
 import 'package:secret_roy/providers/notification_provider.dart';
 import 'package:secret_roy/services/notification_service.dart';
-import 'package:secret_roy/services/secure_storage_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../sync/sync_server_test_harness.dart';

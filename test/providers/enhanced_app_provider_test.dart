@@ -2,11 +2,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:secret_roy/models/account_item.dart';
 import 'package:secret_roy/models/account_template.dart';
 import 'package:secret_roy/models/hlc.dart';
-import 'package:secret_roy/models/local_sync_change.dart';
-import 'package:secret_roy/models/template_conflict_log.dart';
 import 'package:secret_roy/models/totp_credential.dart';
 import 'package:secret_roy/providers/enhanced_app_provider.dart';
-import 'package:secret_roy/services/identity_service.dart';
 import 'package:secret_roy/services/service_manager.dart';
 import 'package:secret_roy/services/totp_service.dart';
 
