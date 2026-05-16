@@ -184,3 +184,33 @@ jobs:
           path: artifacts/secret_roy_windows_x64.zip
           if-no-files-found: error
           retention-days: 14
+
+  release:
+    name: Create Release
+    needs: [android-minimal-apk, windows-portable]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download Android APKs
+        uses: actions/download-artifact@v4
+        with:
+          name: secret-roy-android-split-apk
+          path: artifacts/android/
+
+      - name: Download Windows package
+        uses: actions/download-artifact@v4
+        with:
+          name: secret-roy-windows-x64-portable
+          path: artifacts/windows/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/android/*.apk
+            artifacts/windows/*.zip
+          generate_release_notes: true
