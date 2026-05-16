@@ -11,6 +11,9 @@ import 'enhanced_crypto_service.dart';
 import 'identity_service.dart';
 import 'secure_storage_service.dart';
 
+/// 保险库健康计算器，执行多维安全体检并生成 [VaultHealthReport]。
+///
+/// 检查范围包括：数据库加密、备份年龄、密码强度、重复密码、陈旧记录、2FA 缺失等。
 class VaultHealthCalculator {
   final SecureStorageService _storage;
   final IdentityService _identity;
@@ -21,6 +24,7 @@ class VaultHealthCalculator {
   }) : _storage = storage,
        _identity = identity;
 
+  /// 执行完整保险库健康检查，返回包含各项得分与总评级的报告。
   Future<VaultHealthReport> calculate() async {
     final items = <VaultHealthItem>[];
 
@@ -402,6 +406,7 @@ class VaultHealthCalculator {
     );
   }
 
+  /// 根据 [items] 的风险等级扣减分数，返回 0-100 区间的综合得分。
   static int calculateScore(List<VaultHealthItem> items) {
     int score = 100;
     for (final item in items) {
@@ -418,6 +423,7 @@ class VaultHealthCalculator {
     return score.clamp(0, 100);
   }
 
+  /// 将综合得分转换为评级（excellent / good / warning / critical）。
   static VaultHealthGrade scoreToGrade(int score) {
     if (score >= 90) return VaultHealthGrade.excellent;
     if (score >= 70) return VaultHealthGrade.good;

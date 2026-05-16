@@ -100,6 +100,31 @@ class VaultIdentityImportPreview {
   }
 }
 
+/// 设备身份与保险库身份管理服务，负责生成、存储和导出 vault 身份密钥。
+///
+/// [IdentityService] 在首次初始化时自动生成 [deviceId]、[vaultId]、
+/// [privateKey]、[symmetricKey] 等身份凭证，并持久化到 [SecureKeyValueStore]。
+/// 这些凭证是设备在同步网络中的唯一标识，也是端到端加密与配对的基础。
+///
+/// 主要功能范围：
+/// - 身份初始化与完整性校验（[initialize]、[checkIdentityExists]）。
+/// - 安全导出/导入（加密恢复码、明文 transfer code）。
+/// - Vault API Token 管理（[setVaultApiToken]）。
+///
+/// 使用场景：
+/// ```dart
+/// final identity = IdentityService(secureStorage: store);
+/// await identity.initialize();
+/// print(identity.vaultId); // vault_xxx...
+/// ```
+///
+/// 生命周期：
+/// - [initialize]（首次会自动生成身份）→ 各种读写操作。
+/// - 导入操作（[importSecureLinkCode] 等）会覆盖现有身份。
+///
+/// 异常：
+/// - [IdentityCorruptedException] 身份数据缺失或格式非法。
+/// - [IdentityTransferCodeException] 恢复码/transfer code 格式错误或解密失败。
 class IdentityService {
   static const String _transferCodePrefix = 'sroy-link:';
   static const String _secureCodePrefix = 'sroy-recovery:';
@@ -165,6 +190,10 @@ class IdentityService {
     }
   }
 
+  /// 检查本地是否已存在完整的 vault 身份。
+  ///
+  /// 返回 true 当且仅当 vaultId、privateKey、symmetricKey 均存在且格式合法。
+  /// 用于应用启动时判断用户是否已有保险库。
   Future<bool> checkIdentityExists() async {
     final storedVaultId = await secureStorage.read(key: _vaultIdKey);
     final storedPrivateKey = await secureStorage.read(key: _privateKeyKey);
@@ -200,6 +229,14 @@ class IdentityService {
     return '$_transferCodePrefix$encoded';
   }
 
+  /// 将当前身份导出为密码加密的恢复码（secure link code）。
+  ///
+  /// [password] 用于派生 PBKDF2 加密密钥，必须非空。
+  /// [syncServerUrl] 与 [vaultDump] 为可选附加数据，可一并加密到恢复码中。
+  ///
+  /// 返回带有 `sroy-recovery:` 前缀的字符串，可直接保存或打印。
+  ///
+  /// 抛出 [IdentityTransferCodeException] 当 [password] 为空时。
   Future<String> exportSecureLinkCode(
     String password, {
     String? syncServerUrl,
@@ -242,6 +279,15 @@ class IdentityService {
     return '$_secureCodePrefix${base64UrlEncode(utf8.encode(jsonEncode(envelope)))}';
   }
 
+  /// 导入密码加密的恢复码，替换当前本地身份。
+  ///
+  /// [secureCode] 为带有 `sroy-recovery:` 前缀的恢复码字符串。
+  /// [password] 为解密所需的密码。
+  ///
+  /// 返回导入的附加数据映射（如 sync_server_url、vault_dump 等）。
+  /// 导入成功后会立即将新身份写入安全存储。
+  ///
+  /// 抛出 [IdentityTransferCodeException] 当格式错误或密码不正确时。
   Future<Map<String, String?>> importSecureLinkCode(
     String secureCode,
     String password,
@@ -251,6 +297,13 @@ class IdentityService {
     return preview.toLegacyMap();
   }
 
+  /// 预览密码加密恢复码的内容，不修改本地身份。
+  ///
+  /// [secureCode] 为恢复码字符串，[password] 为解密密码。
+  /// 返回 [VaultIdentityImportPreview] 包含 vaultId、privateKey、symmetricKey
+  /// 及可选附加数据，可用于用户确认后再执行 [importSecureLinkCode]。
+  ///
+  /// 抛出 [IdentityTransferCodeException] 当格式错误或密码不正确时。
   Future<VaultIdentityImportPreview> previewSecureLinkCode(
     String secureCode,
     String password,
@@ -488,6 +541,15 @@ class IdentityService {
     }
   }
 
+  /// 初始化身份服务，从安全存储读取或生成身份凭证。
+  ///
+  /// [allowGenerateVaultIdentity] 为 false 时，若本地无身份则抛出
+  /// [IdentityCorruptedException] 而非自动生成。
+  ///
+  /// 正常流程：
+  /// - 若身份完整且有效，加载到内存。
+  /// - 若身份不存在且允许生成，创建新的 vault 身份并持久化。
+  /// - 若身份部分损坏（部分 key 缺失或格式非法），抛出 [IdentityCorruptedException]。
   Future<void> initialize({bool allowGenerateVaultIdentity = true}) async {
     await _ensureDeviceId();
 

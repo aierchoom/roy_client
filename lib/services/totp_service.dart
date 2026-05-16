@@ -3,8 +3,10 @@ import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart' as crypto;
 
+/// TOTP 使用的 HMAC 哈希算法枚举。
 enum TotpAlgorithm { sha1, sha256, sha512 }
 
+/// TOTP 处理过程中的异常。
 class TotpException implements Exception {
   final String message;
 
@@ -14,12 +16,19 @@ class TotpException implements Exception {
   String toString() => 'TotpException($message)';
 }
 
+/// TOTP 配置数据类，包含密钥、算法、位数与周期等参数。
 class TotpConfig {
+  /// Base32 编码的 TOTP 密钥。
   final String secret;
+  /// 服务商名称（如 Google）。
   final String? issuer;
+  /// 用户账号标识。
   final String? account;
+  /// 使用的 HMAC 算法，默认 SHA1。
   final TotpAlgorithm algorithm;
+  /// OTP 位数，通常为 6 或 8。
   final int digits;
+  /// 生成周期，单位为秒，默认 30。
   final int period;
 
   const TotpConfig({
@@ -91,11 +100,17 @@ class TotpConfig {
   }
 }
 
+/// TOTP 实时码数据类，包含当前 OTP 值与剩余有效时间。
 class TotpCode {
+  /// 当前 OTP 字符串值。
   final String value;
+  /// 当前周期内剩余有效秒数。
   final int secondsRemaining;
+  /// 生成周期，单位为秒。
   final int period;
+  /// 当前时间窗口计数器。
   final int counter;
+  /// 生成时间戳。
   final DateTime generatedAt;
 
   const TotpCode({
@@ -107,6 +122,9 @@ class TotpCode {
   });
 }
 
+/// TOTP 服务，实现 RFC 6238 标准的时间一次性密码生成与解析。
+///
+/// 支持 Base32 密钥、otpauth:// URI 与 JSON 配置三种输入格式。
 class TotpService {
   static const int defaultDigits = 6;
   static const int defaultPeriod = 30;
@@ -115,6 +133,7 @@ class TotpService {
 
   const TotpService();
 
+  /// 解析 TOTP 配置，支持 JSON、otpauth:// URI 与纯 Base32 字符串。
   static TotpConfig parseConfig(String raw) {
     final normalized = raw.trim();
     if (normalized.isEmpty) {
@@ -183,6 +202,7 @@ class TotpService {
     ).validated();
   }
 
+  /// 根据 [config] 生成当前时间窗口的 TOTP 码，可选指定时间 [at]。
   TotpCode generate(TotpConfig config, {DateTime? at}) {
     final validConfig = config.validated();
     final now = at ?? DateTime.now();
@@ -204,6 +224,7 @@ class TotpService {
     );
   }
 
+  /// 基于 [secret] 与 [counter] 生成 HOTP 码（RFC 4226）。
   static String hotp({
     required String secret,
     required int counter,

@@ -56,7 +56,7 @@ class TotpCredential {
           : dummyHlc,
       serverVersion: json['serverVersion'] as int? ?? 0,
       syncStatus: syncStatusFromJson(json['syncStatus']),
-      isDeleted: json['isDeleted'] == 1 || json['isDeleted'] == true,
+      isDeleted: parseBoolValue(json['isDeleted']),
       deleteHlc: json['deleteHlc'] != null
           ? Hlc.parse(json['deleteHlc'].toString())
           : null,

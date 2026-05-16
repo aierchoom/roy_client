@@ -10,6 +10,7 @@ import '../sync/lan_sync_host_handler.dart';
 import '../sync/lan_sync_session.dart';
 import 'vault_pairing_crypto.dart';
 
+/// LAN 配对过程中的异常。
 class LanPairingServiceException implements Exception {
   final String message;
 
@@ -19,6 +20,7 @@ class LanPairingServiceException implements Exception {
   String toString() => 'LanPairingServiceException($message)';
 }
 
+/// LAN 配对主机会话信息，包含配对码、服务端口与过期时间。
 class LanPairingHostSession {
   final String pairingCode;
   final int serverPort;
@@ -33,7 +35,7 @@ class LanPairingHostSession {
   });
 }
 
-/// Information about a discovered LAN host.
+/// 发现的 LAN 主机信息，包含 IP 地址与端口。
 class LanPairingHostInfo {
   final InternetAddress address;
   final int port;
@@ -41,6 +43,9 @@ class LanPairingHostInfo {
   const LanPairingHostInfo({required this.address, required this.port});
 }
 
+/// LAN 配对服务，通过 UDP 广播发现与 HTTP 声明在局域网内安全交换 transfer code。
+///
+/// 主机端广播配对信息，客户端通过配对码获取加密后的 vault bundle。
 class LanPairingService {
   static const int defaultDiscoveryPort = 48653;
   static const String _advertisementKind = 'sroy_lan_pairing';
@@ -70,6 +75,7 @@ class LanPairingService {
 
   bool get isHosting => _hostServer != null;
 
+  /// 启动 LAN 配对主机，生成配对码并通过 UDP 广播服务信息。
   Future<LanPairingHostSession> startHosting({
     required String transferCode,
     Duration ttl = const Duration(minutes: 3),
@@ -192,6 +198,7 @@ class LanPairingService {
     });
   }
 
+  /// 停止 LAN 配对主机，关闭广播、HTTP 服务与相关资源。
   Future<void> stopHosting() async {
     _hostBroadcastTimer?.cancel();
     _hostBroadcastTimer = null;
@@ -219,6 +226,7 @@ class LanPairingService {
     _clearHostedBundleState();
   }
 
+  /// 通过配对码在 LAN 中发现主机并请求 transfer code，返回解密后的明文 bundle。
   Future<String> claimTransferCodeByCode({
     required String pairingCode,
     required String requesterDeviceId,

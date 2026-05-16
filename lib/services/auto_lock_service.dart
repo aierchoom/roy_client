@@ -52,6 +52,26 @@ enum AutoLockDuration {
 
 enum AutoLockState { unlocked, locked, backgroundTimer }
 
+/// 自动锁定服务，根据应用生命周期与超时策略控制保险库的自动锁定。
+///
+/// [AutoLockService] 监听应用前后台切换，在用户设定的无操作时间后自动触发锁定。
+/// 锁定操作会清除 [EnhancedCryptoService] 中的数据库密钥，使保险库回到加密状态。
+/// 支持从 immediately 到 never 的多档超时配置，配置持久化在 [FlutterSecureStorage]。
+///
+/// 使用场景：
+/// ```dart
+/// final autoLock = AutoLockService(cryptoService: cryptoService);
+/// await autoLock.initialize();
+/// // 应用进入后台时自动启动计时器
+/// autoLock.onAppLifecycleStateChanged(AppLifecycleState.paused);
+/// ```
+///
+/// 生命周期：
+/// - [initialize] 读取上次活跃时间并判断是否需要立即锁定。
+/// - [unlock] / [lock] 由 [ServiceManager] 在解锁/锁定时调用。
+/// - [dispose] 在应用退出时取消后台计时器。
+///
+/// 注意：实际的生命周期监听由 [AutoLockObserver]（[WidgetsBindingObserver]）代理。
 class AutoLockService extends ChangeNotifier {
   final EnhancedCryptoService _cryptoService;
   final FlutterSecureStorage _secureStorage;
@@ -81,6 +101,11 @@ class AutoLockService extends ChangeNotifier {
   bool get isLocked => _state == AutoLockState.locked;
   bool get isUnlocked => _state == AutoLockState.unlocked;
 
+  /// 初始化自动锁定服务，加载持久化的超时设置并判断当前锁定状态。
+  ///
+  /// 从 [FlutterSecureStorage] 读取上次活跃时间与 [AutoLockDuration]，
+  /// 若已超时则状态设为 [AutoLockState.locked]，否则为 [AutoLockState.unlocked]。
+  /// 初始化完成后会通知监听者。
   Future<void> initialize() async {
     await _loadSettings();
     _state = await _checkNeedsLock()
@@ -89,6 +114,10 @@ class AutoLockService extends ChangeNotifier {
     _notify();
   }
 
+  /// 设置自动锁定超时时长并持久化。
+  ///
+  /// [duration] 为新的超时策略，会写入 [FlutterSecureStorage] 的 `_auto_lock_duration_key`。
+  /// 设置完成后通知监听者。
   Future<void> setDuration(AutoLockDuration duration) async {
     _duration = duration;
     await _secureStorage.write(
@@ -98,6 +127,15 @@ class AutoLockService extends ChangeNotifier {
     _notify();
   }
 
+  /// 响应应用生命周期状态变化，启动或取消后台锁定计时器。
+  ///
+  /// [state] 为 Flutter 应用生命周期状态：
+  /// - [AppLifecycleState.paused] / [AppLifecycleState.inactive] / [AppLifecycleState.hidden]：
+  ///   记录当前时间并启动后台计时器（若设置为 immediately 则直接锁定）。
+  /// - [AppLifecycleState.resumed]：检查后台期间是否已超时，若超时则锁定。
+  /// - [AppLifecycleState.detached]：保存最后活跃时间。
+  ///
+  /// 通常由 [AutoLockObserver.didChangeAppLifecycleState] 代理调用。
   void onAppLifecycleStateChanged(AppLifecycleState state) {
     switch (state) {
       case AppLifecycleState.paused:
@@ -114,6 +152,11 @@ class AutoLockService extends ChangeNotifier {
     }
   }
 
+  /// 立即锁定保险库，取消后台计时器并清除加密密钥。
+  ///
+  /// 内部调用 [EnhancedCryptoService.logout] 清除数据库密钥，
+  /// 并将状态设为 [AutoLockState.locked]。
+  /// 此操作会触发 [notifyListeners]，[ServiceManager] 应监听并执行进一步清理。
   void lock() {
     _cancelBackgroundTimer();
     _cryptoService.logout();
@@ -122,6 +165,10 @@ class AutoLockService extends ChangeNotifier {
     _notify();
   }
 
+  /// 将自动锁定状态重置为解锁，清除后台计时状态。
+  ///
+  /// 通常在 [ServiceManager] 成功解锁保险库后调用，
+  /// 使 [AutoLockService] 重新开始计时。
   void unlock() {
     _state = AutoLockState.unlocked;
     _backgroundTime = null;

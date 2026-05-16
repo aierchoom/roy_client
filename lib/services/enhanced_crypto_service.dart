@@ -9,6 +9,26 @@ import 'package:secret_roy/core/crypto_random.dart';
 import 'database_file_cipher.dart';
 import 'database_file_key_manager.dart';
 
+/// 核心密码学服务，负责主密码验证、数据库密钥派生与加密信封管理。
+///
+/// [EnhancedCryptoService] 使用 PBKDF2-HMAC-SHA256（100,000 轮）对主密码进行哈希，
+/// 并通过 [DatabaseFileKeyManager] 将随机生成的 32 字节数据库密钥用主密码包装存储。
+/// 解锁成功后，可创建 [DatabaseFileCipher] 用于本地数据库的 AES-GCM-256 加解密。
+///
+/// 使用场景：
+/// ```dart
+/// final crypto = EnhancedCryptoService(secureStorage: secureStorage);
+/// final ok = await crypto.initMasterKey('myPassword');
+/// final cipher = crypto.createDatabaseFileCipher();
+/// ```
+///
+/// 生命周期：
+/// - [initMasterKey] / [verifyMasterPassword] → [createDatabaseFileCipher]
+/// - [logout] 清除内存中的密钥，锁定数据库访问。
+///
+/// 安全注意：
+/// - 不支持降低 PBKDF2 迭代次数。
+/// - 主密码哈希使用恒定时间比较防止时序攻击。
 class EnhancedCryptoService {
   static const String _masterPasswordKey = 'master_password';
   static const String _masterPasswordHashKey = 'master_password_hash';
@@ -32,6 +52,15 @@ class EnhancedCryptoService {
 
   bool get hasMasterKey => _isUnlocked;
 
+  /// 初始化或验证主密码，解锁数据库密钥。
+  ///
+  /// [masterPassword] 为用户输入的明文主密码。
+  /// 返回 true 表示验证/初始化成功，内存中已持有数据库密钥；
+  /// 返回 false 表示密码与已存储哈希不匹配。
+  ///
+  /// 首次调用时会生成新的 PBKDF2 哈希并保存；
+  /// 若存在遗留的明文密码（旧版本），会自动迁移到 PBKDF2。
+  /// 验证失败时自动调用 [logout] 清除敏感状态。
   Future<bool> initMasterKey(String masterPassword) async {
     final storedHash = await _readSecureValue(_masterPasswordHashKey);
     if (storedHash != null) {
@@ -64,6 +93,15 @@ class EnhancedCryptoService {
     return true;
   }
 
+  /// 修改主密码，用新密码重新包装数据库密钥。
+  ///
+  /// [oldPassword] 为当前主密码，[newPassword] 为新主密码。
+  /// 返回 true 表示修改成功；返回 false 表示旧密码验证失败。
+  ///
+  /// 成功后会：
+  /// 1. 使用旧密码解密出数据库密钥；
+  /// 2. 用新密码生成新的包装信封；
+  /// 3. 更新 PBKDF2 哈希并重新解锁。
   Future<bool> updateMasterPassword(
     String oldPassword,
     String newPassword,
@@ -95,6 +133,12 @@ class EnhancedCryptoService {
     return false;
   }
 
+  /// 验证主密码是否正确，不修改任何存储状态。
+  ///
+  /// [masterPassword] 为待验证的明文密码。
+  /// 返回 true 表示与已存储的哈希匹配；返回 false 表示不匹配。
+  ///
+  /// 仅用于密码确认场景（如修改密码前的旧密码校验），不会解锁数据库密钥。
   Future<bool> verifyMasterPassword(String masterPassword) async {
     final storedHash = await _readSecureValue(_masterPasswordHashKey);
     if (storedHash != null) {
@@ -108,11 +152,20 @@ class EnhancedCryptoService {
     );
   }
 
+  /// 清除内存中的数据库密钥并标记为锁定状态。
+  ///
+  /// 调用后 [hasMasterKey] 变为 false，[createDatabaseFileCipher] 将抛出 [StateError]。
+  /// 不会删除 [FlutterSecureStorage] 中已持久化的任何数据。
   void logout() {
     _isUnlocked = false;
     _databaseKeyBytes = null;
   }
 
+  /// 创建一个基于当前解锁状态的数据库文件加密器。
+  ///
+  /// 返回配置好的 [DatabaseFileCipher]，用于 [SecureStorageService] 的加解密。
+  ///
+  /// 抛出 [StateError] 当服务未解锁（即 [hasMasterKey] 为 false）。
   DatabaseFileCipher createDatabaseFileCipher() {
     final keyBytes = _databaseKeyBytes;
     if (!_isUnlocked || keyBytes == null) {

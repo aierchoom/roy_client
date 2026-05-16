@@ -12,6 +12,9 @@ typedef SecureStorageWriter =
     Future<void> Function({required String key, required String value});
 typedef SecureStorageDeleter = Future<void> Function({required String key});
 
+/// 数据库文件密钥管理器，负责通过用户主密码派生 wrapping key 来加/解密数据库文件密钥。
+///
+/// 使用 PBKDF2-HMAC-SHA256 派生密钥，支持 envelope 轮转与旧 envelope 回退。
 class DatabaseFileKeyManager {
   static const String databaseKeySaltKey = 'database_key_salt';
   static const String databaseKeyEnvelopeKey = 'database_file_key_envelope';
@@ -34,6 +37,7 @@ class DatabaseFileKeyManager {
     this.pbkdf2Iterations = defaultPbkdf2Iterations,
   }) : assert(pbkdf2Iterations > 0);
 
+  /// 使用 [password] 解锁数据库文件密钥。若存在旧 envelope，解密后自动迁移到当前 envelope。
   Future<Uint8List> unlock(String password) async {
     final wrappingKeyBytes = await _deriveWrappingKeyBytes(password);
     final unlockResult = await _readOrCreateDatabaseFileKey(wrappingKeyBytes);
@@ -45,6 +49,7 @@ class DatabaseFileKeyManager {
     return unlockResult.keyBytes;
   }
 
+  /// 使用新密码 [newPassword] 重新封装 [databaseKeyBytes]，旧 envelope 保留为回退。
   Future<void> rotateEnvelope({
     required String newPassword,
     required Uint8List databaseKeyBytes,

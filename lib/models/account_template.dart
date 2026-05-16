@@ -254,6 +254,38 @@ class AccountFieldAttributes {
       'timeFormat': timeFormat.name,
     };
   }
+
+  AccountFieldAttributes copyWith({
+    AccountFieldType? type,
+    bool? isPrimary,
+    bool? isRequired,
+    bool? isSecret,
+    bool? isEditable,
+    bool? isSearchable,
+    bool? isCopyable,
+    int? maxLength,
+    int? minLength,
+    String? regex,
+    String? hint,
+    bool? isReference,
+    TimeFieldFormat? timeFormat,
+  }) {
+    return AccountFieldAttributes(
+      type: type ?? this.type,
+      isPrimary: isPrimary ?? this.isPrimary,
+      isRequired: isRequired ?? this.isRequired,
+      isSecret: isSecret ?? this.isSecret,
+      isEditable: isEditable ?? this.isEditable,
+      isSearchable: isSearchable ?? this.isSearchable,
+      isCopyable: isCopyable ?? this.isCopyable,
+      maxLength: maxLength ?? this.maxLength,
+      minLength: minLength ?? this.minLength,
+      regex: regex ?? this.regex,
+      hint: hint ?? this.hint,
+      isReference: isReference ?? this.isReference,
+      timeFormat: timeFormat ?? this.timeFormat,
+    );
+  }
 }
 
 class AccountField {
@@ -439,7 +471,7 @@ class AccountTemplate {
       ),
       hlc: json['hlc'] != null ? Hlc.parse(json['hlc'] as String) : null,
       serverVersion: json['serverVersion'] as int? ?? 0,
-      isDeleted: json['isDeleted'] == true,
+      isDeleted: parseBoolValue(json['isDeleted']),
       deleteHlc: json['deleteHlc'] != null
           ? Hlc.parse(json['deleteHlc'] as String)
           : null,

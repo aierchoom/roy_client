@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:secret_roy/core/app_logger.dart';
 
+/// Vault 配对服务端交互过程中的异常。
 class VaultPairingServiceException implements Exception {
   final String message;
 
@@ -12,6 +13,7 @@ class VaultPairingServiceException implements Exception {
   String toString() => 'VaultPairingServiceException($message)';
 }
 
+/// 配对会话基本信息，由主机创建后返回。
 class PairingSessionInfo {
   final String sessionId;
   final String pairingCode;
@@ -37,6 +39,7 @@ class PairingSessionInfo {
   }
 }
 
+/// 加入配对会话的结果，包含请求方等待审批所需的信息。
 class PairingJoinResult {
   final String sessionId;
   final String requestId;
@@ -62,6 +65,7 @@ class PairingJoinResult {
   }
 }
 
+/// 待审批的配对请求，包含请求方设备 ID 与公钥。
 class PairingPendingRequest {
   final String requestId;
   final String requesterDeviceId;
@@ -87,6 +91,7 @@ class PairingPendingRequest {
   }
 }
 
+/// 配对会话当前状态，主机端轮询使用，包含待审批请求信息。
 class PairingSessionStatus {
   final String sessionId;
   final String status;
@@ -115,6 +120,7 @@ class PairingSessionStatus {
   }
 }
 
+/// 获取配对 bundle 的结果，包含加密后的 vault bundle（审批通过后）。
 class PairingBundleResult {
   final String status;
   final String? wrappedVaultBundle;
@@ -122,14 +128,20 @@ class PairingBundleResult {
   const PairingBundleResult({required this.status, this.wrappedVaultBundle});
 }
 
+/// Vault 配对服务端交互服务，负责创建/加入配对会话、审批与获取加密 bundle。
 class VaultPairingService {
+  final http.Client _httpClient;
+
+  VaultPairingService({http.Client? httpClient}) : _httpClient = httpClient ?? http.Client();
+
+  /// 在 [serverUrl] 上创建新的配对会话，返回会话信息与配对码。
   Future<PairingSessionInfo> createSession({
     required String serverUrl,
     required String vaultId,
     required String hostDeviceId,
     Duration ttl = const Duration(minutes: 10),
   }) async {
-    final response = await http.post(
+    final response = await _httpClient.post(
       Uri.parse('$serverUrl/pairing/sessions'),
       headers: const {'Content-Type': 'application/json'},
       body: jsonEncode({
@@ -149,13 +161,14 @@ class VaultPairingService {
     return PairingSessionInfo.fromJson(body);
   }
 
+  /// 使用 [pairingCode] 加入已有配对会话，返回等待审批的请求信息。
   Future<PairingJoinResult> joinSession({
     required String serverUrl,
     required String pairingCode,
     required String requesterDeviceId,
     required String requesterPublicKey,
   }) async {
-    final response = await http.post(
+    final response = await _httpClient.post(
       Uri.parse('$serverUrl/pairing/sessions/join'),
       headers: const {'Content-Type': 'application/json'},
       body: jsonEncode({
@@ -180,7 +193,7 @@ class VaultPairingService {
     required String sessionId,
     required String hostDeviceId,
   }) async {
-    final response = await http.get(
+    final response = await _httpClient.get(
       Uri.parse(
         '$serverUrl/pairing/sessions/$sessionId?host_device_id=$hostDeviceId',
       ),
@@ -203,7 +216,7 @@ class VaultPairingService {
     required String requestId,
     required String wrappedVaultBundle,
   }) async {
-    final response = await http.post(
+    final response = await _httpClient.post(
       Uri.parse('$serverUrl/pairing/sessions/$sessionId/approve'),
       headers: const {'Content-Type': 'application/json'},
       body: jsonEncode({
@@ -223,13 +236,14 @@ class VaultPairingService {
     );
   }
 
+  /// 请求方轮询获取配对 bundle，审批通过后返回加密的 [wrappedVaultBundle]。
   Future<PairingBundleResult> getBundle({
     required String serverUrl,
     required String sessionId,
     required String requestId,
     required String requesterDeviceId,
   }) async {
-    final response = await http.get(
+    final response = await _httpClient.get(
       Uri.parse(
         '$serverUrl/pairing/sessions/$sessionId/bundle?request_id=$requestId&requester_device_id=$requesterDeviceId',
       ),

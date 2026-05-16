@@ -31,6 +31,29 @@ enum StorageItemType {
   localSyncChange,
 }
 
+/// 本地加密 SQLite 数据库的存储服务，负责所有保险库数据的持久化。
+///
+/// [SecureStorageService] 将数据保存在 AES-GCM-256 加密的长期文件中，
+/// 解锁时解密到临时运行时工作库，操作完成后立即重新加密持久化。
+/// 它管理 accounts、templates、totp_credentials、notifications、
+/// local_sync_changes 等多个表，并提供 HLC 时间戳与同步状态维护。
+///
+/// 使用场景：
+/// ```dart
+/// final storage = SecureStorageService();
+/// storage.setDatabaseCipher(cipher);
+/// await storage.initialize(deviceId: identityService.deviceId);
+/// final accounts = await storage.loadAccounts();
+/// ```
+///
+/// 生命周期：
+/// - [setDatabaseCipher] / [initialize] → 各种 CRUD 操作 → [close]
+/// - [deleteDatabaseFile] 用于彻底删除本地数据库。
+///
+/// 异常：
+/// - [StorageOpenException] 数据库打开失败（如密文损坏）。
+/// - [TemplateInUseException] 删除仍被账号引用的模板。
+/// - [TemplateStaleException] 保存的模板版本落后于已存在版本。
 class SecureStorageService {
   static const String _databaseName = 'secret_roy_vault.db';
   static const String _encryptedDatabaseName = 'secret_roy_vault.db.enc';
@@ -94,6 +117,13 @@ class SecureStorageService {
     }
   }
 
+  /// 初始化数据库连接，解密长期文件到运行时工作库。
+  ///
+  /// [deviceId] 用于初始化 HLC 时钟，确保本地操作的时间戳携带正确设备标识。
+  /// 必须在调用前通过 [setDatabaseCipher] 配置数据库文件加密器，
+  /// 否则抛出 [StateError]。
+  ///
+  /// 若加密数据库文件损坏，会将其备份并抛出 [StorageOpenException]。
   Future<void> initialize({String deviceId = 'local'}) async {
     _deviceId = deviceId;
     _syncClock = SyncClock(deviceId);
@@ -186,6 +216,10 @@ class SecureStorageService {
     );
   }
 
+  /// 关闭数据库连接，将运行时工作库加密持久化后删除工作文件。
+  ///
+  /// [dispose] 为 true 时同时关闭变更事件流（[onChange]）。
+  /// 多次调用安全，内部会检查数据库是否已打开。
   Future<void> close({bool dispose = false}) async {
     final hadOpenDatabase = isOpen;
     if (hadOpenDatabase) {
@@ -265,12 +299,16 @@ class SecureStorageService {
     }
   }
 
-  /// 导入覆盖：用传入数据整体替换本地库。
+  /// 导入覆盖：用传入数据整体替换本地库，保留源数据的 syncStatus。
   ///
-  /// T14 状态重建规则：
-  /// - 保留源 syncStatus，不再强制覆盖为 synchronized。
-  /// - 清空 accounts / templates / totp_credentials / conflict_logs / local_sync_changes。
-  /// - 调用方应在导入后重置 SyncService 状态（version / dirty 由 initialize 重新读取）。
+  /// 用于 vault 导入流程中的状态重建（T14 规则）。
+  /// 执行前会清空 accounts、templates、totp_credentials、conflict_logs、
+  /// local_sync_changes 表，然后批量插入新数据。
+  ///
+  /// 调用方应在导入后重置 [SyncService] 状态，使 version / dirty 重新读取。
+  ///
+  /// 若数据库未打开，抛出 [StateError]。
+  /// 导入完成后会自动重新加密持久化数据库。
   Future<void> replaceAllDataForImport({
     required List<AccountTemplate> templates,
     required List<AccountItem> accounts,
@@ -882,6 +920,11 @@ class SecureStorageService {
     return (raw as List).cast<Map<String, dynamic>>();
   }
 
+  /// 加载所有账号记录，默认排除已软删除的条目。
+  ///
+  /// [includeDeleted] 为 true 时同时返回 is_deleted = 1 的记录。
+  /// 若数据库未打开，返回空列表。
+  /// 结果按 modified_at 降序排列。
   Future<List<AccountItem>> loadAccounts({bool includeDeleted = false}) async {
     if (!isOpen) return [];
 
@@ -937,6 +980,14 @@ class SecureStorageService {
     }
   }
 
+  /// 保存或更新一条账号记录，自动处理 HLC 时间戳与同步状态。
+  ///
+  /// [account] 为要保存的账号数据。
+  /// [isSyncMerge] 为 true 时表示来自同步合并，跳过本地 HLC  stamping
+  /// 并保留源数据的同步状态。
+  ///
+  /// 若数据库未打开，静默返回。
+  /// 保存成功后会触发 [StorageChangeEvent] 并重新加密持久化数据库。
   Future<void> saveAccount(
     AccountItem account, {
     bool isSyncMerge = false,
@@ -1054,6 +1105,13 @@ class SecureStorageService {
     );
   }
 
+  /// 软删除指定 ID 的账号记录。
+  ///
+  /// [id] 为账号唯一标识符。
+  /// [isSyncMerge] 为 true 时使用 [syncDeleteHlc] 作为删除时间戳。
+  /// 默认行为为生成本地 HLC 删除 tombstone 并将 sync_status 设为 pendingPush。
+  ///
+  /// 若数据库未打开，静默返回。
   Future<void> deleteAccount(
     String id, {
     bool isSyncMerge = false,
@@ -1686,6 +1744,11 @@ class SecureStorageService {
     }
   }
 
+  /// 加载所有模板记录（内置 + 自定义），默认排除已软删除的条目。
+  ///
+  /// [includeDeleted] 为 true 时同时返回已删除模板。
+  /// 结果按 is_custom DESC, created_at DESC 排序。
+  /// 若数据库未打开，返回空列表。
   Future<List<AccountTemplate>> loadAllTemplates({
     bool includeDeleted = false,
   }) async {
@@ -1750,6 +1813,13 @@ class SecureStorageService {
     }
   }
 
+  /// 保存或更新一条模板记录，自动处理字段级 HLC 与版本号。
+  ///
+  /// [template] 为要保存的模板数据。
+  /// [isSyncMerge] 为 true 时直接写入，跳过本地冲突检测。
+  ///
+  /// 若数据库未打开，静默返回。
+  /// 当本地模板版本比待保存版本更新时，抛出 [TemplateStaleException]。
   Future<void> saveTemplate(
     AccountTemplate template, {
     bool isSyncMerge = false,
@@ -1869,6 +1939,12 @@ class SecureStorageService {
     );
   }
 
+  /// 软删除指定 ID 的模板。
+  ///
+  /// [id] 为模板唯一标识符。
+  /// 非同步合并模式下，若该模板仍被账号引用，抛出 [TemplateInUseException]。
+  ///
+  /// 若数据库未打开，静默返回。
   Future<void> deleteTemplate(
     String id, {
     bool isSyncMerge = false,
@@ -1947,6 +2023,17 @@ class SecureStorageService {
     }
   }
 
+  /// 记录一条本地同步变更到 outbox（local_sync_changes 表）。
+  ///
+  /// 该方法会自动合并同一实体的连续变更（create → update → delete 的 coalesce 规则）。
+  /// 新生成的变更状态为 [LocalSyncStatus.pendingReview]，等待用户审批后推送到服务器。
+  ///
+  /// [vaultId] 当前保险库 ID。
+  /// [entityType] / [entityId] / [action] 描述变更对象与操作类型。
+  /// [beforeSnapshot] / [afterSnapshot] 用于生成 diff 与展示给用户。
+  /// [skipIfUnchanged] 为 true 时，若快照与现有记录完全一致则跳过写入。
+  ///
+  /// 若数据库未打开，静默返回。
   Future<void> recordLocalSyncChange({
     required String vaultId,
     required LocalSyncEntityType entityType,

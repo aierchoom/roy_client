@@ -31,6 +31,16 @@ SyncStatus syncStatusFromJson(
   return fallback;
 }
 
+bool parseBoolValue(Object? value) {
+  if (value is bool) return value;
+  if (value is int) return value == 1;
+  if (value is String) {
+    final lower = value.trim().toLowerCase();
+    return lower == 'true' || lower == '1';
+  }
+  return false;
+}
+
 @immutable
 class AccountFieldMeta {
   final String type;
@@ -60,6 +70,20 @@ class AccountFieldMeta {
     'sourceTemplateId': sourceTemplateId,
     'sourceTemplateVersion': sourceTemplateVersion,
   };
+
+  AccountFieldMeta copyWith({
+    String? type,
+    String? label,
+    String? sourceTemplateId,
+    int? sourceTemplateVersion,
+  }) {
+    return AccountFieldMeta(
+      type: type ?? this.type,
+      label: label ?? this.label,
+      sourceTemplateId: sourceTemplateId ?? this.sourceTemplateId,
+      sourceTemplateVersion: sourceTemplateVersion ?? this.sourceTemplateVersion,
+    );
+  }
 }
 
 @immutable
@@ -149,7 +173,7 @@ class AccountItem {
           {},
       serverVersion: json['serverVersion'] as int? ?? 0,
       syncStatus: syncStatusFromJson(json['syncStatus']),
-      isDeleted: json['isDeleted'] == 1 || json['isDeleted'] == true,
+      isDeleted: parseBoolValue(json['isDeleted']),
       deleteHlc: json['deleteHlc'] != null
           ? Hlc.parse(json['deleteHlc'])
           : null,

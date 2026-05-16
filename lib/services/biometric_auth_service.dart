@@ -10,14 +10,23 @@ import 'package:cryptography/cryptography.dart';
 
 import 'identity_service.dart' show SecureKeyValueStore;
 
+/// 生物识别认证状态枚举。
 enum BiometricAuthStatus {
+  /// 已启用生物识别解锁。
   enabled,
+  /// 设备支持生物识别，但尚未启用。
   available,
+  /// 设备不支持生物识别。
   notSupported,
+  /// 设备支持生物识别，但用户未录入生物特征。
   notEnrolled,
+  /// 生物识别功能已被禁用。
   disabled,
 }
 
+/// 生物识别认证服务，负责管理指纹/面容等生物识别的启用、解锁与禁用。
+///
+/// 主密码通过 AES-GCM-256 加密后存入安全存储，仅在生物识别验证通过后解密返回。
 class BiometricAuthService {
   final LocalAuthentication _localAuth;
   final SecureKeyValueStore _secureStorage;
@@ -35,6 +44,7 @@ class BiometricAuthService {
   }) : _secureStorage = secureStorage ?? _FlutterSecureStorageAdapter(),
        _localAuth = localAuth ?? LocalAuthentication();
 
+  /// 获取当前生物识别认证状态。
   Future<BiometricAuthStatus> getStatus() async {
     try {
       final isAvailable = await _localAuth.isDeviceSupported();
@@ -73,6 +83,7 @@ class BiometricAuthService {
     return 'Biometrics';
   }
 
+  /// 启用生物识别解锁，验证生物特征后将 [masterPassword] 加密存入安全存储。
   Future<BiometricSetupResult> enableBiometric(String masterPassword) async {
     try {
       final status = await getStatus();
@@ -130,6 +141,7 @@ class BiometricAuthService {
     }
   }
 
+  /// 使用生物识别解锁，验证通过后返回解密后的主密码。
   Future<String?> unlockWithBiometric() async {
     try {
       if (!await _isBiometricEnabled()) return null;
@@ -236,14 +248,24 @@ class _FlutterSecureStorageAdapter implements SecureKeyValueStore {
   Future<void> delete({required String key}) => _storage.delete(key: key);
 }
 
+/// 生物识别启用/解锁结果枚举。
 enum BiometricSetupResult {
+  /// 操作成功。
   success,
+  /// 用户取消操作。
   cancelled,
+  /// 密码无效。
   invalidPassword,
+  /// 设备不支持生物识别。
   notSupported,
+  /// 未录入生物特征。
   notEnrolled,
+  /// 生物识别已被锁定（尝试次数过多）。
   lockedOut,
+  /// 未设置设备密码。
   passcodeNotSet,
+  /// 无密码模式。
   noPasswordMode,
+  /// 未知错误。
   error,
 }

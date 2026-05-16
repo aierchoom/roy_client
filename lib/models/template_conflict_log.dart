@@ -28,15 +28,19 @@ class TemplateConflictLog {
 
   factory TemplateConflictLog.fromJson(Map<String, dynamic> json) {
     return TemplateConflictLog(
-      id: json['id'] as String,
-      templateId: json['templateId'] as String,
-      fieldKey: json['fieldKey'] as String,
-      attributeName: json['attributeName'] as String,
-      localValue: json['localValue'] as String,
-      remoteValue: json['remoteValue'] as String,
-      localHlc: Hlc.parse(json['localHlc'] as String),
-      remoteHlc: Hlc.parse(json['remoteHlc'] as String),
-      savedAt: json['savedAt'] as int,
+      id: json['id'] is String ? json['id'] as String : null,
+      templateId: json['templateId'] is String ? json['templateId'] as String : '',
+      fieldKey: json['fieldKey'] is String ? json['fieldKey'] as String : '',
+      attributeName: json['attributeName'] is String ? json['attributeName'] as String : '',
+      localValue: json['localValue'] is String ? json['localValue'] as String : '',
+      remoteValue: json['remoteValue'] is String ? json['remoteValue'] as String : '',
+      localHlc: json['localHlc'] is String
+          ? Hlc.parse(json['localHlc'] as String)
+          : Hlc.zero('local'),
+      remoteHlc: json['remoteHlc'] is String
+          ? Hlc.parse(json['remoteHlc'] as String)
+          : Hlc.zero('local'),
+      savedAt: json['savedAt'] is int ? json['savedAt'] as int : null,
     );
   }
 
@@ -51,4 +55,28 @@ class TemplateConflictLog {
     'remoteHlc': remoteHlc.toString(),
     'savedAt': savedAt,
   };
+
+  TemplateConflictLog copyWith({
+    String? id,
+    String? templateId,
+    String? fieldKey,
+    String? attributeName,
+    String? localValue,
+    String? remoteValue,
+    Hlc? localHlc,
+    Hlc? remoteHlc,
+    int? savedAt,
+  }) {
+    return TemplateConflictLog(
+      id: id ?? this.id,
+      templateId: templateId ?? this.templateId,
+      fieldKey: fieldKey ?? this.fieldKey,
+      attributeName: attributeName ?? this.attributeName,
+      localValue: localValue ?? this.localValue,
+      remoteValue: remoteValue ?? this.remoteValue,
+      localHlc: localHlc ?? this.localHlc,
+      remoteHlc: remoteHlc ?? this.remoteHlc,
+      savedAt: savedAt ?? this.savedAt,
+    );
+  }
 }

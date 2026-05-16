@@ -5,6 +5,9 @@ import 'dart:typed_data';
 import 'package:cryptography/cryptography.dart';
 import 'package:secret_roy/core/crypto_random.dart';
 
+/// 数据库文件加密器，使用 AES-GCM-256 对 SQLite 数据库文件进行 envelope 加密/解密。
+///
+/// 加密后的文件头部包含 magic、版本号、nonce 与 MAC，可通过 [looksEncrypted] 识别。
 class DatabaseFileCipher {
   static final List<int> _magic = ascii.encode('SROYDB');
   static const int _version = 1;
@@ -35,6 +38,7 @@ class DatabaseFileCipher {
     return CryptoRandom.bytes(_keyLength);
   }
 
+  /// 判断给定字节流是否为 SecretRoy 加密数据库格式。
   static bool looksEncrypted(List<int> bytes) {
     if (bytes.length < _magic.length + 3) {
       return false;
@@ -47,6 +51,7 @@ class DatabaseFileCipher {
     return bytes[_magic.length] == _version;
   }
 
+  /// 使用 AES-GCM-256 加密 [plaintext]，返回带 envelope 头的密文字节。
   Future<Uint8List> encrypt(Uint8List plaintext) async {
     final nonce = Uint8List.fromList(
       List<int>.generate(_nonceLength, (_) => _random.nextInt(256)),
@@ -66,6 +71,7 @@ class DatabaseFileCipher {
     return output.takeBytes();
   }
 
+  /// 解密带 envelope 头的 [encrypted]，返回明文。验证版本与 MAC，失败时抛出异常。
   Future<Uint8List> decrypt(Uint8List encrypted) async {
     try {
       _validateHeader(encrypted);
@@ -122,6 +128,7 @@ class DatabaseFileCipher {
   }
 }
 
+/// 数据库文件加密/解密过程中的异常。
 class DatabaseFileCipherException implements Exception {
   final String message;
   final Object? cause;

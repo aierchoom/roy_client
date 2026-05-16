@@ -35,8 +35,26 @@ import 'vault_pairing_service.dart';
 
 enum ServiceManagerState { uninitialized, locked, unlocking, unlocked, error }
 
-
-
+/// 全局服务统筹中心，管理应用所有核心服务的生命周期与保险库解锁状态。
+///
+/// 作为 [ChangeNotifier]，[ServiceManager] 维护一个统一的状态机（[ServiceManagerState]），
+/// 并在状态变化时通知所有监听者。它负责：
+/// - 初始化与销毁所有底层服务（加密、存储、身份、同步、配对等）。
+/// - 提供保险库的解锁（密码 / 生物识别）与锁定入口。
+/// - 代理数据访问（账号、模板、TOTP）、同步控制、配对与导入导出操作。
+/// - 在自动锁定时执行清理，确保敏感数据不泄露。
+///
+/// 使用场景：
+/// ```dart
+/// final sm = ServiceManager.instance;
+/// await sm.initialize();
+/// final result = await sm.unlockWithPassword('masterPassword');
+/// if (result == UnlockResult.success) { ... }
+/// ```
+///
+/// 生命周期：
+/// - [initialize] → [unlockWithPassword] / [unlockWithBiometric] → [lock] / [logout]
+/// - [dispose] 在应用退出时调用，释放所有资源。
 class ServiceManager extends ChangeNotifier {
   static ServiceManager? _instance;
 
@@ -276,6 +294,11 @@ class ServiceManager extends ChangeNotifier {
   VaultImportExportCoordinator get vaultImportExportCoordinator => _vaultImportExportCoordinator;
   VaultPairingCoordinator get vaultPairingCoordinator => _vaultPairingCoordinator;
 
+  /// 初始化 [ServiceManager]，将状态从 [ServiceManagerState.uninitialized]
+  /// 迁移到 [ServiceManagerState.locked]。
+  ///
+  /// 内部会初始化 [AutoLockService] 并检查上次活跃时间以决定是否需要立即锁定。
+  /// 重复调用会被忽略。
   Future<void> initialize() async {
     if (_state != ServiceManagerState.uninitialized) return;
 
@@ -316,6 +339,15 @@ class ServiceManager extends ChangeNotifier {
     }
   }
 
+  /// 使用主密码解锁保险库。
+  ///
+  /// [password] 为用户的明文主密码。
+  /// 返回 [UnlockResult.success] 表示解锁成功；
+  /// 返回 [UnlockResult.invalidPassword] 表示密码错误；
+  /// 返回 [UnlockResult.alreadyInProgress] 表示解锁正在进行中。
+  ///
+  /// 可能抛出 [IdentityCorruptedException] 当本地身份数据损坏时。
+  /// 前置条件：[state] 不能为 [ServiceManagerState.uninitialized]。
   Future<UnlockResult> unlockWithPassword(String password) async {
     if (_state == ServiceManagerState.unlocking) {
       return UnlockResult.alreadyInProgress;
@@ -359,6 +391,13 @@ class ServiceManager extends ChangeNotifier {
     }
   }
 
+  /// 使用生物识别解锁保险库。
+  ///
+  /// 返回 [UnlockResult.success] 表示解锁成功；
+  /// 返回 [UnlockResult.biometricNotEnabled] 表示生物识别未启用；
+  /// 返回 [UnlockResult.biometricFailed] 表示验证失败。
+  ///
+  /// 前置条件：用户必须已通过 [enableBiometric] 启用生物识别。
   Future<UnlockResult> unlockWithBiometric() async {
     if (_state == ServiceManagerState.unlocking) {
       return UnlockResult.alreadyInProgress;
@@ -385,12 +424,20 @@ class ServiceManager extends ChangeNotifier {
     }
   }
 
+  /// 立即锁定保险库，清理配对密钥并重置同步状态。
+  ///
+  /// 调用后状态变为 [ServiceManagerState.locked]，
+  /// 所有数据访问方法将拒绝执行直到再次解锁。
   void lock() {
     unawaited(_vaultUnlockCoordinator.lock());
     _vaultPairingCoordinator.clearJoinKeys();
     _updateState(ServiceManagerState.locked);
   }
 
+  /// 登出并彻底关闭保险库存储。
+  ///
+  /// 与 [lock] 不同，[logout] 会执行更彻底的存储清理（如关闭数据库连接），
+  /// 通常用于用户主动退出或重置应用前的准备。
   Future<void> logout() async {
     await _vaultUnlockCoordinator.logout();
     _updateState(ServiceManagerState.locked);
@@ -422,6 +469,10 @@ class ServiceManager extends ChangeNotifier {
     return _identityService.checkIdentityExists();
   }
 
+  /// 重置应用：删除所有本地数据、身份、数据库文件及安全存储内容。
+  ///
+  /// **警告**：此操作不可逆，会清空所有保险库数据、同步设置和配对状态。
+  /// 调用后应用回到初始状态，需要重新创建身份并设置主密码。
   Future<void> resetApplication() async {
     _autoLockService.lock();
     await _syncService.disconnect();
@@ -460,11 +511,20 @@ class ServiceManager extends ChangeNotifier {
     return _biometricService.getBiometricName();
   }
 
+  /// 保存或更新一条账号记录。
+  ///
+  /// [account] 为要保存的 [AccountItem]。
+  /// 若保险库未解锁，此方法静默返回不执行任何操作。
+  /// 成功后会通过 [VaultDataRepository] 写入数据库并触发同步变更箱记录。
   Future<void> saveAccount(AccountItem account) async {
     if (!isUnlocked) return;
     await _vaultDataRepository.saveAccount(account);
   }
 
+  /// 软删除指定 ID 的账号记录。
+  ///
+  /// [id] 为账号的唯一标识符。
+  /// 若保险库未解锁，此方法静默返回。
   Future<void> deleteAccount(String id) async {
     if (!isUnlocked) return;
     await _vaultDataRepository.deleteAccount(id);
@@ -514,6 +574,12 @@ class ServiceManager extends ChangeNotifier {
     await _syncCoordinator.disconnect();
   }
 
+  /// 立即执行与服务器的同步（pull + push）。
+  ///
+  /// 返回 [SyncResult] 描述同步结果，包括是否成功、是否有数据被拉取等。
+  /// 若保险库未解锁或身份未初始化，返回失败的 [SyncResult]。
+  ///
+  /// 同步成功后若拉取到新数据，会自动刷新设备别名服务并通知监听者。
   Future<SyncResult> syncNow() async {
     if (!isUnlocked) {
       return SyncResult.failure('Vault is locked.');

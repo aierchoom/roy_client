@@ -10,6 +10,9 @@ import '../models/app_notification.dart';
 import 'enhanced_crypto_service.dart';
 import 'secure_storage_service.dart';
 
+/// 本地通知服务，负责初始化通知插件、扫描密码健康状态并生成提醒。
+///
+/// 支持密码过期提醒、弱密码检测与每日定时检查。
 class NotificationService {
   final SecureStorageService _storage;
   final FlutterLocalNotificationsPlugin _plugin = FlutterLocalNotificationsPlugin();
@@ -21,6 +24,7 @@ class NotificationService {
   static const _channelName = 'SecretRoy 通知';
   static const _channelDesc = '密码安全提醒通知';
 
+  /// 初始化本地通知插件与时区数据库。
   Future<void> init() async {
     if (_initialized) return;
     try {
@@ -40,7 +44,7 @@ class NotificationService {
     }
   }
 
-  /// Scan accounts and generate password-expiry notifications.
+  /// 扫描账号列表，为超过 [expiryDays] 未修改密码的账号生成过期提醒通知。
   Future<List<AppNotification>> generatePasswordExpiryNotifications({
     required List<AccountItem> accounts,
     required List<AccountTemplate> templates,
@@ -90,6 +94,7 @@ class NotificationService {
     return created;
   }
 
+  /// 扫描账号列表，为密码强度低于 [strengthThreshold] 的账号生成弱密码提醒通知。
   Future<List<AppNotification>> generateWeakPasswordNotifications({
     required List<AccountItem> accounts,
     required List<AccountTemplate> templates,
@@ -152,6 +157,7 @@ class NotificationService {
     return created;
   }
 
+  /// 设置每日定时检查通知，默认在指定 [hour]:[minute] 触发。
   Future<void> scheduleDailyCheck({int hour = 9, int minute = 0}) async {
     if (!_initialized) await init();
     try {

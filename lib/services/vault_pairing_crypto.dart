@@ -4,6 +4,7 @@ import 'package:crypto/crypto.dart' show Hmac, sha256;
 import 'package:secret_roy/core/crypto_random.dart';
 import 'package:cryptography/cryptography.dart' hide Hmac;
 
+/// Vault 配对加密过程中的异常。
 class VaultPairingCryptoException implements Exception {
   final String message;
 
@@ -13,6 +14,7 @@ class VaultPairingCryptoException implements Exception {
   String toString() => 'VaultPairingCryptoException($message)';
 }
 
+/// X25519 密钥对封装，包含内部密钥对与 base64url 编码的公钥。
 class VaultPairingKeyPair {
   final SimpleKeyPair keyPair;
   final String publicKey;
@@ -20,6 +22,7 @@ class VaultPairingKeyPair {
   const VaultPairingKeyPair({required this.keyPair, required this.publicKey});
 }
 
+/// Vault 配对加密工具，使用 X25519 + HKDF + AES-GCM-256 安全交换 pairing bundle。
 class VaultPairingCrypto {
   static const String prefix = 'sroy-pairing:';
   static const String _algorithmName = 'x25519-aesgcm-sha256';
@@ -28,6 +31,7 @@ class VaultPairingCrypto {
 
   const VaultPairingCrypto._();
 
+  /// 生成新的 X25519 临时密钥对。
   static Future<VaultPairingKeyPair> createKeyPair() async {
     final algorithm = X25519();
     final keyPair = await algorithm.newKeyPair();
@@ -38,6 +42,7 @@ class VaultPairingCrypto {
     );
   }
 
+  /// 使用请求方公钥 [requesterPublicKey] 对 [plainBundle] 进行 X25519 密钥协商加密。
   static Future<String> encryptBundle({
     required String plainBundle,
     required String requesterPublicKey,
@@ -88,6 +93,7 @@ class VaultPairingCrypto {
     }
   }
 
+  /// 使用本地密钥对 [keyPair] 解密 [wrappedBundle]，返回明文 pairing bundle。
   static Future<String> decryptBundle({
     required String wrappedBundle,
     required VaultPairingKeyPair keyPair,

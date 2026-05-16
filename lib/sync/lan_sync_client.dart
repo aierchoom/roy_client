@@ -24,6 +24,7 @@ class LanSyncClient {
   final IdentityService _identity;
   final SyncService _syncService;
   final LanSyncConfig _config;
+  final http.Client _httpClient;
 
   LanSyncPhase _phase = LanSyncPhase.idle;
   String? _sessionId;
@@ -35,10 +36,12 @@ class LanSyncClient {
     required IdentityService identity,
     required SyncService syncService,
     LanSyncConfig? config,
+    http.Client? httpClient,
   })  : _storage = storage,
         _identity = identity,
         _syncService = syncService,
-        _config = config ?? const LanSyncConfig();
+        _config = config ?? const LanSyncConfig(),
+        _httpClient = httpClient ?? http.Client();
 
   bool get isBusy => _isBusy;
   LanSyncPhase get phase => _phase;
@@ -146,7 +149,7 @@ class LanSyncClient {
     String url,
     Map<String, dynamic> body,
   ) async {
-    final response = await http
+    final response = await _httpClient
         .post(
           Uri.parse(url),
           headers: {'Content-Type': 'application/json'},
@@ -326,7 +329,7 @@ class LanSyncClient {
   Future<void> _abortQuietly() async {
     if (_sessionId == null || _hostUrl == null) return;
     try {
-      await http
+      await _httpClient
           .post(
             Uri.parse('$_hostUrl/lan-sync/abort'),
             headers: {'Content-Type': 'application/json'},
