@@ -3,7 +3,7 @@
 Navigation:
 [Docs Home](README.md) |
 [Executive Summary](architecture/00-executive-summary.md#decision-summary) |
-[Architecture Backlog](architecture/06-distributed-system-implementation-backlog.md)
+[迭代任务跟踪](product/iteration-tasks.md)
 
 | Item | Value |
 |---|---|
@@ -284,4 +284,4 @@ Primary outcomes:
 Navigation:
 [Docs Home](README.md) |
 [Executive Summary](architecture/00-executive-summary.md#decision-summary) |
-[Architecture Backlog](architecture/06-distributed-system-implementation-backlog.md)
+[迭代任务跟踪](product/iteration-tasks.md)

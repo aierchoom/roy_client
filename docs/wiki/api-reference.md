@@ -149,8 +149,8 @@ class SecureStorageService {
   Future<void> deleteAccount(String id, {bool isSyncMerge = false, Hlc? syncDeleteHlc});
   Future<int> countAccountsByTemplate(String templateId);
 
-  Future<void> saveConflictLogs(List<ConflictLog> logs);
-  Future<List<ConflictLog>> getConflictLogs(String accountId);
+  Future<void> saveConflictLogs(List<TemplateConflictLog> logs);   <!-- 2026-05-16 修正：原 ConflictLog，更新为 TemplateConflictLog -->
+  Future<List<TemplateConflictLog>> getConflictLogs(String accountId);  <!-- 2026-05-16 修正：原 ConflictLog，更新为 TemplateConflictLog -->
   Future<void> deleteConflictLog(String logId);
 
   Future<List<AccountTemplate>> loadCustomTemplates({bool includeDeleted = false});
@@ -344,7 +344,97 @@ class AutoLockService extends ChangeNotifier {
 
 `ServiceManager.setupLifecycleObserver()` 会把它接到 Flutter 应用生命周期上。
 
-## 9. AccountItem
+## 9. NotificationService
+
+文件：`lib/services/notification_service.dart`
+
+```dart
+class NotificationService {
+  NotificationService(SecureStorageService storage);
+
+  Future<void> init();
+  Future<List<AppNotification>> generatePasswordExpiryNotifications({
+    required List<AccountItem> accounts,
+    required List<AccountTemplate> templates,
+    int expiryDays = 90,
+  });
+  Future<List<AppNotification>> generateWeakPasswordNotifications({
+    required List<AccountItem> accounts,
+    required List<AccountTemplate> templates,
+    int strengthThreshold = 40,
+  });
+  Future<void> scheduleDailyCheck({int hour = 9, int minute = 0});
+  Future<void> cancelAllScheduled();
+}
+```
+
+## 10. TotpImportService / TotpQrImageImportService
+
+文件：`lib/services/totp_import_service.dart`、`lib/services/totp_qr_image_import_service.dart`
+
+```dart
+class TotpImportService {
+  static String normalizeImportValue(String raw);
+  static String? extractCandidate(String raw);
+}
+
+class TotpQrImageImportService {
+  static Future<String> normalizeClipboardQrImage({
+    Future<Uint8List?> Function()? imageReader,
+  });
+  static String normalizeImageBytes(Uint8List bytes);
+  static String decodeQrImage(Uint8List bytes);
+}
+```
+
+## 11. VaultHealthCalculator
+
+文件：`lib/services/vault_health_calculator.dart`
+
+```dart
+class VaultHealthCalculator {
+  VaultHealthCalculator({
+    required SecureStorageService storage,
+    required IdentityService identity,
+  });
+
+  Future<VaultHealthReport> calculate();
+
+  static VaultHealthItem checkWeakPasswords(List<AccountItem> accounts);
+  static VaultHealthItem checkReusedPasswords(List<AccountItem> accounts);
+  static VaultHealthItem checkStaleRecords(List<AccountItem> accounts);
+  static VaultHealthItem checkIncompleteRecords(
+    List<AccountItem> accounts,
+    List<AccountTemplate> templates,
+  );
+  static VaultHealthItem checkMissing2FA(
+    List<AccountItem> accounts,
+    List<AccountTemplate> templates,
+    List<TOTPCredential> totpCredentials,
+  );
+  static int calculateScore(List<VaultHealthItem> items);
+  static VaultHealthGrade scoreToGrade(int score);
+}
+```
+
+## 12. DeviceAliasService
+
+文件：`lib/services/device_alias_service.dart`
+
+```dart
+class DeviceAliasService {
+  static Future<DeviceAliasService> create();
+  DeviceAliasService.testable();
+
+  String resolve(BuildContext context, String? deviceId, {String? currentDeviceId});
+  Future<void> setAlias(String deviceId, String alias);
+  Future<void> setCurrentDeviceAlias(String alias);
+}
+```
+
+## 13. AccountItem
+
+文件：`lib/models/account_item.dart`
 
 文件：`lib/models/account_item.dart`
 
@@ -379,7 +469,7 @@ enum SyncStatus {
 }
 ```
 
-## 10. AccountTemplate
+## 14. AccountTemplate
 
 文件：`lib/models/account_template.dart`
 
@@ -411,7 +501,7 @@ class AccountTemplate {
 final List<AccountTemplate> basicAccountTemplates = [websiteTemplate];
 ```
 
-## 11. 常用调用链
+## 15. 常用调用链
 
 新增账号：
 

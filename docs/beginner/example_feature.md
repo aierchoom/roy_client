@@ -189,7 +189,16 @@ void _save() {
     return;
   }
 
+  if (_hasMissingTemplate || _pickedTag == null) {
+    // 模板缺失时禁止保存
+    return;
+  }
+
   _persistVisibleFieldDrafts();
+
+  // 合并式保存：保留账户旧字段，用当前可见字段覆盖同名 key，
+  // 仅移除用户明确删除的字段
+  final data = ...;
 
   final item = AccountItem(
     id: widget.initial?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
@@ -199,7 +208,8 @@ void _save() {
     data: data,
     createdAt: widget.initial?.createdAt ?? DateTime.now().millisecondsSinceEpoch,
     syncStatus: widget.initial?.syncStatus ?? SyncStatus.pendingPush,
-    isDeleted: false,
+    isDeleted: widget.initial?.isDeleted ?? false,
+    deleteHlc: widget.initial?.deleteHlc,
   );
 
   Navigator.of(context).pop(item);
@@ -210,6 +220,7 @@ void _save() {
 
 ```text
 把输入框里的零散文本
+与账户已有的旧字段合并
 ↓
 整理成项目统一的数据模型 AccountItem
 ```

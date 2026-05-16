@@ -1,6 +1,6 @@
 # SecretRoy 技术文档
 
-**最后更新**: 2026-04-28
+**最后更新**: 2026-05-16
 
 本文档是当前 `roy_client` 代码的简明技术地图。服务端代码位于同级
 `../roy_server/` 仓库；本文件只描述客户端仓库中仍然真实存在的结构、API 和数据流。
@@ -25,38 +25,86 @@
 ```text
 lib/
 ├── main.dart
+├── core/                          <!-- 2026-05-16 修正：原遗漏，新增 -->
+│   ├── app_logger.dart
+│   └── crypto_random.dart
 ├── l10n/
 ├── models/
 │   ├── account_item.dart
 │   ├── account_template.dart
-│   └── hlc.dart
+│   ├── app_notification.dart      <!-- 2026-05-16 修正：原遗漏，新增 -->
+│   ├── hlc.dart
+│   ├── local_sync_change.dart     <!-- 2026-05-16 修正：原遗漏，新增 -->
+│   ├── template_conflict_log.dart <!-- 2026-05-16 修正：原遗漏，新增 -->
+│   ├── totp_credential.dart       <!-- 2026-05-16 修正：原遗漏，新增 -->
+│   └── vault_health_report.dart   <!-- 2026-05-16 修正：原遗漏，新增 -->
 ├── providers/
 │   ├── enhanced_app_provider.dart
+│   ├── notification_provider.dart <!-- 2026-05-16 修正：原遗漏，新增 -->
 │   └── theme_provider.dart
 ├── services/
-│   ├── service_manager.dart
-│   ├── secure_storage_service.dart
+│   ├── auto_lock_service.dart
+│   ├── biometric_auth_service.dart
+│   ├── database_file_cipher.dart       <!-- 2026-05-16 修正：原遗漏，新增 -->
+│   ├── database_file_key_manager.dart  <!-- 2026-05-16 修正：原遗漏，新增 -->
+│   ├── device_alias_service.dart       <!-- 2026-05-16 修正：原遗漏，新增 -->
 │   ├── enhanced_crypto_service.dart
 │   ├── identity_service.dart
-│   ├── biometric_auth_service.dart
-│   ├── auto_lock_service.dart
-│   ├── vault_pairing_service.dart
-│   └── lan_pairing_service.dart
+│   ├── lan_pairing_service.dart
+│   ├── notification_service.dart       <!-- 2026-05-16 修正：原遗漏，新增 -->
+│   ├── secure_storage_service.dart
+│   ├── sensitive_clipboard_service.dart <!-- 2026-05-16 修正：原遗漏，新增 -->
+│   ├── service_manager.dart
+│   ├── totp_import_service.dart         <!-- 2026-05-16 修正：原遗漏，新增 -->
+│   ├── totp_qr_image_import_service.dart <!-- 2026-05-16 修正：原遗漏，新增 -->
+│   ├── totp_service.dart
+│   ├── vault_health_calculator.dart     <!-- 2026-05-16 修正：原遗漏，新增 -->
+│   ├── vault_pairing_crypto.dart        <!-- 2026-05-16 修正：原遗漏，新增 -->
+│   └── vault_pairing_service.dart
 ├── sync/
-│   ├── sync_service.dart
+│   ├── crdt_merge_engine.dart
+│   ├── lan_sync_client.dart          <!-- 2026-05-16 修正：原遗漏，新增 -->
+│   ├── lan_sync_coordinator.dart     <!-- 2026-05-16 修正：原遗漏，新增 -->
+│   ├── lan_sync_host_handler.dart    <!-- 2026-05-16 修正：原遗漏，新增 -->
+│   ├── lan_sync_session.dart         <!-- 2026-05-16 修正：原遗漏，新增 -->
 │   ├── sync_payload_codec.dart
-│   └── crdt_merge_engine.dart
-├── system/service_manager/
-│   ├── default_sync_server_url.dart
-│   ├── password_tools.dart
-│   ├── sync_server_url_store.dart
-│   └── vault_dump_coordinator.dart
+│   ├── sync_service.dart
+│   ├── sync_service_conflict.dart    <!-- 2026-05-16 修正：原遗漏，新增 -->
+│   ├── sync_service_pull.dart        <!-- 2026-05-16 修正：原遗漏，新增 -->
+│   ├── sync_service_push.dart        <!-- 2026-05-16 修正：原遗漏，新增 -->
+│   ├── sync_service_types.dart       <!-- 2026-05-16 修正：原遗漏，新增 -->
+│   └── totp_credential_merge_engine.dart <!-- 2026-05-16 修正：原遗漏，新增 -->
+├── system/                              <!-- 2026-05-16 修正：原仅列 4 个，更新为 10 个 -->
+│   └── service_manager/
+│       ├── default_sync_server_url.dart
+│       ├── password_tools.dart
+│       ├── sync_coordinator.dart          <!-- 2026-05-16 修正：原遗漏，新增 -->
+│       ├── sync_server_url_store.dart
+│       ├── vault_data_repository.dart     <!-- 2026-05-16 修正：原遗漏，新增 -->
+│       ├── vault_dump_coordinator.dart
+│       ├── vault_import_export_coordinator.dart <!-- 2026-05-16 修正：原遗漏，新增 -->
+│       ├── vault_import_types.dart        <!-- 2026-05-16 修正：原遗漏，新增 -->
+│       ├── vault_pairing_coordinator.dart <!-- 2026-05-16 修正：原遗漏，新增 -->
+│       └── vault_unlock_coordinator.dart  <!-- 2026-05-16 修正：原遗漏，新增 -->
+├── theme/                               <!-- 2026-05-16 修正：原遗漏，新增 -->
+│   ├── app_design_tokens.dart
+│   ├── app_layout.dart
+│   ├── app_text_styles.dart
+│   └── theme.dart
+├── utils/                               <!-- 2026-05-16 修正：原遗漏，新增 -->
+│   ├── field_presets.dart
+│   ├── relative_time_formatter.dart
+│   ├── template_icons.dart
+│   └── text_highlight.dart
 ├── views/
 │   ├── unlock_view.dart
 │   ├── home/
 │   ├── accounts/
 │   ├── templates/
-│   └── settings/security/sync 等页面
+│   ├── settings/
+│   ├── sync/
+│   ├── notifications/
+│   └── settings/security/sync/appearance/conflict 等页面
 └── widgets/
 ```
 
@@ -112,7 +160,7 @@ HomeView
 
 文件：`lib/services/service_manager.dart`
 
-`ServiceManager` 是业务门面，内部持有：
+`ServiceManager` 是业务门面，内部持有/委托：
 
 - `EnhancedCryptoService`
 - `BiometricAuthService`
@@ -124,25 +172,40 @@ HomeView
 - `LanPairingService`
 - `SyncServerUrlStore`
 - `VaultDumpCoordinator`
+- `VaultUnlockCoordinator`       <!-- 2026-05-16 修正：原遗漏，新增 -->
+- `VaultDataRepository`          <!-- 2026-05-16 修正：原遗漏，新增 -->
+- `SyncCoordinator`              <!-- 2026-05-16 修正：原遗漏，新增 -->
+- `VaultImportExportCoordinator` <!-- 2026-05-16 修正：原遗漏，新增 -->
+- `VaultPairingCoordinator`      <!-- 2026-05-16 修正：原遗漏，新增 -->
+- `NotificationService`          <!-- 2026-05-16 修正：原遗漏，新增 -->
+- `SensitiveClipboardService`    <!-- 2026-05-16 修正：原遗漏，新增 -->
+- `DeviceAliasService`           <!-- 2026-05-16 修正：原遗漏，新增 -->
+- `TotpImportService`            <!-- 2026-05-16 修正：原遗漏，新增 -->
+- `TotpQrImageImportService`     <!-- 2026-05-16 修正：原遗漏，新增 -->
+- `VaultHealthCalculator`        <!-- 2026-05-16 修正：原遗漏，新增 -->
+
+<!-- 2026-05-16 修正：原列表遗漏 10+ 个服务/协调器，实际 ServiceManager 已拆分大量职责到 system/ 协调器 -->
 
 解锁流程：
 
 ```text
 unlockWithPassword(password)
 ↓
-IdentityService.initialize()
-↓
-EnhancedCryptoService.initMasterKey(password)
-↓
-SecureStorageService.setDatabaseCipher(...)
-↓
-SecureStorageService.initialize(deviceId)
-↓
-AutoLockService.unlock()
-↓
-SyncService.initialize()
-↓
-后台尝试 SyncService.connect()
+VaultUnlockCoordinator.initializeAndUnlock(password)
+  ↓
+  IdentityService.initialize()
+  ↓
+  EnhancedCryptoService.initMasterKey(password)
+  ↓
+  SecureStorageService.setDatabaseCipher(...)
+  ↓
+  SecureStorageService.initialize(deviceId)
+  ↓
+  AutoLockService.unlock()
+  ↓
+  SyncService.initialize()
+  ↓
+  后台尝试 SyncService.connect()
 ↓
 state = unlocked
 ↓
@@ -183,6 +246,8 @@ secret_roy_vault.runtime.db
 - `templates`
 - `conflict_logs`
 - `settings`
+- `totp_credentials`    <!-- 2026-05-16 修正：原遗漏，新增 -->
+- `app_notifications`   <!-- 2026-05-16 修正：原遗漏，新增 -->
 
 `SecureStorageService` 在保存、删除、写设置后会发出 `StorageChangeEvent`。`EnhancedAppProvider`
 订阅这个事件并重新加载账号/模板。
@@ -292,7 +357,10 @@ deleteHlc
 
 | ID | 标题 | 字段 |
 |---|---|---|
-| `generic_info` | 网站模板 | `website`, `username`, `password`, `notes` |
+| `builtin_generic_info` | 网站模板 | `website`, `username`, `password`, `totp`, `notes` |
+| `builtin_secure_note` | 通用安全笔记 | `content` |
+| `builtin_mnemonic` | 助记词 | `mnemonic_words` |
+| `builtin_api_service` | API 服务 | `service_name`, `api_keys`, `endpoint` |
 
 自定义模板存入 `templates` 表，内置模板来自代码常量 `basicAccountTemplates`。
 

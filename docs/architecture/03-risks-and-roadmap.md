@@ -14,7 +14,7 @@ Related: [architecture-deep-dive.md](architecture-deep-dive.md)
 | Scope | Maturity, risks, readiness, migration and next-stage planning |
 | Owner | Repository maintainers (formal owner TBD) |
 | Review Status | Draft - Unapproved |
-| Last Updated | 2026-04-28 |
+| Last Updated | 2026-05-16 |
 
 ## 1. Maturity Assessment
 
@@ -34,11 +34,11 @@ Related: [architecture-deep-dive.md](architecture-deep-dive.md)
 
 ### Still Prototype-Level
 
-- 同步 payload 加密/认证
+- 🟡 同步 payload 加密/认证（T3 AEAD 信封、T16 vault token 已落地；端到端集成测试仍缺失）
 - 身份与密钥体系
 - 服务端持久化与认证
 - 观测与恢复能力
-- 系统级测试矩阵
+- 🟡 系统级测试矩阵（已达 88 文件 / ~619 用例，但多设备端到端集成测试仍缺失）
 
 ## 2. Quality Attributes
 
@@ -184,11 +184,11 @@ Related: [architecture-deep-dive.md](architecture-deep-dive.md)
 
 ## 7. Recommended Next 90 Days
 
-### Days 1-30
+### Days 1-30（✅ 已完成）
 
 - 统一系统真实定位
-- 补最关键同步回归
-- 梳理 `ServiceManager` 边界
+- 补最关键同步回归（T0-T7 质量迭代已完成）
+- 梳理 `ServiceManager` 边界（T0 已拆分至 `lib/system/`）
 
 ### Days 31-60
 

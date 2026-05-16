@@ -223,6 +223,16 @@ Future<void> saveAccount(AccountItem account) async {
 
 UI 不需要知道 SQLite 怎么写，也不需要知道同步怎么发 HTTP。
 
+### system/ 协调器
+
+`lib/system/service_manager/` 下是从 `ServiceManager` 拆分出的具体协调器：
+
+- `VaultUnlockCoordinator`：解锁、锁定、生物识别、无密码模式。
+- `SyncCoordinator`：同步连接、拉取后重初始化存储。
+- `VaultDataRepository`：账号/模板保存删除、引用校验、同步变更箱记录。
+- `VaultImportExportCoordinator`：保险库导入/导出。
+- `VaultPairingCoordinator`：设备配对。
+
 ### 其他 services
 
 常见服务：
@@ -289,6 +299,7 @@ class AccountItem {
   final int serverVersion;
   final SyncStatus syncStatus;
   final bool isDeleted;
+  final Hlc? deleteHlc;
 }
 ```
 
@@ -311,7 +322,7 @@ class AccountItem {
 编辑页根据模板自动生成输入项
 ```
 
-当前内置模板是 `websiteTemplate`，也就是“网站模板”。
+当前内置模板有 4 个：`websiteTemplate`（网站）、`secureNoteGenericTemplate`（安全笔记）、`secureNoteMnemonicTemplate`（助记词）、`apiServiceTemplate`（API 服务）。
 
 ### 本地存储：SecureStorageService
 

@@ -606,4 +606,28 @@ class LanSyncFeatureFlag {
 
 ---
 
+## 9. 已知问题（来自原 implementation-issues）
+
+以下问题在开发过程中记录，其中 **P0 项（`createApprovedLocalSyncChange`、`commitLanSyncBatch`）已在 Phase 1 解决**，剩余问题待后续迭代：
+
+### 问题 3：`_type` 字段干扰
+
+`SyncPayloadCodec.encodeAccount()` 在序列化时注入 `_type: 'account'` 字段。`AccountItem.fromJson()` 需安全忽略未知字段，否则 LAN 同步反序列化可能失败。
+
+**当前状态**：已在 `_payloadToItem` 中删除 `_type` 后调用 `fromJson`。
+
+### 问题 5：TOTP 冲突日志
+
+`TotpCredentialMergeEngine.merge()` 返回单个 `TotpCredential`（非 `MergeResult`），导致 `LanSyncHostHandler` 无法收集 TOTP 冲突日志。
+
+**当前状态**：采用方案 B，暂不收集 TOTP 冲突日志（字段少、冲突概率低），后续统一 MergeResult 类型。
+
+### 问题 6：全量传输优化
+
+`handlePull()` 当前加载 Host 全部数据推给 B。若 Host 有 1000 条记录、B 只修改 1 条，仍传输 1000 条。
+
+**当前状态**：全量传输（简化实现），后续优化为差集传输。
+
+---
+
 *文档结束*

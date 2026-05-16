@@ -89,9 +89,10 @@
 
 已补充：
 
-- `SecureStorageService` 存储行为测试
-- `AccountListTile` 风险标签展示测试
-- `AccountEditView` 历史字段删除与模板缺失保护测试
+- `test/services/secure_storage_service_encryption_test.dart`
+- `test/services/secure_storage_service_sync_outbox_test.dart`
+- `test/widgets/account_list_tile_test.dart`
+- `test/views/account_edit_view_test.dart`
 
 仍建议后续补充：
 

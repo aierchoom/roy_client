@@ -361,7 +361,7 @@ Debug Navigator → Memory
 ```dart
 // 在 main.dart 中
 void main() {
-  debugPrint('Debug mode enabled');
+  AppLogger.d('Debug mode enabled');
   runApp(MyApp());
 }
 ```

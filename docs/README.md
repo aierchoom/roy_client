@@ -1,6 +1,6 @@
 # SecretRoy Documentation
 
-**Last updated**: 2026-04-30
+**Last updated**: 2026-05-16
 
 This directory is the canonical documentation home for the SecretRoy client.
 Project-owned Markdown files are organized by purpose, use lowercase
@@ -16,11 +16,13 @@ kebab-case names, and avoid duplicated mirror copies.
 | Product | [product/application-characteristics.md](product/application-characteristics.md) | Global application characteristics and iteration guardrails |
 | Iteration Tasks | [product/iteration-tasks.md](product/iteration-tasks.md) | Current step-by-step product and engineering task list |
 | Security | [security/security-features.md](security/security-features.md) | Implemented security capabilities |
-| Sync | [sync/sync-protocol.md](sync/sync-protocol.md) | Sync protocol and vault-linking references |
+| Sync | [architecture/sync-protocol-updated.md](architecture/sync-protocol-updated.md) | Current sync protocol specification (authoritative) |
+| QA | [qa/feature-matrix-for-test.md](qa/feature-matrix-for-test.md) | QA feature matrix with coverage status |
 | Key recovery | [sync/vault-recovery-routes.md](sync/vault-recovery-routes.md) | Recovery routes, risk levels, scenarios, and acceptance checks |
 | Features | [features/README.md](features/README.md) | Feature-level design and long-term regression maintenance docs |
 | Account templates | [features/account-templates/business-analysis.md](features/account-templates/business-analysis.md) | Template feature design and test reports |
-| Guides | [guides/technical-documentation.md](guides/technical-documentation.md) | Code map and implementation guides |
+| Guides | [wiki/code-walkthrough.md](wiki/code-walkthrough.md) | Code walkthrough by user journey |
+| Guides | [wiki/new-developer-quickstart.md](wiki/new-developer-quickstart.md) | 10-minute project overview for new developers |
 | TODO | [todo.md](todo.md) | Project-level TODO derived from the current architecture conclusion |
 | Reports | [reports/execution/README.md](reports/execution/README.md) | Per-feature execution reports |
 
@@ -30,10 +32,10 @@ kebab-case names, and avoid duplicated mirror copies.
 |---|---|
 | User | [wiki/user-manual.md](wiki/user-manual.md) -> [wiki/quick-start-guide.md](wiki/quick-start-guide.md) |
 | New Flutter developer | [beginner/flutter_basics.md](beginner/flutter_basics.md) -> [beginner/app_flow.md](beginner/app_flow.md) |
-| Developer | [wiki/development-setup.md](wiki/development-setup.md) -> [guides/technical-documentation.md](guides/technical-documentation.md) |
+| Developer | [wiki/new-developer-quickstart.md](wiki/new-developer-quickstart.md) -> [wiki/code-walkthrough.md](wiki/code-walkthrough.md) -> [wiki/development-setup.md](wiki/development-setup.md) |
 | Architecture reviewer | [architecture/00-executive-summary.md](architecture/00-executive-summary.md) -> [architecture/03-risks-and-roadmap.md](architecture/03-risks-and-roadmap.md) |
 | Security reviewer | [security/security-features.md](security/security-features.md) -> [sync/vault-recovery-routes.md](sync/vault-recovery-routes.md) |
-| Sync implementer | [sync/sync-protocol.md](sync/sync-protocol.md) -> [security/key-sync-implementation.md](security/key-sync-implementation.md) -> [sync/vault-recovery-routes.md](sync/vault-recovery-routes.md) |
+| Sync implementer | [architecture/sync-protocol-updated.md](architecture/sync-protocol-updated.md) -> [security/key-sync-implementation.md](security/key-sync-implementation.md) -> [sync/vault-recovery-routes.md](sync/vault-recovery-routes.md) |
 
 ## Directory Layout
 

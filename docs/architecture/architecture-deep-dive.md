@@ -2,7 +2,7 @@
 
 > 更适合阅读的拆分文档集见：[README.md](README.md)
 >
-> 现实校准：本文优先以当前源码实现为准。历史版本里的固定 `vaultId`、secure storage 直接主密码比对、早期 payload 协议壳已经被收敛；当前剩余问题是 identity/key 仍偏 mock、sync payload 不是标准 AEAD/E2EE、服务端缺少认证授权。
+> 现实校准：本文优先以当前源码实现为准。历史版本里的固定 `vaultId`、secure storage 直接主密码比对、早期 payload 协议壳已经被收敛；当前剩余问题是 identity/key 体系仍需继续收敛、sync payload 已落地标准 AEAD 但端到端密钥治理（E2EE）与服务端认证授权仍待完善。
 
 | Item | Value |
 |---|---|
@@ -1533,20 +1533,20 @@ sequenceDiagram
 
 这对同步系统非常重要。
 
-#### 11.5 当前“加密”现实
+#### 11.5 当前同步 Payload 加密现实
 
 必须非常明确：
 
-当前同步层所谓的“encryptAndSign”实质只是：
+当前同步层 `encryptAndSign` 已实现为标准 AEAD 信封：
 
-- JSON 编码
-- UTF-8
-- Base64
+- 明文经 UTF-8 编码后使用 AES-256-GCM 加密
+- 密钥通过 HKDF-SHA256 从配对密钥派生
+- 输出为 `sroy-sync:` 前缀的 binary envelope（nonce + ciphertext + tag）
 
 因此从专业角度判断：
 
 - 同步协议结构已形成
-- 真正密码学安全性尚未实现
+- 记录级 payload 密码学保护已落地（防篡改、防重放、vault 隔离）
 
 这不影响我们解读架构，但必须作为系统成熟度评估的一部分写清楚。
 
@@ -1660,15 +1660,20 @@ sequenceDiagram
 
 从意图上看，它是在为未来更正式的设备身份、vault 身份、密钥体系做预留。
 
-但从当前实现看，它仍是：
+当前实现已收敛部分历史债务：
 
-- 设计占位明显
-- mock 痕迹较强
+- `vaultId` 不再返回固定值，首次初始化时随机生成并持久化
+- `deviceId` 同样随机生成并持久化
+
+但仍未完成正式身份体系：
+
+- 多设备加入与撤销尚未实现
+- 密钥生命周期管理仍需继续收敛
 
 因此专业评价应该是：
 
 - 架构方向是对的
-- 实现成熟度不够
+- 实现成熟度仍不足
 
 ---
 
@@ -1971,7 +1976,7 @@ SecretRoy 在这一点上做得不错：
 
 ### OQ-001. Vault identity 的最终模型是什么
 
-当前 `IdentityService` 仍有 mock 痕迹，这意味着后续必须明确：
+当前 `IdentityService` 已完成基础设备身份与 vault 身份初始化（`vaultId`、`deviceId` 随机生成并持久化），但正式身份体系尚未闭环，这意味着后续必须明确：
 
 - vault 是否稳定绑定某个用户身份
 - device 与 vault 的绑定关系如何表达
@@ -1979,10 +1984,10 @@ SecretRoy 在这一点上做得不错：
 
 ### OQ-002. 运行时与远端加密边界最终放在哪里
 
-当前本地长期落盘数据库已使用 `.db.enc` 文件信封，记录级同步 payload 也已进入 encrypted/signed 形态；后续仍必须明确：
+当前本地长期落盘数据库已使用 `.db.enc` 文件信封，记录级同步 payload 已使用 HKDF-SHA256 派生密钥 + AES-256-GCM 标准 AEAD 信封；后续仍必须明确：
 
 - 运行时 SQLite 工作库是否需要进一步缩短明文窗口
-- 远端 payload 是否需要从记录级封装升级到更强的端到端密钥治理
+- 远端 payload 是否需要从当前 vault 级配对密钥升级到更强的端到端密钥治理
 - 签名、验证、撤销与密钥轮换在哪一层执行
 
 ### OQ-003. 模板是否进入正式同步域
@@ -2193,7 +2198,7 @@ SecretRoy 在这一点上做得不错：
 | Domain Modeling | 4 | `AccountItem`、模板系统、同步元数据建模较完整。 |
 | Local-first Design | 5 | 本地优先是系统核心，不是附属能力。 |
 | Sync Design | 4 | pull-then-push、字段级冲突合并、conflict inbox 都较成熟。 |
-| Security Posture | 2 | 方向合理，但实现仍明显是原型级。 |
+| Security Posture | 3 | 本地 at-rest 加密（AES-GCM-256）、同步 payload AEAD、vault token 认证、生物识别、敏感剪贴板分级策略已落地，但运行时明文窗口与 E2EE 密钥治理仍待完善。 |
 | Backend Robustness | 2 | 轻量可跑，但持久化和治理能力都较弱。 |
 | Modifiability | 4 | 模块划分较合理，但 `ServiceManager` 有集中化风险。 |
 | Testability | 3 | 已覆盖高价值点，但整体测试矩阵远未完整。 |

@@ -92,11 +92,15 @@ roy_client/
 ```text
 lib/
   main.dart
+  core/          <!-- 2026-05-16 修正：原遗漏，新增 -->
   l10n/
   models/
   providers/
   services/
   sync/
+  system/        <!-- 2026-05-16 修正：原遗漏，新增 -->
+  theme/         <!-- 2026-05-16 修正：原遗漏，新增 -->
+  utils/         <!-- 2026-05-16 修正：原遗漏，新增 -->
   views/
   widgets/
 ```
@@ -108,6 +112,12 @@ lib/
 - bootstrap
 - root composition
 - root app config
+
+### `core/`
+
+职责：
+
+- 基础工具（AppLogger、CryptoRandom 等） <!-- 2026-05-16 修正：原遗漏，新增 -->
 
 ### `models/`
 
@@ -136,6 +146,28 @@ lib/
 
 - 同步编排
 - 冲突合并
+- LAN 同步子系统（lan_sync_client / lan_sync_coordinator / lan_sync_host_handler / lan_sync_session） <!-- 2026-05-16 修正：原遗漏 LAN Sync 模块描述，新增 -->
+
+### `system/`
+
+职责：
+
+- ServiceManager 拆分后的协调器（Coordinators） <!-- 2026-05-16 修正：原遗漏整个 system/ 目录说明，新增 -->
+- VaultUnlockCoordinator、VaultDumpCoordinator、VaultImportExportCoordinator
+- VaultPairingCoordinator、SyncCoordinator、VaultDataRepository
+- SyncServerUrlStore、PasswordTools
+
+### `theme/`
+
+职责：
+
+- Token-based Design System（AppDesignTokens、AppLayout、AppTextStyles） <!-- 2026-05-16 修正：原遗漏，新增 -->
+
+### `utils/`
+
+职责：
+
+- 通用工具与常量（field_presets、template_icons、relative_time_formatter、text_highlight） <!-- 2026-05-16 修正：原遗漏，新增 -->
 
 ### `views/`
 
@@ -157,9 +189,11 @@ flowchart TB
         UI["Views / Widgets"]
         ST["Providers"]
         SM["ServiceManager"]
+        CO["Coordinators (system/)"]   <!-- 2026-05-16 修正：原遗漏 system/ 协调器层，新增 -->
         SS["SecureStorageService"]
-        SY["SyncService"]
+        SY["SyncService + LAN Sync"]
         SEC["Crypto / Biometrics / AutoLock / Identity"]
+        TH["Theme (Design Tokens / Layout / TextStyles)"]   <!-- 2026-05-16 修正：原遗漏 Theme 层，新增 -->
         DB["Encrypted SQLite + SharedPreferences + Secure Storage"]
     end
 
@@ -171,9 +205,13 @@ flowchart TB
 
     UI --> ST
     ST --> SM
+    SM --> CO
     SM --> SS
     SM --> SY
     SM --> SEC
+    SM --> TH
+    CO --> SS
+    CO --> SY
     SS --> DB
     SY --> DB
     SY --> API

@@ -22,31 +22,30 @@
 
 ```
 ┌─────────────────┐       ┌─────────────────┐
-│     Vault       │       │ AccountTemplate │
+│   AccountItem   │       │ AccountTemplate │
 ├─────────────────┤       ├─────────────────┤
-│ - vaultId       │       │ - templateId    │
-│ - accounts[]    │──────→│ - title         │
-│ - templates[]   │──────→│ - fields[]      │
-│ - version       │       │ - category      │
-└─────────────────┘       └─────────────────┘
-         │                         │
-         │                         │
-         ▼                         ▼
-┌─────────────────┐       ┌─────────────────┐
-│   AccountItem   │       │  AccountField   │
-├─────────────────┤       ├─────────────────┤
-│ - id            │       │ - fieldKey      │
-│ - name          │       │ - label         │
-│ - email         │       │ - attributes    │
-│ - templateId    │       │ - description   │
-│ - data{}        │       │ - order         │
-│ - nameHlc       │       │ - labelHlc      │
-│ - dataHlc{}     │       │ - attributesHlc │
-└─────────────────┘       └─────────────────┘
-                                  │
-                                  ▼
-                          ┌─────────────────┐
-                          │FieldAttributes  │
+│ - id            │◄──────│ - templateId    │
+│ - name          │       │ - title         │
+│ - email         │       │ - fields[]      │
+│ - templateId    │       │ - category      │
+│ - data{}        │       └─────────────────┘
+│ - nameHlc       │                │
+│ - dataHlc{}     │                ▼
+│ - syncStatus    │       ┌─────────────────┐
+│ - isDeleted     │       │  AccountField   │
+└─────────────────┘       ├─────────────────┤
+         │                │ - fieldKey      │
+         │                │ - label         │
+         ▼                │ - attributes    │
+┌─────────────────┐       │ - description   │
+│ TotpCredential  │       │ - order         │
+├─────────────────┤       │ - labelHlc      │
+│ - id            │       │ - attributesHlc │
+│ - label         │       └─────────────────┘
+│ - config        │                │
+│ - linkedAccIds  │                ▼
+│ - syncStatus    │       ┌─────────────────┐
+└─────────────────┘       │FieldAttributes  │
                           ├─────────────────┤
                           │ - type          │
                           │ - isRequired    │
@@ -60,44 +59,7 @@
 
 ## 2. 核心模型
 
-### 2.1 Vault
-
-Vault 是顶层容器，包含所有账户和模板数据。
-
-```dart
-class Vault {
-  /// Vault 唯一标识
-  final String vaultId;
-
-  /// 所有账户列表
-  final List<AccountItem> accounts;
-
-  /// 所有模板列表
-  final List<AccountTemplate> templates;
-
-  /// 同步版本号
-  final int version;
-
-  /// 最后同步时间
-  final DateTime? lastSyncAt;
-
-  /// Vault 加密密钥（内存中）
-  final String? encryptionKey;
-}
-```
-
-**JSON 示例**:
-```json
-{
-  "vaultId": "vault_abc123",
-  "accounts": [...],
-  "templates": [...],
-  "version": 42,
-  "lastSyncAt": "2026-04-27T10:30:00Z"
-}
-```
-
-### 2.2 AccountItem
+### 2.1 AccountItem
 
 账户条目，包含账户的所有数据和同步元数据。
 
@@ -161,6 +123,173 @@ class AccountItem {
 | `isDeleted` | bool | 软删除标记 |
 
 ---
+
+### 2.3 TotpCredential
+
+TOTP 凭据，支持 RFC 6238 标准（SHA1/SHA256/SHA512）。
+
+```dart
+class TotpCredential {
+  /// 唯一标识
+  final String id;
+
+  /// 显示标签
+  final String label;
+
+  /// TOTP 配置（secret、algorithm、digits、period、issuer、account）
+  final TotpConfig config;
+
+  /// 关联的 AccountItem ID 列表
+  final List<String> linkedAccountIds;
+
+  /// 创建时间戳
+  final int createdAt;
+
+  /// 标签字段的 HLC 时间戳
+  final Hlc labelHlc;
+
+  /// 配置字段的 HLC 时间戳
+  final Hlc configHlc;
+
+  /// 关联列表的 HLC 时间戳
+  final Hlc linksHlc;
+
+  /// 服务器版本号
+  final int serverVersion;
+
+  /// 同步状态
+  final SyncStatus syncStatus;
+
+  /// 是否已删除（墓碑标记）
+  final bool isDeleted;
+
+  /// 删除操作的 HLC 时间戳
+  final Hlc? deleteHlc;
+}
+```
+
+### 2.4 AppNotification
+
+应用内通知，由保险库健康检查等模块生成。
+
+```dart
+class AppNotification {
+  /// 唯一标识
+  final String id;
+
+  /// 通知类型（passwordExpiry / weakPassword）
+  final AppNotificationType type;
+
+  /// 标题
+  final String title;
+
+  /// 正文
+  final String body;
+
+  /// 关联账户 ID（可选）
+  final String? accountId;
+
+  /// 创建时间戳
+  final int createdAt;
+
+  /// 是否已读
+  final bool isRead;
+
+  /// 附加参数（如账户名、分数、天数等）
+  final Map<String, dynamic> params;
+}
+```
+
+### 2.5 LocalSyncChange
+
+本地同步变更箱条目，记录待推送或已推送的变更。
+
+```dart
+class LocalSyncChange {
+  /// 唯一标识
+  final String id;
+
+  /// 所属 vaultId
+  final String vaultId;
+
+  /// 实体类型（account / template / totpCredential）
+  final LocalSyncEntityType entityType;
+
+  /// 实体 ID
+  final String entityId;
+
+  /// 操作类型（create / update / delete）
+  final LocalSyncAction action;
+
+  /// 变更标题（用于展示）
+  final String title;
+
+  /// 变更前快照 JSON（可选）
+  final String? beforeJson;
+
+  /// 变更后快照 JSON（可选）
+  final String? afterJson;
+
+  /// 差异信息
+  final Map<String, dynamic> diff;
+
+  /// 基准服务器版本
+  final int baseServerVersion;
+
+  /// 状态（pendingReview / approved / pushing / pushed / failed / conflict / reverted）
+  final LocalSyncStatus status;
+
+  /// 创建时间戳
+  final int createdAt;
+
+  /// 更新时间戳
+  final int updatedAt;
+
+  /// 审批时间戳（可选）
+  final int? approvedAt;
+
+  /// 推送时间戳（可选）
+  final int? pushedAt;
+
+  /// 错误信息（可选）
+  final String? errorMessage;
+}
+```
+
+### 2.6 TemplateConflictLog
+
+模板字段级冲突记录，由 CRDT 合并产生。
+
+```dart
+class TemplateConflictLog {
+  /// 唯一标识
+  final String id;
+
+  /// 关联模板 ID
+  final String templateId;
+
+  /// 关联字段 key
+  final String fieldKey;
+
+  /// 冲突属性名（如 label、type、order、isRequired 等）
+  final String attributeName;
+
+  /// 本地值
+  final String localValue;
+
+  /// 远程值
+  final String remoteValue;
+
+  /// 本地 HLC 时间戳
+  final Hlc localHlc;
+
+  /// 远程 HLC 时间戳
+  final Hlc remoteHlc;
+
+  /// 保存时间戳
+  final int savedAt;
+}
+```
 
 ## 3. 同步模型
 
@@ -605,11 +734,14 @@ final account = AccountItem.fromJson(json);
 
 | 模型 | 文件路径 |
 |------|----------|
-| Vault | `lib/models/vault.dart` |
 | AccountItem | `lib/models/account_item.dart` |
 | AccountTemplate | `lib/models/account_template.dart` |
-| Hlc / SyncClock / SyncValue | `lib/models/hlc.dart` |
+| TotpCredential | `lib/models/totp_credential.dart` |
+| AppNotification | `lib/models/app_notification.dart` |
+| LocalSyncChange | `lib/models/local_sync_change.dart` |
 | TemplateConflictLog | `lib/models/template_conflict_log.dart` |
+| VaultHealthReport | `lib/models/vault_health_report.dart` |
+| Hlc / SyncClock / SyncValue | `lib/models/hlc.dart` |
 
 ### B. 数据验证规则
 

@@ -13,7 +13,7 @@ Next: [01-system-architecture.md](01-system-architecture.md)
 | Scope | SecretRoy current architecture snapshot |
 | Owner | Repository maintainers (formal owner TBD) |
 | Review Status | Draft - Unapproved |
-| Last Updated | 2026-05-07 |
+| Last Updated | 2026-05-16 |
 
 ## Positioning
 
@@ -28,7 +28,7 @@ SecretRoy 当前最准确的定位是：
 - `IdentityService` 当前已经会在首次初始化时自动生成并持久化 `deviceId`、`vaultId`、mock `privateKey` 与 mock `symmetricKey`；它不再返回固定常量，但身份与密钥体系仍然是过渡态。
 - `EnhancedCryptoService` 当前使用 PBKDF2-HMAC-SHA256 存储主密码 verifier，并在解锁后用主密码派生包装密钥解开随机 DB 数据密钥。
 - `SecureStorageService` 当前长期落盘 `secret_roy_vault.db.enc`，通过 Dart 层 AES-GCM-256 二进制信封保护 SQLite 快照；解锁期间会在临时目录创建 runtime SQLite 工作库。
-- `SyncService` 里的 `_encryptAndSign()` / `_decryptAndVerify()` 已经进入记录级 nonce/ciphertext/HMAC 信封；它比早期占位实现更真实，但仍不是经过审计的标准 AEAD/E2EE 方案。
+- `SyncService` 里的 `_encryptAndSign()` / `_decryptAndVerify()` 已升级为标准 AEAD 方案：`sroy-sync:` 前缀 + HKDF-SHA256 派生密钥 + AES-256-GCM 加密；服务端只存储密文，不解析 payload。
 
 它已经具备一套真实系统应有的基础骨架：
 
@@ -92,26 +92,26 @@ Node 服务端只是同步协调器。
 | Security Posture | 3 | 已具备主密码 verifier、本地 DB 文件信封加密、离线恢复码、面对面链接和远程配对；同步 payload、服务端认证和运行时硬化仍不足。 |
 | Backend Robustness | 2 | 可跑，但不具备正式后端的治理与承载能力。 |
 | Modifiability | 4 | 分层较好，但 `ServiceManager` 有集中化风险。 |
-| Testability | 3 | 已覆盖高价值点，但还不足以支撑高风险数据系统。 |
+| Testability | 4 | 88 个测试文件、约 619 个测试用例，覆盖 sync/services/system/theme/views/widgets；核心加密、CRDT 合并、状态机均有回归测试。 |
 | Observability | 2 | 仅有基础日志和有限诊断信息。 |
 | Production Readiness | 2 | 适合研究和演示，不适合直接投产。 |
 
 ## Recommended Next 90 Days
 
-### Days 1-30（已完成）
+### Days 1-30（✅ 已完成）
 
 - 统一命名、文案和真实能力表述，避免把原型包装成成熟安全产品。
 - 补最小同步回归测试，优先覆盖 pull、push、409 conflict、remote missing。
 - 梳理 `ServiceManager` 职责边界，识别可拆分项。
 - 模板系统扩展：新增 `longText`/`list` 字段类型、`note` 模板分类、4 个内置模板、字段级 HLC 支持。
 
-### Days 31-60
+### Days 31-60（部分完成）
 
-- 继续强化主密钥派生参数、无密码模式边界和运行时明文工作库保护。
-- 完善本地数据库加密的备份、恢复和损坏检测闭环。
-- 设计同步 payload 的正式加密/认证模型。
-- 制定服务端从 JSON 文件迁移到正式数据库的目标结构。
-- 模板系统安全重构：合并式保存、模板缺失只读、历史字段区、切模板迁移向导。
+- ✅ 继续强化主密钥派生参数、无密码模式边界和运行时明文工作库保护。（T12 敏感剪贴板、T15 生物识别/无密码收敛已完成）
+- 🟡 完善本地数据库加密的备份、恢复和损坏检测闭环。（导入导出已实现，损坏检测待做）
+- ✅ 设计同步 payload 的正式加密/认证模型。（T3 `sroy-sync:` AEAD 信封、T16 vault token 认证已完成）
+- 🟡 制定服务端从 JSON 文件迁移到正式数据库的目标结构。
+- ✅ 模板系统安全重构：合并式保存、模板缺失只读、服务层校验已实现；历史字段区、切模板迁移向导待做。
 
 ### Days 61-90
 

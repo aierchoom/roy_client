@@ -29,7 +29,7 @@
 
 | 软件 | 版本要求 | 用途 |
 |------|----------|------|
-| Flutter SDK | 与 Dart `^3.10.1` 兼容的版本 | 跨平台框架 |
+| Flutter SDK | `3.38.3` stable（与 CI 锁定版本一致） | 跨平台框架 |
 | Dart SDK | `^3.10.1` | 编程语言 |
 | Git | 2.0+ | 版本控制 |
 | VS Code / Android Studio | 最新版 | IDE |
@@ -149,7 +149,7 @@ flutter pub get
 2. 推荐设置 (`settings.json`)：
 ```json
 {
-  "dart.lineLength": 100,
+  "dart.lineLength": 120,  <!-- 2026-05-16 修正：原 100，更新为 120（与 .vscode/settings.json 及 AGENTS.md 一致） -->
   "dart.previewFlutterUiGuides": true,
   "editor.formatOnSave": true,
   "editor.codeActionsOnSave": {

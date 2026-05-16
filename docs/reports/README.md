@@ -1,6 +1,6 @@
 # Reports
 
-**Last updated**: 2026-04-28
+**Last updated**: 2026-05-16
 
 This directory keeps current project reports that are still useful for ongoing
 development. Legacy audits, one-off handoff notes, old quality passes, and

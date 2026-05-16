@@ -123,7 +123,7 @@ style: theme.textTheme.titleMedium?.copyWith(
 
 ## 三、分阶段执行方案
 
-### 阶段 1：跨平台 Typography & Token 系统（低风险，高回报）
+### 阶段 1：跨平台 Typography & Token 系统（低风险，高回报）✅ 已完成
 
 **目标**：建立真正跨平台的排版系统，消灭字体硬编码；补齐 Surface/Shadow 工具。
 
@@ -166,7 +166,7 @@ style: theme.textTheme.titleMedium?.copyWith(
 
 ---
 
-### 阶段 2：通用组件提取与跨平台增强（中风险，中回报）
+### 阶段 2：通用组件提取与跨平台增强（中风险，中回报）✅ 已完成
 
 **目标**：将散落在视图内的可复用 UI 模式提取为官方 Widget，并注入跨平台适配能力。
 
@@ -213,7 +213,7 @@ style: theme.textTheme.titleMedium?.copyWith(
 
 ---
 
-### 阶段 3：跨平台布局重构（中风险，高回报）
+### 阶段 3：跨平台布局重构（中风险，高回报）🟡 部分完成
 
 **目标**：让布局真正适配三档断点，桌面端体验达到生产力工具水准。
 
@@ -265,7 +265,7 @@ style: theme.textTheme.titleMedium?.copyWith(
 
 ---
 
-### 阶段 4：魔法数字清理与文件重组（低风险）
+### 阶段 4：魔法数字清理与文件重组（低风险）🟡 部分完成
 
 **任务清单**：
 

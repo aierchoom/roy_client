@@ -219,15 +219,11 @@ _unlockWithPassword()
 ↓
 ServiceManager.unlockWithPassword(password)
 ↓
-ServiceManager._completeUnlock(password)
+ServiceManager._performUnlock(password)
 ↓
-IdentityService.initialize()
-↓
-EnhancedCryptoService.initMasterKey(password)
-↓
-SecureStorageService.initialize(deviceId)
-↓
-SyncService.initialize()
+VaultUnlockCoordinator.initializeAndUnlock(password)
+  (内部依次初始化 IdentityService、CryptoService、
+   SecureStorageService、SyncService 等)
 ↓
 ServiceManagerState.unlocked
 ↓
@@ -246,11 +242,11 @@ HomeView 展示
 2. `EnhancedCryptoService.initMasterKey(password)`
    校验或创建主密码，并解开数据库文件密钥。
 
-3. `SecureStorageService.initialize(deviceId)`
-   打开加密数据库。真实数据保存在 `secret_roy_vault.db.enc`，解锁后会临时解密成运行期 SQLite 文件。
+3. `VaultUnlockCoordinator.initializeAndUnlock(password)`
+   委托协调器完成解锁后的完整初始化：校验主密码、打开加密数据库、初始化同步服务等。真实数据保存在 `secret_roy_vault.db.enc`，解锁后会临时解密成运行期 SQLite 文件。
 
-4. `SyncService.initialize()`
-   读取本地同步版本、脏数据标记、恢复标记等同步状态。
+4. 同步服务初始化
+   在 `VaultUnlockCoordinator.initializeAndUnlock` 内部完成，读取本地同步版本、脏数据标记等同步状态。
 
 5. `ServiceManagerState.unlocked`
    全局状态变为已解锁，UI 可以进入主界面。
