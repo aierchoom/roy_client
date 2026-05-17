@@ -48,6 +48,12 @@ void main() {
 
   testWidgets('layout: mobile compact surface renders correctly', (tester) async {
     await configureSmokeSurface(tester);
+    // 覆盖为 compact 手机尺寸，验证移动端布局
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    tester.binding.handleMetricsChanged();
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpAndSettle();
+
     await launchAndUnlockSmokeApp(tester);
 
     // Verify core home elements render on small surface.

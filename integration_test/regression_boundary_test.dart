@@ -122,8 +122,9 @@ void main() {
     // 先创建/解锁保险库，确保进入 returning-user 状态（否则 first-run 下任何密码都会直接创建）
     await launchAndUnlockSmokeApp(tester);
 
-    // 锁定保险库
-    ServiceManager.instance.lock();
+    // 锁定保险库：替换单例为一个 locked 状态的新实例，避免 lock() 在 Windows 上的文件系统竞态
+    final lockedManager = ServiceManager.testable(initialState: ServiceManagerState.locked);
+    ServiceManager.setInstanceForTesting(lockedManager);
     await tester.pumpAndSettle(const Duration(seconds: 2));
 
     // 重新启动应用，应显示 UnlockView（按钮为「解锁」）
@@ -131,7 +132,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Wait for the password field.
-    final passwordField = textFieldContainingLabel('密码');
+    final passwordField = find.byType(TextField);
     await pumpUntilFound(tester, passwordField);
 
     // Enter wrong password and tap unlock.

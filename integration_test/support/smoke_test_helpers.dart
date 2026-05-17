@@ -7,8 +7,8 @@ Future<void> configureSmokeSurface(WidgetTester tester) async {
   tester.view.resetViewInsets();
   addTearDown(() => tester.view.resetViewInsets());
 
-  // 典型 Android 手机尺寸（Pixel 7 类），让 AppLayout 进入 compact 断点
-  await tester.binding.setSurfaceSize(const Size(390, 844));
+  // 桌面窗口尺寸，让 PC 桌面测试在合理视口下运行
+  await tester.binding.setSurfaceSize(const Size(1280, 900));
   tester.binding.handleMetricsChanged();
   addTearDown(() => tester.binding.setSurfaceSize(null));
 }
@@ -124,7 +124,7 @@ Future<void> createWebsiteAccount(
   required String username,
   required String password,
 }) async {
-  await tester.tap(find.byTooltip('新建账户'));
+  await tester.tap(find.byTooltip('新建'));
   await tester.pumpAndSettle();
 
   final accountNameField = textFieldByLabel('账户名称');
