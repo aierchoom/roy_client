@@ -480,96 +480,94 @@ class _AccountListTileState extends State<AccountListTile>
               mainAxisSize: MainAxisSize.min,
               children: [
                 // ── Header row ──
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                OverflowBar(
+                  spacing: AppSpacing.sm,
+                  overflowSpacing: AppSpacing.sm,
+                  overflowAlignment: OverflowBarAlignment.start,
                   children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              if (widget.account.isPinned) ...[
-                                Icon(
-                                  Icons.push_pin,
-                                  size: 14,
-                                  color: accent,
-                                ),
-                                const SizedBox(width: 4),
-                              ],
-                              Expanded(
-                                child: Text(
-                                  '${widget.localeText(context, '名称', 'Name')}: ${widget.account.name}',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: AppTextStyles.bodyLarge(context)
-                                      ?.copyWith(
-                                    fontWeight: FontWeight.w400,
-                                    color: colorScheme.onSurface,
-                                    height: 1.3,
-                                  ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 4,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            if (widget.account.isPinned) ...[
+                              Icon(
+                                Icons.push_pin,
+                                size: 14,
+                                color: accent,
+                              ),
+                              const SizedBox(width: 4),
+                            ],
+                            Text(
+                              '${widget.localeText(context, '名称', 'Name')}: ${widget.account.name}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTextStyles.bodyLarge(context)
+                                  ?.copyWith(
+                                fontWeight: FontWeight.w400,
+                                color: colorScheme.onSurface,
+                                height: 1.3,
+                              ),
+                            ),
+                            if (fieldEntries.isNotEmpty) ...[
+                              const SizedBox(width: 8),
+                              _FieldCountTag(
+                                count: fieldEntries.length,
+                                label: widget.localeText(
+                                  context,
+                                  '个字段',
+                                  'fields',
                                 ),
                               ),
-                              if (fieldEntries.isNotEmpty) ...[
-                                const SizedBox(width: 8),
-                                _FieldCountTag(
-                                  count: fieldEntries.length,
-                                  label: widget.localeText(
-                                    context,
-                                    '个字段',
-                                    'fields',
-                                  ),
+                            ],
+                            if (widget.linkedTotpCredentialCount > 0) ...[
+                              const SizedBox(width: 8),
+                              _TinyBadge(
+                                icon: Icons.verified_user_outlined,
+                                label: widget.localeText(
+                                  context,
+                                  '2FA enabled',
+                                  '2FA enabled',
                                 ),
-                              ],
-                              if (widget.linkedTotpCredentialCount > 0) ...[
-                                const SizedBox(width: 8),
-                                _TinyBadge(
-                                  icon: Icons.verified_user_outlined,
-                                  label: widget.localeText(
-                                    context,
-                                    '2FA enabled',
-                                    '2FA enabled',
-                                  ),
-                                  color: colorScheme.primary,
+                                color: colorScheme.primary,
+                              ),
+                            ],
+                          ],
+                        ),
+                        if (!_isExpanded && summary.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 4,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              Container(
+                                width: 2,
+                                height: 14,
+                                decoration: BoxDecoration(
+                                  color: accent.withAlpha(100),
+                                  borderRadius: BorderRadius.circular(1),
                                 ),
-                              ],
+                              ),
+                              Text(
+                                summary,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTextStyles.bodySmall(context)
+                                    ?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                  height: 1.35,
+                                ),
+                              ),
                             ],
                           ),
-                          if (!_isExpanded && summary.isNotEmpty) ...[
-                            const SizedBox(height: 8),
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                Container(
-                                  width: 2,
-                                  height: 14,
-                                  decoration: BoxDecoration(
-                                    color: accent.withAlpha(100),
-                                    borderRadius: BorderRadius.circular(1),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    summary,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: AppTextStyles.bodySmall(context)
-                                        ?.copyWith(
-                                      color: colorScheme.onSurfaceVariant,
-                                      height: 1.35,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
                         ],
-                      ),
+                      ],
                     ),
-                    const SizedBox(width: AppSpacing.sm),
                     // Action buttons
                     if (primaryValue != null)
                       _IconButtonCompact(
@@ -816,11 +814,12 @@ class _TinyBadge extends StatelessWidget {
         color: color.withAlpha(16),
         borderRadius: BorderRadius.circular(AppRadii.chip),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+      child: Wrap(
+        spacing: 3,
+        runSpacing: 2,
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           Icon(icon, size: 11, color: color),
-          const SizedBox(width: 3),
           Text(
             label,
             style: AppTextStyles.caption(context).copyWith(

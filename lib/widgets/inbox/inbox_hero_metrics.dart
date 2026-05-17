@@ -67,27 +67,35 @@ class MetricChip extends StatelessWidget {
         color: color.withAlpha(AppAlphas.tint),
         borderRadius: BorderRadius.circular(AppRadii.panel),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            value,
-            style: TextStyle(
-              fontWeight: FontWeight.w900,
-              color: color,
-              fontSize: 14,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.centerLeft,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                color: color,
+                fontSize: 14,
+              ),
             ),
-          ),
-          const SizedBox(width: AppSpacing.sm2),
-          Text(
-            label,
-            style: TextStyle(
-              color: color.withAlpha(190),
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
+            const SizedBox(width: AppSpacing.sm2),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color.withAlpha(190),
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

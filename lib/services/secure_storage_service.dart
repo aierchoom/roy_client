@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart' as ffi;
 
+import '../core/crypto_random.dart';
 import '../models/account_item.dart';
 import '../models/account_template.dart';
 import '../models/app_notification.dart';
@@ -85,7 +86,11 @@ class SecureStorageService {
         when path.isNotEmpty) {
       return Directory(path);
     }
-    return getTemporaryDirectory();
+    try {
+      return await getApplicationSupportDirectory();
+    } catch (_) {
+      return await getTemporaryDirectory();
+    }
   }
 
   SecureStorageService({DatabaseFileCipher? databaseCipher})
@@ -95,11 +100,14 @@ class SecureStorageService {
   bool get isOpen => _database?.isOpen ?? false;
 
   String _newWorkingDatabaseName() {
-    if (Platform.environment['SECRETROY_TEST_DIR'] case final path?
-        when path.isNotEmpty) {
-      return '$_workingDatabaseName.${DateTime.now().microsecondsSinceEpoch}';
+    if (Platform.environment['SECRETROY_TEST_DIR'] != null &&
+        Platform.environment['SECRETROY_TEST_DIR']!.isNotEmpty) {
+      return _workingDatabaseName;
     }
-    return _workingDatabaseName;
+    final suffix = CryptoRandom.bytes(
+      8,
+    ).map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    return '$_workingDatabaseName.$suffix';
   }
 
   void setDatabaseCipher(DatabaseFileCipher cipher) {
@@ -446,6 +454,7 @@ class SecureStorageService {
       encryptedBytes,
     );
     await _writeFileAtomically(workingPath, plaintextBytes);
+    await _restrictFilePermissions(workingPath);
   }
 
   Future<void> _recoverInterruptedEncryptedDatabaseWrite() async {
@@ -459,15 +468,21 @@ class SecureStorageService {
     final tempFile = File('$encryptedPath.tmp');
 
     if (!targetFile.existsSync() && backupFile.existsSync()) {
-      try { await backupFile.rename(targetFile.path); } catch (_) {}
+      try {
+        await backupFile.rename(targetFile.path);
+      } catch (_) {}
     }
 
     if (targetFile.existsSync() && tempFile.existsSync()) {
-      try { await tempFile.delete(); } catch (_) {}
+      try {
+        await tempFile.delete();
+      } catch (_) {}
     }
 
     if (targetFile.existsSync() && backupFile.existsSync()) {
-      try { await backupFile.delete(); } catch (_) {}
+      try {
+        await backupFile.delete();
+      } catch (_) {}
     }
   }
 
@@ -521,41 +536,69 @@ class SecureStorageService {
     await _persistEncryptedDatabase();
   }
 
+  Future<void> _restrictFilePermissions(String path) async {
+    try {
+      if (Platform.isLinux || Platform.isMacOS) {
+        await Process.run('chmod', ['600', path]);
+      } else if (Platform.isWindows) {
+        await Process.run('attrib', ['+H', path]);
+      }
+    } catch (_) {}
+  }
+
   Future<void> _writeFileAtomically(String targetPath, Uint8List bytes) async {
     await Directory(dirname(targetPath)).create(recursive: true);
 
     final targetFile = File(targetPath);
-    final tempFile = File('$targetPath.tmp');
+    // Use a unique temp file name to avoid concurrency conflicts on Windows.
+    final tempSuffix = DateTime.now().microsecondsSinceEpoch;
+    final tempFile = File('$targetPath.$tempSuffix.tmp');
     final backupFile = File('$targetPath.bak');
 
-    if (tempFile.existsSync()) {
-      try { await tempFile.delete(); } catch (_) {}
-    }
-    await tempFile.writeAsBytes(bytes, flush: true);
-
-    if (backupFile.existsSync()) {
-      try { await backupFile.delete(); } catch (_) {}
-    }
-    if (targetFile.existsSync()) {
-      await targetFile.rename(backupFile.path);
-    }
-
     try {
+      // Explicitly open/close the file to ensure the handle is released
+      // before rename on Windows.
+      final raf = await tempFile.open(mode: FileMode.write);
+      try {
+        await raf.writeFrom(bytes);
+        await raf.flush();
+      } finally {
+        await raf.close();
+      }
+
+      if (backupFile.existsSync()) {
+        try {
+          await backupFile.delete();
+        } catch (_) {}
+      }
+      if (targetFile.existsSync()) {
+        await targetFile.rename(backupFile.path);
+      }
+
       try {
         await tempFile.rename(targetPath);
-      } on PathNotFoundException catch (_) {
-        // Windows: rename can fail across volumes or if path is invalid.
-        // Fallback to copy + delete.
+      } on FileSystemException catch (_) {
+        // Windows: rename can fail if the file is still locked or across
+        // volumes. Wait a tick for the handle to clear, then fallback to
+        // copy + delete.
+        await Future.delayed(const Duration(milliseconds: 50));
         await tempFile.copy(targetPath);
-        try { await tempFile.delete(); } catch (_) {}
+        try {
+          await tempFile.delete();
+        } catch (_) {}
       }
+      await _restrictFilePermissions(targetPath);
       if (backupFile.existsSync()) {
-        try { await backupFile.delete(); } catch (_) {}
+        try {
+          await backupFile.delete();
+        } catch (_) {}
       }
     } catch (e) {
       AppLogger.d('Database file atomic write failed: $e');
       if (backupFile.existsSync() && !targetFile.existsSync()) {
-        try { await backupFile.rename(targetPath); } catch (_) {}
+        try {
+          await backupFile.rename(targetPath);
+        } catch (_) {}
       }
       rethrow;
     } finally {
@@ -718,6 +761,19 @@ class SecureStorageService {
 
     await _createLocalSyncChangesTable(db);
 
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS notifications (
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL,
+        title TEXT NOT NULL,
+        body TEXT NOT NULL,
+        account_id TEXT,
+        created_at INTEGER NOT NULL,
+        is_read INTEGER DEFAULT 0,
+        params TEXT
+      )
+    ''');
+
     await db.execute(
       'CREATE INDEX idx_accounts_template ON accounts(template_id)',
     );
@@ -845,9 +901,12 @@ class SecureStorageService {
     }
 
     if (oldVersion < 12) {
-      await db.execute(
-        'ALTER TABLE notifications ADD COLUMN params TEXT',
-      );
+      // params column already exists in v9+ CREATE TABLE, skip for safety
+      try {
+        await db.execute('ALTER TABLE notifications ADD COLUMN params TEXT');
+      } catch (e) {
+        // Column may already exist; ignore
+      }
     }
   }
 
@@ -1452,18 +1511,14 @@ class SecureStorageService {
   ]) async {
     if (!isOpen) return [];
     try {
-      final rows =
-          templateId == null
-              ? await _query(
-                'template_conflict_logs',
-                orderBy: 'saved_at DESC',
-              )
-              : await _query(
-                'template_conflict_logs',
-                where: 'template_id = ?',
-                whereArgs: [templateId],
-                orderBy: 'saved_at DESC',
-              );
+      final rows = templateId == null
+          ? await _query('template_conflict_logs', orderBy: 'saved_at DESC')
+          : await _query(
+              'template_conflict_logs',
+              where: 'template_id = ?',
+              whereArgs: [templateId],
+              orderBy: 'saved_at DESC',
+            );
       return rows.map((r) => TemplateConflictLog.fromJson(r)).toList();
     } catch (e) {
       AppLogger.d('Failed to load template conflict logs: $e');
@@ -1473,15 +1528,37 @@ class SecureStorageService {
 
   // ── Notification CRUD ──────────────────────────────────────────────
 
+  Future<void> _ensureNotificationsTable() async {
+    if (!isOpen) return;
+    try {
+      await _database!.execute('''
+        CREATE TABLE IF NOT EXISTS notifications (
+          id TEXT PRIMARY KEY,
+          type TEXT NOT NULL,
+          title TEXT NOT NULL,
+          body TEXT NOT NULL,
+          account_id TEXT,
+          created_at INTEGER NOT NULL,
+          is_read INTEGER DEFAULT 0,
+          params TEXT
+        )
+      ''');
+    } catch (e) {
+      AppLogger.d('Failed to ensure notifications table: $e');
+    }
+  }
+
   Future<List<AppNotification>> loadNotifications() async {
     if (!isOpen) return [];
     try {
-      final rows = await _query(
-        'notifications',
-        orderBy: 'created_at DESC',
-      );
+      final rows = await _query('notifications', orderBy: 'created_at DESC');
       return rows.map((r) => AppNotification.fromRow(r)).toList();
     } catch (e) {
+      final msg = e.toString();
+      if (msg.contains('no such table') && msg.contains('notifications')) {
+        await _ensureNotificationsTable();
+        return [];
+      }
       AppLogger.d('Failed to load notifications: $e');
       return [];
     }
@@ -1496,6 +1573,11 @@ class SecureStorageService {
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
     } catch (e) {
+      final msg = e.toString();
+      if (msg.contains('no such table') && msg.contains('notifications')) {
+        await _ensureNotificationsTable();
+        return;
+      }
       AppLogger.d('Failed to save notification: $e');
     }
   }
@@ -1510,6 +1592,11 @@ class SecureStorageService {
         whereArgs: [id],
       );
     } catch (e) {
+      final msg = e.toString();
+      if (msg.contains('no such table') && msg.contains('notifications')) {
+        await _ensureNotificationsTable();
+        return;
+      }
       AppLogger.d('Failed to mark notification read: $e');
     }
   }
@@ -1517,12 +1604,15 @@ class SecureStorageService {
   Future<void> markAllNotificationsRead() async {
     if (!isOpen) return;
     try {
-      await _database!.update(
-        'notifications',
-        {'is_read': 1},
-        where: 'is_read = 0',
-      );
+      await _database!.update('notifications', {
+        'is_read': 1,
+      }, where: 'is_read = 0');
     } catch (e) {
+      final msg = e.toString();
+      if (msg.contains('no such table') && msg.contains('notifications')) {
+        await _ensureNotificationsTable();
+        return;
+      }
       AppLogger.d('Failed to mark all notifications read: $e');
     }
   }
@@ -1530,8 +1620,17 @@ class SecureStorageService {
   Future<void> deleteNotification(String id) async {
     if (!isOpen) return;
     try {
-      await _database!.delete('notifications', where: 'id = ?', whereArgs: [id]);
+      await _database!.delete(
+        'notifications',
+        where: 'id = ?',
+        whereArgs: [id],
+      );
     } catch (e) {
+      final msg = e.toString();
+      if (msg.contains('no such table') && msg.contains('notifications')) {
+        await _ensureNotificationsTable();
+        return;
+      }
       AppLogger.d('Failed to delete notification: $e');
     }
   }
@@ -1544,6 +1643,11 @@ class SecureStorageService {
       );
       return rows.first['cnt'] as int? ?? 0;
     } catch (e) {
+      final msg = e.toString();
+      if (msg.contains('no such table') && msg.contains('notifications')) {
+        await _ensureNotificationsTable();
+        return 0;
+      }
       return 0;
     }
   }
@@ -1615,9 +1719,7 @@ class SecureStorageService {
             ? Hlc.parse(row['delete_hlc'])
             : null,
         isPinned: row['is_pinned'] == 1,
-        pinHlc: row['pin_hlc'] != null
-            ? Hlc.parse(row['pin_hlc'])
-            : null,
+        pinHlc: row['pin_hlc'] != null ? Hlc.parse(row['pin_hlc']) : null,
       );
     } catch (e) {
       AppLogger.d('Skipping unreadable account row: $e');
@@ -1868,7 +1970,8 @@ class SecureStorageService {
       'category': itemToSave.category.name,
       'fields': jsonEncode(itemToSave.fields.map((f) => f.toJson()).toList()),
       'is_custom': itemToSave.isCustom ? 1 : 0,
-      'created_at': itemToSave.createdAt ?? DateTime.now().millisecondsSinceEpoch,
+      'created_at':
+          itemToSave.createdAt ?? DateTime.now().millisecondsSinceEpoch,
       'modified_at': DateTime.now().millisecondsSinceEpoch,
       'last_edited_by': _deviceId,
       'hlc': itemToSave.hlc?.toString(),
@@ -2745,7 +2848,8 @@ class SecureStorageService {
   /// Returns the number of items successfully committed.
   Future<int> commitLanSyncBatch({
     required String vaultId,
-    required List<({LocalSyncEntityType type, Map<String, dynamic> payload})> items,
+    required List<({LocalSyncEntityType type, Map<String, dynamic> payload})>
+    items,
     required bool markForServerPush,
   }) async {
     if (!isOpen || items.isEmpty) return 0;
@@ -2758,7 +2862,11 @@ class SecureStorageService {
           switch (item.type) {
             case LocalSyncEntityType.account:
               final account = AccountItem.fromJson(payload);
-              await txn.insert('accounts', _accountItemToMap(account), conflictAlgorithm: ConflictAlgorithm.replace);
+              await txn.insert(
+                'accounts',
+                _accountItemToMap(account),
+                conflictAlgorithm: ConflictAlgorithm.replace,
+              );
               if (markForServerPush) {
                 await _insertApprovedChange(
                   txn: txn,
@@ -2770,7 +2878,11 @@ class SecureStorageService {
               }
             case LocalSyncEntityType.template:
               final template = AccountTemplate.fromJson(payload);
-              await txn.insert('templates', _templateToMap(template), conflictAlgorithm: ConflictAlgorithm.replace);
+              await txn.insert(
+                'templates',
+                _templateToMap(template),
+                conflictAlgorithm: ConflictAlgorithm.replace,
+              );
               if (markForServerPush) {
                 await _insertApprovedChange(
                   txn: txn,
@@ -2782,7 +2894,11 @@ class SecureStorageService {
               }
             case LocalSyncEntityType.totpCredential:
               final totp = TotpCredential.fromJson(payload);
-              await txn.insert('totp_credentials', _totpCredentialRow(totp), conflictAlgorithm: ConflictAlgorithm.replace);
+              await txn.insert(
+                'totp_credentials',
+                _totpCredentialRow(totp),
+                conflictAlgorithm: ConflictAlgorithm.replace,
+              );
               if (markForServerPush) {
                 await _insertApprovedChange(
                   txn: txn,

@@ -34,8 +34,10 @@ class AppPageHeader extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Wrap(
+            spacing: AppSpacing.md,
+            runSpacing: AppSpacing.md,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Container(
                 width: 44,
@@ -48,10 +50,10 @@ class AppPageHeader extends StatelessWidget {
                 alignment: Alignment.center,
                 child: Icon(icon, size: 24, color: colors.primary),
               ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
+              IntrinsicWidth(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       title,
@@ -75,10 +77,7 @@ class AppPageHeader extends StatelessWidget {
                   ],
                 ),
               ),
-              if (trailing != null) ...[
-                const SizedBox(width: AppSpacing.md),
-                trailing!,
-              ],
+              if (trailing != null) trailing!,
             ],
           ),
           if (metrics.isNotEmpty) ...[

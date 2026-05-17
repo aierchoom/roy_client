@@ -41,16 +41,13 @@ void main() {
     await pumpUntilFound(tester, find.text('设置中心'));
 
     // Return to home and verify basic rendering still works.
-    await tapVisibleText(tester, '账户中心');
+    await tapVisibleText(tester, '账户');
     await pumpUntilFound(tester, find.text('保险库'));
     expect(find.text('保险库'), findsAtLeastNWidgets(1));
   });
 
   testWidgets('layout: mobile compact surface renders correctly', (tester) async {
-    // Simulate a typical mobile phone screen size.
-    await tester.binding.setSurfaceSize(const Size(375, 812));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-
+    await configureSmokeSurface(tester);
     await launchAndUnlockSmokeApp(tester);
 
     // Verify core home elements render on small surface.

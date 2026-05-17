@@ -3,7 +3,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:secret_roy/main.dart' as app;
 
 Future<void> configureSmokeSurface(WidgetTester tester) async {
-  await tester.binding.setSurfaceSize(const Size(1440, 1400));
+  // 清除残留键盘 inset，防止 AppNavBar 因 bottomInset > 0 被隐藏
+  tester.view.resetViewInsets();
+  addTearDown(() => tester.view.resetViewInsets());
+
+  // 典型 Android 手机尺寸（Pixel 7 类），让 AppLayout 进入 compact 断点
+  await tester.binding.setSurfaceSize(const Size(390, 844));
+  tester.binding.handleMetricsChanged();
   addTearDown(() => tester.binding.setSurfaceSize(null));
 }
 
@@ -72,8 +78,18 @@ Future<void> launchAndUnlockSmokeApp(
   app.main();
   await tester.pumpAndSettle();
 
-  final passwordField = textFieldContainingLabel('密码');
-  await pumpUntilFound(tester, passwordField);
+  final passwordField = find.byType(TextField);
+  final homeText = find.text('保险库');
+  await pumpUntilFound(tester, passwordField, timeout: const Duration(seconds: 5));
+
+  if (passwordField.evaluate().isEmpty && homeText.evaluate().isNotEmpty) {
+    // App is already unlocked (singleton state from prior test), skip unlock
+    return;
+  }
+
+  if (passwordField.evaluate().isEmpty) {
+    throw StateError('Password TextField not found on UnlockView');
+  }
   expect(passwordField, findsOneWidget);
 
   await tester.enterText(passwordField, password);
@@ -96,8 +112,8 @@ Future<void> launchAndUnlockSmokeApp(
     throw StateError('未找到创建保险库或解锁按钮');
   }
 
-  await pumpUntilFound(tester, find.text('账户中心'));
-  expect(find.text('账户中心'), findsOneWidget);
+  await pumpUntilFound(tester, find.text('保险库'));
+  expect(find.text('保险库'), findsOneWidget);
 }
 
 Future<void> createWebsiteAccount(

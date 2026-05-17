@@ -1,8 +1,10 @@
-﻿import 'dart:async';
+import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../debug/qa_debug_menu.dart';
 import '../../l10n/app_text_extension.dart';
 import '../../models/account_item.dart';
 import '../../models/account_template.dart';
@@ -91,9 +93,7 @@ class _AccountListViewState extends State<AccountListView> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text(
-          context.text( '删除账户', 'Delete Account'),
-        ),
+        title: Text(context.text('删除账户', 'Delete Account')),
         content: Text(
           context.text(
             '确认删除“${account.name}”吗？该操作不可撤销。',
@@ -103,12 +103,12 @@ class _AccountListViewState extends State<AccountListView> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: Text(context.text( '取消', 'Cancel')),
+            child: Text(context.text('取消', 'Cancel')),
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, true),
             child: Text(
-              context.text( '删除', 'Delete'),
+              context.text('删除', 'Delete'),
               style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
           ),
@@ -178,19 +178,13 @@ class _AccountListViewState extends State<AccountListView> {
     String countLabel;
     switch (_categoryFilter) {
       case _VaultCategoryFilter.all:
-        title = context.text( '保险库', 'Vault');
-        subtitle = context.text(
-          '你的加密信息库',
-          'Your encrypted vault',
-        );
-        countLabel = context.text( '个条目', 'Items');
+        title = context.text('保险库', 'Vault');
+        subtitle = context.text('你的加密信息库', 'Your encrypted vault');
+        countLabel = context.text('个条目', 'Items');
       case _VaultCategoryFilter.totp:
         title = '2FA';
-        subtitle = context.text(
-          '动态验证码管理',
-          'Authenticator code management',
-        );
-        countLabel = context.text( '项', 'Items');
+        subtitle = context.text('动态验证码管理', 'Authenticator code management');
+        countLabel = context.text('项', 'Items');
     }
 
     if (_categoryFilter == _VaultCategoryFilter.totp) {
@@ -204,8 +198,16 @@ class _AccountListViewState extends State<AccountListView> {
         title: title,
         subtitle: subtitle,
         metrics: [
-          MetricChip(value: '${credentials.length}', label: countLabel, color: theme.colorScheme.primary),
-          MetricChip(value: '$linkedCount', label: context.text( '关联', 'Links'), color: theme.colorScheme.primary),
+          MetricChip(
+            value: '${credentials.length}',
+            label: countLabel,
+            color: theme.colorScheme.primary,
+          ),
+          MetricChip(
+            value: '$linkedCount',
+            label: context.text('关联', 'Links'),
+            color: theme.colorScheme.primary,
+          ),
         ],
       );
     }
@@ -215,9 +217,21 @@ class _AccountListViewState extends State<AccountListView> {
       title: title,
       subtitle: subtitle,
       metrics: [
-        MetricChip(value: '$totalItems', label: countLabel, color: theme.colorScheme.primary),
-        MetricChip(value: '$usedTemplates', label: context.text( '个模板', 'Templates'), color: theme.colorScheme.primary),
-        MetricChip(value: '$secretItems', label: context.text( '个保密', 'Secrets'), color: theme.colorScheme.primary),
+        MetricChip(
+          value: '$totalItems',
+          label: countLabel,
+          color: theme.colorScheme.primary,
+        ),
+        MetricChip(
+          value: '$usedTemplates',
+          label: context.text('个模板', 'Templates'),
+          color: theme.colorScheme.primary,
+        ),
+        MetricChip(
+          value: '$secretItems',
+          label: context.text('个保密', 'Secrets'),
+          color: theme.colorScheme.primary,
+        ),
       ],
     );
   }
@@ -228,13 +242,13 @@ class _AccountListViewState extends State<AccountListView> {
     String message;
     switch (_categoryFilter) {
       case _VaultCategoryFilter.all:
-        title = context.text( '暂无条目', 'No Items');
+        title = context.text('暂无条目', 'No Items');
         message = context.text(
           '保险库中还没有任何内容，点击右下角按钮开始添加。',
           'Your vault is empty. Tap the button to add items.',
         );
       case _VaultCategoryFilter.totp:
-        title = context.text( '暂无 2FA', 'No 2FA Items');
+        title = context.text('暂无 2FA', 'No 2FA Items');
         message = context.text(
           '尚无动态验证码，点击右下角按钮添加。',
           'No authenticator codes yet. Tap the button to add one.',
@@ -272,63 +286,63 @@ class _AccountListViewState extends State<AccountListView> {
 
   Widget _buildCategoryFilterBar(BuildContext context) {
     final theme = Theme.of(context);
-    return SegmentedButton<_VaultCategoryFilter>(
-      showSelectedIcon: false,
-      segments: [
-        ButtonSegment(
-          value: _VaultCategoryFilter.all,
-          label: Text(context.text( '全部', 'All')),
-          icon: const Icon(Icons.dashboard_outlined, size: 16),
-        ),
-        ButtonSegment(
-          value: _VaultCategoryFilter.totp,
-          label: const Text('2FA'),
-          icon: const Icon(Icons.verified_user_outlined, size: 16),
-        ),
-      ],
-      selected: <_VaultCategoryFilter>{_categoryFilter},
-      onSelectionChanged: (newSelection) {
-        setState(() {
-          _categoryFilter = newSelection.first;
-        });
-      },
-      style: ButtonStyle(
-        backgroundColor: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.selected)) {
-            return theme.colorScheme.primary;
-          }
-          return Colors.transparent;
-        }),
-        foregroundColor: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.selected)) {
-            return theme.colorScheme.onPrimary;
-          }
-          return theme.colorScheme.onSurfaceVariant;
-        }),
-        side: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.selected)) {
-            return BorderSide(
-              color: theme.colorScheme.primary,
-              width: 1,
-            );
-          }
-          return BorderSide(
-            color: theme.colorScheme.outlineVariant.withAlpha(60),
-            width: 0.5,
-          );
-        }),
-        padding: WidgetStateProperty.all(
-          const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        ),
-        textStyle: WidgetStateProperty.all(
-          theme.textTheme.labelMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-            fontSize: 12,
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: SegmentedButton<_VaultCategoryFilter>(
+        showSelectedIcon: false,
+        segments: [
+          ButtonSegment(
+            value: _VaultCategoryFilter.all,
+            label: Text(context.text('全部', 'All')),
+            icon: const Icon(Icons.dashboard_outlined, size: 16),
           ),
+          ButtonSegment(
+            value: _VaultCategoryFilter.totp,
+            label: const Text('2FA'),
+            icon: const Icon(Icons.verified_user_outlined, size: 16),
+          ),
+        ],
+        selected: <_VaultCategoryFilter>{_categoryFilter},
+        onSelectionChanged: (newSelection) {
+          setState(() {
+            _categoryFilter = newSelection.first;
+          });
+        },
+        style: ButtonStyle(
+          backgroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return theme.colorScheme.primary;
+            }
+            return Colors.transparent;
+          }),
+          foregroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return theme.colorScheme.onPrimary;
+            }
+            return theme.colorScheme.onSurfaceVariant;
+          }),
+          side: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return BorderSide(color: theme.colorScheme.primary, width: 1);
+            }
+            return BorderSide(
+              color: theme.colorScheme.outlineVariant.withAlpha(60),
+              width: 0.5,
+            );
+          }),
+          padding: WidgetStateProperty.all(
+            const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          ),
+          textStyle: WidgetStateProperty.all(
+            theme.textTheme.labelMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+            ),
+          ),
+          iconSize: WidgetStateProperty.all(16),
+          visualDensity: VisualDensity.compact,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         ),
-        iconSize: WidgetStateProperty.all(16),
-        visualDensity: VisualDensity.compact,
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
     );
   }
@@ -345,7 +359,7 @@ class _AccountListViewState extends State<AccountListView> {
     final activeTemplate = templates
         .where((t) => t.templateId == _activeTemplateId)
         .firstOrNull;
-    final label = activeTemplate?.title ?? context.text( '全部汇总', 'Dashboard');
+    final label = activeTemplate?.title ?? context.text('全部汇总', 'Dashboard');
     final icon = activeTemplate?.icon ?? Icons.dashboard_outlined;
 
     return MenuAnchor(
@@ -377,11 +391,12 @@ class _AccountListViewState extends State<AccountListView> {
                 width: 0.5,
               ),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
+            child: Wrap(
+              spacing: AppSpacing.sm,
+              runSpacing: 2,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 Icon(icon, size: 18, color: theme.colorScheme.primary),
-                const SizedBox(width: AppSpacing.sm),
                 Text(
                   label,
                   style: theme.textTheme.labelLarge?.copyWith(
@@ -389,7 +404,6 @@ class _AccountListViewState extends State<AccountListView> {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(width: AppSpacing.xs),
                 if (_activeTemplateId != null)
                   Padding(
                     padding: const EdgeInsets.only(left: 4),
@@ -417,7 +431,7 @@ class _AccountListViewState extends State<AccountListView> {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
           child: Text(
-            context.text( '切换模版', 'Switch Template'),
+            context.text('切换模版', 'Switch Template'),
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
               fontWeight: FontWeight.bold,
@@ -427,7 +441,7 @@ class _AccountListViewState extends State<AccountListView> {
         MenuItemButton(
           onPressed: () => setState(() => _activeTemplateId = null),
           leadingIcon: const Icon(Icons.dashboard_outlined, size: 20),
-          child: Text(context.text( '全部汇总', 'Dashboard')),
+          child: Text(context.text('全部汇总', 'Dashboard')),
         ),
         const Divider(indent: 12, endIndent: 12, height: 16),
         ...sortedTemplates.map((template) {
@@ -481,7 +495,7 @@ class _AccountListViewState extends State<AccountListView> {
   ) {
     final theme = Theme.of(context);
     final template = group.template;
-    final title = template?.title ?? context.text( '其它', 'Other');
+    final title = template?.title ?? context.text('其它', 'Other');
     final subtitle = template?.subTitle.trim() ?? '';
 
     return Column(
@@ -492,7 +506,10 @@ class _AccountListViewState extends State<AccountListView> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
+              Wrap(
+                spacing: 10,
+                runSpacing: 4,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   if (template != null) ...[
                     Transform.rotate(
@@ -514,16 +531,18 @@ class _AccountListViewState extends State<AccountListView> {
                           boxShadow: template.isCustom
                               ? [
                                   BoxShadow(
-                                    color: theme.colorScheme.primary
-                                        .withAlpha(100),
+                                    color: theme.colorScheme.primary.withAlpha(
+                                      100,
+                                    ),
                                     blurRadius: 8,
                                     offset: const Offset(-1, 3),
                                   ),
                                 ]
                               : [
                                   BoxShadow(
-                                    color: theme.colorScheme.primary
-                                        .withAlpha(30),
+                                    color: theme.colorScheme.primary.withAlpha(
+                                      30,
+                                    ),
                                     blurRadius: 6,
                                     offset: const Offset(0, 2),
                                   ),
@@ -541,7 +560,6 @@ class _AccountListViewState extends State<AccountListView> {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 10),
                   ],
                   Text(
                     title,
@@ -549,7 +567,6 @@ class _AccountListViewState extends State<AccountListView> {
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  const SizedBox(width: 10),
                   _GroupCountChip(count: group.accounts.length),
                 ],
               ),
@@ -647,6 +664,143 @@ class _AccountListViewState extends State<AccountListView> {
     }
   }
 
+  void _showQaDebugSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('QA Debug', style: Theme.of(ctx).textTheme.titleLarge),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.add, color: Colors.green),
+                title: const Text('+1 随机账户'),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  QaDebugMenu.injectRandomAccounts(context, 1);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.add_box, color: Colors.green),
+                title: const Text('+5 随机账户'),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  QaDebugMenu.injectRandomAccounts(context, 5);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.library_add, color: Colors.green),
+                title: const Text('+10 随机账户'),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  QaDebugMenu.injectRandomAccounts(context, 10);
+                },
+              ),
+              ListTile(
+                leading: const Icon(
+                  Icons.description_outlined,
+                  color: Colors.blue,
+                ),
+                title: const Text('按模板新增'),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  _showTemplatePickerForMock(context);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete_forever, color: Colors.red),
+                title: const Text('清空所有账户'),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  QaDebugMenu.clearAllAccounts(context);
+                },
+              ),
+              const SizedBox(height: AppSpacing.md),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showTemplatePickerForMock(BuildContext context) {
+    final provider = context.read<EnhancedAppProvider>();
+    final templates = provider.allTemplates;
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('选择模板', style: Theme.of(ctx).textTheme.titleLarge),
+              const Divider(),
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(ctx).size.height * 0.5,
+                ),
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: templates.length,
+                  itemBuilder: (_, i) {
+                    final t = templates[i];
+                    return ListTile(
+                      leading: Icon(t.displayIcon),
+                      title: Text(t.title),
+                      subtitle: Text('${t.fields.length} 个字段'),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _TemplateCountButton(
+                            label: '+1',
+                            onTap: () {
+                              Navigator.of(ctx).pop();
+                              QaDebugMenu.injectAccountFromTemplate(context, t);
+                            },
+                          ),
+                          const SizedBox(width: 4),
+                          _TemplateCountButton(
+                            label: '+5',
+                            onTap: () {
+                              Navigator.of(ctx).pop();
+                              QaDebugMenu.injectAccountsFromTemplate(
+                                context,
+                                t,
+                                5,
+                              );
+                            },
+                          ),
+                          const SizedBox(width: 4),
+                          _TemplateCountButton(
+                            label: '+10',
+                            onTap: () {
+                              Navigator.of(ctx).pop();
+                              QaDebugMenu.injectAccountsFromTemplate(
+                                context,
+                                t,
+                                10,
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _deleteTotpCredential(
     BuildContext context,
     TotpCredential credential,
@@ -691,9 +845,7 @@ class _AccountListViewState extends State<AccountListView> {
     );
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(context.text('验证码已复制', 'Code copied.')),
-      ),
+      SnackBar(content: Text(context.text('验证码已复制', 'Code copied.'))),
     );
   }
 
@@ -736,15 +888,16 @@ class _AccountListViewState extends State<AccountListView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      credential.displayLabel,
+          ClipRect(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        credential.displayLabel,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.titleMedium?.copyWith(
@@ -765,17 +918,18 @@ class _AccountListViewState extends State<AccountListView> {
                   ],
                 ),
               ),
-              IconButton(
-                tooltip: context.text('编辑', 'Edit'),
-                onPressed: () => _openTotpEditor(context, initial: credential),
-                icon: const Icon(Icons.edit_outlined),
-              ),
-              IconButton(
-                tooltip: context.text('删除', 'Delete'),
-                onPressed: () => _deleteTotpCredential(context, credential),
-                icon: const Icon(Icons.delete_outline),
-              ),
-            ],
+                IconButton(
+                  tooltip: context.text('编辑', 'Edit'),
+                  onPressed: () => _openTotpEditor(context, initial: credential),
+                  icon: const Icon(Icons.edit_outlined),
+                ),
+                IconButton(
+                  tooltip: context.text('删除', 'Delete'),
+                  onPressed: () => _deleteTotpCredential(context, credential),
+                  icon: const Icon(Icons.delete_outline),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 14),
           Row(
@@ -807,10 +961,7 @@ class _AccountListViewState extends State<AccountListView> {
     );
   }
 
-  Widget _buildTotpPanel(
-    BuildContext context,
-    EnhancedAppProvider provider,
-  ) {
+  Widget _buildTotpPanel(BuildContext context, EnhancedAppProvider provider) {
     final credentials = provider.totpCredentials;
     if (credentials.isEmpty) return _buildEmptyState(context);
 
@@ -901,20 +1052,22 @@ class _AccountListViewState extends State<AccountListView> {
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 8,
                                 ),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: _buildCategoryFilterBar(context),
-                                    ),
-                                    if (_categoryFilter != _VaultCategoryFilter.totp) ...[
-                                      const SizedBox(width: AppSpacing.sm),
-                                      _buildModernTemplateDropdown(
-                                        context,
-                                        provider.allTemplates,
-                                        provider.allAccounts,
-                                      ),
+                                child: ClipRect(
+                                  child: OverflowBar(
+                                    spacing: AppSpacing.sm,
+                                    overflowSpacing: AppSpacing.sm,
+                                    overflowAlignment: OverflowBarAlignment.start,
+                                    children: [
+                                      _buildCategoryFilterBar(context),
+                                      if (_categoryFilter !=
+                                          _VaultCategoryFilter.totp)
+                                        _buildModernTemplateDropdown(
+                                          context,
+                                          provider.allTemplates,
+                                          provider.allAccounts,
+                                        ),
                                     ],
-                                  ],
+                                  ),
                                 ),
                               ),
                             ),
@@ -929,37 +1082,36 @@ class _AccountListViewState extends State<AccountListView> {
                       child: AnimatedSwitcher(
                         duration: const Duration(milliseconds: 250),
                         child: widget.showTemplates
-                            ? const TemplateListBody(
-                                key: ValueKey('templates'),
-                              )
+                            ? const TemplateListBody(key: ValueKey('templates'))
                             : Stack(
                                 key: const ValueKey('accounts'),
                                 children: [
                                   ScrollConfiguration(
-                                    behavior: ScrollConfiguration.of(
-                                      context,
-                                    ).copyWith(
-                                      physics: const ClampingScrollPhysics(),
-                                    ),
+                                    behavior: ScrollConfiguration.of(context)
+                                        .copyWith(
+                                          physics:
+                                              const ClampingScrollPhysics(),
+                                        ),
                                     child: RefreshIndicator(
                                       onRefresh: () => provider.refresh(),
                                       child: ListView(
-                                      padding: EdgeInsets.fromLTRB(
-                                        16,
-                                        0,
-                                        16,
-                                        fabBottomOffset + 80,
+                                        padding: EdgeInsets.fromLTRB(
+                                          16,
+                                          0,
+                                          16,
+                                          fabBottomOffset + 80,
+                                        ),
+                                        children: [
+                                          if (_categoryFilter ==
+                                              _VaultCategoryFilter.totp)
+                                            _buildTotpPanel(context, provider)
+                                          else
+                                            _buildAccountPanel(
+                                              context,
+                                              provider,
+                                            ),
+                                        ],
                                       ),
-                                      children: [
-                                        if (_categoryFilter == _VaultCategoryFilter.totp)
-                                          _buildTotpPanel(context, provider)
-                                        else
-                                          _buildAccountPanel(
-                                            context,
-                                            provider,
-                                          ),
-                                      ],
-                                    ),
                                     ),
                                   ),
                                   // Bottom Fade interaction hint
@@ -992,7 +1144,23 @@ class _AccountListViewState extends State<AccountListView> {
                   ],
                 ),
               ),
-              if (!widget.showTemplates)
+              if (!widget.showTemplates) ...[
+                if (kDebugMode)
+                  Positioned(
+                    right: 20,
+                    bottom: fabBottomOffset + 72,
+                    child: SafeArea(
+                      top: false,
+                      minimum: EdgeInsets.zero,
+                      child: FloatingActionButton.small(
+                        heroTag: 'qa-debug-fab',
+                        backgroundColor: Colors.orange,
+                        foregroundColor: Colors.white,
+                        onPressed: () => _showQaDebugSheet(context),
+                        child: const Icon(Icons.bug_report),
+                      ),
+                    ),
+                  ),
                 Positioned(
                   right: 20,
                   bottom: fabBottomOffset,
@@ -1006,10 +1174,11 @@ class _AccountListViewState extends State<AccountListView> {
                       onPressed: _categoryFilter == _VaultCategoryFilter.totp
                           ? () => _openTotpEditor(context)
                           : () => _openEditor(context),
-                      tooltip: context.text( '新建', 'Add'),
+                      tooltip: context.text('新建', 'Add'),
                     ),
                   ),
                 ),
+              ],
             ],
           ),
         );
@@ -1024,7 +1193,6 @@ class _AccountGroup {
 
   const _AccountGroup({required this.template, required this.accounts});
 }
-
 
 class _GroupCountChip extends StatelessWidget {
   final int count;
@@ -1048,6 +1216,41 @@ class _GroupCountChip extends StatelessWidget {
         style: theme.textTheme.labelSmall?.copyWith(
           color: theme.colorScheme.onSurface,
           fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
+class _TemplateCountButton extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+
+  const _TemplateCountButton({required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadii.control),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: Theme.of(context).colorScheme.primary.withAlpha(100),
+            ),
+            borderRadius: BorderRadius.circular(AppRadii.control),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
         ),
       ),
     );
