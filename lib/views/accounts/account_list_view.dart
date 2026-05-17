@@ -1,10 +1,8 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../debug/qa_debug_menu.dart';
 import '../../l10n/app_text_extension.dart';
 import '../../models/account_item.dart';
 import '../../models/account_template.dart';
@@ -664,143 +662,6 @@ class _AccountListViewState extends State<AccountListView> {
     }
   }
 
-  void _showQaDebugSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('QA Debug', style: Theme.of(ctx).textTheme.titleLarge),
-              const Divider(),
-              ListTile(
-                leading: const Icon(Icons.add, color: Colors.green),
-                title: const Text('+1 随机账户'),
-                onTap: () {
-                  Navigator.of(ctx).pop();
-                  QaDebugMenu.injectRandomAccounts(context, 1);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.add_box, color: Colors.green),
-                title: const Text('+5 随机账户'),
-                onTap: () {
-                  Navigator.of(ctx).pop();
-                  QaDebugMenu.injectRandomAccounts(context, 5);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.library_add, color: Colors.green),
-                title: const Text('+10 随机账户'),
-                onTap: () {
-                  Navigator.of(ctx).pop();
-                  QaDebugMenu.injectRandomAccounts(context, 10);
-                },
-              ),
-              ListTile(
-                leading: const Icon(
-                  Icons.description_outlined,
-                  color: Colors.blue,
-                ),
-                title: const Text('按模板新增'),
-                onTap: () {
-                  Navigator.of(ctx).pop();
-                  _showTemplatePickerForMock(context);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.delete_forever, color: Colors.red),
-                title: const Text('清空所有账户'),
-                onTap: () {
-                  Navigator.of(ctx).pop();
-                  QaDebugMenu.clearAllAccounts(context);
-                },
-              ),
-              const SizedBox(height: AppSpacing.md),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showTemplatePickerForMock(BuildContext context) {
-    final provider = context.read<EnhancedAppProvider>();
-    final templates = provider.allTemplates;
-    showModalBottomSheet(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('选择模板', style: Theme.of(ctx).textTheme.titleLarge),
-              const Divider(),
-              ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxHeight: MediaQuery.of(ctx).size.height * 0.5,
-                ),
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: templates.length,
-                  itemBuilder: (_, i) {
-                    final t = templates[i];
-                    return ListTile(
-                      leading: Icon(t.displayIcon),
-                      title: Text(t.title),
-                      subtitle: Text('${t.fields.length} 个字段'),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          _TemplateCountButton(
-                            label: '+1',
-                            onTap: () {
-                              Navigator.of(ctx).pop();
-                              QaDebugMenu.injectAccountFromTemplate(context, t);
-                            },
-                          ),
-                          const SizedBox(width: 4),
-                          _TemplateCountButton(
-                            label: '+5',
-                            onTap: () {
-                              Navigator.of(ctx).pop();
-                              QaDebugMenu.injectAccountsFromTemplate(
-                                context,
-                                t,
-                                5,
-                              );
-                            },
-                          ),
-                          const SizedBox(width: 4),
-                          _TemplateCountButton(
-                            label: '+10',
-                            onTap: () {
-                              Navigator.of(ctx).pop();
-                              QaDebugMenu.injectAccountsFromTemplate(
-                                context,
-                                t,
-                                10,
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Future<void> _deleteTotpCredential(
     BuildContext context,
     TotpCredential credential,
@@ -1145,22 +1006,6 @@ class _AccountListViewState extends State<AccountListView> {
                 ),
               ),
               if (!widget.showTemplates) ...[
-                if (kDebugMode)
-                  Positioned(
-                    right: 20,
-                    bottom: fabBottomOffset + 72,
-                    child: SafeArea(
-                      top: false,
-                      minimum: EdgeInsets.zero,
-                      child: FloatingActionButton.small(
-                        heroTag: 'qa-debug-fab',
-                        backgroundColor: Colors.orange,
-                        foregroundColor: Colors.white,
-                        onPressed: () => _showQaDebugSheet(context),
-                        child: const Icon(Icons.bug_report),
-                      ),
-                    ),
-                  ),
                 Positioned(
                   right: 20,
                   bottom: fabBottomOffset,
@@ -1222,37 +1067,4 @@ class _GroupCountChip extends StatelessWidget {
   }
 }
 
-class _TemplateCountButton extends StatelessWidget {
-  final String label;
-  final VoidCallback onTap;
 
-  const _TemplateCountButton({required this.label, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(AppRadii.control),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: Theme.of(context).colorScheme.primary.withAlpha(100),
-            ),
-            borderRadius: BorderRadius.circular(AppRadii.control),
-          ),
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
