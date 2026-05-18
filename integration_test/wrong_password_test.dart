@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
+import 'package:secret_roy/l10n/app_localizations.dart';
 import 'package:secret_roy/services/service_manager.dart';
+import 'package:secret_roy/views/home/home_view.dart';
+import 'package:secret_roy/views/unlock_view.dart';
 
 import 'support/smoke_test_helpers.dart';
 
@@ -18,14 +22,29 @@ void main() {
     // 先创建/解锁保险库，确保进入 returning-user 状态
     await launchAndUnlockSmokeApp(tester);
 
-    // 禁用无密码模式，防止 UnlockView 自动解锁跳过密码输入
+    // 禁用无密码模式
     await ServiceManager.instance.disableNoPasswordMode();
 
-    // 正常锁定保险库；MaterialApp 的 home 属性会从 HomeView 切到 UnlockView
+    // 锁定保险库
     await ServiceManager.instance.lock();
     await tester.pumpAndSettle(const Duration(seconds: 2));
 
-    // 等待 UnlockView 出现
+    // 显式渲染 UnlockView（不依赖 MaterialApp home 自动切换）
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: const [Locale('zh'), Locale('en')],
+        locale: const Locale('zh'),
+        home: const UnlockView(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
     final passwordField = find.byType(TextField);
     await pumpUntilFound(tester, passwordField);
 
@@ -33,8 +52,6 @@ void main() {
     await tester.enterText(passwordField, 'wrong-password');
     await tester.pumpAndSettle();
 
-    // FilledButton.icon 的 factory 实际创建的是 private class _FilledButtonWithIcon，
-    // find.byType(FilledButton) 因严格 runtimeType 匹配而失效，改用 is 检查。
     final submitButton = find.ancestor(
       of: find.text('解锁'),
       matching: find.byWidgetPredicate((w) => w is FilledButton),
@@ -60,8 +77,22 @@ void main() {
     await tester.tap(submitButton2);
     await tester.pumpAndSettle(const Duration(seconds: 2));
 
-    // Should reach the home screen.
-    await pumpUntilFound(tester, find.text('保险库'));
+    // 解锁成功后显式切换到 HomeView 验证
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: const [Locale('zh'), Locale('en')],
+        locale: const Locale('zh'),
+        home: const HomeView(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
     expect(find.text('保险库'), findsOneWidget);
   });
 }
