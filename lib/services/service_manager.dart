@@ -447,8 +447,8 @@ class ServiceManager extends ChangeNotifier {
   ///
   /// 调用后状态变为 [ServiceManagerState.locked]，
   /// 所有数据访问方法将拒绝执行直到再次解锁。
-  void lock() {
-    unawaited(_vaultUnlockCoordinator.lock());
+  Future<void> lock() async {
+    await _vaultUnlockCoordinator.lock();
     _vaultPairingCoordinator.clearJoinKeys();
     _updateState(ServiceManagerState.locked);
   }

@@ -83,8 +83,13 @@ void main() {
     // Vault health is accessed via notification center, not settings.
     // Skipping direct Vault health navigation as it requires notification state.
 
-    // Template manager: create a minimal custom template with one field.
-    await tapVisibleText(tester, '模板管理');
+    // Template manager: navigate via desktop nav rail (first destination).
+    // First tap switches from Settings (index 3) to Accounts (index 0).
+    // Second tap toggles accountShowTemplates to true.
+    await tapVisibleText(tester, '账户');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('账户').first);
+    await tester.pumpAndSettle();
     await pumpUntilFound(tester, find.text('模板中心'));
     await tester.tap(find.byTooltip('新建模板'));
     await tester.pumpAndSettle();

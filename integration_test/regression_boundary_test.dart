@@ -95,7 +95,7 @@ void main() {
     expect(find.text(accountName), findsNothing);
 
     // Clear search and verify target reappears.
-    await tester.tap(find.byTooltip('清除'));
+    await tester.enterText(searchField, '');
     await tester.pumpAndSettle(const Duration(seconds: 1));
     expect(textContaining(accountName), findsAtLeastNWidgets(1));
   });

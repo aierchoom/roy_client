@@ -23,7 +23,7 @@ void main() {
     await ServiceManager.instance.disableNoPasswordMode();
 
     // 正常锁定保险库
-    ServiceManager.instance.lock();
+    await ServiceManager.instance.lock();
     await tester.pumpAndSettle(const Duration(seconds: 2));
 
     // 重新启动应用，应显示 UnlockView（按钮为「解锁」）
