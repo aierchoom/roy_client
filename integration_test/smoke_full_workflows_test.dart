@@ -91,7 +91,7 @@ void main() {
     await tester.tap(find.text('账户').first);
     await tester.pumpAndSettle();
     await pumpUntilFound(tester, find.text('模板中心'));
-    await tester.tap(find.byTooltip('新建模板'));
+    await tester.tap(find.text('新建模板'));
     await tester.pumpAndSettle();
 
     await enterTextByLabel(tester, '标题', templateName);

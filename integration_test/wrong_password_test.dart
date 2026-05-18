@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
-import 'package:secret_roy/main.dart' as app;
 import 'package:secret_roy/services/service_manager.dart';
 
 import 'support/smoke_test_helpers.dart';
@@ -22,15 +21,11 @@ void main() {
     // 禁用无密码模式，防止 UnlockView 自动解锁跳过密码输入
     await ServiceManager.instance.disableNoPasswordMode();
 
-    // 正常锁定保险库
+    // 正常锁定保险库；MaterialApp 的 home 属性会从 HomeView 切到 UnlockView
     await ServiceManager.instance.lock();
     await tester.pumpAndSettle(const Duration(seconds: 2));
 
-    // 重新启动应用，应显示 UnlockView（按钮为「解锁」）
-    app.main();
-    await tester.pumpAndSettle();
-
-    // Wait for the password field.
+    // 等待 UnlockView 出现
     final passwordField = find.byType(TextField);
     await pumpUntilFound(tester, passwordField);
 
