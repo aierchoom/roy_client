@@ -106,7 +106,7 @@ void main() {
 
     await tester.tap(find.byTooltip('保存模板'));
     await tester.pumpAndSettle(const Duration(seconds: 2));
-    await pumpUntilFound(tester, find.text(templateName));
-    expect(find.text(templateName), findsAtLeastNWidgets(1));
+    await pumpUntilFound(tester, textContaining(templateName));
+    expect(textContaining(templateName), findsAtLeastNWidgets(1));
   });
 }

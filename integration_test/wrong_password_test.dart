@@ -4,7 +4,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:secret_roy/l10n/app_localizations.dart';
 import 'package:secret_roy/services/service_manager.dart';
-import 'package:secret_roy/views/home/home_view.dart';
 import 'package:secret_roy/views/unlock_view.dart';
 
 import 'support/smoke_test_helpers.dart';
@@ -77,22 +76,7 @@ void main() {
     await tester.tap(submitButton2);
     await tester.pumpAndSettle(const Duration(seconds: 2));
 
-    // 解锁成功后显式切换到 HomeView 验证
-    await tester.pumpWidget(
-      MaterialApp(
-        localizationsDelegates: const [
-          AppLocalizations.delegate,
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
-        ],
-        supportedLocales: const [Locale('zh'), Locale('en')],
-        locale: const Locale('zh'),
-        home: const HomeView(),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text('保险库'), findsOneWidget);
+    // 解锁成功后验证状态
+    expect(ServiceManager.instance.state, ServiceManagerState.unlocked);
   });
 }
