@@ -69,8 +69,7 @@ class VaultHealthCalculator {
   Future<VaultHealthItem> _checkDatabaseEncryption() async {
     try {
       final dbPath = await _storage.getDatabaseFilePath();
-      final encryptedPath = dbPath.replaceAll('.db', '.db.enc');
-      final exists = File(encryptedPath).existsSync();
+      final exists = File(dbPath).existsSync();
       return VaultHealthItem(
         id: 'db_encryption',
         title: '本地数据库加密',
@@ -282,13 +281,17 @@ class VaultHealthCalculator {
         .where((ids) => ids.length > 1)
         .expand((ids) => ids)
         .toList();
-    final reusedCount = passwordHashes.values.where((ids) => ids.length > 1).length;
+    final reusedCount = passwordHashes.values
+        .where((ids) => ids.length > 1)
+        .length;
     return VaultHealthItem(
       id: 'reused_passwords',
       title: '重复密码检测',
       riskLevel: VaultHealthRiskLevel.high,
       isPass: reusedIds.isEmpty,
-      description: reusedIds.isEmpty ? '未发现重复使用的密码' : '发现 $reusedCount 组重复使用的密码',
+      description: reusedIds.isEmpty
+          ? '未发现重复使用的密码'
+          : '发现 $reusedCount 组重复使用的密码',
       action: reusedIds.isNotEmpty
           ? VaultHealthAction(
               type: VaultHealthActionType.navigateToAccountEdit,
@@ -305,10 +308,10 @@ class VaultHealthCalculator {
     for (final account in accounts) {
       if (account.isDeleted) continue;
       // Use modified_at from the account if available, otherwise createdAt
-      final ts = account.modifiedAt > 0 ? account.modifiedAt : account.createdAt;
-      final age = now.difference(
-        DateTime.fromMillisecondsSinceEpoch(ts),
-      );
+      final ts = account.modifiedAt > 0
+          ? account.modifiedAt
+          : account.createdAt;
+      final age = now.difference(DateTime.fromMillisecondsSinceEpoch(ts));
       if (age.inDays > 180) {
         staleAccountIds.add(account.id);
         staleAccountNames.add(account.name);

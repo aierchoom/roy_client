@@ -15,7 +15,11 @@ void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   setUp(() async {
-    ServiceManager.resetInstance();
+    await ServiceManager.destroyForTesting();
+  });
+
+  tearDown(() async {
+    await ServiceManager.destroyForTesting();
   });
 
   testWidgets('regression: delete account with confirmation', (tester) async {
@@ -42,7 +46,9 @@ void main() {
     await tester.pumpAndSettle();
 
     // Tap delete in the bottom sheet.
-    await tapVisibleText(tester, '删除');
+    final sheetDelete = find.widgetWithText(ListTile, '删除');
+    await pumpUntilFound(tester, sheetDelete);
+    await tester.tap(sheetDelete);
     await tester.pumpAndSettle();
 
     // Confirm deletion in the AlertDialog.

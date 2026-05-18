@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
+import 'package:secret_roy/services/service_manager.dart';
+
 import 'support/smoke_test_helpers.dart';
 
 /// PC 桌面端核心冒烟测试
@@ -10,6 +12,10 @@ import 'support/smoke_test_helpers.dart';
 /// 脚本参考: tool/run_integration_tests.ps1
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+
+  tearDown(() async {
+    await ServiceManager.destroyForTesting();
+  });
 
   testWidgets(
     'PC smoke: create vault, add account, search, navigate settings',

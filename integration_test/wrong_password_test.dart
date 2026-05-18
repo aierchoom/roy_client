@@ -9,15 +9,21 @@ import 'support/smoke_test_helpers.dart';
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
+  tearDown(() async {
+    await ServiceManager.destroyForTesting();
+  });
+
   testWidgets('regression: wrong password then correct password', (tester) async {
     await configureSmokeSurface(tester);
 
     // 先创建/解锁保险库，确保进入 returning-user 状态
     await launchAndUnlockSmokeApp(tester);
 
-    // 锁定保险库：替换单例为一个 locked 状态的新实例，避免 lock() 在 Windows 上的文件系统竞态
-    final lockedManager = ServiceManager.testable(initialState: ServiceManagerState.locked);
-    ServiceManager.setInstanceForTesting(lockedManager);
+    // 禁用无密码模式，防止 UnlockView 自动解锁跳过密码输入
+    await ServiceManager.instance.disableNoPasswordMode();
+
+    // 正常锁定保险库
+    ServiceManager.instance.lock();
     await tester.pumpAndSettle(const Duration(seconds: 2));
 
     // 重新启动应用，应显示 UnlockView（按钮为「解锁」）

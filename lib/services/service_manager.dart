@@ -274,6 +274,25 @@ class ServiceManager extends ChangeNotifier {
     _instance = null;
   }
 
+  /// 彻底销毁当前单例，关闭数据库并清理所有资源。
+  /// 用于集成测试中确保测试之间完全隔离。
+  @visibleForTesting
+  static Future<void> destroyForTesting() async {
+    if (_instance != null) {
+      try {
+        if (!_instance!._disposed) {
+          // dispose() 是 void，但内部会异步关闭存储；等待一小段时间让清理完成
+          _instance!.dispose();
+          await Future.delayed(const Duration(milliseconds: 500));
+        }
+      } catch (e) {
+        AppLogger.d('ServiceManager.destroyForTesting error: $e');
+      } finally {
+        _instance = null;
+      }
+    }
+  }
+
   ServiceManagerState get state => _state;
   bool get isLocked => _state == ServiceManagerState.locked;
   bool get isUnlocked => _state == ServiceManagerState.unlocked;
