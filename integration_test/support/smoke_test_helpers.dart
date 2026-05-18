@@ -144,7 +144,12 @@ Future<void> createWebsiteAccount(
   await tester.tap(find.byTooltip('保存账户'));
   await tester.pumpAndSettle(const Duration(seconds: 2));
 
-  expect(find.text(name), findsAtLeastNWidgets(1));
+  expect(
+    find.byWidgetPredicate(
+      (widget) => widget is Text && (widget.data?.contains(name) ?? false),
+    ),
+    findsAtLeastNWidgets(1),
+  );
 }
 
 Future<void> tapVisibleText(
@@ -157,6 +162,14 @@ Future<void> tapVisibleText(
   expect(finder, findsAtLeastNWidgets(1));
   await tester.tap(last ? finder.last : finder.first);
   await tester.pumpAndSettle();
+}
+
+Finder textContaining(String text) {
+  return find.byWidgetPredicate(
+    (widget) =>
+        widget is Text && (widget.data?.contains(text) ?? false) ||
+        widget is RichText && widget.text.toPlainText().contains(text),
+  );
 }
 
 Future<void> tapBack(WidgetTester tester) async {

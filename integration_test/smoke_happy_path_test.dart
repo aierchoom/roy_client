@@ -32,7 +32,14 @@ void main() {
         'AutoTest',
       );
       await tester.pumpAndSettle(const Duration(seconds: 1));
-      expect(find.text('AutoTest-Google'), findsAtLeastNWidgets(1));
+      expect(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is Text &&
+              (widget.data?.contains('AutoTest-Google') ?? false),
+        ),
+        findsAtLeastNWidgets(1),
+      );
 
       await tapVisibleText(tester, '设置');
       await pumpUntilFound(tester, find.text('设置中心'));

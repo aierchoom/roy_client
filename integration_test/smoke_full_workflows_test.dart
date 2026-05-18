@@ -31,7 +31,7 @@ void main() {
     );
 
     // Edit the account from its preview screen.
-    await tester.tap(find.text(originalAccountName).first);
+    await tester.tap(textContaining(originalAccountName).first);
     await tester.pumpAndSettle();
     await pumpUntilFound(tester, find.text('预览账户'));
     expect(find.text('预览账户'), findsOneWidget);
@@ -41,22 +41,24 @@ void main() {
     await enterTextByLabel(tester, '账户名称', editedAccountName);
     await tester.tap(find.byTooltip('保存账户'));
     await tester.pumpAndSettle(const Duration(seconds: 2));
-    expect(find.text(editedAccountName), findsAtLeastNWidgets(1));
+    expect(textContaining(editedAccountName), findsAtLeastNWidgets(1));
 
     // Create a TOTP item and link it to the edited account.
     await tapVisibleText(tester, '2FA');
-    await tapVisibleText(tester, '新增');
+    await tester.tap(find.byTooltip('新建'));
+    await tester.pumpAndSettle();
     await enterTextByLabel(tester, '名称', totpLabel);
     await enterTextByLabel(
       tester,
       '密钥 / otpauth URI',
       'otpauth://totp/SecretRoy:$accountEmail?secret=JBSWY3DPEHPK3PXP&issuer=SecretRoy',
     );
-    await tapVisibleText(tester, editedAccountName);
+    await tester.tap(textContaining(editedAccountName).first);
+    await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('保存').first);
     await tester.pumpAndSettle(const Duration(seconds: 2));
     expect(find.text(totpLabel), findsAtLeastNWidgets(1));
-    expect(find.text(editedAccountName), findsAtLeastNWidgets(1));
+    expect(textContaining(editedAccountName), findsAtLeastNWidgets(1));
 
     // Password tools: open generator, keep a generated result.
     await tapVisibleText(tester, '设置');

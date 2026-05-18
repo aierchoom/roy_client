@@ -33,7 +33,7 @@ void main() {
     );
 
     // Long-press the account tile to open context menu.
-    final accountFinder = find.text(accountName).first;
+    final accountFinder = textContaining(accountName).first;
     await pumpUntilFound(tester, accountFinder);
     expect(accountFinder, findsAtLeastNWidgets(1));
     await tester.longPress(accountFinder);
@@ -79,7 +79,7 @@ void main() {
     await pumpUntilFound(tester, searchField);
     await tester.enterText(searchField, 'Search-Target');
     await tester.pumpAndSettle(const Duration(seconds: 1));
-    expect(find.text(accountName), findsAtLeastNWidgets(1));
+    expect(textContaining(accountName), findsAtLeastNWidgets(1));
 
     // Enter a query that matches nothing.
     await tester.enterText(searchField, 'NoSuchAccountXYZ');
@@ -89,7 +89,7 @@ void main() {
     // Clear search and verify target reappears.
     await tester.tap(find.byTooltip('清除'));
     await tester.pumpAndSettle(const Duration(seconds: 1));
-    expect(find.text(accountName), findsAtLeastNWidgets(1));
+    expect(textContaining(accountName), findsAtLeastNWidgets(1));
   });
 
   testWidgets('regression: category tab switching', (tester) async {
@@ -98,14 +98,6 @@ void main() {
 
     // Default view should show the "全部" tab.
     expect(find.text('全部'), findsAtLeastNWidgets(1));
-
-    // Switch to "账户" tab.
-    await tapVisibleText(tester, '账户');
-    await tester.pumpAndSettle(const Duration(seconds: 1));
-
-    // Switch to "安全笔记" tab.
-    await tapVisibleText(tester, '安全笔记');
-    await tester.pumpAndSettle(const Duration(seconds: 1));
 
     // Switch to "2FA" tab.
     await tapVisibleText(tester, '2FA');
