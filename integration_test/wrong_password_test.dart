@@ -26,9 +26,10 @@ void main() {
 
     // 锁定保险库
     await ServiceManager.instance.lock();
-    await tester.pumpAndSettle(const Duration(seconds: 2));
 
     // 显式渲染 UnlockView（不依赖 MaterialApp home 自动切换）
+    // 注意：lock() 后不能先 pumpAndSettle，否则旧 HomeView 重建时其中的
+    // FutureBuilder 会尝试访问已关闭的数据库，导致异常。
     await tester.pumpWidget(
       MaterialApp(
         localizationsDelegates: const [
@@ -42,7 +43,7 @@ void main() {
         home: const UnlockView(),
       ),
     );
-    await tester.pumpAndSettle();
+    await tester.pumpAndSettle(const Duration(seconds: 2));
 
     final passwordField = find.byType(TextField);
     await pumpUntilFound(tester, passwordField);

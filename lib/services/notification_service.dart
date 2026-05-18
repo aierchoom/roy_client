@@ -36,7 +36,17 @@ class NotificationService {
 
       const android = AndroidInitializationSettings('@mipmap/ic_launcher');
       const darwin = DarwinInitializationSettings();
-      const settings = InitializationSettings(android: android, iOS: darwin, macOS: darwin);
+      const windows = WindowsInitializationSettings(
+        appName: 'SecretRoy',
+        appUserModelId: 'com.example.secret_roy',
+        guid: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+      );
+      const settings = InitializationSettings(
+        android: android,
+        iOS: darwin,
+        macOS: darwin,
+        windows: windows,
+      );
       await _plugin.initialize(settings);
       _initialized = true;
     } catch (e) {
