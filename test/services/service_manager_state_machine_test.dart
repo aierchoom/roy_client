@@ -66,7 +66,7 @@ void main() {
 
     testWidgets('lock transitions from unlocked to locked', (tester) async {
       final manager = _createFakeManager(initialState: ServiceManagerState.unlocked);
-      manager.lock();
+      await manager.lock();
       expect(manager.state, ServiceManagerState.locked);
     });
 
