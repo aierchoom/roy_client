@@ -141,8 +141,11 @@ Future<void> createWebsiteAccount(
   await enterTextByLabel(tester, '账号', username);
   await enterTextByLabel(tester, '密码', password);
 
+  // 额外 pump 确保 AccountEditView 的模板已加载（_pickedTag 不为 null）
+  await tester.pumpAndSettle(const Duration(seconds: 1));
+
   await tester.tap(find.byTooltip('保存账户'));
-  await tester.pumpAndSettle(const Duration(seconds: 2));
+  await tester.pumpAndSettle(const Duration(seconds: 3));
 
   expect(
     find.byWidgetPredicate(
