@@ -379,8 +379,11 @@ class ServiceManager extends ChangeNotifier {
 
   Future<UnlockResult> _performUnlock(String password) async {
     try {
+      AppLogger.d('_performUnlock: calling initializeAndUnlock');
       final cipher = await _vaultUnlockCoordinator.initializeAndUnlock(password);
+      AppLogger.d('_performUnlock: initializeAndUnlock returned cipher=${cipher != null}');
       if (cipher == null) {
+        AppLogger.d('_performUnlock: cipher is null, setting state to locked');
         _updateState(ServiceManagerState.locked);
         return UnlockResult.invalidPassword;
       }
@@ -393,7 +396,9 @@ class ServiceManager extends ChangeNotifier {
         unawaited(_vaultUnlockCoordinator.migrateNoPasswordToPseudoKey());
       }
 
+      AppLogger.d('_performUnlock: setting state to unlocked');
       _updateState(ServiceManagerState.unlocked);
+      AppLogger.d('_performUnlock: state is now $_state');
       return UnlockResult.success;
     } on IdentityCorruptedException catch (e, stack) {
       AppLogger.d('Failed to unlock because identity is corrupted: $e');

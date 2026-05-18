@@ -231,15 +231,32 @@ class SecureStorageService {
   Future<void> close({bool dispose = false}) async {
     final hadOpenDatabase = isOpen;
     if (hadOpenDatabase) {
-      await _checkpointRuntimeDatabase();
+      try {
+        await _checkpointRuntimeDatabase();
+      } catch (e) {
+        AppLogger.d('Failed to checkpoint runtime database during close: $e');
+      }
     }
 
-    await _database?.close();
-    _database = null;
+    try {
+      await _database?.close();
+    } catch (e) {
+      AppLogger.d('Failed to close database connection: $e');
+    } finally {
+      _database = null;
+    }
 
     if (hadOpenDatabase) {
-      await _persistEncryptedDatabase(databaseIsOpen: false);
-      await _deleteWorkingDatabase();
+      try {
+        await _persistEncryptedDatabase(databaseIsOpen: false);
+      } catch (e) {
+        AppLogger.d('Failed to persist encrypted database during close: $e');
+      }
+      try {
+        await _deleteWorkingDatabase();
+      } catch (e) {
+        AppLogger.d('Failed to delete working database during close: $e');
+      }
     }
 
     if (dispose && !_changeController.isClosed) {

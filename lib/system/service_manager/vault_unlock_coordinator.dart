@@ -64,7 +64,9 @@ class VaultUnlockCoordinator {
     );
 
     final didUnlock = await _cryptoService.initMasterKey(password);
+    AppLogger.d('initializeAndUnlock: didUnlock=$didUnlock');
     if (!didUnlock) {
+      AppLogger.d('initializeAndUnlock: password invalid, closing storage');
       await _secureStorageService.close();
       _secureStorageService.clearDatabaseCipher();
       await _syncService.disconnect();
@@ -82,6 +84,7 @@ class VaultUnlockCoordinator {
       _identityService.vaultId,
     );
     unawaited(_syncService.connect());
+    AppLogger.d('initializeAndUnlock: success, returning cipher');
     return cipher;
   }
 
