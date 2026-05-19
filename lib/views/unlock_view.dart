@@ -102,6 +102,7 @@ class _UnlockViewState extends State<UnlockView> {
 
   Future<void> _unlockWithPassword() async {
     final password = _passwordController.text.trim();
+    AppLogger.d('UnlockView: _unlockWithPassword called with password length=${password.length}, empty=${password.isEmpty}');
     if (password.isEmpty) return;
 
     setState(() {
@@ -115,6 +116,7 @@ class _UnlockViewState extends State<UnlockView> {
     }
 
     final result = await _serviceManager.unlockWithPassword(password);
+    AppLogger.d('UnlockView: unlockWithPassword returned $result');
 
     if (!mounted) return;
     setState(() => _isLoading = false);
