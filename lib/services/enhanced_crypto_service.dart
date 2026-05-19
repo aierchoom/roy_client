@@ -4,7 +4,6 @@ import 'dart:typed_data';
 
 import 'package:cryptography/cryptography.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:secret_roy/core/app_logger.dart';
 import 'package:secret_roy/core/crypto_random.dart';
 
 import 'database_file_cipher.dart';
@@ -64,10 +63,8 @@ class EnhancedCryptoService {
   /// 验证失败时自动调用 [logout] 清除敏感状态。
   Future<bool> initMasterKey(String masterPassword) async {
     final storedHash = await _readSecureValue(_masterPasswordHashKey);
-    AppLogger.d('initMasterKey: storedHash=${storedHash != null}');
     if (storedHash != null) {
       final verified = await _verifyPbkdf2(masterPassword, storedHash);
-      AppLogger.d('initMasterKey: _verifyPbkdf2 returned $verified');
       if (verified) {
         await _unlockWithPassword(masterPassword);
       } else {
@@ -77,7 +74,6 @@ class EnhancedCryptoService {
     }
 
     final storedPassword = await _readSecureValue(_masterPasswordKey);
-    AppLogger.d('initMasterKey: storedPassword=${storedPassword != null}');
     if (storedPassword != null) {
       if (!_constantTimeEquals(
         utf8.encode(storedPassword),

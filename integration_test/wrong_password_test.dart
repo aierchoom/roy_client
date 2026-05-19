@@ -49,6 +49,8 @@ void main() {
     await pumpUntilFound(tester, passwordField);
 
     // Enter wrong password and tap unlock.
+    await tester.tap(passwordField);
+    await tester.pumpAndSettle();
     await tester.enterText(passwordField, 'wrong-password');
     await tester.pumpAndSettle();
 
@@ -65,6 +67,8 @@ void main() {
     expect(find.text('主密码不正确。'), findsOneWidget);
 
     // Enter correct password and tap submit again.
+    await tester.tap(passwordField);
+    await tester.pumpAndSettle();
     await tester.enterText(passwordField, '123ckets');
     await tester.pumpAndSettle();
 
