@@ -1,5 +1,6 @@
 ﻿import 'package:flutter/material.dart';
 
+import '../core/app_logger.dart';
 import '../l10n/app_text_extension.dart';
 import '../services/biometric_auth_service.dart';
 import '../services/service_manager.dart';

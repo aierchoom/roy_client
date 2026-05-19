@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:cryptography/cryptography.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:secret_roy/core/app_logger.dart';
 import 'package:secret_roy/core/crypto_random.dart';
 
 import 'database_file_cipher.dart';
