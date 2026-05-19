@@ -67,6 +67,8 @@ Future<void> enterTextByLabel(
   }
   await pumpUntilFound(tester, field);
   expect(field, findsOneWidget);
+  await tester.tap(field);
+  await tester.pumpAndSettle();
   await tester.enterText(field, value);
   await tester.pumpAndSettle();
 }
@@ -131,6 +133,8 @@ Future<void> createWebsiteAccount(
   await pumpUntilFound(tester, accountNameField);
   expect(accountNameField, findsOneWidget);
 
+  await tester.tap(accountNameField);
+  await tester.pumpAndSettle();
   await tester.enterText(accountNameField, name);
   await tester.pumpAndSettle();
 
