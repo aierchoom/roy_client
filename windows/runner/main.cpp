@@ -13,6 +13,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
     CreateAndAttachConsole();
   }
 
+  // Disable Impeller on Windows to avoid D3D12 descriptor heap errors
+  // in CI and on certain GPU drivers.
+  ::SetEnvironmentVariableW(L"FLUTTER_NO_ENABLE_IMPELLER", L"1");
+
   // Initialize COM, so that it is available for use in the library and/or
   // plugins.
   ::CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
