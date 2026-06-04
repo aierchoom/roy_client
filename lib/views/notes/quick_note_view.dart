@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,6 +11,10 @@ import '../../services/quick_note_store.dart';
 import '../../theme/theme.dart';
 import '../../widgets/adaptive_page.dart';
 
+const Duration _draftSaveDelay = Duration(milliseconds: 450);
+const Duration _focusLossDelay = Duration(milliseconds: 80);
+const Duration _scrollFollowDelay = Duration(milliseconds: 120);
+
 class QuickNoteView extends StatefulWidget {
   const QuickNoteView({super.key});
 
@@ -20,6 +25,7 @@ class QuickNoteView extends StatefulWidget {
 class _QuickNoteViewState extends State<QuickNoteView> {
   final QuickNoteStore _store = QuickNoteStore();
   final List<_MarkdownBlock> _blocks = [];
+  final ScrollController _scrollController = ScrollController();
   List<QuickNote> _notes = [];
   String? _activeNoteId;
   int _nextBlockId = 0;
@@ -27,7 +33,9 @@ class _QuickNoteViewState extends State<QuickNoteView> {
   bool _showTools = false;
   bool _splittingBlock = false;
   bool _loadingNote = true;
+  bool _ensureVisibleQueued = false;
   Timer? _saveTimer;
+  Timer? _focusLossTimer;
 
   @override
   void initState() {
@@ -40,6 +48,8 @@ class _QuickNoteViewState extends State<QuickNoteView> {
   void dispose() {
     unawaited(_persistActiveNote(_plainMarkdown));
     _saveTimer?.cancel();
+    _focusLossTimer?.cancel();
+    _scrollController.dispose();
     for (final block in _blocks) {
       block.dispose();
     }
@@ -119,7 +129,7 @@ class _QuickNoteViewState extends State<QuickNoteView> {
   void _scheduleDraftSave() {
     if (_loadingNote) return;
     _saveTimer?.cancel();
-    _saveTimer = Timer(const Duration(milliseconds: 450), () async {
+    _saveTimer = Timer(_draftSaveDelay, () async {
       await _persistActiveNote(_plainMarkdown);
     });
   }
@@ -158,6 +168,14 @@ class _QuickNoteViewState extends State<QuickNoteView> {
     final unordered = RegExp(r'^(\s*[-*]\s+).+').firstMatch(value);
     if (unordered != null) return unordered.group(1)!;
 
+    final ordered = RegExp(r'^(\s*)(\d+)([.)]\s+).+').firstMatch(value);
+    if (ordered != null) {
+      final indent = ordered.group(1)!;
+      final num = int.parse(ordered.group(2)!) + 1;
+      final delim = ordered.group(3)!;
+      return '$indent$num$delim';
+    }
+
     final quote = RegExp(r'^(>\s?).+').firstMatch(value);
     if (quote != null) return quote.group(1)!;
 
@@ -167,6 +185,7 @@ class _QuickNoteViewState extends State<QuickNoteView> {
   bool _isBareContinuation(String value) {
     return RegExp(r'^\s*[-*]\s*$').hasMatch(value) ||
         RegExp(r'^\s*-\s+\[[ xX]\]\s*$').hasMatch(value) ||
+        RegExp(r'^\s*\d+[.)]\s*$').hasMatch(value) ||
         RegExp(r'^>\s*$').hasMatch(value);
   }
 
@@ -179,6 +198,9 @@ class _QuickNoteViewState extends State<QuickNoteView> {
     if (!text.contains('\n')) {
       setState(() {});
       _scheduleDraftSave();
+      if (index == _editingIndex) {
+        _queueEnsureBlockVisible(index);
+      }
       return;
     }
 
@@ -197,6 +219,7 @@ class _QuickNoteViewState extends State<QuickNoteView> {
     }
 
     final inserted = parts.skip(1).map(_createBlock).toList();
+    var continuationGenerated = false;
     if (parts.length == 2 && parts[1].isEmpty) {
       if (_isBareContinuation(parts.first)) {
         parts[0] = '';
@@ -209,16 +232,19 @@ class _QuickNoteViewState extends State<QuickNoteView> {
             ..clear()
             ..add(_createBlock(prefix));
           targetPartIndex = 1;
+          continuationGenerated = true;
         }
       }
     }
     final nextIndex = index + targetPartIndex;
-    final nextOffset = (caret - partStart).clamp(
-      0,
-      targetPartIndex == 0
-          ? parts.first.length
-          : inserted[targetPartIndex - 1].text.length,
-    );
+    final nextOffset = continuationGenerated
+        ? inserted.first.text.length
+        : (caret - partStart).clamp(
+            0,
+            targetPartIndex == 0
+                ? parts.first.length
+                : inserted[targetPartIndex - 1].text.length,
+          );
 
     _splittingBlock = true;
     block.controller.value = TextEditingValue(
@@ -238,6 +264,7 @@ class _QuickNoteViewState extends State<QuickNoteView> {
       nextBlock.controller.selection = TextSelection.collapsed(
         offset: nextOffset,
       );
+      _ensureBlockVisible(nextIndex);
     });
   }
 
@@ -251,12 +278,105 @@ class _QuickNoteViewState extends State<QuickNoteView> {
       block.controller.selection = TextSelection.collapsed(
         offset: cursorOffset ?? block.text.length,
       );
+      _ensureBlockVisible(index);
     });
+  }
+
+  void _queueEnsureBlockVisible(int index) {
+    if (_ensureVisibleQueued) return;
+    _ensureVisibleQueued = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _ensureVisibleQueued = false;
+      if (!mounted) return;
+      _ensureBlockVisible(index);
+    });
+  }
+
+  void _ensureBlockVisible(int index, {int attempt = 0}) {
+    if (index < 0 || index >= _blocks.length) return;
+    final context = _blocks[index].itemKey.currentContext;
+    if (context != null) {
+      Scrollable.ensureVisible(
+        context,
+        duration: _scrollFollowDelay,
+        curve: Curves.easeOut,
+        alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+      );
+      return;
+    }
+    if (_scrollController.hasClients) {
+      final maxExtent = _scrollController.position.maxScrollExtent;
+      if (maxExtent > 0) {
+        final denominator = math.max(1, _blocks.length - 1);
+        final target = maxExtent * (index / denominator);
+        _scrollController.jumpTo(target.clamp(0.0, maxExtent));
+      }
+    }
+    if (attempt >= 3) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _ensureBlockVisible(index, attempt: attempt + 1);
+    });
+  }
+
+  void _editBlockAtPreviewTap(
+    int index, {
+    required double localX,
+    required double width,
+    int rawPrefixLength = 0,
+    double horizontalPadding = AppSpacing.lg,
+  }) {
+    if (index < 0 || index >= _blocks.length) return;
+    final text = _blocks[index].text;
+    final prefixLength = rawPrefixLength > 0
+        ? rawPrefixLength
+        : _previewCursorPrefixLength(text);
+    final offset = _estimateCursorOffsetForTap(
+      text,
+      localX: localX,
+      width: width,
+      rawPrefixLength: prefixLength.clamp(0, text.length),
+      horizontalPadding: horizontalPadding,
+    );
+    _editBlock(index, cursorOffset: offset);
   }
 
   void _finishEditing() {
     setState(() => _editingIndex = -1);
     FocusManager.instance.primaryFocus?.unfocus();
+  }
+
+  void _restoreActiveBlockFocus() {
+    if (_editingIndex < 0 || _editingIndex >= _blocks.length) return;
+    _blocks[_editingIndex].focusNode.requestFocus();
+  }
+
+  void _toggleTools() {
+    setState(() => _showTools = !_showTools);
+    _restoreActiveBlockFocus();
+  }
+
+  void _toggleTask(int index) {
+    if (index < 0 || index >= _blocks.length) return;
+    final block = _blocks[index];
+    final text = block.text;
+    final match = RegExp(r'^(\s*-\s+)\[([ xX])\](.*)$').firstMatch(text);
+    if (match == null) return;
+    final newCheck = match.group(2)!.trim().isEmpty ? 'x' : ' ';
+    block.controller.text = '${match.group(1)}[$newCheck]${match.group(3)}';
+    setState(() {});
+    _scheduleDraftSave();
+  }
+
+  void _onBlockFocusLost(int blockIndex) {
+    _focusLossTimer?.cancel();
+    _focusLossTimer = Timer(_focusLossDelay, () {
+      if (!mounted) return;
+      if (_editingIndex != blockIndex) return;
+      final block = _blocks[blockIndex];
+      if (block.focusNode.hasFocus) return;
+      _finishEditing();
+    });
   }
 
   void _continueAtEnd() {
@@ -376,12 +496,160 @@ class _QuickNoteViewState extends State<QuickNoteView> {
     );
   }
 
-  Future<void> _copyMarkdown() async {
-    await Clipboard.setData(ClipboardData(text: _plainMarkdown));
+  Future<void> _openCopyActions() async {
+    final activeBlock = _activeBlock;
+    final paragraph = activeBlock?.text.trimRight();
+    final hasParagraph = paragraph != null && paragraph.trim().isNotEmpty;
+    final action = await showModalBottomSheet<_CopyAction>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            0,
+            AppSpacing.lg,
+            AppSpacing.lg,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ListTile(
+                enabled: hasParagraph,
+                leading: const Icon(Icons.notes_outlined),
+                title: Text(
+                  context.text('澶嶅埗褰撳墠娈佃惤', 'Copy current paragraph'),
+                ),
+                subtitle: Text(
+                  hasParagraph
+                      ? paragraph
+                      : context.text('褰撳墠娈佃惤涓虹┖', 'Current paragraph is empty'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                onTap: hasParagraph
+                    ? () => Navigator.pop(sheetContext, _CopyAction.paragraph)
+                    : null,
+              ),
+              ListTile(
+                leading: const Icon(Icons.copy_all_outlined),
+                title: Text(
+                  context.text('澶嶅埗鏁寸瘒 Markdown', 'Copy all Markdown'),
+                ),
+                subtitle: Text(
+                  _displayTitle.isEmpty
+                      ? context.text('闅忔墜璁?', 'Quick Note')
+                      : _displayTitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                onTap: () => Navigator.pop(sheetContext, _CopyAction.markdown),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (!mounted || action == null) return;
+
+    switch (action) {
+      case _CopyAction.paragraph:
+        if (!hasParagraph) return;
+        await _copyToClipboard(
+          paragraph,
+          context.text('褰撳墠娈佃惤宸插鍒?', 'Current paragraph copied'),
+        );
+        return;
+      case _CopyAction.markdown:
+        await _copyToClipboard(
+          _plainMarkdown,
+          context.text('Markdown 宸插鍒?', 'Markdown copied'),
+        );
+        return;
+    }
+  }
+
+  Future<void> _copyToClipboard(String text, String message) async {
+    await Clipboard.setData(ClipboardData(text: text));
     if (!mounted) return;
+    if (message.isNotEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+      return;
+    }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(context.text('Markdown 已复制', 'Markdown copied'))),
     );
+  }
+
+  Future<void> _openLinkActions(
+    int blockIndex, {
+    required String label,
+    required String href,
+  }) async {
+    final action = await showModalBottomSheet<_LinkAction>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            0,
+            AppSpacing.lg,
+            AppSpacing.lg,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.copy_all_outlined),
+                title: Text(context.text('复制链接', 'Copy link')),
+                subtitle: Text(
+                  href,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                onTap: () => Navigator.pop(sheetContext, _LinkAction.copy),
+              ),
+              ListTile(
+                leading: const Icon(Icons.edit_outlined),
+                title: Text(context.text('编辑链接', 'Edit link')),
+                subtitle: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                onTap: () => Navigator.pop(sheetContext, _LinkAction.edit),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (!mounted || action == null) return;
+
+    switch (action) {
+      case _LinkAction.copy:
+        await Clipboard.setData(ClipboardData(text: href));
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.text('链接已复制', 'Link copied'))),
+        );
+        break;
+      case _LinkAction.edit:
+        if (blockIndex < 0 || blockIndex >= _blocks.length) return;
+        final source = _blocks[blockIndex].text;
+        final markdown = '[$label]($href)';
+        final offset = source.indexOf(markdown);
+        _editBlock(
+          blockIndex,
+          cursorOffset: offset < 0 ? source.length : offset,
+        );
+        break;
+    }
   }
 
   void _removeEmptyBlock(int index) {
@@ -476,6 +744,36 @@ class _QuickNoteViewState extends State<QuickNoteView> {
     _replaceSelection(replacement, cursorOffset: replacement.length - 1);
   }
 
+  void _insertCodeBlock() {
+    final block = _activeBlock;
+    if (block == null) {
+      _continueAtEnd();
+      return;
+    }
+
+    final selection = block.controller.selection;
+    final text = block.text;
+    final start = selection.isValid ? selection.start : text.length;
+    final end = selection.isValid ? selection.end : text.length;
+    final selected = start == end ? 'code' : text.substring(start, end);
+    _replaceSelection('```\n$selected\n```', cursorOffset: 4 + selected.length);
+  }
+
+  List<_CodeLineKind> _codeLineKinds() {
+    final kinds = <_CodeLineKind>[];
+    var inFence = false;
+    for (final block in _blocks) {
+      final isFence = block.text.trimLeft().startsWith('```');
+      if (isFence) {
+        kinds.add(_CodeLineKind.fence);
+        inFence = !inFence;
+      } else {
+        kinds.add(inFence ? _CodeLineKind.body : _CodeLineKind.none);
+      }
+    }
+    return kinds;
+  }
+
   MarkdownStyleSheet _markdownStyle(ThemeData theme) {
     final colors = theme.colorScheme;
     return MarkdownStyleSheet.fromTheme(theme).copyWith(
@@ -540,10 +838,9 @@ class _QuickNoteViewState extends State<QuickNoteView> {
                       noteCount: _notes.length,
                       onNewNoteTap: _createNewNote,
                       onNotesTap: _openNotesSheet,
-                      onCopyTap: _copyMarkdown,
+                      onCopyTap: _openCopyActions,
                       onDoneTap: _finishEditing,
-                      onToolsTap: () =>
-                          setState(() => _showTools = !_showTools),
+                      onToolsTap: _toggleTools,
                     ),
                   AnimatedContainer(
                     duration: const Duration(milliseconds: 180),
@@ -565,6 +862,17 @@ class _QuickNoteViewState extends State<QuickNoteView> {
                       child: _buildBlockList(theme, layout),
                     ),
                   ),
+                  if (keyboardVisible && layout.isCompact)
+                    _MobileInputToolbar(
+                      onListTap: () => _insertLinePrefix('- '),
+                      onTaskTap: () => _insertLinePrefix('- [ ] '),
+                      onBoldTap: () => _surroundSelection(
+                        '**',
+                        '**',
+                        context.text('重点', 'Important'),
+                      ),
+                      onDoneTap: _finishEditing,
+                    ),
                 ],
               ),
             );
@@ -575,7 +883,9 @@ class _QuickNoteViewState extends State<QuickNoteView> {
   }
 
   Widget _buildBlockList(ThemeData theme, AppLayoutData layout) {
+    final codeLineKinds = _codeLineKinds();
     return ListView.separated(
+      controller: _scrollController,
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: EdgeInsets.symmetric(
         horizontal: layout.isCompact ? AppSpacing.lg : AppSpacing.xxl,
@@ -589,19 +899,32 @@ class _QuickNoteViewState extends State<QuickNoteView> {
         }
 
         final block = _blocks[index];
+        final codeLineKind = codeLineKinds[index];
         if (index == _editingIndex) {
           return _EditableMarkdownBlock(
-            key: ValueKey('${block.id}-editor'),
+            key: block.itemKey,
             block: block,
             onBackspaceEmpty: () => _removeEmptyBlock(index),
+            onFocusLost: () => _onBlockFocusLost(index),
           );
         }
 
         return _PreviewMarkdownBlock(
-          key: ValueKey('${block.id}-preview'),
+          key: block.itemKey,
           text: block.text,
+          codeLineKind: codeLineKind,
           styleSheet: _markdownStyle(theme),
-          onTap: () => _editBlock(index),
+          onTapAt: (localX, width, rawPrefixLength, horizontalPadding) =>
+              _editBlockAtPreviewTap(
+                index,
+                localX: localX,
+                width: width,
+                rawPrefixLength: rawPrefixLength,
+                horizontalPadding: horizontalPadding,
+              ),
+          onToggleTask: () => _toggleTask(index),
+          onLinkTap: (label, href) =>
+              _openLinkActions(index, label: label, href: href),
         );
       },
     );
@@ -645,6 +968,11 @@ class _QuickNoteViewState extends State<QuickNoteView> {
             onTap: () => _surroundSelection('`', '`', 'code'),
           ),
           _ToolButton(
+            icon: Icons.developer_mode,
+            label: context.text('代码块', 'Block'),
+            onTap: _insertCodeBlock,
+          ),
+          _ToolButton(
             icon: Icons.link,
             label: context.text('链接', 'Link'),
             onTap: _insertLink,
@@ -657,6 +985,7 @@ class _QuickNoteViewState extends State<QuickNoteView> {
 
 class _MarkdownBlock {
   final String id;
+  final GlobalKey itemKey = GlobalKey();
   final _MarkdownEditingController controller;
   final FocusNode focusNode;
 
@@ -670,6 +999,48 @@ class _MarkdownBlock {
     controller.dispose();
     focusNode.dispose();
   }
+}
+
+enum _CodeLineKind { none, fence, body }
+
+enum _LinkAction { copy, edit }
+
+enum _CopyAction { paragraph, markdown }
+
+enum _NoteListAction { delete }
+
+int _previewCursorPrefixLength(String text) {
+  final heading = RegExp(r'^\s*#{1,6}\s+').firstMatch(text);
+  if (heading != null) return heading.end;
+
+  final task = RegExp(r'^\s*-\s+\[[ xX]\]\s*').firstMatch(text);
+  if (task != null) return task.end;
+
+  final list = RegExp(r'^\s*(?:[-*]|\d+[.)])\s+').firstMatch(text);
+  if (list != null) return list.end;
+
+  final quote = RegExp(r'^>\s?').firstMatch(text);
+  if (quote != null) return quote.end;
+
+  return 0;
+}
+
+int _estimateCursorOffsetForTap(
+  String text, {
+  required double localX,
+  required double width,
+  required int rawPrefixLength,
+  required double horizontalPadding,
+}) {
+  if (text.isEmpty) return 0;
+  final prefixLength = rawPrefixLength.clamp(0, text.length);
+  final body = text.substring(prefixLength);
+  if (body.isEmpty) return text.length;
+
+  final contentWidth = math.max(1.0, width - horizontalPadding * 2);
+  final contentX = (localX - horizontalPadding).clamp(0.0, contentWidth);
+  final ratio = contentX / contentWidth;
+  return prefixLength + (body.length * ratio).round().clamp(0, body.length);
 }
 
 class _MarkdownEditingController extends TextEditingController {
@@ -759,7 +1130,7 @@ class _MarkdownEditingController extends TextEditingController {
       ];
     }
 
-    final list = RegExp(r'^(\s*(?:[-*]|\d+\.)\s+)(.*)$').firstMatch(line);
+    final list = RegExp(r'^(\s*(?:[-*]|\d+[.)])\s+)(.*)$').firstMatch(line);
     if (list != null) {
       return [
         TextSpan(text: list.group(1), style: mutedStyle),
@@ -855,7 +1226,7 @@ class _MarkdownEditingController extends TextEditingController {
   }
 }
 
-class _QuickNoteListSheet extends StatelessWidget {
+class _QuickNoteListSheet extends StatefulWidget {
   final List<QuickNote> notes;
   final String? activeNoteId;
   final Future<void> Function() onCreateNote;
@@ -871,9 +1242,33 @@ class _QuickNoteListSheet extends StatelessWidget {
   });
 
   @override
+  State<_QuickNoteListSheet> createState() => _QuickNoteListSheetState();
+}
+
+class _QuickNoteListSheetState extends State<_QuickNoteListSheet> {
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<QuickNote> get _filteredNotes {
+    final query = _searchController.text.trim().toLowerCase();
+    if (query.isEmpty) return widget.notes;
+    return widget.notes.where((note) {
+      return note.title.toLowerCase().contains(query) ||
+          note.preview.toLowerCase().contains(query) ||
+          note.content.toLowerCase().contains(query);
+    }).toList();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
+    final filteredNotes = _filteredNotes;
 
     return SafeArea(
       child: Padding(
@@ -897,62 +1292,105 @@ class _QuickNoteListSheet extends StatelessWidget {
                 ),
                 const Spacer(),
                 FilledButton.tonalIcon(
-                  onPressed: onCreateNote,
+                  onPressed: widget.onCreateNote,
                   icon: const Icon(Icons.add_outlined),
                   label: Text(context.text('新建', 'New')),
                 ),
               ],
             ),
             const SizedBox(height: AppSpacing.md),
-            Flexible(
-              child: ListView.separated(
-                shrinkWrap: true,
-                itemCount: notes.length,
-                separatorBuilder: (context, index) =>
-                    const SizedBox(height: AppSpacing.sm),
-                itemBuilder: (context, index) {
-                  final note = notes[index];
-                  final selected = note.id == activeNoteId;
-                  return Material(
-                    color: selected
-                        ? colors.primary.withAlpha(AppAlphas.tint)
-                        : colors.surface,
-                    borderRadius: BorderRadius.circular(AppRadii.button),
-                    child: ListTile(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppRadii.button),
-                      ),
-                      leading: Icon(
-                        selected ? Icons.edit_note : Icons.edit_note_outlined,
-                        color: selected
-                            ? colors.primary
-                            : colors.onSurfaceVariant,
-                      ),
-                      title: Text(
-                        note.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: selected
-                              ? FontWeight.w800
-                              : FontWeight.w700,
-                        ),
-                      ),
-                      subtitle: Text(
-                        '${note.preview} · ${_formatTime(note.updatedAt)}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      trailing: IconButton(
-                        onPressed: () => onDeleteNote(note),
-                        tooltip: context.text('删除', 'Delete'),
-                        icon: const Icon(Icons.delete_outline),
-                      ),
-                      onTap: () => onSelectNote(note),
-                    ),
-                  );
-                },
+            TextField(
+              controller: _searchController,
+              onChanged: (_) => setState(() {}),
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: Color.alphaBlend(
+                  colors.primary.withAlpha(AppAlphas.tint),
+                  colors.surface,
+                ),
+                prefixIcon: const Icon(Icons.search_outlined),
+                hintText: context.text('搜索随手记', 'Search notes'),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppRadii.button),
+                  borderSide: BorderSide.none,
+                ),
+                isDense: true,
               ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Flexible(
+              child: filteredNotes.isEmpty
+                  ? _QuickNoteEmptyResult(onCreateNote: widget.onCreateNote)
+                  : ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: filteredNotes.length,
+                      separatorBuilder: (context, index) =>
+                          const SizedBox(height: AppSpacing.sm),
+                      itemBuilder: (context, index) {
+                        final note = filteredNotes[index];
+                        final selected = note.id == widget.activeNoteId;
+                        return Material(
+                          color: selected
+                              ? colors.primary.withAlpha(AppAlphas.tint)
+                              : colors.surface,
+                          borderRadius: BorderRadius.circular(AppRadii.button),
+                          child: ListTile(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(
+                                AppRadii.button,
+                              ),
+                            ),
+                            leading: Icon(
+                              selected
+                                  ? Icons.edit_note
+                                  : Icons.edit_note_outlined,
+                              color: selected
+                                  ? colors.primary
+                                  : colors.onSurfaceVariant,
+                            ),
+                            title: Text(
+                              note.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: selected
+                                    ? FontWeight.w800
+                                    : FontWeight.w700,
+                              ),
+                            ),
+                            subtitle: Text(
+                              '${note.preview} · ${_formatTime(note.updatedAt)}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            trailing: PopupMenuButton<_NoteListAction>(
+                              onSelected: (action) {
+                                switch (action) {
+                                  case _NoteListAction.delete:
+                                    widget.onDeleteNote(note);
+                                    break;
+                                }
+                              },
+                              tooltip: context.text('删除', 'Delete'),
+                              icon: const Icon(Icons.more_horiz_outlined),
+                              itemBuilder: (context) => [
+                                PopupMenuItem(
+                                  value: _NoteListAction.delete,
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.delete_outline),
+                                      const SizedBox(width: AppSpacing.sm),
+                                      Text(context.text('鍒犻櫎', 'Delete')),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            onTap: () => widget.onSelectNote(note),
+                          ),
+                        );
+                      },
+                    ),
             ),
           ],
         ),
@@ -968,6 +1406,43 @@ class _QuickNoteListSheet extends StatelessWidget {
       return '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
     }
     return '${value.month}/${value.day}';
+  }
+}
+
+class _QuickNoteEmptyResult extends StatelessWidget {
+  final Future<void> Function() onCreateNote;
+
+  const _QuickNoteEmptyResult({required this.onCreateNote});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxl),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.search_off_outlined,
+            color: theme.colorScheme.onSurfaceVariant,
+            size: 36,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            context.text('没有找到随手记', 'No notes found'),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          TextButton.icon(
+            onPressed: onCreateNote,
+            icon: const Icon(Icons.add_outlined),
+            label: Text(context.text('新建一条', 'Create one')),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -1069,11 +1544,13 @@ class _QuickNoteTopBar extends StatelessWidget {
 class _EditableMarkdownBlock extends StatelessWidget {
   final _MarkdownBlock block;
   final VoidCallback onBackspaceEmpty;
+  final VoidCallback onFocusLost;
 
   const _EditableMarkdownBlock({
     super.key,
     required this.block,
     required this.onBackspaceEmpty,
+    required this.onFocusLost,
   });
 
   @override
@@ -1090,6 +1567,9 @@ class _EditableMarkdownBlock extends StatelessWidget {
           return KeyEventResult.handled;
         }
         return KeyEventResult.ignored;
+      },
+      onFocusChange: (hasFocus) {
+        if (!hasFocus) onFocusLost();
       },
       child: Padding(
         padding: const EdgeInsets.symmetric(
@@ -1127,39 +1607,189 @@ class _EditableMarkdownBlock extends StatelessWidget {
 
 class _PreviewMarkdownBlock extends StatelessWidget {
   final String text;
+  final _CodeLineKind codeLineKind;
   final MarkdownStyleSheet styleSheet;
-  final VoidCallback onTap;
+  final void Function(
+    double localX,
+    double width,
+    int rawPrefixLength,
+    double horizontalPadding,
+  )
+  onTapAt;
+  final VoidCallback? onToggleTask;
+  final void Function(String label, String href)? onLinkTap;
 
   const _PreviewMarkdownBlock({
     super.key,
     required this.text,
+    required this.codeLineKind,
     required this.styleSheet,
-    required this.onTap,
+    required this.onTapAt,
+    this.onToggleTask,
+    this.onLinkTap,
   });
 
   @override
   Widget build(BuildContext context) {
     if (text.trim().isEmpty) return const SizedBox(height: AppSpacing.sm);
 
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(AppRadii.sm),
-      splashColor: Theme.of(
-        context,
-      ).colorScheme.primary.withAlpha(AppAlphas.tint),
-      highlightColor: Colors.transparent,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.lg,
-          vertical: AppSpacing.xs,
-        ),
-        child: MarkdownBody(
-          data: text,
-          selectable: false,
-          styleSheet: styleSheet,
-        ),
+    if (codeLineKind != _CodeLineKind.none) {
+      return _buildCodePreview(context);
+    }
+
+    final taskMatch = RegExp(r'^(\s*-\s+)\[([ xX])\]\s*(.*)$').firstMatch(text);
+    if (taskMatch != null && onToggleTask != null) {
+      return _buildTaskPreview(context, taskMatch);
+    }
+
+    return _buildMarkdownPreview(context);
+  }
+
+  Widget _buildTaskPreview(BuildContext context, RegExpMatch taskMatch) {
+    final isChecked = taskMatch.group(2)!.trim().toLowerCase() == 'x';
+    final content = taskMatch.group(3)!;
+    final leadingSpaces = text.length - text.trimLeft().length;
+    final indentWidth = leadingSpaces * 8.0;
+    return Padding(
+      padding: EdgeInsets.only(
+        left: AppSpacing.lg + indentWidth,
+        right: AppSpacing.lg,
+        top: AppSpacing.xs,
+        bottom: AppSpacing.xs,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          SizedBox(
+            width: 24,
+            height: 24,
+            child: Checkbox(
+              value: isChecked,
+              onChanged: (_) => onToggleTask!(),
+              visualDensity: VisualDensity.compact,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return InkWell(
+                  onTapUp: (details) => onTapAt(
+                    details.localPosition.dx,
+                    constraints.maxWidth,
+                    text.length - content.length,
+                    0,
+                  ),
+                  borderRadius: BorderRadius.circular(AppRadii.sm),
+                  splashColor: Theme.of(
+                    context,
+                  ).colorScheme.primary.withAlpha(AppAlphas.tint),
+                  highlightColor: Colors.transparent,
+                  child: MarkdownBody(
+                    data: content.isEmpty ? ' ' : content,
+                    selectable: false,
+                    styleSheet: styleSheet,
+                    onTapLink: _handleLinkTap,
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
+  }
+
+  Widget _buildMarkdownPreview(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return InkWell(
+          onTapUp: (details) => onTapAt(
+            details.localPosition.dx,
+            constraints.maxWidth,
+            0,
+            AppSpacing.lg,
+          ),
+          borderRadius: BorderRadius.circular(AppRadii.sm),
+          splashColor: Theme.of(
+            context,
+          ).colorScheme.primary.withAlpha(AppAlphas.tint),
+          highlightColor: Colors.transparent,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.lg,
+              vertical: AppSpacing.xs,
+            ),
+            child: MarkdownBody(
+              data: text,
+              selectable: false,
+              styleSheet: styleSheet,
+              onTapLink: _handleLinkTap,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildCodePreview(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final isFence = codeLineKind == _CodeLineKind.fence;
+    final label = isFence && text.trimLeft().length > 3
+        ? text.trimLeft().substring(3).trim()
+        : '';
+    final display = isFence ? (label.isEmpty ? '```' : '``` $label') : text;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return InkWell(
+          onTapUp: (details) => onTapAt(
+            details.localPosition.dx,
+            constraints.maxWidth,
+            0,
+            AppSpacing.lg,
+          ),
+          borderRadius: BorderRadius.circular(AppRadii.sm),
+          splashColor: colors.primary.withAlpha(AppAlphas.tint),
+          highlightColor: Colors.transparent,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.lg,
+              vertical: AppSpacing.xs,
+            ),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: colors.primary.withAlpha(
+                  isFence ? AppAlphas.subtle : AppAlphas.tint,
+                ),
+                borderRadius: BorderRadius.circular(AppRadii.sm),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.sm,
+                ),
+                child: Text(
+                  display.isEmpty ? ' ' : display,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontFamily: 'monospace',
+                    color: isFence ? colors.onSurfaceVariant : colors.onSurface,
+                    height: 1.5,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _handleLinkTap(String text, String? href, String title) {
+    if (href == null || href.isEmpty) return;
+    onLinkTap?.call(text, href);
   }
 }
 
@@ -1234,6 +1864,97 @@ class _TopBarButton extends StatelessWidget {
             ? theme.colorScheme.primary.withAlpha(AppAlphas.tint)
             : Colors.transparent,
         minimumSize: const Size(36, 36),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+    );
+  }
+}
+
+class _MobileInputToolbar extends StatelessWidget {
+  final VoidCallback onListTap;
+  final VoidCallback onTaskTap;
+  final VoidCallback onBoldTap;
+  final VoidCallback onDoneTap;
+
+  const _MobileInputToolbar({
+    required this.onListTap,
+    required this.onTaskTap,
+    required this.onBoldTap,
+    required this.onDoneTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.sm),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Color.alphaBlend(
+            colors.primary.withAlpha(AppAlphas.tint),
+            colors.surface,
+          ),
+          borderRadius: BorderRadius.circular(AppRadii.button),
+          border: Border.all(color: colors.primary.withAlpha(AppAlphas.low)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm,
+            vertical: AppSpacing.xs,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _MobileInputButton(
+                icon: Icons.format_list_bulleted,
+                tooltip: context.text('列表', 'List'),
+                onTap: onListTap,
+              ),
+              _MobileInputButton(
+                icon: Icons.checklist,
+                tooltip: context.text('待办', 'Task'),
+                onTap: onTaskTap,
+              ),
+              _MobileInputButton(
+                icon: Icons.format_bold,
+                tooltip: context.text('粗体', 'Bold'),
+                onTap: onBoldTap,
+              ),
+              _MobileInputButton(
+                icon: Icons.check_outlined,
+                tooltip: context.text('完成', 'Done'),
+                onTap: onDoneTap,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MobileInputButton extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  const _MobileInputButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return IconButton(
+      tooltip: tooltip,
+      onPressed: onTap,
+      icon: Icon(icon, size: 20),
+      color: colors.onSurfaceVariant,
+      style: IconButton.styleFrom(
+        minimumSize: const Size(42, 36),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
     );

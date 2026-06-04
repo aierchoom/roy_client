@@ -8,6 +8,7 @@ class QuickNoteStore {
   static const String _notesKey = 'quick_notes_v1';
   static const String _activeNoteIdKey = 'quick_notes_active_id_v1';
   static const String _legacyDraftKey = 'quick_note_markdown_draft_v1';
+  static int _noteSequence = 0;
 
   Future<QuickNotesSnapshot> load() async {
     final preferences = await SharedPreferences.getInstance();
@@ -107,7 +108,7 @@ class QuickNoteStore {
   QuickNote _newNote({String content = ''}) {
     final now = DateTime.now();
     return QuickNote(
-      id: 'note_${now.microsecondsSinceEpoch}',
+      id: 'note_${now.microsecondsSinceEpoch}_${_noteSequence++}',
       content: content,
       createdAt: now,
       updatedAt: now,
