@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../l10n/app_text_extension.dart';
@@ -63,12 +63,8 @@ class HomeViewDesktop extends StatelessWidget {
                         ? context.text('模板', 'Templates')
                         : context.text('账户', 'Accounts'),
                     description: accountShowTemplates
-                        ? context.text('管理账户模板',
-                            'Manage account templates',
-                          )
-                        : context.text('查看全部账户',
-                            'Browse your vault',
-                          ),
+                        ? context.text('管理账户模板', 'Manage account templates')
+                        : context.text('查看全部账户', 'Browse your vault'),
                     badgeLabel: selectedIndex == 0
                         ? (accountShowTemplates ? '账户' : '模板')
                         : null,
@@ -76,25 +72,37 @@ class HomeViewDesktop extends StatelessWidget {
                   AppNavDestination(
                     icon: Icons.search_outlined,
                     selectedIcon: Icons.search,
-                    label: context.text( '搜索', 'Search'),
-                    description: context.text('快速定位账户',
-                      'Search and jump fast',
+                    label: context.text('搜索', 'Search'),
+                    description: context.text('快速定位账户', 'Search and jump fast'),
+                  ),
+                  AppNavDestination(
+                    icon: Icons.edit_note_outlined,
+                    selectedIcon: Icons.edit_note,
+                    label: context.text('随手记', 'Notes'),
+                    description: context.text(
+                      '轻量 Markdown 速记',
+                      'Light Markdown notes',
                     ),
                   ),
                   AppNavDestination(
                     icon: Icons.notifications_outlined,
                     selectedIcon: Icons.notifications,
                     label: context.text('通知', 'Alerts'),
-                    description: context.text('密码安全提醒与通知',
+                    description: context.text(
+                      '密码安全提醒与通知',
                       'Password security reminders',
                     ),
-                    badgeCount: notificationBadgeCount + syncBadgeCount + conflictBadgeCount,
+                    badgeCount:
+                        notificationBadgeCount +
+                        syncBadgeCount +
+                        conflictBadgeCount,
                   ),
                   AppNavDestination(
                     icon: Icons.settings_outlined,
                     selectedIcon: Icons.settings,
-                    label: context.text( '设置', 'Settings'),
-                    description: context.text('主题、安全与模板',
+                    label: context.text('设置', 'Settings'),
+                    description: context.text(
+                      '主题、安全与模板',
                       'Theme, security, templates',
                     ),
                   ),
@@ -137,9 +145,7 @@ class HomeViewDesktop extends StatelessWidget {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              context.text('安全库工作区',
-                                'Secure workspace',
-                              ),
+                              context.text('安全库工作区', 'Secure workspace'),
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: theme.colorScheme.onSurfaceVariant,
                               ),
@@ -160,7 +166,8 @@ class HomeViewDesktop extends StatelessWidget {
                     borderRadius: BorderRadius.circular(AppRadii.panel),
                   ),
                   child: Text(
-                    context.text('导航保持稳定，高频工具入口不再强调悬浮装饰。',
+                    context.text(
+                      '导航保持稳定，高频工具入口不再强调悬浮装饰。',
                       'Navigation stays stable, with less decorative chrome around frequent tools.',
                     ),
                     style: theme.textTheme.bodySmall?.copyWith(

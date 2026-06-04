@@ -6,6 +6,7 @@ import '../../providers/notification_provider.dart';
 import '../../widgets/app_layout_builder.dart';
 import '../../widgets/lan_sync_conflict_sheet.dart';
 import '../accounts/account_list_view.dart';
+import '../notes/quick_note_view.dart';
 import '../notifications/notification_center_view.dart';
 import '../settings_view.dart';
 import 'home_search_view.dart';
@@ -61,9 +62,11 @@ class _HomeViewState extends State<HomeView> {
     final pages = <Widget>[
       AccountListView(
         showTemplates: _accountShowTemplates,
-        onShowTemplatesChanged: (v) => setState(() => _accountShowTemplates = v),
+        onShowTemplatesChanged: (v) =>
+            setState(() => _accountShowTemplates = v),
       ),
       const HomeSearchView(),
+      const QuickNoteView(),
       const NotificationCenterView(),
       const SettingsView(),
     ];

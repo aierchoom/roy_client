@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../l10n/app_text_extension.dart';
@@ -57,18 +57,24 @@ class HomeViewMobile extends StatelessWidget {
           AppNavDestination(
             icon: Icons.search_outlined,
             selectedIcon: Icons.search,
-            label: context.text( '搜索', 'Search'),
+            label: context.text('搜索', 'Search'),
+          ),
+          AppNavDestination(
+            icon: Icons.edit_note_outlined,
+            selectedIcon: Icons.edit_note,
+            label: context.text('随记', 'Notes'),
           ),
           AppNavDestination(
             icon: Icons.notifications_outlined,
             selectedIcon: Icons.notifications,
             label: context.text('通知', 'Alerts'),
-            badgeCount: notificationBadgeCount + syncBadgeCount + conflictBadgeCount,
+            badgeCount:
+                notificationBadgeCount + syncBadgeCount + conflictBadgeCount,
           ),
           AppNavDestination(
             icon: Icons.settings_outlined,
             selectedIcon: Icons.settings,
-            label: context.text( '设置', 'Settings'),
+            label: context.text('设置', 'Settings'),
           ),
         ],
       ),
