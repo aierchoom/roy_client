@@ -5,6 +5,7 @@ import 'package:secret_roy/core/crypto_random.dart';
 
 import '../models/account_item.dart';
 import '../models/account_template.dart';
+import '../models/quick_note.dart';
 import '../models/totp_credential.dart';
 
 class SyncPayloadException implements Exception {
@@ -110,6 +111,24 @@ class SyncPayloadCodec {
   }) {
     final json = credential.toJson();
     json['_type'] = 'totp_credential';
+    return encodePayload(
+      payloadJson: json,
+      vaultId: vaultId,
+      nodeId: nodeId,
+      privateKey: privateKey,
+      symmetricKey: symmetricKey,
+    );
+  }
+
+  static Future<String> encodeQuickNote({
+    required QuickNote note,
+    required String vaultId,
+    required String nodeId,
+    required String privateKey,
+    required String symmetricKey,
+  }) {
+    final json = note.toJson();
+    json['_type'] = 'quick_note';
     return encodePayload(
       payloadJson: json,
       vaultId: vaultId,
@@ -227,9 +246,11 @@ class SyncPayloadCodec {
     required List<int> salt,
   }) {
     return Hkdf(hmac: Hmac.sha256(), outputLength: _keyLength).deriveKey(
-      secretKey: SecretKey(
-        [...utf8.encode(symmetricKey), 0, ...utf8.encode(privateKey)],
-      ),
+      secretKey: SecretKey([
+        ...utf8.encode(symmetricKey),
+        0,
+        ...utf8.encode(privateKey),
+      ]),
       nonce: salt,
       info: utf8.encode('sroy-sync-payload|$_algorithmName|$vaultId'),
     );

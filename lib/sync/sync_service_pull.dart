@@ -184,99 +184,124 @@ extension SyncServicePull on SyncService {
     var skippedCount = 0;
     for (final item in itemsList) {
       try {
-      final remoteEncoded = _readRemoteRecord(item);
-      final remoteVersion = _readRemoteVersion(remoteEncoded);
-      final isRemoteDeleted = remoteEncoded['is_deleted'] == true;
+        final remoteEncoded = _readRemoteRecord(item);
+        final remoteVersion = _readRemoteVersion(remoteEncoded);
+        final isRemoteDeleted = remoteEncoded['is_deleted'] == true;
 
-      final payload = await _decryptAndVerifyPayload(remoteEncoded);
-      final type = payload['_type'] as String?;
+        final payload = await _decryptAndVerifyPayload(remoteEncoded);
+        final type = payload['_type'] as String?;
 
-      if (type == 'totp_credential') {
-        final remoteCredential = TotpCredential.fromJson(payload).copyWith(
-          serverVersion: remoteVersion,
-          syncStatus: SyncStatus.synchronized,
-          isDeleted: isRemoteDeleted,
-        );
-
-        final maybeLocal = await _storageService.getTotpCredentialById(
-          remoteCredential.id,
-          includeDeleted: true,
-        );
-        if (maybeLocal == null) {
-          await _storageService.saveTotpCredential(
-            remoteCredential,
-            isSyncMerge: true,
+        if (type == 'quick_note') {
+          final remoteNote = QuickNote.fromJson(payload).copyWith(
+            serverVersion: remoteVersion,
+            syncStatus: SyncStatus.synchronized,
+            isDeleted: isRemoteDeleted,
           );
-        } else {
-          final merged = TotpCredentialMergeEngine.merge(
-            maybeLocal,
-            remoteCredential,
+          final maybeLocal = await _storageService.getQuickNoteById(
+            remoteNote.id,
+            includeDeleted: true,
           );
-          await _storageService.saveTotpCredential(
-            merged.copyWith(
-              syncStatus: _totpCredentialContentEquals(merged, remoteCredential)
-                  ? SyncStatus.synchronized
-                  : SyncStatus.pendingPush,
-            ),
-            isSyncMerge: true,
-          );
-        }
-      } else if (type == 'template') {
-        final remoteTemplate = AccountTemplate.fromJson(payload).copyWith(
-          serverVersion: remoteVersion,
-          syncStatus: SyncStatus.synchronized,
-          isDeleted: isRemoteDeleted,
-        );
-
-        final maybeLocal = await _storageService.loadTemplateById(
-          remoteTemplate.templateId,
-        );
-        if (maybeLocal == null) {
-          await _storageService.saveTemplate(remoteTemplate, isSyncMerge: true);
-        } else {
-          final mergeResult = CrdtMergeEngine.mergeTemplate(
-            maybeLocal,
-            remoteTemplate,
-          );
-          await _storageService.saveTemplate(
-            mergeResult.template,
-            isSyncMerge: true,
-          );
-          if (mergeResult.conflictLogs.isNotEmpty &&
-              !mergeResult.isPureFastForward) {
-            await _storageService.saveTemplateConflictLogs(
-              mergeResult.conflictLogs,
+          if (maybeLocal == null) {
+            await _storageService.saveQuickNote(remoteNote, isSyncMerge: true);
+          } else {
+            await _storageService.saveQuickNote(
+              _mergeQuickNote(maybeLocal, remoteNote),
+              isSyncMerge: true,
             );
           }
-        }
-      } else {
-        // Default to account
-        final remoteAccount = AccountItem.fromJson(payload).copyWith(
-          serverVersion: remoteVersion,
-          syncStatus: SyncStatus.synchronized,
-          isDeleted: isRemoteDeleted,
-        );
-
-        final maybeLocal = await _storageService.getAccountById(
-          remoteAccount.id,
-          includeDeleted: true,
-        );
-
-        if (maybeLocal == null) {
-          await _storageService.saveAccount(remoteAccount, isSyncMerge: true);
-        } else {
-          final mergeResult = CrdtMergeEngine.merge(maybeLocal, remoteAccount);
-          await _storageService.saveAccount(
-            mergeResult.mergedItem,
-            isSyncMerge: true,
+        } else if (type == 'totp_credential') {
+          final remoteCredential = TotpCredential.fromJson(payload).copyWith(
+            serverVersion: remoteVersion,
+            syncStatus: SyncStatus.synchronized,
+            isDeleted: isRemoteDeleted,
           );
-          if (mergeResult.conflictLogs.isNotEmpty &&
-              !mergeResult.isPureFastForward) {
-            await _storageService.saveConflictLogs(mergeResult.conflictLogs);
+
+          final maybeLocal = await _storageService.getTotpCredentialById(
+            remoteCredential.id,
+            includeDeleted: true,
+          );
+          if (maybeLocal == null) {
+            await _storageService.saveTotpCredential(
+              remoteCredential,
+              isSyncMerge: true,
+            );
+          } else {
+            final merged = TotpCredentialMergeEngine.merge(
+              maybeLocal,
+              remoteCredential,
+            );
+            await _storageService.saveTotpCredential(
+              merged.copyWith(
+                syncStatus:
+                    _totpCredentialContentEquals(merged, remoteCredential)
+                    ? SyncStatus.synchronized
+                    : SyncStatus.pendingPush,
+              ),
+              isSyncMerge: true,
+            );
+          }
+        } else if (type == 'template') {
+          final remoteTemplate = AccountTemplate.fromJson(payload).copyWith(
+            serverVersion: remoteVersion,
+            syncStatus: SyncStatus.synchronized,
+            isDeleted: isRemoteDeleted,
+          );
+
+          final maybeLocal = await _storageService.loadTemplateById(
+            remoteTemplate.templateId,
+          );
+          if (maybeLocal == null) {
+            await _storageService.saveTemplate(
+              remoteTemplate,
+              isSyncMerge: true,
+            );
+          } else {
+            final mergeResult = CrdtMergeEngine.mergeTemplate(
+              maybeLocal,
+              remoteTemplate,
+            );
+            await _storageService.saveTemplate(
+              mergeResult.template,
+              isSyncMerge: true,
+            );
+            if (mergeResult.conflictLogs.isNotEmpty &&
+                !mergeResult.isPureFastForward) {
+              await _storageService.saveTemplateConflictLogs(
+                mergeResult.conflictLogs,
+              );
+            }
+          }
+        } else {
+          // Default to account
+          final remoteAccount = AccountItem.fromJson(payload).copyWith(
+            serverVersion: remoteVersion,
+            syncStatus: SyncStatus.synchronized,
+            isDeleted: isRemoteDeleted,
+          );
+
+          final maybeLocal = await _storageService.getAccountById(
+            remoteAccount.id,
+            includeDeleted: true,
+          );
+
+          if (maybeLocal == null) {
+            await _storageService.saveAccount(remoteAccount, isSyncMerge: true);
+          } else {
+            final mergeResult = CrdtMergeEngine.merge(
+              maybeLocal,
+              remoteAccount,
+            );
+            await _storageService.saveAccount(
+              mergeResult.mergedItem,
+              isSyncMerge: true,
+            );
+            if (mergeResult.conflictLogs.isNotEmpty &&
+                !mergeResult.isPureFastForward) {
+              await _storageService.saveConflictLogs(mergeResult.conflictLogs);
+            }
           }
         }
-      }
-      mergedCount++;
+        mergedCount++;
       } catch (e) {
         skippedCount++;
         AppLogger.d('[Sync] Skipping corrupted remote item: $e');
@@ -318,7 +343,14 @@ extension SyncServicePull on SyncService {
       final payload = await _decryptAndVerifyPayload(remoteEncoded);
       final type = payload['_type'] as String?;
 
-      if (type == 'totp_credential') {
+      if (type == 'quick_note') {
+        final remoteNote = QuickNote.fromJson(payload).copyWith(
+          serverVersion: remoteVersion,
+          syncStatus: SyncStatus.synchronized,
+          isDeleted: isRemoteDeleted,
+        );
+        await _storageService.saveQuickNote(remoteNote, isSyncMerge: true);
+      } else if (type == 'totp_credential') {
         final remoteCredential = TotpCredential.fromJson(payload).copyWith(
           serverVersion: remoteVersion,
           syncStatus: SyncStatus.synchronized,
@@ -360,5 +392,19 @@ extension SyncServicePull on SyncService {
   Future<int> _pullFromVersion(String serverUrl, int sinceVersion) async {
     final data = await _fetchAllRemoteChanges(serverUrl, since: sinceVersion);
     return _applyRemoteChanges(data);
+  }
+
+  QuickNote _mergeQuickNote(QuickNote local, QuickNote remote) {
+    if (local.syncStatus == SyncStatus.synchronized) {
+      return remote;
+    }
+    if (remote.updatedAt.isAfter(local.updatedAt) ||
+        remote.updatedAt.isAtSameMomentAs(local.updatedAt)) {
+      return remote;
+    }
+    return local.copyWith(
+      serverVersion: max(local.serverVersion, remote.serverVersion),
+      syncStatus: SyncStatus.pendingPush,
+    );
   }
 }

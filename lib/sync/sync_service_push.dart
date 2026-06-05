@@ -44,16 +44,25 @@ extension SyncServicePush on SyncService {
           ),
         )
         .toList();
+    final dirtyQuickNotes = (await _storageService.loadDirtyQuickNotes())
+        .where(
+          (note) => approvedChangeKeys.contains(
+            _syncEntityKey(LocalSyncEntityType.quickNote, note.id),
+          ),
+        )
+        .toList();
 
     final List<dynamic> dirtyItems = [
       ...dirtyAccounts,
       ...dirtyTemplates,
       ...dirtyTotpCredentials,
+      ...dirtyQuickNotes,
     ];
 
     if (dirtyItems.isEmpty) {
       if (allPendingAccounts.isNotEmpty ||
           allDirtyTotpCredentials.isNotEmpty ||
+          dirtyQuickNotes.isNotEmpty ||
           approvedChanges.isNotEmpty) {
         AppLogger.d(
           '[Sync] Push Phase: local changes exist, but none are approved and pushable.',
@@ -319,6 +328,35 @@ extension SyncServicePush on SyncService {
       return;
     }
 
+    if (item is QuickNote) {
+      final current = await _storageService.getQuickNoteById(
+        item.id,
+        includeDeleted: true,
+      );
+      if (current == null) return;
+      if (!_sameSyncPayload(item, current)) {
+        await _storageService.saveQuickNote(
+          current.copyWith(
+            serverVersion: max(current.serverVersion, newVersion),
+            syncStatus: current.syncStatus == SyncStatus.synchronized
+                ? SyncStatus.pendingPush
+                : current.syncStatus,
+          ),
+          isSyncMerge: true,
+        );
+        await _refreshOpenChangeBaseVersion(item, newVersion);
+        return;
+      }
+      await _storageService.saveQuickNote(
+        item.copyWith(
+          syncStatus: SyncStatus.synchronized,
+          serverVersion: newVersion,
+        ),
+        isSyncMerge: true,
+      );
+      return;
+    }
+
     throw ArgumentError('Unsupported sync item type: ${item.runtimeType}');
   }
 
@@ -368,6 +406,9 @@ extension SyncServicePush on SyncService {
     if (item is TotpCredential) {
       return _syncEntityKey(LocalSyncEntityType.totpCredential, item.id);
     }
+    if (item is QuickNote) {
+      return _syncEntityKey(LocalSyncEntityType.quickNote, item.id);
+    }
     throw ArgumentError('Unsupported sync item type: ${item.runtimeType}');
   }
 
@@ -375,6 +416,7 @@ extension SyncServicePush on SyncService {
     if (item is AccountItem) return item.id;
     if (item is AccountTemplate) return item.templateId;
     if (item is TotpCredential) return item.id;
+    if (item is QuickNote) return item.id;
     throw ArgumentError('Unsupported sync item type: ${item.runtimeType}');
   }
 
@@ -382,6 +424,7 @@ extension SyncServicePush on SyncService {
     if (item is AccountItem) return item.serverVersion;
     if (item is AccountTemplate) return item.serverVersion;
     if (item is TotpCredential) return item.serverVersion;
+    if (item is QuickNote) return item.serverVersion;
     throw ArgumentError('Unsupported sync item type: ${item.runtimeType}');
   }
 
@@ -389,6 +432,7 @@ extension SyncServicePush on SyncService {
     if (item is AccountItem) return LocalSyncEntityType.account;
     if (item is AccountTemplate) return LocalSyncEntityType.template;
     if (item is TotpCredential) return LocalSyncEntityType.totpCredential;
+    if (item is QuickNote) return LocalSyncEntityType.quickNote;
     throw ArgumentError('Unsupported sync item type: ${item.runtimeType}');
   }
 
@@ -396,6 +440,7 @@ extension SyncServicePush on SyncService {
     if (item is AccountItem) return item.isDeleted;
     if (item is AccountTemplate) return item.isDeleted;
     if (item is TotpCredential) return item.isDeleted;
+    if (item is QuickNote) return item.isDeleted;
     throw ArgumentError('Unsupported sync item type: ${item.runtimeType}');
   }
 
@@ -434,6 +479,14 @@ extension SyncServicePush on SyncService {
     } else if (item is TotpCredential) {
       return SyncPayloadCodec.encodeTotpCredential(
         credential: item,
+        vaultId: _identityService.vaultId,
+        nodeId: _identityService.deviceId,
+        privateKey: _identityService.privateKey,
+        symmetricKey: _identityService.symmetricKey,
+      );
+    } else if (item is QuickNote) {
+      return SyncPayloadCodec.encodeQuickNote(
+        note: item,
         vaultId: _identityService.vaultId,
         nodeId: _identityService.deviceId,
         privateKey: _identityService.privateKey,

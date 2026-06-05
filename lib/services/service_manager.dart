@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/account_item.dart';
 import '../models/account_template.dart';
 import '../models/local_sync_change.dart';
+import '../models/quick_note.dart';
 import '../models/totp_credential.dart';
 import '../sync/lan_sync_coordinator.dart';
 import '../sync/sync_service.dart';
@@ -22,7 +23,8 @@ import '../system/service_manager/vault_import_types.dart';
 import '../system/service_manager/vault_pairing_coordinator.dart';
 import '../system/service_manager/vault_unlock_coordinator.dart';
 
-export '../system/service_manager/vault_data_repository.dart' show TemplateInUseException;
+export '../system/service_manager/vault_data_repository.dart'
+    show TemplateInUseException;
 export '../system/service_manager/vault_import_types.dart';
 import 'auto_lock_service.dart';
 import 'biometric_auth_service.dart';
@@ -186,21 +188,24 @@ class ServiceManager extends ChangeNotifier {
     ServiceManagerState initialState = ServiceManagerState.uninitialized,
   }) {
     const secureStorage = FlutterSecureStorage();
-    _cryptoService = cryptoService ??
-        EnhancedCryptoService(secureStorage: secureStorage);
+    _cryptoService =
+        cryptoService ?? EnhancedCryptoService(secureStorage: secureStorage);
     _biometricService = biometricService ?? BiometricAuthService();
-    _autoLockService = autoLockService ??
+    _autoLockService =
+        autoLockService ??
         AutoLockService(
           cryptoService: _cryptoService,
           secureStorage: secureStorage,
         );
-    _identityService = identityService ??
+    _identityService =
+        identityService ??
         IdentityService(
           secureStorage: const FlutterSecureKeyValueStore(secureStorage),
         );
     _secureStorageService = secureStorageService ?? SecureStorageService();
     _deviceAliasService = deviceAliasService ?? DeviceAliasService.testable();
-    _syncService = syncService ??
+    _syncService =
+        syncService ??
         SyncService(
           storageService: _secureStorageService,
           identityService: _identityService,
@@ -209,19 +214,22 @@ class ServiceManager extends ChangeNotifier {
     _vaultPairingService = vaultPairingService ?? VaultPairingService();
     _lanPairingService = lanPairingService ?? LanPairingService();
     _syncServerUrlStore = syncServerUrlStore ?? const SyncServerUrlStore();
-    _vaultDumpCoordinator = vaultDumpCoordinator ??
+    _vaultDumpCoordinator =
+        vaultDumpCoordinator ??
         VaultDumpCoordinator(
           identityService: _identityService,
           storageService: _secureStorageService,
         );
-    _lanSyncCoordinator = lanSyncCoordinator ??
+    _lanSyncCoordinator =
+        lanSyncCoordinator ??
         LanSyncCoordinator(
           storage: _secureStorageService,
           identity: _identityService,
           pairing: _lanPairingService,
           syncService: _syncService,
         );
-    _vaultUnlockCoordinator = vaultUnlockCoordinator ??
+    _vaultUnlockCoordinator =
+        vaultUnlockCoordinator ??
         VaultUnlockCoordinator(
           cryptoService: _cryptoService,
           secureStorageService: _secureStorageService,
@@ -232,20 +240,23 @@ class ServiceManager extends ChangeNotifier {
           lanPairingService: _lanPairingService,
           lanSyncCoordinator: _lanSyncCoordinator,
         );
-    _vaultDataRepository = vaultDataRepository ??
+    _vaultDataRepository =
+        vaultDataRepository ??
         VaultDataRepository(
           storage: _secureStorageService,
           identity: _identityService,
           sync: _syncService,
         );
-    _syncCoordinator = syncCoordinator ??
+    _syncCoordinator =
+        syncCoordinator ??
         SyncCoordinator(
           syncService: _syncService,
           identityService: _identityService,
           secureStorageService: _secureStorageService,
           syncServerUrlStore: _syncServerUrlStore,
         );
-    _vaultImportExportCoordinator = vaultImportExportCoordinator ??
+    _vaultImportExportCoordinator =
+        vaultImportExportCoordinator ??
         VaultImportExportCoordinator(
           dumpCoordinator: _vaultDumpCoordinator,
           identityService: _identityService,
@@ -253,7 +264,8 @@ class ServiceManager extends ChangeNotifier {
           syncService: _syncService,
           syncServerUrlStore: _syncServerUrlStore,
         );
-    _vaultPairingCoordinator = vaultPairingCoordinator ??
+    _vaultPairingCoordinator =
+        vaultPairingCoordinator ??
         VaultPairingCoordinator(
           vaultPairingService: _vaultPairingService,
           lanPairingService: _lanPairingService,
@@ -310,8 +322,10 @@ class ServiceManager extends ChangeNotifier {
   VaultUnlockCoordinator get vaultUnlockCoordinator => _vaultUnlockCoordinator;
   VaultDataRepository get vaultDataRepository => _vaultDataRepository;
   SyncCoordinator get syncCoordinator => _syncCoordinator;
-  VaultImportExportCoordinator get vaultImportExportCoordinator => _vaultImportExportCoordinator;
-  VaultPairingCoordinator get vaultPairingCoordinator => _vaultPairingCoordinator;
+  VaultImportExportCoordinator get vaultImportExportCoordinator =>
+      _vaultImportExportCoordinator;
+  VaultPairingCoordinator get vaultPairingCoordinator =>
+      _vaultPairingCoordinator;
 
   /// 初始化 [ServiceManager]，将状态从 [ServiceManagerState.uninitialized]
   /// 迁移到 [ServiceManagerState.locked]。
@@ -373,13 +387,16 @@ class ServiceManager extends ChangeNotifier {
     }
 
     _updateState(ServiceManagerState.unlocking);
-    final effectivePassword = await _vaultUnlockCoordinator.resolveEffectivePassword(password);
+    final effectivePassword = await _vaultUnlockCoordinator
+        .resolveEffectivePassword(password);
     return _performUnlock(effectivePassword);
   }
 
   Future<UnlockResult> _performUnlock(String password) async {
     try {
-      final cipher = await _vaultUnlockCoordinator.initializeAndUnlock(password);
+      final cipher = await _vaultUnlockCoordinator.initializeAndUnlock(
+        password,
+      );
       if (cipher == null) {
         _updateState(ServiceManagerState.locked);
         return UnlockResult.invalidPassword;
@@ -481,7 +498,10 @@ class ServiceManager extends ChangeNotifier {
     String oldPassword,
     String newPassword,
   ) async {
-    return _vaultUnlockCoordinator.changeMasterPassword(oldPassword, newPassword);
+    return _vaultUnlockCoordinator.changeMasterPassword(
+      oldPassword,
+      newPassword,
+    );
   }
 
   Future<bool> checkIdentityExists() async {
@@ -572,6 +592,21 @@ class ServiceManager extends ChangeNotifier {
   Future<int> countAccountsByTemplate(String templateId) async {
     if (!isUnlocked) return 0;
     return _vaultDataRepository.countAccountsByTemplate(templateId);
+  }
+
+  Future<List<QuickNote>> loadQuickNotes() async {
+    if (!isUnlocked) return const <QuickNote>[];
+    return _vaultDataRepository.loadQuickNotes();
+  }
+
+  Future<void> saveQuickNote(QuickNote note) async {
+    if (!isUnlocked) return;
+    await _vaultDataRepository.saveQuickNote(note);
+  }
+
+  Future<void> deleteQuickNote(String id) async {
+    if (!isUnlocked) return;
+    await _vaultDataRepository.deleteQuickNote(id);
   }
 
   Future<void> saveTemplate(AccountTemplate template) async {
@@ -923,7 +958,3 @@ enum UnlockResult {
   alreadyInProgress,
   error,
 }
-
-
-
-

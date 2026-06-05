@@ -8,6 +8,7 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import '../../l10n/app_text_extension.dart';
 import '../../models/quick_note.dart';
 import '../../services/quick_note_store.dart';
+import '../../services/service_manager.dart';
 import '../../theme/theme.dart';
 import '../../widgets/adaptive_page.dart';
 
@@ -23,7 +24,9 @@ class QuickNoteView extends StatefulWidget {
 }
 
 class _QuickNoteViewState extends State<QuickNoteView> {
-  final QuickNoteStore _store = QuickNoteStore();
+  final QuickNoteStore _store = QuickNoteStore(
+    serviceManager: ServiceManager.instance,
+  );
   final List<_MarkdownBlock> _blocks = [];
   final ScrollController _scrollController = ScrollController();
   List<QuickNote> _notes = [];

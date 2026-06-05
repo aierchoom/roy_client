@@ -8,6 +8,7 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 // ignore: depend_on_referenced_packages
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'package:secret_roy/models/local_sync_change.dart';
+import 'package:secret_roy/models/quick_note.dart';
 import 'package:secret_roy/services/database_file_cipher.dart';
 import 'package:secret_roy/services/secure_storage_service.dart';
 
@@ -142,6 +143,29 @@ void main() {
       expect(recovered.errorMessage, contains('Push was interrupted'));
     },
   );
+
+  test('ensurePendingSyncOutboxEntries records dirty quick notes', () async {
+    final storage = SecureStorageService(databaseCipher: cipher);
+    await storage.initialize(deviceId: 'device_test');
+    addTearDown(() => storage.close(dispose: true));
+
+    await storage.saveQuickNote(
+      QuickNote(
+        id: 'note_1',
+        content: '# Sync me',
+        createdAt: DateTime(2026, 1, 1),
+        updatedAt: DateTime(2026, 1, 2),
+      ),
+    );
+
+    await storage.ensurePendingSyncOutboxEntries(_vaultId);
+
+    final changes = await storage.loadOpenLocalSyncChanges(vaultId: _vaultId);
+    expect(changes, hasLength(1));
+    expect(changes.single.entityType, LocalSyncEntityType.quickNote);
+    expect(changes.single.entityId, 'note_1');
+    expect(changes.single.title, 'Sync me');
+  });
 }
 
 const _vaultId = 'vault_test';

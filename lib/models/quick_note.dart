@@ -1,14 +1,22 @@
+import 'account_item.dart';
+
 class QuickNote {
   final String id;
   final String content;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final int serverVersion;
+  final SyncStatus syncStatus;
+  final bool isDeleted;
 
   const QuickNote({
     required this.id,
     required this.content,
     required this.createdAt,
     required this.updatedAt,
+    this.serverVersion = 0,
+    this.syncStatus = SyncStatus.pendingPush,
+    this.isDeleted = false,
   });
 
   String get title {
@@ -35,12 +43,18 @@ class QuickNote {
     String? content,
     DateTime? createdAt,
     DateTime? updatedAt,
+    int? serverVersion,
+    SyncStatus? syncStatus,
+    bool? isDeleted,
   }) {
     return QuickNote(
       id: id ?? this.id,
       content: content ?? this.content,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      serverVersion: serverVersion ?? this.serverVersion,
+      syncStatus: syncStatus ?? this.syncStatus,
+      isDeleted: isDeleted ?? this.isDeleted,
     );
   }
 
@@ -50,6 +64,9 @@ class QuickNote {
       'content': content,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
+      'serverVersion': serverVersion,
+      'syncStatus': syncStatus.name,
+      'isDeleted': isDeleted,
     };
   }
 
@@ -60,6 +77,9 @@ class QuickNote {
       content: json['content'] as String? ?? '',
       createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ?? now,
       updatedAt: DateTime.tryParse(json['updatedAt'] as String? ?? '') ?? now,
+      serverVersion: json['serverVersion'] as int? ?? 0,
+      syncStatus: syncStatusFromJson(json['syncStatus']),
+      isDeleted: json['isDeleted'] as bool? ?? false,
     );
   }
 

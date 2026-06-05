@@ -8,6 +8,7 @@ import 'package:secret_roy/core/app_logger.dart';
 import 'package:secret_roy/models/account_item.dart';
 import 'package:secret_roy/models/account_template.dart';
 import 'package:secret_roy/models/local_sync_change.dart';
+import 'package:secret_roy/models/quick_note.dart';
 import 'package:secret_roy/models/totp_credential.dart';
 import 'package:secret_roy/services/identity_service.dart';
 import 'package:secret_roy/services/secure_storage_service.dart';
@@ -37,11 +38,11 @@ class LanSyncClient {
     required SyncService syncService,
     LanSyncConfig? config,
     http.Client? httpClient,
-  })  : _storage = storage,
-        _identity = identity,
-        _syncService = syncService,
-        _config = config ?? const LanSyncConfig(),
-        _httpClient = httpClient ?? http.Client();
+  }) : _storage = storage,
+       _identity = identity,
+       _syncService = syncService,
+       _config = config ?? const LanSyncConfig(),
+       _httpClient = httpClient ?? http.Client();
 
   bool get isBusy => _isBusy;
   LanSyncPhase get phase => _phase;
@@ -185,8 +186,14 @@ class LanSyncClient {
     final accounts = await _storage.loadPendingSyncAccounts();
     final templates = await _storage.loadDirtyTemplates();
     final totps = await _storage.loadDirtyTotpCredentials();
+    final quickNotes = await _storage.loadDirtyQuickNotes();
 
-    final allItems = <dynamic>[...accounts, ...templates, ...totps];
+    final allItems = <dynamic>[
+      ...accounts,
+      ...templates,
+      ...totps,
+      ...quickNotes,
+    ];
     final pageSize = _config.pageSize;
 
     for (var i = 0; i < allItems.length; i += pageSize) {
@@ -267,17 +274,20 @@ class LanSyncClient {
   }
 
   @visibleForTesting
-  Future<void> commitLocalForTest(List<dynamic> mergedItems) => _commitLocal(mergedItems);
+  Future<void> commitLocalForTest(List<dynamic> mergedItems) =>
+      _commitLocal(mergedItems);
 
   Future<List<String>> _loadLocalRecordIds() async {
     final accounts = await _storage.loadAccounts(includeDeleted: true);
     final templates = await _storage.loadAllTemplates(includeDeleted: true);
     final totps = await _storage.loadTotpCredentials(includeDeleted: true);
+    final quickNotes = await _storage.loadQuickNotes(includeDeleted: true);
 
     return [
       ...accounts.map((a) => a.id),
       ...templates.map((t) => t.templateId),
       ...totps.map((t) => t.id),
+      ...quickNotes.map((note) => note.id),
     ];
   }
 
@@ -299,6 +309,8 @@ class LanSyncClient {
         payload['_type'] = 'template';
       } else if (item is TotpCredential) {
         payload['_type'] = 'totp_credential';
+      } else if (item is QuickNote) {
+        payload['_type'] = 'quick_note';
       }
       final type = payload['_type'] as String;
       return (
@@ -306,6 +318,7 @@ class LanSyncClient {
           'account' => LocalSyncEntityType.account,
           'template' => LocalSyncEntityType.template,
           'totp_credential' => LocalSyncEntityType.totpCredential,
+          'quick_note' => LocalSyncEntityType.quickNote,
           _ => throw ArgumentError('Unknown payload type: $type'),
         },
         payload: payload,
@@ -352,6 +365,9 @@ class LanSyncClient {
     } else if (item is TotpCredential) {
       payloadJson = item.toJson();
       payloadJson['_type'] = 'totp_credential';
+    } else if (item is QuickNote) {
+      payloadJson = item.toJson();
+      payloadJson['_type'] = 'quick_note';
     } else {
       throw ArgumentError('Unknown item type: ${item.runtimeType}');
     }
@@ -374,6 +390,8 @@ class LanSyncClient {
         return AccountTemplate.fromJson(payload);
       case 'totp_credential':
         return TotpCredential.fromJson(payload);
+      case 'quick_note':
+        return QuickNote.fromJson(payload);
       default:
         throw ArgumentError('Unknown payload type: $type');
     }
@@ -383,6 +401,10 @@ class LanSyncClient {
     final accounts = await _storage.loadPendingSyncAccounts();
     final templates = await _storage.loadDirtyTemplates();
     final totps = await _storage.loadDirtyTotpCredentials();
-    return accounts.length + templates.length + totps.length;
+    final quickNotes = await _storage.loadDirtyQuickNotes();
+    return accounts.length +
+        templates.length +
+        totps.length +
+        quickNotes.length;
   }
 }

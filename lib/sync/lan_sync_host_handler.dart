@@ -1,15 +1,14 @@
 import 'dart:async';
 
-
 import 'package:secret_roy/core/app_logger.dart';
 import 'package:secret_roy/models/account_item.dart';
 import 'package:secret_roy/models/account_template.dart';
 
 import 'package:secret_roy/models/local_sync_change.dart';
+import 'package:secret_roy/models/quick_note.dart';
 import 'package:secret_roy/models/totp_credential.dart';
 import 'package:secret_roy/services/identity_service.dart';
 import 'package:secret_roy/services/secure_storage_service.dart';
-
 
 import 'crdt_merge_engine.dart';
 import 'lan_sync_session.dart';
@@ -32,9 +31,9 @@ class LanSyncHostHandler {
     required SecureStorageService storage,
     required IdentityService identity,
     LanSyncConfig? config,
-  })  : _storage = storage,
-        _identity = identity,
-        _config = config ?? const LanSyncConfig();
+  }) : _storage = storage,
+       _identity = identity,
+       _config = config ?? const LanSyncConfig();
 
   /// HTTP Server 收到 /lan-sync/start 时调用
   Future<Map<String, dynamic>> handleStart(
@@ -280,7 +279,10 @@ class LanSyncHostHandler {
       final type = payload['_type'] as String?;
       if (type == 'account') {
         final remote = AccountItem.fromJson(payload);
-        final local = await _storage.getAccountById(remote.id, includeDeleted: true);
+        final local = await _storage.getAccountById(
+          remote.id,
+          includeDeleted: true,
+        );
         if (local == null) {
           mergedItems.add(remote);
         } else {
@@ -302,12 +304,28 @@ class LanSyncHostHandler {
         }
       } else if (type == 'totp_credential') {
         final remote = TotpCredential.fromJson(payload);
-        final local = await _storage.getTotpCredentialById(remote.id, includeDeleted: true);
+        final local = await _storage.getTotpCredentialById(
+          remote.id,
+          includeDeleted: true,
+        );
         if (local == null) {
           mergedItems.add(remote);
         } else {
           final merged = TotpCredentialMergeEngine.merge(local, remote);
           mergedItems.add(merged);
+        }
+      } else if (type == 'quick_note') {
+        final remote = QuickNote.fromJson(payload);
+        final local = await _storage.getQuickNoteById(
+          remote.id,
+          includeDeleted: true,
+        );
+        if (local == null ||
+            remote.updatedAt.isAfter(local.updatedAt) ||
+            local.syncStatus == SyncStatus.synchronized) {
+          mergedItems.add(remote);
+        } else {
+          mergedItems.add(local);
         }
       }
     }
@@ -317,11 +335,13 @@ class LanSyncHostHandler {
 
     if (conflictLogs.isNotEmpty) {
       session.conflictPreview = conflictLogs
-          .map((l) => {
-                'account_id': l.accountId,
-                'field_key': l.fieldKey,
-                'field_value': l.fieldValue,
-              })
+          .map(
+            (l) => {
+              'account_id': l.accountId,
+              'field_key': l.fieldKey,
+              'field_value': l.fieldValue,
+            },
+          )
           .toList();
       session.phase = LanSyncPhase.resolving;
       AppLogger.d(
@@ -351,6 +371,7 @@ class LanSyncHostHandler {
           'account' => LocalSyncEntityType.account,
           'template' => LocalSyncEntityType.template,
           'totp_credential' => LocalSyncEntityType.totpCredential,
+          'quick_note' => LocalSyncEntityType.quickNote,
           _ => throw ArgumentError('Unknown payload type: $type'),
         },
         payload: payload,
@@ -381,6 +402,7 @@ class LanSyncHostHandler {
     items.addAll(await _storage.loadAccounts(includeDeleted: true));
     items.addAll(await _storage.loadAllTemplates(includeDeleted: true));
     items.addAll(await _storage.loadTotpCredentials(includeDeleted: true));
+    items.addAll(await _storage.loadQuickNotes(includeDeleted: true));
     return items;
   }
 
@@ -396,6 +418,7 @@ class LanSyncHostHandler {
     if (item is AccountItem) return item.id;
     if (item is AccountTemplate) return item.templateId;
     if (item is TotpCredential) return item.id;
+    if (item is QuickNote) return item.id;
     return '';
   }
 
@@ -407,6 +430,8 @@ class LanSyncHostHandler {
       json['_type'] = 'template';
     } else if (item is TotpCredential) {
       json['_type'] = 'totp_credential';
+    } else if (item is QuickNote) {
+      json['_type'] = 'quick_note';
     }
     return json;
   }

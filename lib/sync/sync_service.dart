@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/account_item.dart';
 import '../models/account_template.dart';
+import '../models/quick_note.dart';
 import '../models/totp_credential.dart';
 import '../services/identity_service.dart';
 import '../services/secure_storage_service.dart';
@@ -602,7 +603,8 @@ class SyncService extends ChangeNotifier {
       // Allow loopback HTTP for local development and testing;
       // reject cleartext HTTP to remote servers.
       final host = Uri.tryParse(url)?.host.toLowerCase() ?? '';
-      final isLoopback = host == '127.0.0.1' ||
+      final isLoopback =
+          host == '127.0.0.1' ||
           host == 'localhost' ||
           host == '::1' ||
           host == '0.0.0.0';
@@ -653,7 +655,10 @@ class SyncService extends ChangeNotifier {
     if (kIsWeb) return false;
     if (!Platform.isAndroid && !Platform.isIOS) return false;
     final host = Uri.tryParse(serverUrl)?.host.toLowerCase() ?? '';
-    return host == '127.0.0.1' || host == 'localhost' || host == '::1' || host == '0.0.0.0';
+    return host == '127.0.0.1' ||
+        host == 'localhost' ||
+        host == '::1' ||
+        host == '0.0.0.0';
   }
 
   bool _looksLikeCleartextBlock(String message) {

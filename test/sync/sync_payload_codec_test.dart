@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:secret_roy/models/account_item.dart';
 import 'package:secret_roy/models/hlc.dart';
+import 'package:secret_roy/models/quick_note.dart';
 import 'package:secret_roy/models/totp_credential.dart';
 import 'package:secret_roy/services/totp_service.dart';
 import 'package:secret_roy/sync/sync_payload_codec.dart';
@@ -178,5 +179,32 @@ void main() {
     expect(decoded['_type'], 'totp_credential');
     expect(TotpCredential.fromJson(decoded).toJson(), credential.toJson());
     expect(encoded.contains('JBSWY3DPEHPK3PXP'), isFalse);
+  });
+
+  test('encodes quick notes as encrypted payloads', () async {
+    final note = QuickNote(
+      id: 'note_1',
+      content: '# Private note\n- [ ] Sync me',
+      createdAt: DateTime(2026, 1, 1),
+      updatedAt: DateTime(2026, 1, 2),
+    );
+
+    final encoded = await SyncPayloadCodec.encodeQuickNote(
+      note: note,
+      vaultId: vaultId,
+      nodeId: deviceId,
+      privateKey: privateKey,
+      symmetricKey: symmetricKey,
+    );
+    final decoded = await SyncPayloadCodec.decodePayload(
+      encodedPayload: encoded,
+      expectedVaultId: vaultId,
+      privateKey: privateKey,
+      symmetricKey: symmetricKey,
+    );
+
+    expect(decoded['_type'], 'quick_note');
+    expect(QuickNote.fromJson(decoded).toJson(), note.toJson());
+    expect(encoded.contains('Private note'), isFalse);
   });
 }

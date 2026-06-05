@@ -1,6 +1,7 @@
 import 'package:secret_roy/models/account_item.dart';
 import 'package:secret_roy/models/account_template.dart';
 import 'package:secret_roy/models/local_sync_change.dart';
+import 'package:secret_roy/models/quick_note.dart';
 import 'package:secret_roy/models/totp_credential.dart';
 import 'package:secret_roy/services/identity_service.dart';
 import 'package:secret_roy/services/secure_storage_service.dart';
@@ -19,9 +20,9 @@ class VaultDataRepository {
     required SecureStorageService storage,
     required IdentityService identity,
     required SyncService sync,
-  })  : _storage = storage,
-        _identity = identity,
-        _sync = sync;
+  }) : _storage = storage,
+       _identity = identity,
+       _sync = sync;
 
   // === Account ===
 
@@ -53,15 +54,9 @@ class VaultDataRepository {
   }
 
   Future<void> deleteAccount(String id) async {
-    final before = await _storage.getAccountById(
-      id,
-      includeDeleted: true,
-    );
+    final before = await _storage.getAccountById(id, includeDeleted: true);
     await _storage.deleteAccount(id);
-    final after = await _storage.getAccountById(
-      id,
-      includeDeleted: true,
-    );
+    final after = await _storage.getAccountById(id, includeDeleted: true);
     await _storage.recordLocalSyncChange(
       vaultId: _identity.vaultId,
       entityType: LocalSyncEntityType.account,
@@ -76,15 +71,9 @@ class VaultDataRepository {
   }
 
   Future<void> togglePin(String id) async {
-    final before = await _storage.getAccountById(
-      id,
-      includeDeleted: true,
-    );
+    final before = await _storage.getAccountById(id, includeDeleted: true);
     await _storage.togglePin(id);
-    final after = await _storage.getAccountById(
-      id,
-      includeDeleted: true,
-    );
+    final after = await _storage.getAccountById(id, includeDeleted: true);
     await _storage.recordLocalSyncChange(
       vaultId: _identity.vaultId,
       entityType: LocalSyncEntityType.account,
@@ -102,6 +91,54 @@ class VaultDataRepository {
 
   Future<int> countAccountsByTemplate(String templateId) =>
       _storage.countAccountsByTemplate(templateId);
+
+  // === Quick Note ===
+
+  Future<List<QuickNote>> loadQuickNotes() => _storage.loadQuickNotes();
+
+  Future<void> saveQuickNote(QuickNote note) async {
+    final before = await _storage.getQuickNoteById(
+      note.id,
+      includeDeleted: true,
+    );
+    await _storage.saveQuickNote(note);
+    final after = await _storage.getQuickNoteById(
+      note.id,
+      includeDeleted: true,
+    );
+    if (after != null) {
+      await _storage.recordLocalSyncChange(
+        vaultId: _identity.vaultId,
+        entityType: LocalSyncEntityType.quickNote,
+        entityId: after.id,
+        action: before == null
+            ? LocalSyncAction.create
+            : LocalSyncAction.update,
+        title: after.title,
+        beforeSnapshot: before?.toJson(),
+        afterSnapshot: after.toJson(),
+        baseServerVersion: before?.serverVersion ?? after.serverVersion,
+      );
+    }
+    await _sync.reconcileDirtyState();
+  }
+
+  Future<void> deleteQuickNote(String id) async {
+    final before = await _storage.getQuickNoteById(id, includeDeleted: true);
+    await _storage.deleteQuickNote(id);
+    final after = await _storage.getQuickNoteById(id, includeDeleted: true);
+    await _storage.recordLocalSyncChange(
+      vaultId: _identity.vaultId,
+      entityType: LocalSyncEntityType.quickNote,
+      entityId: id,
+      action: LocalSyncAction.delete,
+      title: before?.title ?? after?.title ?? id,
+      beforeSnapshot: before?.toJson(),
+      afterSnapshot: after?.toJson(),
+      baseServerVersion: before?.serverVersion ?? after?.serverVersion ?? 0,
+    );
+    await _sync.reconcileDirtyState();
+  }
 
   // === TOTP Credential ===
 
@@ -203,9 +240,7 @@ class VaultDataRepository {
 
   Future<List<LocalSyncChange>> loadOpenLocalSyncChanges() async {
     await _storage.ensurePendingSyncOutboxEntries(_identity.vaultId);
-    return _storage.loadOpenLocalSyncChanges(
-      vaultId: _identity.vaultId,
-    );
+    return _storage.loadOpenLocalSyncChanges(vaultId: _identity.vaultId);
   }
 
   Future<void> approveLocalSyncChanges({Iterable<String>? ids}) async {
@@ -248,6 +283,16 @@ class VaultDataRepository {
         } else {
           await _storage.saveTotpCredential(
             TotpCredential.fromJson(before),
+            isSyncMerge: true,
+          );
+        }
+        break;
+      case LocalSyncEntityType.quickNote:
+        if (before == null) {
+          await _storage.hardDeleteQuickNote(change.entityId);
+        } else {
+          await _storage.saveQuickNote(
+            QuickNote.fromJson(before),
             isSyncMerge: true,
           );
         }

@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:secret_roy/models/account_item.dart';
 import 'package:secret_roy/models/quick_note.dart';
 
 void main() {
@@ -56,6 +57,24 @@ void main() {
       final fallback = QuickNote.fromJson({'content': 'Loose note'});
       expect(fallback.id, startsWith('note_'));
       expect(fallback.content, 'Loose note');
+    });
+
+    test('round trips sync metadata', () {
+      final note = QuickNote(
+        id: 'note-sync',
+        content: 'Synced',
+        createdAt: DateTime(2026, 1, 1),
+        updatedAt: DateTime(2026, 1, 2),
+        serverVersion: 7,
+        syncStatus: SyncStatus.synchronized,
+        isDeleted: true,
+      );
+
+      final decoded = QuickNote.fromJson(note.toJson());
+
+      expect(decoded.serverVersion, 7);
+      expect(decoded.syncStatus, SyncStatus.synchronized);
+      expect(decoded.isDeleted, isTrue);
     });
   });
 }

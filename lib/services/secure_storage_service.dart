@@ -15,6 +15,7 @@ import '../models/account_template.dart';
 import '../models/app_notification.dart';
 import '../models/hlc.dart';
 import '../models/local_sync_change.dart';
+import '../models/quick_note.dart';
 import '../models/template_conflict_log.dart';
 import '../models/totp_credential.dart';
 import '../sync/crdt_merge_engine.dart';
@@ -28,6 +29,7 @@ enum StorageItemType {
   account,
   template,
   totpCredential,
+  quickNote,
   setting,
   localSyncChange,
 }
@@ -59,7 +61,7 @@ class SecureStorageService {
   static const String _databaseName = 'secret_roy_vault.db';
   static const String _encryptedDatabaseName = 'secret_roy_vault.db.enc';
   static const String _workingDatabaseName = 'secret_roy_vault.runtime.db';
-  static const int _databaseVersion = 12;
+  static const int _databaseVersion = 13;
 
   DatabaseFileCipher? _databaseCipher;
 
@@ -767,6 +769,7 @@ class SecureStorageService {
     ''');
 
     await _createTotpCredentialsTable(db);
+    await _createQuickNotesTable(db);
 
     await db.execute('''
       CREATE TABLE settings (
@@ -925,6 +928,10 @@ class SecureStorageService {
         // Column may already exist; ignore
       }
     }
+
+    if (oldVersion < 13) {
+      await _createQuickNotesTable(db);
+    }
   }
 
   Future<void> _createTotpCredentialsTable(Database db) async {
@@ -976,6 +983,23 @@ class SecureStorageService {
     );
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_local_sync_changes_entity ON local_sync_changes(vault_id, entity_type, entity_id)',
+    );
+  }
+
+  Future<void> _createQuickNotesTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS quick_notes (
+        id TEXT PRIMARY KEY,
+        content TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        server_version INTEGER DEFAULT 0,
+        sync_status INTEGER DEFAULT 1,
+        is_deleted INTEGER DEFAULT 0
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_quick_notes_updated ON quick_notes(updated_at DESC)',
     );
   }
 
@@ -1448,6 +1472,109 @@ class SecureStorageService {
     );
   }
 
+  Future<List<QuickNote>> loadQuickNotes({bool includeDeleted = false}) async {
+    if (!isOpen || _database == null) return [];
+    try {
+      final rows = await _query(
+        'quick_notes',
+        where: includeDeleted ? null : 'is_deleted = 0',
+        orderBy: 'updated_at DESC',
+      );
+      return rows.map(_mapToQuickNote).whereType<QuickNote>().toList();
+    } catch (e) {
+      AppLogger.d('Failed to load quick notes: $e');
+      return [];
+    }
+  }
+
+  Future<List<QuickNote>> loadDirtyQuickNotes() async {
+    if (!isOpen || _database == null) return [];
+    try {
+      final rows = await _query(
+        'quick_notes',
+        where: 'sync_status != ?',
+        whereArgs: [SyncStatus.synchronized.index],
+        orderBy: 'updated_at DESC',
+      );
+      return rows.map(_mapToQuickNote).whereType<QuickNote>().toList();
+    } catch (e) {
+      AppLogger.d('Failed to load dirty quick notes: $e');
+      return [];
+    }
+  }
+
+  Future<QuickNote?> getQuickNoteById(
+    String id, {
+    bool includeDeleted = false,
+  }) async {
+    if (!isOpen || _database == null) return null;
+    try {
+      final rows = await _query(
+        'quick_notes',
+        where: includeDeleted ? 'id = ?' : 'id = ? AND is_deleted = 0',
+        whereArgs: [id],
+        limit: 1,
+      );
+      if (rows.isEmpty) return null;
+      return _mapToQuickNote(rows.first);
+    } catch (e) {
+      AppLogger.d('Failed to load quick note by id: $e');
+      return null;
+    }
+  }
+
+  Future<void> saveQuickNote(QuickNote note, {bool isSyncMerge = false}) async {
+    if (!isOpen || _database == null) return;
+
+    var noteToSave = note;
+    if (!isSyncMerge) {
+      final existing = await getQuickNoteById(note.id, includeDeleted: true);
+      noteToSave = note.copyWith(
+        serverVersion: existing?.serverVersion ?? note.serverVersion,
+        syncStatus: SyncStatus.pendingPush,
+        isDeleted: false,
+      );
+    }
+
+    await _database!.insert(
+      'quick_notes',
+      _quickNoteRow(noteToSave),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+    await _persistAfterMutation();
+    _notifyChange(
+      StorageChangeEvent(
+        type: StorageItemType.quickNote,
+        action: StorageAction.save,
+        id: noteToSave.id,
+      ),
+    );
+  }
+
+  Future<void> deleteQuickNote(String id, {bool isSyncMerge = false}) async {
+    if (!isOpen || _database == null) return;
+    await _database!.update(
+      'quick_notes',
+      {
+        'is_deleted': 1,
+        'sync_status': isSyncMerge
+            ? SyncStatus.synchronized.index
+            : SyncStatus.pendingPush.index,
+        'updated_at': DateTime.now().millisecondsSinceEpoch,
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    await _persistAfterMutation();
+    _notifyChange(
+      StorageChangeEvent(
+        type: StorageItemType.quickNote,
+        action: StorageAction.delete,
+        id: id,
+      ),
+    );
+  }
+
   Future<int> countAccountsByTemplate(String templateId) async {
     if (!isOpen) return 0;
     try {
@@ -1835,6 +1962,39 @@ class SecureStorageService {
     }
   }
 
+  Map<String, dynamic> _quickNoteRow(QuickNote note) {
+    return {
+      'id': note.id,
+      'content': note.content,
+      'created_at': note.createdAt.millisecondsSinceEpoch,
+      'updated_at': note.updatedAt.millisecondsSinceEpoch,
+      'server_version': note.serverVersion,
+      'sync_status': note.syncStatus.index,
+      'is_deleted': note.isDeleted ? 1 : 0,
+    };
+  }
+
+  QuickNote? _mapToQuickNote(Map<String, dynamic> row) {
+    try {
+      return QuickNote(
+        id: row['id'] as String,
+        content: row['content'] as String? ?? '',
+        createdAt: DateTime.fromMillisecondsSinceEpoch(
+          row['created_at'] as int? ?? 0,
+        ),
+        updatedAt: DateTime.fromMillisecondsSinceEpoch(
+          row['updated_at'] as int? ?? 0,
+        ),
+        serverVersion: row['server_version'] as int? ?? 0,
+        syncStatus: syncStatusFromJson(row['sync_status']),
+        isDeleted: row['is_deleted'] == 1,
+      );
+    } catch (e) {
+      AppLogger.d('Skipping unreadable quick note row: $e');
+      return null;
+    }
+  }
+
   String _totpConfigJson(TotpConfig config) {
     return jsonEncode(config.toJson());
   }
@@ -2205,8 +2365,10 @@ class SecureStorageService {
           await hardDeleteAccount(entityId);
         } else if (entityType == LocalSyncEntityType.template) {
           await hardDeleteTemplate(entityId);
-        } else {
+        } else if (entityType == LocalSyncEntityType.totpCredential) {
           await hardDeleteTotpCredential(entityId);
+        } else {
+          await hardDeleteQuickNote(entityId);
         }
         return;
       }
@@ -2370,6 +2532,25 @@ class SecureStorageService {
           beforeSnapshot: null,
           afterSnapshot: credential.toJson(),
           baseServerVersion: credential.serverVersion,
+          skipIfUnchanged: true,
+        );
+      }
+
+      final dirtyQuickNotes = await loadDirtyQuickNotes();
+      for (final note in dirtyQuickNotes) {
+        await recordLocalSyncChange(
+          vaultId: vaultId,
+          entityType: LocalSyncEntityType.quickNote,
+          entityId: note.id,
+          action: note.isDeleted
+              ? LocalSyncAction.delete
+              : note.serverVersion == 0
+              ? LocalSyncAction.create
+              : LocalSyncAction.update,
+          title: note.title,
+          beforeSnapshot: null,
+          afterSnapshot: note.toJson(),
+          baseServerVersion: note.serverVersion,
           skipIfUnchanged: true,
         );
       }
@@ -2618,6 +2799,19 @@ class SecureStorageService {
     );
   }
 
+  Future<void> hardDeleteQuickNote(String id) async {
+    if (!isOpen || _database == null) return;
+    await _database!.delete('quick_notes', where: 'id = ?', whereArgs: [id]);
+    await _persistAfterMutation();
+    _notifyChange(
+      StorageChangeEvent(
+        type: StorageItemType.quickNote,
+        action: StorageAction.delete,
+        id: id,
+      ),
+    );
+  }
+
   Future<void> clearLocalSyncChanges(String vaultId) async {
     if (!isOpen) return;
     await _database!.delete(
@@ -2649,6 +2843,13 @@ class SecureStorageService {
     await _database!.update(
       'totp_credentials',
       {'sync_status': SyncStatus.pendingPush.index, 'modified_at': now},
+      where: 'sync_status = ?',
+      whereArgs: [SyncStatus.synchronized.index],
+    );
+
+    await _database!.update(
+      'quick_notes',
+      {'sync_status': SyncStatus.pendingPush.index, 'updated_at': now},
       where: 'sync_status = ?',
       whereArgs: [SyncStatus.synchronized.index],
     );
@@ -2923,6 +3124,22 @@ class SecureStorageService {
                   entityType: LocalSyncEntityType.totpCredential,
                   entityId: totp.id,
                   title: totp.label,
+                );
+              }
+            case LocalSyncEntityType.quickNote:
+              final note = QuickNote.fromJson(payload);
+              await txn.insert(
+                'quick_notes',
+                _quickNoteRow(note),
+                conflictAlgorithm: ConflictAlgorithm.replace,
+              );
+              if (markForServerPush) {
+                await _insertApprovedChange(
+                  txn: txn,
+                  vaultId: vaultId,
+                  entityType: LocalSyncEntityType.quickNote,
+                  entityId: note.id,
+                  title: note.title,
                 );
               }
           }

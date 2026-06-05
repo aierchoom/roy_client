@@ -34,20 +34,21 @@ class LocalSyncQueueView extends StatelessWidget {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text(context.text( '撤销本地变更', 'Discard Local Change')),
+          title: Text(context.text('撤销本地变更', 'Discard Local Change')),
           content: Text(
-            context.text('将把"${change.title}"恢复到本次变更前的状态，此变更不会推送到其他设备。',
+            context.text(
+              '将把"${change.title}"恢复到本次变更前的状态，此变更不会推送到其他设备。',
               'This restores "${change.title}" to its previous local state and will not push it to other devices.',
             ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: Text(context.text( '取消', 'Cancel')),
+              child: Text(context.text('取消', 'Cancel')),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(context, true),
-              child: Text(context.text( '撤销', 'Discard')),
+              child: Text(context.text('撤销', 'Discard')),
             ),
           ],
         );
@@ -62,10 +63,8 @@ class LocalSyncQueueView extends StatelessWidget {
 
   void _showResultSnack(BuildContext context, SyncResult result) {
     final message = result.success
-        ? context.text( '已推送已确认的本地变更。', 'Approved local changes pushed.')
-        : context.text('同步失败：${result.error}',
-            'Sync failed: ${result.error}',
-          );
+        ? context.text('已推送已确认的本地变更。', 'Approved local changes pushed.')
+        : context.text('同步失败：${result.error}', 'Sync failed: ${result.error}');
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(message)));
@@ -114,7 +113,8 @@ class LocalSyncQueueView extends StatelessWidget {
                 if (change.isDelete) ...[
                   const SizedBox(height: 14),
                   Text(
-                    context.text('这是删除类变更。推送后，其他可信设备会直接同步该删除，除非存在本地冲突。',
+                    context.text(
+                      '这是删除类变更。推送后，其他可信设备会直接同步该删除，除非存在本地冲突。',
                       'This is a delete change. Once pushed, other trusted devices will apply it unless they have local conflicts.',
                     ),
                     style: theme.textTheme.bodySmall?.copyWith(
@@ -131,7 +131,7 @@ class LocalSyncQueueView extends StatelessWidget {
                           Navigator.pop(ctx);
                           _discardChange(context, change);
                         },
-                        child: Text(context.text( '撤销', 'Discard')),
+                        child: Text(context.text('撤销', 'Discard')),
                       ),
                     ),
                     const SizedBox(width: AppSpacing.md),
@@ -141,7 +141,7 @@ class LocalSyncQueueView extends StatelessWidget {
                           Navigator.pop(ctx);
                           _pushChange(context, change);
                         },
-                        child: Text(context.text( '推送', 'Push')),
+                        child: Text(context.text('推送', 'Push')),
                       ),
                     ),
                   ],
@@ -156,33 +156,34 @@ class LocalSyncQueueView extends StatelessWidget {
 
   String _actionLabel(BuildContext context, LocalSyncAction action) {
     return switch (action) {
-      LocalSyncAction.create => context.text( '新增', 'Create'),
-      LocalSyncAction.update => context.text( '修改', 'Update'),
-      LocalSyncAction.delete => context.text( '删除', 'Delete'),
+      LocalSyncAction.create => context.text('新增', 'Create'),
+      LocalSyncAction.update => context.text('修改', 'Update'),
+      LocalSyncAction.delete => context.text('删除', 'Delete'),
     };
   }
 
   String _entityLabel(BuildContext context, LocalSyncEntityType type) {
     return switch (type) {
-      LocalSyncEntityType.account => context.text( '账号', 'Account'),
-      LocalSyncEntityType.template => context.text( '模板', 'Template'),
-      LocalSyncEntityType.totpCredential => context.text( '2FA', '2FA'),
+      LocalSyncEntityType.account => context.text('账号', 'Account'),
+      LocalSyncEntityType.template => context.text('模板', 'Template'),
+      LocalSyncEntityType.totpCredential => context.text('2FA', '2FA'),
+      LocalSyncEntityType.quickNote => context.text('随手记', 'Quick note'),
     };
   }
 
   List<String> _changeFields(BuildContext context, LocalSyncChange change) {
     if (change.changedFields.isEmpty) {
-      return [context.text( '记录内容', 'Record content')];
+      return [context.text('记录内容', 'Record content')];
     }
     return change.changedFields
         .map((field) {
           return switch (field) {
-            'record.created' => context.text( '新建记录', 'New record'),
-            'record.deleted' => context.text( '删除记录', 'Deleted record'),
-            'record.updated' => context.text( '记录内容', 'Record content'),
-            'name' => context.text( '名称', 'Name'),
-            'email' => context.text( '邮箱', 'Email'),
-            'template' || 'templateId' => context.text( '模板', 'Template'),
+            'record.created' => context.text('新建记录', 'New record'),
+            'record.deleted' => context.text('删除记录', 'Deleted record'),
+            'record.updated' => context.text('记录内容', 'Record content'),
+            'name' => context.text('名称', 'Name'),
+            'email' => context.text('邮箱', 'Email'),
+            'template' || 'templateId' => context.text('模板', 'Template'),
             _ when field.startsWith('data.') => field.substring(5),
             _ => field,
           };
@@ -197,13 +198,13 @@ class LocalSyncQueueView extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(context.text( '待同步变更', 'Pending Sync Changes')),
+        title: Text(context.text('待同步变更', 'Pending Sync Changes')),
         actions: [
           if (changes.isNotEmpty)
             TextButton.icon(
               onPressed: () => _pushAll(context),
               icon: const Icon(Icons.cloud_upload_outlined, size: 18),
-              label: Text(context.text( '推送全部', 'Push All')),
+              label: Text(context.text('推送全部', 'Push All')),
             ),
         ],
       ),
@@ -212,7 +213,10 @@ class LocalSyncQueueView extends StatelessWidget {
             ? InboxEmptyState(
                 icon: Icons.cloud_done_outlined,
                 title: context.text('没有待同步的变更', 'No pending sync changes'),
-                subtitle: context.text('所有本地变更已同步', 'All local changes have been synced'),
+                subtitle: context.text(
+                  '所有本地变更已同步',
+                  'All local changes have been synced',
+                ),
               )
             : ListView.separated(
                 padding: const EdgeInsets.all(AppSpacing.lg),

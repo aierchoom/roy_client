@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../core/app_logger.dart';
 
-enum LocalSyncEntityType { account, template, totpCredential }
+enum LocalSyncEntityType { account, template, totpCredential, quickNote }
 
 enum LocalSyncAction { create, update, delete }
 
@@ -49,7 +49,9 @@ LocalSyncStatus localSyncStatusFromString(Object? value) {
     orElse: () => LocalSyncStatus.pendingReview,
   );
   if (name != null && result.name != name) {
-    AppLogger.w('Unknown LocalSyncStatus "$name", defaulting to "pendingReview"');
+    AppLogger.w(
+      'Unknown LocalSyncStatus "$name", defaulting to "pendingReview"',
+    );
   }
   return result;
 }
@@ -119,6 +121,8 @@ class LocalSyncChange {
   bool get isAccount => entityType == LocalSyncEntityType.account;
 
   bool get isTotpCredential => entityType == LocalSyncEntityType.totpCredential;
+
+  bool get isQuickNote => entityType == LocalSyncEntityType.quickNote;
 
   bool get canPush =>
       status == LocalSyncStatus.pendingReview ||
