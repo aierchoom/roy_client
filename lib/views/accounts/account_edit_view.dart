@@ -2158,7 +2158,7 @@ class _AccountEditViewState extends State<AccountEditView> {
                           previewParts.join(' · '),
                           style: theme.textTheme.labelSmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant
-                                .withAlpha(180),
+                                .withAlpha(AppAlphas.emphasis),
                             fontWeight: FontWeight.w500,
                           ),
                           maxLines: 1,
@@ -2330,7 +2330,7 @@ class _AccountEditViewState extends State<AccountEditView> {
             tint: colors.secondary, tintAlpha: 10),
         borderRadius: BorderRadius.circular(AppRadii.xl),
         border: Border.all(
-            color: theme.colorScheme.outlineVariant.withAlpha(88)),
+            color: theme.colorScheme.outlineVariant.withAlpha(AppAlphas.high)),
         boxShadow: AppShadows.card(theme, depth: 0.55),
       ),
       child: Padding(

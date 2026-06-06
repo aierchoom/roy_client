@@ -648,7 +648,7 @@ class _TemplateEditViewState extends State<TemplateEditView> {
           color: AppSurfaces.soft(theme.colorScheme,
               tint: accent, tintAlpha: 8),
           borderRadius: BorderRadius.circular(AppRadii.panel),
-          border: Border.all(color: accent.withAlpha(28)),
+          border: Border.all(color: accent.withAlpha(AppAlphas.subtle)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -691,7 +691,7 @@ class _TemplateEditViewState extends State<TemplateEditView> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.surface.withAlpha(140),
+                      color: theme.colorScheme.surface.withAlpha(AppAlphas.outline),
                       borderRadius: BorderRadius.circular(AppRadii.chip),
                     ),
                     child: Row(
@@ -1076,7 +1076,7 @@ class _TemplateEditViewState extends State<TemplateEditView> {
           tintAlpha: 10,
         ),
         borderRadius: BorderRadius.circular(AppRadii.xl),
-        border: Border.all(color: theme.colorScheme.outlineVariant.withAlpha(88)),
+        border: Border.all(color: theme.colorScheme.outlineVariant.withAlpha(AppAlphas.high)),
         boxShadow: AppShadows.card(theme, depth: 0.55),
       ),
       child: Padding(
@@ -1118,8 +1118,8 @@ class _TemplateEditViewState extends State<TemplateEditView> {
                     onDeleted: () => setState(() {
                       _parentTemplateIds.remove(t.templateId);
                     }),
-                    backgroundColor: colors.tertiary.withAlpha(30),
-                    side: BorderSide(color: colors.tertiary.withAlpha(80)),
+                    backgroundColor: colors.tertiary.withAlpha(AppAlphas.subtle),
+                    side: BorderSide(color: colors.tertiary.withAlpha(AppAlphas.high)),
                   );
                 }).toList(),
               ),
