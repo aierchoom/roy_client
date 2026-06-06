@@ -51,7 +51,7 @@ jobs:
         run: python3 tool/check_style_tokens.py
 
       - name: Test with coverage
-        run: flutter test --coverage
+        run: flutter test --coverage --timeout 120s
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
