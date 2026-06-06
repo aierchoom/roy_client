@@ -157,6 +157,9 @@ $integrationStages = @(
                 } catch {
                     $allPassed = $false
                 } finally {
+                    # Wait for unawaited closeStorage() to finish writing the
+                    # encrypted database file, otherwise Remove-Item races it.
+                    Start-Sleep -Seconds 5
                     Remove-Item -Recurse -Force -Path $testDir -ErrorAction SilentlyContinue
                 }
             }
