@@ -52,7 +52,7 @@ void main() {
       await tester.tap(find.widgetWithIcon(GreenAddButton, Icons.check));
       await tester.pump();
 
-      expect(find.text('请至少添加一个字段。'), findsOneWidget);
+      expect(find.text('请至少添加一个字段或选择一个父模板。'), findsOneWidget);
     });
 
     testWidgets('adds field and saves template successfully', (tester) async {
