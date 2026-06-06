@@ -14,7 +14,7 @@ import '../../sync/sync_service_types.dart';
 import '../../theme/theme.dart';
 import '../../widgets/adaptive_page.dart';
 
-const Duration _draftSaveDelay = Duration(milliseconds: 450);
+const Duration _draftSaveDelay = Duration(milliseconds: 200);
 const Duration _focusLossDelay = Duration(milliseconds: 80);
 const Duration _scrollFollowDelay = Duration(milliseconds: 120);
 
@@ -487,6 +487,8 @@ class _QuickNoteViewState extends State<QuickNoteView> {
   }
 
   void _finishEditing() {
+    _saveTimer?.cancel();
+    unawaited(_persistActiveNote(_plainMarkdown));
     setState(() => _editingIndex = -1);
     FocusManager.instance.primaryFocus?.unfocus();
   }
