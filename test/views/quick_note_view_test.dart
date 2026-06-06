@@ -1,7 +1,6 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:secret_roy/views/notes/quick_note_view.dart';
@@ -57,27 +56,6 @@ void main() {
     return find
         .ancestor(of: find.byIcon(icon), matching: find.byType(ActionChip))
         .first;
-  }
-
-  Finder iconButtonFor(IconData icon) {
-    return find
-        .ancestor(of: find.byIcon(icon), matching: find.byType(IconButton))
-        .first;
-  }
-
-  Finder previewText(String text) {
-    return find.descendant(
-      of: find.byType(MarkdownBody).first,
-      matching: find.text(text, findRichText: true),
-    );
-  }
-
-  Future<void> pumpCompactWithKeyboard(WidgetTester tester) async {
-    tester.view.physicalSize = const Size(390, 800);
-    tester.view.devicePixelRatio = 1.0;
-    tester.view.viewInsets = FakeViewPadding(bottom: 280);
-    addTearDown(tester.view.reset);
-    await pumpQuickNote(tester);
   }
 
   // ---------------------------------------------------------------------------
