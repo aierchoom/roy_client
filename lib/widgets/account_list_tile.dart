@@ -953,18 +953,6 @@ class _FieldRowState extends State<_FieldRow> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Field icon
-          Container(
-            width: 28,
-            height: 28,
-            decoration: BoxDecoration(
-              color: widget.accent.withAlpha(12),
-              borderRadius: BorderRadius.circular(7),
-            ),
-            alignment: Alignment.center,
-            child: Icon(widget.icon, size: 14, color: widget.accent),
-          ),
-          const SizedBox(width: 10),
           // Label (fixed width)
           SizedBox(
             width: 72,
