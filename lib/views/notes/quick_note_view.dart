@@ -102,7 +102,28 @@ class _QuickNoteViewState extends State<QuickNoteView> {
   }
 
   void _handleSyncSignal() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    _store.load().then((snapshot) {
+      if (!mounted) return;
+      final newActiveId = snapshot.activeNoteId;
+      if (newActiveId != _activeNoteId &&
+          _activeNoteId != null &&
+          snapshot.notes.any((n) => n.id == _activeNoteId)) {
+        // Keep editing the current note if it still exists.
+      } else if (newActiveId != _activeNoteId) {
+        // Switched to a different note externally — reload content.
+        _loadNoteContent(
+          snapshot.notes
+              .firstWhere((n) => n.id == newActiveId,
+                  orElse: () => snapshot.notes.first)
+              .content,
+        );
+      }
+      setState(() {
+        _notes = snapshot.notes;
+        _activeNoteId = newActiveId;
+      });
+    });
   }
 
   Future<void> _loadNotes() async {
