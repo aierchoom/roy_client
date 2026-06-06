@@ -13,6 +13,7 @@ import 'package:secret_roy/services/secure_storage_service.dart';
 import 'crdt_merge_engine.dart';
 import 'lan_sync_session.dart';
 import 'sync_payload_codec.dart';
+import 'sync_service.dart';
 import 'totp_credential_merge_engine.dart';
 
 /// Host 端 LAN 同步处理器。
@@ -22,6 +23,7 @@ import 'totp_credential_merge_engine.dart';
 class LanSyncHostHandler {
   final SecureStorageService _storage;
   final IdentityService _identity;
+  final SyncService _syncService;
   final LanSyncConfig _config;
 
   final Map<String, LanSyncHostSession> _sessions = {};
@@ -30,9 +32,11 @@ class LanSyncHostHandler {
   LanSyncHostHandler({
     required SecureStorageService storage,
     required IdentityService identity,
+    required SyncService syncService,
     LanSyncConfig? config,
   }) : _storage = storage,
        _identity = identity,
+       _syncService = syncService,
        _config = config ?? const LanSyncConfig();
 
   /// HTTP Server 收到 /lan-sync/start 时调用
@@ -383,6 +387,9 @@ class LanSyncHostHandler {
       items: items,
       markForServerPush: true,
     );
+
+    // Notify views (e.g. QuickNoteView) that data changed.
+    await _syncService.markDirty();
 
     if (session.conflictCount != null && session.conflictCount! > 0) {
       // 冲突日志已在 merging 时生成，但预览版不包含完整 ConflictLog

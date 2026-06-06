@@ -79,6 +79,7 @@ class LanSyncCoordinator extends ChangeNotifier {
       _hostHandler = LanSyncHostHandler(
         storage: _storage,
         identity: _identity,
+        syncService: _syncService,
       );
 
       // Register with LanPairingService's HTTP server

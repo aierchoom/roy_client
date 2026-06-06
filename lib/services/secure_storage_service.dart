@@ -3340,9 +3340,10 @@ class SecureStorageService {
     });
 
     // Notify listeners once after the transaction.
+    // Use a generic notification so all entity types trigger reloads.
     _notifyChange(
       StorageChangeEvent(
-        type: StorageItemType.account,
+        type: StorageItemType.quickNote,
         action: StorageAction.save,
       ),
     );

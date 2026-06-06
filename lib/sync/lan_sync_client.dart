@@ -107,6 +107,10 @@ class LanSyncClient {
       onProgress(LanSyncPhase.committing, 'Writing to database...');
       await _commitLocal(mergedItems);
 
+      // Trigger UI refresh for views that listen to SyncService
+      // (e.g. QuickNoteView._handleSyncSignal).
+      await _syncService.markDirty();
+
       _phase = LanSyncPhase.completed;
       onProgress(LanSyncPhase.completed, 'Sync complete');
 
