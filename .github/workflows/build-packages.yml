@@ -126,10 +126,17 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Integration Test
+      - name: Integration Test (Ubuntu)
+        if: runner.os == 'Linux'
         run: |
-          echo "Integration tests disabled — teardown race condition with sqflite."
-          exit 0
+          echo "Skipping Linux desktop integration tests in headless CI"
+
+      - name: Integration Test (Windows)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          flutter config --enable-windows-desktop
+          .\tool\run_regression.ps1 -IntegrationOnly
 
   windows-portable:
     name: Windows Portable

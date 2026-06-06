@@ -291,16 +291,18 @@ class ServiceManager extends ChangeNotifier {
   @visibleForTesting
   static Future<void> destroyForTesting() async {
     if (_instance != null) {
+      final inst = _instance!;
+      _instance = null; // null first so background tasks don't re-enter
       try {
-        if (!_instance!._disposed) {
-          // dispose() 是 void，但内部会异步关闭存储；等待一小段时间让清理完成
-          _instance!.dispose();
-          await Future.delayed(const Duration(milliseconds: 500));
+        if (!inst._disposed) {
+          inst.dispose();
+          // Let closeStorage() and background tasks (VaultHealthCalculator,
+          // SyncService) settle before test process exits, otherwise sqflite
+          // throws "database already closed" during teardown.
+          await Future.delayed(const Duration(seconds: 3));
         }
       } catch (e) {
         AppLogger.d('ServiceManager.destroyForTesting error: $e');
-      } finally {
-        _instance = null;
       }
     }
   }
