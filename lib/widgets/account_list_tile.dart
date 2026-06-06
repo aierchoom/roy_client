@@ -482,15 +482,14 @@ class _AccountListTileState extends State<AccountListTile>
               mainAxisSize: MainAxisSize.min,
               children: [
                 // ── Header row ──
-                OverflowBar(
-                  spacing: AppSpacing.sm,
-                  overflowSpacing: AppSpacing.sm,
-                  overflowAlignment: OverflowBarAlignment.start,
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
                         Wrap(
                           spacing: 8,
                           runSpacing: 4,
@@ -570,7 +569,8 @@ class _AccountListTileState extends State<AccountListTile>
                         ],
                       ],
                     ),
-                    // Action buttons
+                    ),
+                    // Action buttons — fixed to right, never wrap
                     if (primaryValue != null)
                       _IconButtonCompact(
                         tooltip: widget.localeText(context, '复制', 'Copy'),
