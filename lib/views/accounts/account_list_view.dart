@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../l10n/app_text_extension.dart';
@@ -12,6 +13,7 @@ import '../../services/sensitive_clipboard_service.dart';
 import '../../services/totp_service.dart';
 import '../../theme/app_design_tokens.dart';
 import '../../theme/app_layout.dart';
+import '../../utils/account_csv.dart';
 import '../../widgets/adaptive_page.dart';
 import '../../widgets/app_page_header.dart';
 import '../../widgets/inbox/inbox_hero_metrics.dart';
@@ -41,6 +43,8 @@ class _AccountListViewState extends State<AccountListView> {
   String? _activeTemplateId;
   _VaultCategoryFilter _categoryFilter = _VaultCategoryFilter.all;
   Timer? _totpTimer;
+  bool _selectMode = false;
+  final Set<String> _selectedIds = {};
 
   @override
   void initState() {
@@ -605,22 +609,55 @@ class _AccountListViewState extends State<AccountListView> {
                 account,
                 accountTemplate,
               );
+              final isSelected = _selectedIds.contains(account.id);
               return Column(
                 children: [
-                  AccountListTile(
-                    account: account,
-                    template: accountTemplate,
-                    hasMissingTemplate: accountTemplate == null,
-                    legacyFieldCount: legacyFieldCount,
-                    linkedTotpCredentialCount: provider
-                        .totpCredentialsForAccount(account.id)
-                        .length,
-                    onEdit: () => _openEditor(context, initial: account),
-                    onDelete: () => _deleteAccount(context, account),
-                    onTogglePin: () => provider.togglePin(account.id),
-                    localeText: (ctx, zh, en) => ctx.text(zh, en),
-                    resolveAccountName: (id) => provider.resolveAccountName(id),
-                  ),
+                  if (_selectMode)
+                    CheckboxListTile(
+                      value: isSelected,
+                      onChanged: (_) {
+                        setState(() {
+                          if (isSelected) {
+                            _selectedIds.remove(account.id);
+                          } else {
+                            _selectedIds.add(account.id);
+                          }
+                        });
+                      },
+                      title: Text(
+                        account.name,
+                        style: theme.textTheme.bodyLarge
+                            ?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                      subtitle: Text(
+                        accountTemplate?.title ?? account.templateId,
+                        style: theme.textTheme.bodySmall,
+                      ),
+                      secondary: Icon(
+                        account.isPinned
+                            ? Icons.push_pin
+                            : Icons.account_circle_outlined,
+                        color: theme.colorScheme.primary,
+                      ),
+                      controlAffinity: ListTileControlAffinity.leading,
+                      dense: true,
+                    )
+                  else
+                    AccountListTile(
+                      account: account,
+                      template: accountTemplate,
+                      hasMissingTemplate: accountTemplate == null,
+                      legacyFieldCount: legacyFieldCount,
+                      linkedTotpCredentialCount: provider
+                          .totpCredentialsForAccount(account.id)
+                          .length,
+                      onEdit: () => _openEditor(context, initial: account),
+                      onDelete: () => _deleteAccount(context, account),
+                      onTogglePin: () => provider.togglePin(account.id),
+                      localeText: (ctx, zh, en) => ctx.text(zh, en),
+                      resolveAccountName: (id) =>
+                          provider.resolveAccountName(id),
+                    ),
                   if (index < group.accounts.length - 1)
                     Divider(
                       height: 1,
@@ -874,6 +911,131 @@ class _AccountListViewState extends State<AccountListView> {
     );
   }
 
+  Future<void> _exportCsv(EnhancedAppProvider provider) async {
+    final selected = provider.allAccounts
+        .where((a) => _selectedIds.contains(a.id))
+        .toList();
+    if (selected.isEmpty) return;
+
+    final csv = encodeAccountsToCsv(selected, provider.allTemplates);
+    await Clipboard.setData(ClipboardData(text: csv));
+    if (!mounted) return;
+
+    setState(() {
+      _selectMode = false;
+      _selectedIds.clear();
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          context.text(
+            '已导出 ${selected.length} 条账户到剪贴板',
+            'Exported ${selected.length} accounts to clipboard',
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _importCsv(EnhancedAppProvider provider) async {
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    final csv = data?.text;
+    if (csv == null || csv.trim().isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            context.text('剪贴板为空', 'Clipboard is empty'),
+          ),
+        ),
+      );
+      return;
+    }
+
+    final rows = parseCsv(csv);
+    if (rows.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            context.text('未识别到 CSV 数据', 'No CSV data detected'),
+          ),
+        ),
+      );
+      return;
+    }
+
+    final result = importAccountsFromCsv(
+      rows: rows,
+      existingAccounts: provider.allAccounts,
+      allTemplates: provider.allTemplates,
+    );
+
+    if (!mounted) return;
+
+    for (final account in result.imported) {
+      await provider.addAccount(account);
+    }
+
+    if (!mounted) return;
+
+    final msg = StringBuffer();
+    msg.write(
+      context.text(
+        '成功导入 ${result.imported.length} 条账户',
+        'Imported ${result.imported.length} accounts',
+      ),
+    );
+    if (result.skipped.isNotEmpty) {
+      msg.write(
+        context.text(
+          '，跳过 ${result.skipped.length} 条',
+          ', skipped ${result.skipped.length}',
+        ),
+      );
+    }
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(context.text('导入结果', 'Import Result')),
+        content: SizedBox(
+          width: 400,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(msg.toString()),
+              if (result.skipped.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                const Divider(),
+                ...result.skipped.take(10).map((s) => Padding(
+                      padding: const EdgeInsets.only(bottom: 2),
+                      child: Text(s, style: const TextStyle(fontSize: 12)),
+                    )),
+                if (result.skipped.length > 10)
+                  Text(
+                    context.text(
+                      '…等 ${result.skipped.length - 10} 条',
+                      '…and ${result.skipped.length - 10} more',
+                    ),
+                    style: const TextStyle(fontSize: 12),
+                  ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(context.text('确定', 'OK')),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<EnhancedAppProvider>();
@@ -929,6 +1091,77 @@ class _AccountListViewState extends State<AccountListView> {
                                         ),
                                     ],
                                   ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.xs),
+                            AdaptiveSection(
+                              maxWidth: AppSectionWidths.panel,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8),
+                                child: Row(
+                                  children: [
+                                    if (_categoryFilter !=
+                                        _VaultCategoryFilter.totp) ...[
+                                      if (_selectMode)
+                                        Text(
+                                          context.text(
+                                            '已选 ${_selectedIds.length} 条',
+                                            '${_selectedIds.length} selected',
+                                          ),
+                                          style: theme.textTheme.bodySmall
+                                              ?.copyWith(
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      const Spacer(),
+                                      if (_selectMode)
+                                        TextButton(
+                                          onPressed: () {
+                                            setState(() {
+                                              _selectMode = false;
+                                              _selectedIds.clear();
+                                            });
+                                          },
+                                          child: Text(
+                                            context.text('取消', 'Cancel'),
+                                          ),
+                                        ),
+                                      if (_selectMode)
+                                        FilledButton.tonalIcon(
+                                          onPressed: _selectedIds.isNotEmpty
+                                              ? () => _exportCsv(provider)
+                                              : null,
+                                          icon: const Icon(
+                                              Icons.file_download_outlined,
+                                              size: 18),
+                                          label: Text(context.text(
+                                              '导出 CSV', 'Export CSV')),
+                                        )
+                                      else ...[
+                                        OutlinedButton.icon(
+                                          onPressed: () => setState(
+                                              () => _selectMode = true),
+                                          icon: const Icon(
+                                              Icons.checklist_outlined,
+                                              size: 18),
+                                          label: Text(context.text(
+                                              '批量导出', 'Export')),
+                                        ),
+                                        const SizedBox(width: AppSpacing.sm),
+                                        OutlinedButton.icon(
+                                          onPressed: () =>
+                                              _importCsv(provider),
+                                          icon: const Icon(
+                                              Icons.file_upload_outlined,
+                                              size: 18),
+                                          label: Text(context.text(
+                                              '导入 CSV', 'Import CSV')),
+                                        ),
+                                      ],
+                                    ],
+                                  ],
                                 ),
                               ),
                             ),
