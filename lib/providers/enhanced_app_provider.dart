@@ -6,6 +6,7 @@ import 'package:secret_roy/core/app_logger.dart';
 import '../models/account_item.dart';
 import '../models/account_template.dart';
 import '../models/local_sync_change.dart';
+import '../models/quick_note.dart';
 import '../models/template_conflict_log.dart';
 import '../models/totp_credential.dart';
 import '../services/secure_storage_service.dart';
@@ -19,6 +20,7 @@ class EnhancedAppProvider extends ChangeNotifier {
   List<AccountItem> _accounts = [];
   List<AccountTemplate> _customTemplates = [];
   List<TotpCredential> _totpCredentials = [];
+  List<QuickNote> _quickNotes = [];
   List<LocalSyncChange> _localSyncChanges = [];
   List<TemplateConflictLog> _templateConflictLogs = [];
   String _searchQuery = '';
@@ -48,6 +50,7 @@ class EnhancedAppProvider extends ChangeNotifier {
   List<TotpCredential> get totpCredentials => _totpCredentials;
   List<AccountTemplate> get customTemplates => _customTemplates;
   List<LocalSyncChange> get localSyncChanges => _localSyncChanges;
+  List<QuickNote> get quickNotes => _quickNotes;
   List<TemplateConflictLog> get templateConflictLogs => _templateConflictLogs;
   String get searchQuery => _searchQuery;
   Set<String> get selectedTags => _selectedTags;
@@ -194,6 +197,9 @@ class EnhancedAppProvider extends ChangeNotifier {
     _localSyncChanges = List<LocalSyncChange>.of(
       await _serviceManager.loadOpenLocalSyncChanges(),
     );
+    _quickNotes = List<QuickNote>.of(
+      await _storageService.loadQuickNotes(),
+    );
     // Count total conflict logs across all accounts and templates
     int count = 0;
     for (final acc in _accounts) {
@@ -217,6 +223,7 @@ class EnhancedAppProvider extends ChangeNotifier {
     _accounts = [];
     _customTemplates = [];
     _totpCredentials = [];
+    _quickNotes = [];
     _localSyncChanges = [];
     _templateConflictLogs = [];
     _notify();
@@ -231,6 +238,7 @@ class EnhancedAppProvider extends ChangeNotifier {
     _accounts = [];
     _customTemplates = [];
     _totpCredentials = [];
+    _quickNotes = [];
     _localSyncChanges = [];
     _templateConflictLogs = [];
     _notify();
