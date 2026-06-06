@@ -592,7 +592,16 @@ class SecureStorageService {
         } catch (_) {}
       }
       if (targetFile.existsSync()) {
-        await targetFile.rename(backupFile.path);
+        try {
+          await targetFile.rename(backupFile.path);
+        } catch (_) {
+          // rename can fail if the file was deleted between existsSync and
+          // rename, or if the backup file is locked. Fall through to copy.
+          try {
+            await targetFile.copy(backupFile.path);
+            await targetFile.delete();
+          } catch (_) {}
+        }
       }
 
       try {
