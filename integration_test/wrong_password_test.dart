@@ -11,11 +11,18 @@ import 'support/smoke_test_helpers.dart';
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  tearDown(() async {
-    await ServiceManager.destroyForTesting();
-  });
-
   testWidgets('regression: wrong password then correct password', (tester) async {
+    // Cleanup: dispose widget tree first, then destroy the service manager.
+    // addTearDown callbacks run in reverse registration order, so the pump
+    // registered second runs first, disposing the tree before destroy.
+    addTearDown(() async {
+      await ServiceManager.destroyForTesting();
+    });
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle(const Duration(seconds: 3));
+    });
+
     await configureSmokeSurface(tester);
 
     // 先创建/解锁保险库，确保进入 returning-user 状态
