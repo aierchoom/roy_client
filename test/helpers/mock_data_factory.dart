@@ -117,9 +117,11 @@ class AccountItemBuilder {
     return this;
   }
 
-  AccountItemBuilder withPassword(String password) => withField('password', password);
+  AccountItemBuilder withPassword(String password) =>
+      withField('password', password);
 
-  AccountItemBuilder withUsername(String username) => withField('username', username);
+  AccountItemBuilder withUsername(String username) =>
+      withField('username', username);
 
   AccountItemBuilder withWebsite(String url) => withField('website', url);
 
@@ -183,7 +185,10 @@ class AccountItemBuilder {
   // ---- 构建 ----
 
   AccountItem build() {
-    assert(_id.isNotEmpty, 'AccountItemBuilder: id must be set. Use .withId() or MockDataFactory.account()');
+    assert(
+      _id.isNotEmpty,
+      'AccountItemBuilder: id must be set. Use .withId() or MockDataFactory.account()',
+    );
     if (_createdAt == 0) _createdAt = _defaultTimestamp();
     if (_modifiedAt == 0) _modifiedAt = _createdAt;
     return AccountItem(
@@ -193,7 +198,9 @@ class AccountItemBuilder {
       templateId: _templateId,
       templateVersion: _templateVersion,
       data: Map.unmodifiable(Map<String, dynamic>.from(_data)),
-      fieldMeta: Map.unmodifiable(Map<String, AccountFieldMeta>.from(_fieldMeta)),
+      fieldMeta: Map.unmodifiable(
+        Map<String, AccountFieldMeta>.from(_fieldMeta),
+      ),
       createdAt: _createdAt,
       modifiedAt: _modifiedAt,
       lastEditedBy: _lastEditedBy,
@@ -224,7 +231,7 @@ class AccountItemBuilder {
 /// final t = AccountTemplateBuilder('custom_bank')
 ///   .withTitle('My Bank')
 ///   .withCategory(TemplateCategory.payment)
-///   .addField(key: 'cardNumber', label: '卡号', type: AccountFieldType.text)
+///   .addField(key: 'card_number', label: '卡号', type: AccountFieldType.text)
 ///   .addField(key: 'cvv', label: 'CVV', type: AccountFieldType.password, isSecret: true)
 ///   .build();
 /// ```
@@ -260,19 +267,23 @@ class AccountTemplateBuilder {
   factory AccountTemplateBuilder.fromPreset(String presetId) {
     final preset = kFieldPresets.firstWhere(
       (p) => p.id == presetId,
-      orElse: () => throw ArgumentError('Unknown preset id: $presetId. '
-          'Available: ${kFieldPresets.map((p) => p.id).join(', ')}'),
+      orElse: () => throw ArgumentError(
+        'Unknown preset id: $presetId. '
+        'Available: ${kFieldPresets.map((p) => p.id).join(', ')}',
+      ),
     );
     return AccountTemplateBuilder(preset.id)
       ..withTitle(preset.name)
       .._fields.addAll(
-        preset.fields.map((f) => AccountField(
-          fieldKey: f.fieldKey,
-          label: f.label,
-          description: f.description,
-          attributes: f.attributes,
-          order: f.order,
-        )),
+        preset.fields.map(
+          (f) => AccountField(
+            fieldKey: f.fieldKey,
+            label: f.label,
+            description: f.description,
+            attributes: f.attributes,
+            order: f.order,
+          ),
+        ),
       );
   }
 
@@ -311,23 +322,25 @@ class AccountTemplateBuilder {
     int? maxLength,
     int? minLength,
   }) {
-    _fields.add(AccountField(
-      fieldKey: key,
-      label: label,
-      description: description,
-      attributes: AccountFieldAttributes(
-        type: type,
-        isPrimary: isPrimary,
-        isRequired: isRequired,
-        isSecret: isSecret,
-        isEditable: isEditable,
-        isSearchable: isSearchable,
-        isCopyable: isCopyable,
-        maxLength: maxLength,
-        minLength: minLength,
+    _fields.add(
+      AccountField(
+        fieldKey: key,
+        label: label,
+        description: description,
+        attributes: AccountFieldAttributes(
+          type: type,
+          isPrimary: isPrimary,
+          isRequired: isRequired,
+          isSecret: isSecret,
+          isEditable: isEditable,
+          isSearchable: isSearchable,
+          isCopyable: isCopyable,
+          maxLength: maxLength,
+          minLength: minLength,
+        ),
+        order: _fields.length,
       ),
-      order: _fields.length,
-    ));
+    );
     return this;
   }
 
@@ -359,7 +372,7 @@ class AccountTemplateBuilder {
   }
 
   AccountTemplate build() {
-    if (_createdAt == null) _createdAt = _defaultTimestamp();
+    _createdAt ??= _defaultTimestamp();
     return AccountTemplate(
       templateId: _templateId,
       version: _version,
@@ -535,7 +548,10 @@ class MockDataFactory {
   ///   .withPassword('secret')
   ///   .build();
   /// ```
-  static AccountItemBuilder account({required String id, required String name}) {
+  static AccountItemBuilder account({
+    required String id,
+    required String name,
+  }) {
     return AccountItemBuilder()
       ..withId(id)
       ..withName(name)
@@ -553,14 +569,14 @@ class MockDataFactory {
     String website = 'https://example.com',
   }) {
     return AccountItemBuilder()
-      .withId(id)
-      .withName(name)
-      .withEmail(email)
-      .withTemplateId('builtin_generic_info')
-      .withUsername(username)
-      .withPassword(password)
-      .withWebsite(website)
-      .build();
+        .withId(id)
+        .withName(name)
+        .withEmail(email)
+        .withTemplateId('builtin_generic_info')
+        .withUsername(username)
+        .withPassword(password)
+        .withWebsite(website)
+        .build();
   }
 
   /// 构造一个安全笔记账户。
@@ -570,12 +586,12 @@ class MockDataFactory {
     String content = 'This is a secret note content.',
   }) {
     return AccountItemBuilder()
-      .withId(id)
-      .withName(name)
-      .withEmail('')
-      .withTemplateId('builtin_secure_note')
-      .withField('content', content)
-      .build();
+        .withId(id)
+        .withName(name)
+        .withEmail('')
+        .withTemplateId('builtin_secure_note')
+        .withField('content', content)
+        .build();
   }
 
   /// 构造一个银行账号。
@@ -588,15 +604,15 @@ class MockDataFactory {
     String expiryDate = '12/28',
   }) {
     return AccountItemBuilder()
-      .withId(id)
-      .withName(name)
-      .withEmail('')
-      .withTemplateId('builtin_payment')
-      .withField('bankName', bankName)
-      .withField('cardNumber', cardNumber)
-      .withField('cvv', cvv)
-      .withField('expiryDate', expiryDate)
-      .build();
+        .withId(id)
+        .withName(name)
+        .withEmail('')
+        .withTemplateId('builtin_payment_card')
+        .withField('bank_name', bankName)
+        .withField('card_number', cardNumber)
+        .withField('cvv', cvv)
+        .withField('expiry_date', expiryDate)
+        .build();
   }
 
   /// 构造一个已删除的账户（tombstone）。
@@ -606,15 +622,15 @@ class MockDataFactory {
     int serverVersion = 3,
   }) {
     return AccountItemBuilder()
-      .withId(id)
-      .withName(name)
-      .withEmail('')
-      .withTemplateId('builtin_generic_info')
-      .withData({})
-      .withSyncStatus(SyncStatus.synchronized)
-      .withServerVersion(serverVersion)
-      .withDeleted()
-      .build();
+        .withId(id)
+        .withName(name)
+        .withEmail('')
+        .withTemplateId('builtin_generic_info')
+        .withData({})
+        .withSyncStatus(SyncStatus.synchronized)
+        .withServerVersion(serverVersion)
+        .withDeleted()
+        .build();
   }
 
   /// 快速构造一个 [AccountTemplateBuilder]。
@@ -623,11 +639,12 @@ class MockDataFactory {
   }
 
   /// 快速构造一个 [TotpCredentialBuilder]。
-  static TotpCredentialBuilder totp({required String id, required String label}) {
+  static TotpCredentialBuilder totp({
+    required String id,
+    required String label,
+  }) {
     return TotpCredentialBuilder(id)..withLabel(label);
   }
-
-
 
   // ====== 批量生成器 ======
 
@@ -693,7 +710,7 @@ class MockDataFactory {
   /// );
   /// // pair.local  /  pair.remote
   /// ```
-  static _ConflictPair<AccountItem> conflictAccountPair({
+  static ConflictPair<AccountItem> conflictAccountPair({
     required String id,
     required String localName,
     required String remoteName,
@@ -705,28 +722,28 @@ class MockDataFactory {
     final localHlc = hlc.local(baseTime);
     final remoteHlc = hlc.remote(baseTime + 1);
     final local = AccountItemBuilder()
-      .withId(id)
-      .withName(localName)
-      .withEmail(localEmail)
-      .withTemplateId(templateId)
-      .withData({})
-      .withNameHlc(localHlc)
-      .withEmailHlc(localHlc)
-      .withSyncStatus(SyncStatus.synchronized)
-      .withServerVersion(1)
-      .build();
+        .withId(id)
+        .withName(localName)
+        .withEmail(localEmail)
+        .withTemplateId(templateId)
+        .withData({})
+        .withNameHlc(localHlc)
+        .withEmailHlc(localHlc)
+        .withSyncStatus(SyncStatus.synchronized)
+        .withServerVersion(1)
+        .build();
     final remote = AccountItemBuilder()
-      .withId(id)
-      .withName(remoteName)
-      .withEmail(remoteEmail)
-      .withTemplateId(templateId)
-      .withData({})
-      .withNameHlc(remoteHlc)
-      .withEmailHlc(remoteHlc)
-      .withSyncStatus(SyncStatus.synchronized)
-      .withServerVersion(2)
-      .build();
-    return _ConflictPair(local: local, remote: remote);
+        .withId(id)
+        .withName(remoteName)
+        .withEmail(remoteEmail)
+        .withTemplateId(templateId)
+        .withData({})
+        .withNameHlc(remoteHlc)
+        .withEmailHlc(remoteHlc)
+        .withSyncStatus(SyncStatus.synchronized)
+        .withServerVersion(2)
+        .build();
+    return ConflictPair(local: local, remote: remote);
   }
 
   // ====== 默认值配置 ======
@@ -745,14 +762,15 @@ class MockDataFactory {
 
 // 顶层默认时间戳（可被 MockDataFactory.setDefaultTimestamp 覆盖）
 int? _defaultTimestampOverride;
-int _defaultTimestamp() => _defaultTimestampOverride ?? DateTime(2024, 1, 1).millisecondsSinceEpoch;
+int _defaultTimestamp() =>
+    _defaultTimestampOverride ?? DateTime(2024, 1, 1).millisecondsSinceEpoch;
 
 // ---------------------------------------------------------------------------
 // 冲突数据对
 // ---------------------------------------------------------------------------
 
-class _ConflictPair<T> {
+class ConflictPair<T> {
   final T local;
   final T remote;
-  const _ConflictPair({required this.local, required this.remote});
+  const ConflictPair({required this.local, required this.remote});
 }

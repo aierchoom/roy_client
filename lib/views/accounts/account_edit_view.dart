@@ -1,4 +1,5 @@
 ﻿import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
@@ -66,6 +67,14 @@ class _AccountEditViewState extends State<AccountEditView> {
 
   bool _isAccountLinkField(AccountField field) {
     return field.attributes.type == AccountFieldType.accountLink;
+  }
+
+  bool _isTemplateRefField(AccountField field) {
+    return field.attributes.type == AccountFieldType.templateRef;
+  }
+
+  bool _isSubFormField(AccountField field) {
+    return field.attributes.type == AccountFieldType.subForm;
   }
 
   DateTime? _tryParseDateTime(String raw, TimeFieldFormat format) {
@@ -281,12 +290,16 @@ class _AccountEditViewState extends State<AccountEditView> {
     _fieldCtrls.clear();
     _fieldVisibility.clear();
 
-    for (final field in template.fields) {
+    final resolvedFields = provider.resolveFields(template);
+
+    for (final field in resolvedFields) {
       if (_isTotpField(field)) {
         _draftData.remove(field.fieldKey);
         continue;
       }
-      if (_isAccountLinkField(field)) {
+      if (_isAccountLinkField(field) ||
+          _isTemplateRefField(field) ||
+          _isSubFormField(field)) {
         continue;
       }
       final controller = TextEditingController();
@@ -517,7 +530,9 @@ class _AccountEditViewState extends State<AccountEditView> {
           }
           continue;
         }
-        if (_isAccountLinkField(field)) {
+        if (_isAccountLinkField(field) ||
+            _isTemplateRefField(field) ||
+            _isSubFormField(field)) {
           if (field.attributes.isRequired &&
               (_draftData[field.fieldKey]?.isEmpty ?? true)) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -1278,6 +1293,12 @@ class _AccountEditViewState extends State<AccountEditView> {
     }
     if (_isAccountLinkField(field)) {
       return _buildAccountLinkSection(context, field);
+    }
+    if (_isTemplateRefField(field)) {
+      return _buildTemplateRefSection(context, field);
+    }
+    if (_isSubFormField(field)) {
+      return _buildSubFormSection(context, field);
     }
     if (field.attributes.type == AccountFieldType.longText) {
       return _buildLongTextFieldCard(context, field);
@@ -2073,6 +2094,19 @@ class _AccountEditViewState extends State<AccountEditView> {
     final provider = context.read<EnhancedAppProvider>();
     final template = provider.getTemplate(account.templateId);
 
+    // Collect up to 3 non-secret, non-empty field values for preview.
+    final previewParts = <String>[];
+    if (template != null) {
+      for (final f in template.fields) {
+        if (f.attributes.isSecret) continue;
+        final v = account.data[f.fieldKey];
+        if (v != null && v.toString().trim().isNotEmpty) {
+          previewParts.add(v.toString().trim());
+          if (previewParts.length >= 3) break;
+        }
+      }
+    }
+
     return Material(
       color: theme.colorScheme.surfaceContainerHighest.withAlpha(80),
       borderRadius: BorderRadius.circular(AppRadii.panel),
@@ -2117,6 +2151,20 @@ class _AccountEditViewState extends State<AccountEditView> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
+                    if (previewParts.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          previewParts.join(' · '),
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant
+                                .withAlpha(180),
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -2132,13 +2180,363 @@ class _AccountEditViewState extends State<AccountEditView> {
     );
   }
 
+  Widget _buildTemplateRefSection(BuildContext context, AccountField field) {
+    final theme = Theme.of(context);
+    final provider = context.watch<EnhancedAppProvider>();
+    final linkedId = _draftData[field.fieldKey];
+    final linkedAccount = linkedId != null && linkedId.isNotEmpty
+        ? provider.getAccount(linkedId)
+        : null;
+    final targetTemplateId = field.attributes.targetTemplateId;
+    final targetTemplate = targetTemplateId != null
+        ? provider.getTemplate(targetTemplateId)
+        : null;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppSurfaces.soft(
+          theme.colorScheme,
+          tint: theme.colorScheme.primary,
+          tintAlpha: 10,
+        ),
+        borderRadius: BorderRadius.circular(AppRadii.xl),
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withAlpha(88),
+        ),
+        boxShadow: AppShadows.card(theme, depth: 0.55),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.account_tree_outlined, color: theme.colorScheme.primary),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    field.label.trim().isEmpty
+                        ? _text('模板关联', 'Template Reference')
+                        : field.label,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                if (linkedAccount != null)
+                  ToneChip(
+                    icon: Icons.check_circle_outlined,
+                    label: _text('已关联', 'Linked'),
+                    tint: theme.colorScheme.primary,
+                  ),
+              ],
+            ),
+            if (targetTemplate != null) ...[
+              const SizedBox(height: 6),
+              ToneChip(
+                icon: Icons.filter_alt_outlined,
+                label: _text(
+                  '仅限 ${targetTemplate.title}',
+                  'Only ${targetTemplate.title}',
+                ),
+                tint: theme.colorScheme.secondary,
+              ),
+            ],
+            const SizedBox(height: 8),
+            Text(
+              field.description?.trim().isNotEmpty == true
+                  ? field.description!.trim()
+                  : _text(
+                      '关联一个指定模板类型的账户。',
+                      'Link to an account of a specific template type.',
+                    ),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                height: 1.35,
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (linkedAccount != null)
+              _buildLinkedAccountCard(context, linkedAccount, field)
+            else
+              Text(
+                _text('尚未关联任何账户。', 'No account linked yet.'),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            const SizedBox(height: 10),
+            if (_isEditing)
+              Row(
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: () => _showAccountPicker(
+                      context,
+                      field,
+                      targetTemplateId: targetTemplateId,
+                    ),
+                    icon: Icon(
+                      linkedAccount != null
+                          ? Icons.swap_horiz_outlined
+                          : Icons.add_link_outlined,
+                    ),
+                    label: Text(
+                      linkedAccount != null
+                          ? _text('更换关联', 'Change Link')
+                          : _text('选择账户', 'Select Account'),
+                    ),
+                  ),
+                  if (linkedAccount != null) ...[
+                    const SizedBox(width: 8),
+                    OutlinedButton.icon(
+                      onPressed: () => setState(() {
+                        _draftData.remove(field.fieldKey);
+                      }),
+                      icon: const Icon(Icons.link_off_outlined),
+                      label: Text(_text('清除关联', 'Clear Link')),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: theme.colorScheme.error,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSubFormSection(BuildContext context, AccountField field) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final provider = context.watch<EnhancedAppProvider>();
+    final subTemplateId = field.attributes.subTemplateId;
+    final subTemplate = subTemplateId != null
+        ? provider.getTemplate(subTemplateId)
+        : null;
+
+    final raw = _draftData[field.fieldKey];
+    final items = raw != null && raw.isNotEmpty
+        ? (jsonDecode(raw) as List).cast<Map<String, dynamic>>()
+        : <Map<String, dynamic>>[];
+    final maxItems = field.attributes.maxSubItems;
+    final atLimit = maxItems != null && items.length >= maxItems;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppSurfaces.soft(theme.colorScheme,
+            tint: colors.secondary, tintAlpha: 10),
+        borderRadius: BorderRadius.circular(AppRadii.xl),
+        border: Border.all(
+            color: theme.colorScheme.outlineVariant.withAlpha(88)),
+        boxShadow: AppShadows.card(theme, depth: 0.55),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              Icon(Icons.dynamic_feed_outlined, color: colors.secondary),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  field.label.trim().isEmpty
+                      ? _text('嵌套子表单', 'Sub-Form')
+                      : field.label,
+                  style: theme.textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w700),
+                ),
+              ),
+              if (subTemplate != null)
+                ToneChip(
+                  icon: Icons.description_outlined,
+                  label: subTemplate.title,
+                  tint: colors.secondary,
+                ),
+            ]),
+            const SizedBox(height: 6),
+            Text(
+              '${_text('已添加', 'Added')} ${items.length}'
+              '${maxItems != null ? ' / $maxItems' : ''}',
+              style: theme.textTheme.bodyMedium
+                  ?.copyWith(color: colors.onSurfaceVariant, height: 1.35),
+            ),
+            const SizedBox(height: 12),
+            if (items.isNotEmpty)
+              StatefulBuilder(
+                builder: (context, setLocalState) {
+                  return ReorderableListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: items.length,
+                    onReorder: (oldIndex, newIndex) {
+                      if (!_isEditing) return;
+                      if (newIndex > oldIndex) newIndex--;
+                      final item = items.removeAt(oldIndex);
+                      items.insert(newIndex, item);
+                      _draftData[field.fieldKey] = jsonEncode(items);
+                      setLocalState(() {});
+                      setState(() {});
+                    },
+                    proxyDecorator: (child, index, animation) {
+                      return AnimatedBuilder(
+                        animation: animation,
+                        builder: (context, child) {
+                          return Material(
+                            elevation: 2,
+                            borderRadius:
+                                BorderRadius.circular(AppRadii.panel),
+                            child: child,
+                          );
+                        },
+                        child: child,
+                      );
+                    },
+                    itemBuilder: (context, index) {
+                      final item = items[index];
+                      return _ExpandableSubItem(
+                        key: ValueKey(
+                            '${field.fieldKey}-sub-$index-${item.hashCode}'),
+                        index: index,
+                        item: item,
+                        subTemplate: subTemplate,
+                        isEditing: _isEditing,
+                        onEdit: () =>
+                            _editSubItem(field, items, index, subTemplate),
+                        onDelete: () {
+                          items.removeAt(index);
+                          _draftData[field.fieldKey] = jsonEncode(items);
+                          setState(() {});
+                        },
+                        text: _text,
+                      );
+                    },
+                  );
+                },
+              ),
+            if (_isEditing && !atLimit)
+              OutlinedButton.icon(
+                onPressed: () => _addSubItem(field, items, subTemplate),
+                icon: const Icon(Icons.add_outlined),
+                label: Text(_text('添加子项', 'Add Item')),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _addSubItem(
+    AccountField field,
+    List<Map<String, dynamic>> items,
+    AccountTemplate? subTemplate,
+  ) async {
+    if (subTemplate == null) return;
+    final result = await _showSubItemEditor(context, subTemplate, null);
+    if (result == null || !mounted) return;
+    setState(() {
+      items.add(result);
+      _draftData[field.fieldKey] = jsonEncode(items);
+    });
+  }
+
+  Future<void> _editSubItem(
+    AccountField field,
+    List<Map<String, dynamic>> items,
+    int index,
+    AccountTemplate? subTemplate,
+  ) async {
+    if (subTemplate == null) return;
+    final result = await _showSubItemEditor(
+        context, subTemplate, items[index]);
+    if (result == null || !mounted) return;
+    setState(() {
+      items[index] = result;
+      _draftData[field.fieldKey] = jsonEncode(items);
+    });
+  }
+
+  Future<Map<String, dynamic>?> _showSubItemEditor(
+    BuildContext context,
+    AccountTemplate subTemplate,
+    Map<String, dynamic>? initial,
+  ) async {
+    final ctrls = <String, TextEditingController>{};
+    for (final f in subTemplate.fields) {
+      if (f.attributes.type == AccountFieldType.subForm) continue; // 1-level limit
+      ctrls[f.fieldKey] =
+          TextEditingController(text: initial?[f.fieldKey]?.toString() ?? '');
+    }
+
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(initial == null ? _text('添加子项', 'Add Item') : _text('编辑子项', 'Edit Item')),
+        content: SizedBox(
+          width: 400,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: subTemplate.fields
+                  .where((f) => f.attributes.type != AccountFieldType.subForm)
+                  .map((f) => Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: TextField(
+                          controller: ctrls[f.fieldKey],
+                          decoration: InputDecoration(
+                            labelText: f.label,
+                            hintText: f.attributes.hint,
+                          ),
+                          obscureText: f.attributes.isSecret,
+                        ),
+                      ))
+                  .toList(),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(_text('取消', 'Cancel')),
+          ),
+          FilledButton.tonal(
+            onPressed: () {
+              final data = <String, dynamic>{};
+              for (final e in ctrls.entries) {
+                data[e.key] = e.value.text;
+              }
+              for (final c in ctrls.values) {
+                c.dispose();
+              }
+              Navigator.pop(ctx, data);
+            },
+            child: Text(_text('确定', 'Confirm')),
+          ),
+        ],
+      ),
+    );
+
+    if (result == null) {
+      for (final c in ctrls.values) {
+        c.dispose();
+      }
+    }
+    return result;
+  }
+
   Future<void> _showAccountPicker(
     BuildContext context,
-    AccountField field,
-  ) async {
+    AccountField field, {
+    String? targetTemplateId,
+  }) async {
     final provider = context.read<EnhancedAppProvider>();
     final accounts = provider.allAccounts
         .where((a) => a.id != _accountId)
+        .where((a) =>
+            targetTemplateId == null || a.templateId == targetTemplateId)
         .toList(growable: false);
 
     final selected = await showDialog<String>(
@@ -3313,6 +3711,197 @@ class _AccountPickerDialogState extends State<_AccountPickerDialog> {
           child: Text(widget.localeText('取消', 'Cancel')),
         ),
       ],
+    );
+  }
+}
+
+/// An expandable card for a sub-form item.
+///
+/// Collapsed: shows a summary line with drag handle.
+/// Expanded: shows all fields from [subTemplate] with their values.
+class _ExpandableSubItem extends StatefulWidget {
+  final int index;
+  final Map<String, dynamic> item;
+  final AccountTemplate? subTemplate;
+  final bool isEditing;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+  final String Function(String, String) text;
+
+  const _ExpandableSubItem({
+    super.key,
+    required this.index,
+    required this.item,
+    required this.subTemplate,
+    required this.isEditing,
+    required this.onEdit,
+    required this.onDelete,
+    required this.text,
+  });
+
+  @override
+  State<_ExpandableSubItem> createState() => _ExpandableSubItemState();
+}
+
+class _ExpandableSubItemState extends State<_ExpandableSubItem> {
+  bool _expanded = false;
+
+  String get _summary {
+    if (widget.subTemplate == null) {
+      return widget.item.values.take(3).join(' · ');
+    }
+    final parts = <String>[];
+    for (final f in widget.subTemplate!.fields) {
+      if (f.attributes.isSecret) continue;
+      final v = widget.item[f.fieldKey];
+      if (v != null && v.toString().isNotEmpty) {
+        parts.add(v.toString());
+        if (parts.length >= 3) break;
+      }
+    }
+    return parts.isEmpty
+        ? widget.text('(空)', '(empty)')
+        : parts.join(' · ');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final fields = widget.subTemplate?.fields ?? [];
+    final nonSecretFields =
+        fields.where((f) => !f.attributes.isSecret).toList();
+    final secretFields =
+        fields.where((f) => f.attributes.isSecret).toList();
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          ListTile(
+            leading: widget.isEditing
+                ? ReorderableDragStartListener(
+                    index: widget.index,
+                    child: const Icon(Icons.drag_handle, size: 20),
+                  )
+                : null,
+            title: Text(
+              _summary,
+              maxLines: _expanded ? 5 : 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            subtitle: _expanded
+                ? Text(
+                    '${widget.text('第', '#')}${widget.index + 1}'
+                    ' ${widget.text('项', 'item')}',
+                    style: theme.textTheme.labelSmall,
+                  )
+                : null,
+            trailing: Icon(
+              _expanded ? Icons.expand_less : Icons.expand_more,
+              size: 20,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+            onTap: () => setState(() => _expanded = !_expanded),
+          ),
+          if (_expanded) ...[
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final f in nonSecretFields)
+                    _SubFieldRow(
+                      field: f,
+                      value: widget.item[f.fieldKey]?.toString() ?? '',
+                    ),
+                  if (secretFields.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      widget.text(
+                        '${secretFields.length} 个保密字段',
+                        '${secretFields.length} secret fields',
+                      ),
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                  if (widget.isEditing)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton.icon(
+                          onPressed: () {
+                            widget.onDelete();
+                            setState(() => _expanded = false);
+                          },
+                          icon: const Icon(Icons.delete_outline, size: 16),
+                          label: Text(widget.text('删除', 'Delete')),
+                          style: TextButton.styleFrom(
+                            foregroundColor: theme.colorScheme.error,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        FilledButton.tonalIcon(
+                          onPressed: widget.onEdit,
+                          icon: const Icon(Icons.edit_outlined, size: 16),
+                          label: Text(widget.text('编辑', 'Edit')),
+                        ),
+                      ],
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// A compact row showing a sub-form field label and value.
+class _SubFieldRow extends StatelessWidget {
+  final AccountField field;
+  final String value;
+
+  const _SubFieldRow({required this.field, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 80,
+            child: Text(
+              field.label,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              value.isEmpty ? '—' : value,
+              style: theme.textTheme.bodyMedium,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

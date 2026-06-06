@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
@@ -24,6 +24,8 @@ enum AccountFieldType {
   time,
   custom,
   accountLink,
+  templateRef,
+  subForm,
   longText,
   list,
   unknown,
@@ -31,16 +33,7 @@ enum AccountFieldType {
 
 enum TimeFieldFormat { full, date, monthYear, time }
 
-enum TemplateCategory {
-  login,
-  payment,
-  contact,
-  identity,
-  work,
-  shopping,
-  finance,
-  custom,
-}
+enum TemplateCategory { access, secret, payment, identity, license, custom }
 
 AccountFieldType fieldTypeFromString(String value) {
   return AccountFieldType.values.firstWhere(
@@ -50,6 +43,19 @@ AccountFieldType fieldTypeFromString(String value) {
 }
 
 TemplateCategory templateCategoryFromString(String? value) {
+  switch (value) {
+    case 'login':
+    case 'work':
+    case 'shopping':
+      return TemplateCategory.access;
+    case 'contact':
+      return TemplateCategory.identity;
+    case 'finance':
+      return TemplateCategory.payment;
+    case 'note':
+      return TemplateCategory.secret;
+  }
+
   return TemplateCategory.values.firstWhere(
     (category) => category.name == value,
     orElse: () => TemplateCategory.custom,
@@ -58,20 +64,16 @@ TemplateCategory templateCategoryFromString(String? value) {
 
 IconData templateCategoryIcon(TemplateCategory category) {
   switch (category) {
-    case TemplateCategory.login:
+    case TemplateCategory.access:
       return Icons.lock_person_outlined;
+    case TemplateCategory.secret:
+      return Icons.shield_outlined;
     case TemplateCategory.payment:
       return Icons.credit_card_outlined;
-    case TemplateCategory.contact:
-      return Icons.contact_mail_outlined;
     case TemplateCategory.identity:
       return Icons.badge_outlined;
-    case TemplateCategory.work:
-      return Icons.work_outline;
-    case TemplateCategory.shopping:
-      return Icons.shopping_bag_outlined;
-    case TemplateCategory.finance:
-      return Icons.account_balance_outlined;
+    case TemplateCategory.license:
+      return Icons.key_outlined;
     case TemplateCategory.custom:
       return Icons.widgets_outlined;
   }
@@ -88,88 +90,78 @@ TemplateCategory inferTemplateCategory({
     return templateCategoryFromString(explicitCategory);
   }
 
-  switch (templateId) {
-    case 'generic_info':
-      return TemplateCategory.custom;
-  }
-
-  if (iconCodePoint == Icons.credit_card_outlined.codePoint) {
-    return TemplateCategory.payment;
-  }
-  if (iconCodePoint == Icons.email_outlined.codePoint ||
-      iconCodePoint == Icons.language_outlined.codePoint ||
-      iconCodePoint == Icons.lock_outline.codePoint ||
-      iconCodePoint == Icons.vpn_key_outlined.codePoint) {
-    return TemplateCategory.login;
-  }
-  if (iconCodePoint == Icons.phone_outlined.codePoint) {
-    return TemplateCategory.contact;
-  }
-  if (iconCodePoint == Icons.business_center_outlined.codePoint ||
-      iconCodePoint == Icons.apartment_outlined.codePoint) {
-    return TemplateCategory.work;
-  }
-  if (iconCodePoint == Icons.shopping_bag_outlined.codePoint) {
-    return TemplateCategory.shopping;
-  }
-
   final normalizedTitle = (title ?? '').toLowerCase();
+  if (normalizedTitle.contains('note') ||
+      normalizedTitle.contains('mnemonic') ||
+      normalizedTitle.contains('seed') ||
+      normalizedTitle.contains('recovery') ||
+      normalizedTitle.contains('private key') ||
+      normalizedTitle.contains('笔记') ||
+      normalizedTitle.contains('助记词') ||
+      normalizedTitle.contains('恢复码') ||
+      normalizedTitle.contains('私钥')) {
+    return TemplateCategory.secret;
+  }
   if (normalizedTitle.contains('bank') ||
       normalizedTitle.contains('card') ||
       normalizedTitle.contains('payment') ||
       normalizedTitle.contains('wallet') ||
       normalizedTitle.contains('银行卡') ||
+      normalizedTitle.contains('信用卡') ||
       normalizedTitle.contains('支付')) {
     return TemplateCategory.payment;
+  }
+  if (normalizedTitle.contains('id') ||
+      normalizedTitle.contains('passport') ||
+      normalizedTitle.contains('identity') ||
+      normalizedTitle.contains('license plate') ||
+      normalizedTitle.contains('证件') ||
+      normalizedTitle.contains('身份') ||
+      normalizedTitle.contains('护照')) {
+    return TemplateCategory.identity;
+  }
+  if (normalizedTitle.contains('license') ||
+      normalizedTitle.contains('serial') ||
+      normalizedTitle.contains('activation') ||
+      normalizedTitle.contains('授权') ||
+      normalizedTitle.contains('序列号')) {
+    return TemplateCategory.license;
   }
   if (normalizedTitle.contains('email') ||
       normalizedTitle.contains('web') ||
       normalizedTitle.contains('website') ||
       normalizedTitle.contains('app') ||
       normalizedTitle.contains('login') ||
+      normalizedTitle.contains('api') ||
+      normalizedTitle.contains('token') ||
+      normalizedTitle.contains('server') ||
+      normalizedTitle.contains('ssh') ||
+      normalizedTitle.contains('wifi') ||
+      normalizedTitle.contains('router') ||
+      normalizedTitle.contains('nas') ||
       normalizedTitle.contains('账号') ||
-      normalizedTitle.contains('登录')) {
-    return TemplateCategory.login;
+      normalizedTitle.contains('登录') ||
+      normalizedTitle.contains('服务') ||
+      normalizedTitle.contains('服务器') ||
+      normalizedTitle.contains('路由器')) {
+    return TemplateCategory.access;
   }
-  if (normalizedTitle.contains('phone') ||
-      normalizedTitle.contains('sim') ||
-      normalizedTitle.contains('mobile') ||
-      normalizedTitle.contains('电话') ||
-      normalizedTitle.contains('手机')) {
-    return TemplateCategory.contact;
-  }
-  if (normalizedTitle.contains('id') ||
-      normalizedTitle.contains('passport') ||
-      normalizedTitle.contains('identity') ||
-      normalizedTitle.contains('证件') ||
-      normalizedTitle.contains('身份')) {
-    return TemplateCategory.identity;
-  }
-  if (normalizedTitle.contains('work') ||
-      normalizedTitle.contains('company') ||
-      normalizedTitle.contains('office') ||
-      normalizedTitle.contains('business') ||
-      normalizedTitle.contains('工作') ||
-      normalizedTitle.contains('企业')) {
-    return TemplateCategory.work;
-  }
-  if (normalizedTitle.contains('shop') ||
-      normalizedTitle.contains('shopping') ||
-      normalizedTitle.contains('store') ||
-      normalizedTitle.contains('商城') ||
-      normalizedTitle.contains('购物')) {
-    return TemplateCategory.shopping;
-  }
+
   final sourceFields = fields ?? const <AccountField>[];
-  final hasEmailLike = sourceFields.any(
-    (field) =>
-        field.attributes.type == AccountFieldType.email ||
+  final hasAccessLike = sourceFields.any((field) {
+    final normalized = '${field.fieldKey} ${field.label}'.toLowerCase();
+    return field.attributes.type == AccountFieldType.email ||
         field.attributes.type == AccountFieldType.url ||
-        field.attributes.type == AccountFieldType.password,
-  );
-  final hasPhoneLike = sourceFields.any(
-    (field) => field.attributes.type == AccountFieldType.phone,
-  );
+        field.attributes.type == AccountFieldType.password ||
+        normalized.contains('username') ||
+        normalized.contains('password') ||
+        normalized.contains('api') ||
+        normalized.contains('token') ||
+        normalized.contains('ssh') ||
+        normalized.contains('wifi') ||
+        normalized.contains('账号') ||
+        normalized.contains('密码');
+  });
   final hasPaymentLike = sourceFields.any((field) {
     final normalized = '${field.fieldKey} ${field.label}'.toLowerCase();
     return normalized.contains('card') ||
@@ -178,9 +170,59 @@ TemplateCategory inferTemplateCategory({
         normalized.contains('支付') ||
         normalized.contains('银行卡');
   });
+  final hasIdentityLike = sourceFields.any((field) {
+    final normalized = '${field.fieldKey} ${field.label}'.toLowerCase();
+    return normalized.contains('passport') ||
+        normalized.contains('identity') ||
+        normalized.contains('id_number') ||
+        normalized.contains('证件') ||
+        normalized.contains('身份证');
+  });
+  final hasLicenseLike = sourceFields.any((field) {
+    final normalized = '${field.fieldKey} ${field.label}'.toLowerCase();
+    return normalized.contains('license') ||
+        normalized.contains('serial') ||
+        normalized.contains('activation') ||
+        normalized.contains('授权') ||
+        normalized.contains('序列号');
+  });
+  final hasSecretLike = sourceFields.any(
+    (field) =>
+        field.attributes.isSecret &&
+        (field.attributes.type == AccountFieldType.longText ||
+            field.attributes.type == AccountFieldType.list),
+  );
   if (hasPaymentLike) return TemplateCategory.payment;
-  if (hasPhoneLike) return TemplateCategory.contact;
-  if (hasEmailLike) return TemplateCategory.login;
+  if (hasIdentityLike) return TemplateCategory.identity;
+  if (hasLicenseLike) return TemplateCategory.license;
+  if (hasAccessLike) return TemplateCategory.access;
+  if (hasSecretLike) return TemplateCategory.secret;
+
+  if (iconCodePoint == Icons.credit_card_outlined.codePoint) {
+    return TemplateCategory.payment;
+  }
+  if (iconCodePoint == Icons.badge_outlined.codePoint) {
+    return TemplateCategory.identity;
+  }
+  if (iconCodePoint == Icons.key_outlined.codePoint) {
+    return TemplateCategory.license;
+  }
+  if (iconCodePoint == Icons.note_outlined.codePoint ||
+      iconCodePoint == Icons.notes_outlined.codePoint ||
+      iconCodePoint == Icons.article_outlined.codePoint ||
+      iconCodePoint == Icons.vpn_key_outlined.codePoint) {
+    return TemplateCategory.secret;
+  }
+  if (iconCodePoint == Icons.email_outlined.codePoint ||
+      iconCodePoint == Icons.language_outlined.codePoint ||
+      iconCodePoint == Icons.lock_outline.codePoint ||
+      iconCodePoint == Icons.code_outlined.codePoint ||
+      iconCodePoint == Icons.terminal_outlined.codePoint ||
+      iconCodePoint == Icons.dns_outlined.codePoint ||
+      iconCodePoint == Icons.wifi_outlined.codePoint ||
+      iconCodePoint == Icons.computer_outlined.codePoint) {
+    return TemplateCategory.access;
+  }
 
   return TemplateCategory.custom;
 }
@@ -199,6 +241,9 @@ class AccountFieldAttributes {
   final String? hint;
   final bool isReference;
   final TimeFieldFormat timeFormat;
+  final String? targetTemplateId;
+  final String? subTemplateId;
+  final int? maxSubItems;
 
   const AccountFieldAttributes({
     required this.type,
@@ -214,6 +259,9 @@ class AccountFieldAttributes {
     this.regex,
     this.hint,
     this.timeFormat = TimeFieldFormat.full,
+    this.targetTemplateId,
+    this.subTemplateId,
+    this.maxSubItems,
   });
 
   factory AccountFieldAttributes.fromJson(Map<String, dynamic> json) {
@@ -234,6 +282,9 @@ class AccountFieldAttributes {
         (e) => e.name == (json['timeFormat'] as String? ?? 'full'),
         orElse: () => TimeFieldFormat.full,
       ),
+      targetTemplateId: json['targetTemplateId'] as String?,
+      subTemplateId: json['subTemplateId'] as String?,
+      maxSubItems: json['maxSubItems'] as int?,
     );
   }
 
@@ -252,6 +303,9 @@ class AccountFieldAttributes {
       'regex': regex,
       'hint': hint,
       'timeFormat': timeFormat.name,
+      if (targetTemplateId != null) 'targetTemplateId': targetTemplateId,
+      if (subTemplateId != null) 'subTemplateId': subTemplateId,
+      if (maxSubItems != null) 'maxSubItems': maxSubItems,
     };
   }
 
@@ -269,6 +323,9 @@ class AccountFieldAttributes {
     String? hint,
     bool? isReference,
     TimeFieldFormat? timeFormat,
+    String? targetTemplateId,
+    String? subTemplateId,
+    int? maxSubItems,
   }) {
     return AccountFieldAttributes(
       type: type ?? this.type,
@@ -284,6 +341,9 @@ class AccountFieldAttributes {
       hint: hint ?? this.hint,
       isReference: isReference ?? this.isReference,
       timeFormat: timeFormat ?? this.timeFormat,
+      targetTemplateId: targetTemplateId ?? this.targetTemplateId,
+      subTemplateId: subTemplateId ?? this.subTemplateId,
+      maxSubItems: maxSubItems ?? this.maxSubItems,
     );
   }
 }
@@ -392,6 +452,7 @@ class AccountTemplate {
   final int? iconCodePoint;
   final TemplateCategory category;
   final List<AccountField> fields;
+  final List<String> parentTemplateIds;
   final bool isCustom;
   final int? createdAt;
   final int? modifiedAt;
@@ -412,6 +473,7 @@ class AccountTemplate {
     this.iconCodePoint,
     required this.category,
     required this.fields,
+    this.parentTemplateIds = const [],
     this.isCustom = false,
     this.createdAt,
     this.modifiedAt,
@@ -460,6 +522,9 @@ class AccountTemplate {
       fields: (json['fields'] as List<dynamic>? ?? const [])
           .map((field) => AccountField.fromJson(field as Map<String, dynamic>))
           .toList(),
+      parentTemplateIds: (json['parentTemplateIds'] as List<dynamic>?)
+              ?.cast<String>() ??
+          const [],
       isCustom: isCustom,
       createdAt: json['createdAt'] as int?,
       modifiedAt: json['modifiedAt'] as int?,
@@ -487,6 +552,8 @@ class AccountTemplate {
       'icon': iconCodePoint,
       'category': category.name,
       'fields': fields.map((field) => field.toJson()).toList(),
+      if (parentTemplateIds.isNotEmpty)
+        'parentTemplateIds': parentTemplateIds,
       'createdAt': createdAt,
       'modifiedAt': modifiedAt,
       'lastEditedBy': lastEditedBy,
@@ -508,6 +575,8 @@ class AccountTemplate {
       'icon': iconCodePoint,
       'category': category.name,
       'fields': fields.map((f) => f.toExportJson()).toList(),
+      if (parentTemplateIds.isNotEmpty)
+        'parentTemplateIds': parentTemplateIds,
     };
   }
 
@@ -519,6 +588,7 @@ class AccountTemplate {
     int? iconCodePoint,
     TemplateCategory? category,
     List<AccountField>? fields,
+    List<String>? parentTemplateIds,
     bool? isCustom,
     int? createdAt,
     int? modifiedAt,
@@ -538,6 +608,7 @@ class AccountTemplate {
       iconCodePoint: iconCodePoint ?? this.iconCodePoint,
       category: category ?? this.category,
       fields: fields ?? this.fields,
+      parentTemplateIds: parentTemplateIds ?? this.parentTemplateIds,
       isCustom: isCustom ?? this.isCustom,
       createdAt: createdAt ?? this.createdAt,
       modifiedAt: modifiedAt ?? this.modifiedAt,
@@ -554,31 +625,116 @@ class AccountTemplate {
 
 final _builtinZeroHlc = Hlc.zero('builtin');
 
+AccountField _builtinField({
+  required String fieldKey,
+  required String label,
+  String? description,
+  required AccountFieldAttributes attributes,
+  required int order,
+}) {
+  return AccountField(
+    fieldKey: fieldKey,
+    label: label,
+    description: description,
+    attributes: attributes,
+    order: order,
+    labelHlc: _builtinZeroHlc,
+    descriptionHlc: _builtinZeroHlc,
+    attributesHlc: _builtinZeroHlc,
+    orderHlc: _builtinZeroHlc,
+  );
+}
+
+final AccountTemplate websiteTemplate = AccountTemplate(
+  templateId: 'builtin_generic_info',
+  version: 1,
+  title: '登录凭据',
+  subTitle: '网站、App 或服务的账号、密码和 2FA',
+  iconCodePoint: Icons.language_outlined.codePoint,
+  category: TemplateCategory.access,
+  fields: [
+    _builtinField(
+      fieldKey: 'website',
+      label: '站点/服务',
+      description: '网站名称、App 名称或登录地址。',
+      attributes: const AccountFieldAttributes(
+        type: AccountFieldType.url,
+        isPrimary: true,
+        isRequired: true,
+        isSearchable: true,
+        hint: 'https://example.com',
+      ),
+      order: 0,
+    ),
+    _builtinField(
+      fieldKey: 'username',
+      label: '账号',
+      description: '登录用户名、邮箱或手机号。',
+      attributes: const AccountFieldAttributes(
+        type: AccountFieldType.text,
+        isPrimary: true,
+        isRequired: true,
+        isSearchable: true,
+        hint: '用户名 / 邮箱 / 手机号',
+      ),
+      order: 1,
+    ),
+    _builtinField(
+      fieldKey: 'password',
+      label: '密码',
+      description: '该站点或服务的登录密码。',
+      attributes: const AccountFieldAttributes(
+        type: AccountFieldType.password,
+        isRequired: true,
+        isSecret: true,
+        hint: '输入或生成密码',
+      ),
+      order: 2,
+    ),
+    _builtinField(
+      fieldKey: 'totp',
+      label: '2FA',
+      description: '关联独立的 2FA/TOTP 凭据，不在账户字段中保存动态码密钥。',
+      attributes: const AccountFieldAttributes(
+        type: AccountFieldType.custom,
+        isReference: true,
+        isCopyable: false,
+        hint: '选择或新建 2FA',
+      ),
+      order: 3,
+    ),
+    _builtinField(
+      fieldKey: 'notes',
+      label: '备注',
+      description: '额外说明、恢复提示或安全问题等信息。',
+      attributes: const AccountFieldAttributes(
+        type: AccountFieldType.text,
+        hint: '可选',
+      ),
+      order: 4,
+    ),
+  ],
+);
+
 final AccountTemplate secureNoteGenericTemplate = AccountTemplate(
   templateId: 'builtin_secure_note',
   version: 1,
   title: '通用安全笔记',
-  subTitle:
-      '存储助记词、API Key、私钥等敏感文本',
+  subTitle: '存储恢复提示、私钥片段和其他敏感文本',
   iconCodePoint: Icons.note_outlined.codePoint,
-  category: TemplateCategory.custom,
+  category: TemplateCategory.secret,
   fields: [
-    AccountField(
+    _builtinField(
       fieldKey: 'content',
       label: '内容',
-      description:
-          '多行加密文本，默认折叠显示。',
-      attributes: AccountFieldAttributes(
+      description: '多行加密文本，默认折叠显示。',
+      attributes: const AccountFieldAttributes(
         type: AccountFieldType.longText,
         isRequired: true,
         isSecret: true,
         hint: '粘贴或输入敏感内容...',
       ),
       order: 0,
-      labelHlc: _builtinZeroHlc,
-      descriptionHlc: _builtinZeroHlc,
-      attributesHlc: _builtinZeroHlc,
-      orderHlc: _builtinZeroHlc,
     ),
   ],
 );
@@ -587,16 +743,15 @@ final AccountTemplate secureNoteMnemonicTemplate = AccountTemplate(
   templateId: 'builtin_mnemonic',
   version: 1,
   title: '助记词',
-  subTitle: '加密存储 12/24 个孝复词',
+  subTitle: '加密存储 12/24 个恢复词',
   iconCodePoint: Icons.vpn_key_outlined.codePoint,
-  category: TemplateCategory.custom,
+  category: TemplateCategory.secret,
   fields: [
-    AccountField(
+    _builtinField(
       fieldKey: 'mnemonic_words',
       label: '助记词',
-      description:
-          '支持整段粘贴自动分词，默认折叠隐藏。',
-      attributes: AccountFieldAttributes(
+      description: '支持整段粘贴自动分词，默认折叠隐藏。',
+      attributes: const AccountFieldAttributes(
         type: AccountFieldType.list,
         isRequired: true,
         isSecret: true,
@@ -604,10 +759,6 @@ final AccountTemplate secureNoteMnemonicTemplate = AccountTemplate(
             'abandon ability able about above absent absorb abstract absurd abuse access accident',
       ),
       order: 0,
-      labelHlc: _builtinZeroHlc,
-      descriptionHlc: _builtinZeroHlc,
-      attributesHlc: _builtinZeroHlc,
-      orderHlc: _builtinZeroHlc,
     ),
   ],
 );
@@ -615,15 +766,15 @@ final AccountTemplate secureNoteMnemonicTemplate = AccountTemplate(
 final AccountTemplate apiServiceTemplate = AccountTemplate(
   templateId: 'builtin_api_service',
   version: 1,
-  title: 'API 服务',
+  title: 'API 凭据',
   subTitle: '存储 API Key、Token 和端点信息',
   iconCodePoint: Icons.code_outlined.codePoint,
-  category: TemplateCategory.custom,
+  category: TemplateCategory.access,
   fields: [
-    AccountField(
+    _builtinField(
       fieldKey: 'service_name',
       label: '服务名称',
-      attributes: AccountFieldAttributes(
+      attributes: const AccountFieldAttributes(
         type: AccountFieldType.text,
         isPrimary: true,
         isRequired: true,
@@ -631,139 +782,328 @@ final AccountTemplate apiServiceTemplate = AccountTemplate(
         hint: 'OpenAI / Stripe / AWS',
       ),
       order: 0,
-      labelHlc: _builtinZeroHlc,
-      attributesHlc: _builtinZeroHlc,
-      orderHlc: _builtinZeroHlc,
     ),
-    AccountField(
+    _builtinField(
       fieldKey: 'api_keys',
       label: 'API Key',
-      attributes: AccountFieldAttributes(
+      attributes: const AccountFieldAttributes(
         type: AccountFieldType.list,
         isSecret: true,
         hint: 'sk-proj-xxxxx',
       ),
       order: 1,
-      labelHlc: _builtinZeroHlc,
-      attributesHlc: _builtinZeroHlc,
-      orderHlc: _builtinZeroHlc,
     ),
-    AccountField(
+    _builtinField(
       fieldKey: 'endpoint',
       label: 'API 端点',
-      attributes: AccountFieldAttributes(
+      attributes: const AccountFieldAttributes(
         type: AccountFieldType.url,
         hint: 'https://api.example.com/v1',
       ),
       order: 2,
-      labelHlc: _builtinZeroHlc,
-      attributesHlc: _builtinZeroHlc,
-      orderHlc: _builtinZeroHlc,
     ),
   ],
 );
 
-final AccountTemplate websiteTemplate = AccountTemplate(
-  templateId: 'builtin_generic_info',
+final AccountTemplate paymentCardTemplate = AccountTemplate(
+  templateId: 'builtin_payment_card',
   version: 1,
-  title: '网站模板',
-  subTitle:
-      '保存网站、登录账号、密码和备注',
-  iconCodePoint: Icons.language_outlined.codePoint,
-  category: TemplateCategory.login,
+  title: '银行卡',
+  subTitle: '银行卡、信用卡和支付卡信息',
+  iconCodePoint: Icons.credit_card_outlined.codePoint,
+  category: TemplateCategory.payment,
   fields: [
-    AccountField(
-      fieldKey: 'website',
-      label: '网站',
-      description:
-          '网站名称或登录地址。',
-      attributes: AccountFieldAttributes(
-        type: AccountFieldType.url,
-        isPrimary: true,
-        isRequired: true,
-        isSearchable: true,
-        hint: 'https://example.com',
-      ),
-      order: 0,
-      labelHlc: _builtinZeroHlc,
-      descriptionHlc: _builtinZeroHlc,
-      attributesHlc: _builtinZeroHlc,
-      orderHlc: _builtinZeroHlc,
-    ),
-    AccountField(
-      fieldKey: 'username',
-      label: '账号',
-      description:
-          '登录用户名、邮箱或手机号。',
-      attributes: AccountFieldAttributes(
+    _builtinField(
+      fieldKey: 'bank_name',
+      label: '银行名称',
+      attributes: const AccountFieldAttributes(
         type: AccountFieldType.text,
         isPrimary: true,
         isRequired: true,
         isSearchable: true,
-        hint: '用户名 / 邮箱 / 手机号',
+        hint: '中国工商银行',
+      ),
+      order: 0,
+    ),
+    _builtinField(
+      fieldKey: 'card_number',
+      label: '卡号',
+      attributes: const AccountFieldAttributes(
+        type: AccountFieldType.text,
+        isRequired: true,
+        isSearchable: true,
+        hint: '6222 **** **** 8888',
       ),
       order: 1,
-      labelHlc: _builtinZeroHlc,
-      descriptionHlc: _builtinZeroHlc,
-      attributesHlc: _builtinZeroHlc,
-      orderHlc: _builtinZeroHlc,
     ),
-    AccountField(
-      fieldKey: 'password',
-      label: '密码',
-      description: '该网站的登录密码。',
-      attributes: AccountFieldAttributes(
+    _builtinField(
+      fieldKey: 'cvv',
+      label: 'CVV',
+      attributes: const AccountFieldAttributes(
         type: AccountFieldType.password,
-        isRequired: true,
         isSecret: true,
-        hint: '输入或生成密码',
+        hint: '卡背后三位',
       ),
       order: 2,
-      labelHlc: _builtinZeroHlc,
-      descriptionHlc: _builtinZeroHlc,
-      attributesHlc: _builtinZeroHlc,
-      orderHlc: _builtinZeroHlc,
     ),
-    AccountField(
-      fieldKey: 'totp',
-      label: '2FA',
-      description:
-          '关联独立的 2FA/TOTP 凭据，不在账户字段中保存动态码密钥。',
-      attributes: AccountFieldAttributes(
-        type: AccountFieldType.custom,
-        isReference: true,
-        isCopyable: false,
-        hint: '选择或新建 2FA',
+    _builtinField(
+      fieldKey: 'expiry_date',
+      label: '有效期',
+      attributes: const AccountFieldAttributes(
+        type: AccountFieldType.time,
+        timeFormat: TimeFieldFormat.monthYear,
+        hint: 'MM/YY',
       ),
       order: 3,
-      labelHlc: _builtinZeroHlc,
-      descriptionHlc: _builtinZeroHlc,
-      attributesHlc: _builtinZeroHlc,
-      orderHlc: _builtinZeroHlc,
     ),
-    AccountField(
+    _builtinField(
       fieldKey: 'notes',
       label: '备注',
-      description:
-          '额外说明、恢复提示或安全问题等信息。',
-      attributes: AccountFieldAttributes(
+      attributes: const AccountFieldAttributes(
         type: AccountFieldType.text,
         hint: '可选',
       ),
       order: 4,
-      labelHlc: _builtinZeroHlc,
-      descriptionHlc: _builtinZeroHlc,
-      attributesHlc: _builtinZeroHlc,
-      orderHlc: _builtinZeroHlc,
+    ),
+  ],
+);
+
+final AccountTemplate identityDocumentTemplate = AccountTemplate(
+  templateId: 'builtin_identity_document',
+  version: 1,
+  title: '身份证件',
+  subTitle: '身份证、护照、驾照等证件信息',
+  iconCodePoint: Icons.badge_outlined.codePoint,
+  category: TemplateCategory.identity,
+  fields: [
+    _builtinField(
+      fieldKey: 'full_name',
+      label: '姓名',
+      attributes: const AccountFieldAttributes(
+        type: AccountFieldType.text,
+        isPrimary: true,
+        isRequired: true,
+        isSearchable: true,
+      ),
+      order: 0,
+    ),
+    _builtinField(
+      fieldKey: 'id_number',
+      label: '证件号码',
+      attributes: const AccountFieldAttributes(
+        type: AccountFieldType.text,
+        isRequired: true,
+        isSecret: true,
+        hint: '110101********0001',
+      ),
+      order: 1,
+    ),
+    _builtinField(
+      fieldKey: 'issuing_authority',
+      label: '签发机关',
+      attributes: const AccountFieldAttributes(
+        type: AccountFieldType.text,
+        hint: '某市公安局',
+      ),
+      order: 2,
+    ),
+    _builtinField(
+      fieldKey: 'valid_until',
+      label: '有效期限',
+      attributes: const AccountFieldAttributes(
+        type: AccountFieldType.time,
+        timeFormat: TimeFieldFormat.date,
+      ),
+      order: 3,
+    ),
+    _builtinField(
+      fieldKey: 'notes',
+      label: '备注',
+      attributes: const AccountFieldAttributes(type: AccountFieldType.text),
+      order: 4,
+    ),
+  ],
+);
+
+final AccountTemplate wifiCredentialTemplate = AccountTemplate(
+  templateId: 'builtin_wifi',
+  version: 1,
+  title: 'WiFi / 网络',
+  subTitle: '家庭、办公网络和路由器登录信息',
+  iconCodePoint: Icons.wifi_outlined.codePoint,
+  category: TemplateCategory.access,
+  fields: [
+    _builtinField(
+      fieldKey: 'ssid',
+      label: '网络名称',
+      attributes: const AccountFieldAttributes(
+        type: AccountFieldType.text,
+        isPrimary: true,
+        isRequired: true,
+        isSearchable: true,
+        hint: 'Home_WiFi_5G',
+      ),
+      order: 0,
+    ),
+    _builtinField(
+      fieldKey: 'wifi_password',
+      label: 'WiFi 密码',
+      attributes: const AccountFieldAttributes(
+        type: AccountFieldType.password,
+        isSecret: true,
+        hint: 'WPA/WPA2 密码',
+      ),
+      order: 1,
+    ),
+    _builtinField(
+      fieldKey: 'admin_url',
+      label: '管理地址',
+      attributes: const AccountFieldAttributes(
+        type: AccountFieldType.url,
+        hint: 'http://192.168.1.1',
+      ),
+      order: 2,
+    ),
+    _builtinField(
+      fieldKey: 'admin_username',
+      label: '管理账号',
+      attributes: const AccountFieldAttributes(
+        type: AccountFieldType.text,
+        hint: 'admin',
+      ),
+      order: 3,
+    ),
+    _builtinField(
+      fieldKey: 'admin_password',
+      label: '管理密码',
+      attributes: const AccountFieldAttributes(
+        type: AccountFieldType.password,
+        isSecret: true,
+      ),
+      order: 4,
+    ),
+  ],
+);
+
+final AccountTemplate serverCredentialTemplate = AccountTemplate(
+  templateId: 'builtin_server_ssh',
+  version: 1,
+  title: '服务器 / SSH',
+  subTitle: '服务器地址、登录用户、端口和 SSH 密钥',
+  iconCodePoint: Icons.dns_outlined.codePoint,
+  category: TemplateCategory.access,
+  fields: [
+    _builtinField(
+      fieldKey: 'host',
+      label: '主机地址',
+      attributes: const AccountFieldAttributes(
+        type: AccountFieldType.url,
+        isPrimary: true,
+        isRequired: true,
+        isSearchable: true,
+        hint: '192.168.1.100 或 domain.com',
+      ),
+      order: 0,
+    ),
+    _builtinField(
+      fieldKey: 'ssh_user',
+      label: '用户名',
+      attributes: const AccountFieldAttributes(
+        type: AccountFieldType.text,
+        isRequired: true,
+        hint: 'root',
+      ),
+      order: 1,
+    ),
+    _builtinField(
+      fieldKey: 'ssh_port',
+      label: '端口',
+      attributes: const AccountFieldAttributes(
+        type: AccountFieldType.number,
+        hint: '22',
+      ),
+      order: 2,
+    ),
+    _builtinField(
+      fieldKey: 'ssh_key',
+      label: 'SSH 密钥',
+      attributes: const AccountFieldAttributes(
+        type: AccountFieldType.longText,
+        isSecret: true,
+        hint: '-----BEGIN OPENSSH PRIVATE KEY-----',
+      ),
+      order: 3,
+    ),
+    _builtinField(
+      fieldKey: 'notes',
+      label: '备注',
+      attributes: const AccountFieldAttributes(type: AccountFieldType.text),
+      order: 4,
+    ),
+  ],
+);
+
+final AccountTemplate softwareLicenseTemplate = AccountTemplate(
+  templateId: 'builtin_software_license',
+  version: 1,
+  title: '软件授权',
+  subTitle: '许可证密钥、购买邮箱和到期信息',
+  iconCodePoint: Icons.key_outlined.codePoint,
+  category: TemplateCategory.license,
+  fields: [
+    _builtinField(
+      fieldKey: 'software_name',
+      label: '软件名称',
+      attributes: const AccountFieldAttributes(
+        type: AccountFieldType.text,
+        isPrimary: true,
+        isRequired: true,
+        isSearchable: true,
+      ),
+      order: 0,
+    ),
+    _builtinField(
+      fieldKey: 'license_key',
+      label: '授权码',
+      attributes: const AccountFieldAttributes(
+        type: AccountFieldType.text,
+        isRequired: true,
+        isSecret: true,
+        hint: 'XXXX-XXXX-XXXX-XXXX',
+      ),
+      order: 1,
+    ),
+    _builtinField(
+      fieldKey: 'purchase_email',
+      label: '购买邮箱',
+      attributes: const AccountFieldAttributes(
+        type: AccountFieldType.email,
+        hint: 'name@example.com',
+      ),
+      order: 2,
+    ),
+    _builtinField(
+      fieldKey: 'expires_at',
+      label: '到期时间',
+      attributes: const AccountFieldAttributes(
+        type: AccountFieldType.time,
+        timeFormat: TimeFieldFormat.date,
+      ),
+      order: 3,
     ),
   ],
 );
 
 final List<AccountTemplate> basicAccountTemplates = [
   websiteTemplate,
+  apiServiceTemplate,
+  wifiCredentialTemplate,
+  serverCredentialTemplate,
   secureNoteGenericTemplate,
   secureNoteMnemonicTemplate,
-  apiServiceTemplate,
+  paymentCardTemplate,
+  identityDocumentTemplate,
+  softwareLicenseTemplate,
 ];
 
 String encodeTemplateExport(List<AccountTemplate> templates) {
@@ -795,14 +1135,51 @@ List<AccountTemplate> parseTemplateExport(
   }
 
   final results = <AccountTemplate>[];
+  final importedIds = <String>{};
   for (final raw in rawList) {
     var template = AccountTemplate.fromJson(raw, isCustom: true);
     if (existingIds.contains(template.templateId)) {
       template = template.copyWith(
-        templateId: 'custom_${DateTime.now().millisecondsSinceEpoch}_${results.length}',
+        templateId:
+            'custom_${DateTime.now().millisecondsSinceEpoch}_${results.length}',
       );
     }
+    importedIds.add(template.templateId);
     results.add(template);
   }
+
+  // Resolve and clean references: merge existing + imported IDs.
+  final allKnownIds = {...existingIds, ...importedIds};
+
+  for (var i = 0; i < results.length; i++) {
+    final t = results[i];
+
+    // Strip dangling parent references.
+    final validParents = t.parentTemplateIds
+        .where((id) => allKnownIds.contains(id))
+        .toList();
+    if (validParents.length != t.parentTemplateIds.length) {
+      results[i] = t.copyWith(parentTemplateIds: validParents);
+    }
+
+    // Strip dangling field references.
+    final cleanedFields = t.fields.map((f) {
+      var attrs = f.attributes;
+      if (attrs.targetTemplateId != null &&
+          !allKnownIds.contains(attrs.targetTemplateId)) {
+        attrs = attrs.copyWith(targetTemplateId: null);
+      }
+      if (attrs.subTemplateId != null &&
+          !allKnownIds.contains(attrs.subTemplateId)) {
+        attrs = attrs.copyWith(subTemplateId: null);
+      }
+      if (identical(attrs, f.attributes)) return f;
+      return f.copyWith(attributes: attrs);
+    }).toList();
+    if (!identical(cleanedFields, t.fields)) {
+      results[i] = t.copyWith(fields: cleanedFields);
+    }
+  }
+
   return results;
 }

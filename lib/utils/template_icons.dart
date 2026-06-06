@@ -4,6 +4,7 @@ const List<IconData> kTemplateIconOptions = [
   // General
   Icons.description_outlined,
   Icons.article_outlined,
+  Icons.note_outlined,
   Icons.notes_outlined,
   Icons.folder_outlined,
   Icons.folder_copy_outlined,
@@ -17,6 +18,7 @@ const List<IconData> kTemplateIconOptions = [
   Icons.vpn_key_outlined,
   Icons.shield_outlined,
   Icons.verified_user_outlined,
+  Icons.badge_outlined,
   // Payment / Finance
   Icons.credit_card_outlined,
   Icons.payment_outlined,
@@ -35,6 +37,8 @@ const List<IconData> kTemplateIconOptions = [
   Icons.computer_outlined,
   Icons.code_outlined,
   Icons.terminal_outlined,
+  Icons.dns_outlined,
+  Icons.wifi_outlined,
   // Shopping
   Icons.shopping_bag_outlined,
   Icons.shopping_cart_outlined,
@@ -64,6 +68,8 @@ const List<IconData> kTemplateIconOptions = [
   Icons.school_outlined,
   Icons.book_outlined,
   Icons.menu_book_outlined,
+  // Entitlement / keys
+  Icons.key_outlined,
 ];
 
 IconData? templateIconFromStorageValue(Object? rawValue) {
@@ -104,8 +110,24 @@ String templateBadgeText(String title) {
 
 IconData iconForBuiltinTemplate(String id) {
   switch (id) {
-    case 'generic_info':
+    case 'builtin_generic_info':
       return Icons.language_outlined;
+    case 'builtin_secure_note':
+      return Icons.note_outlined;
+    case 'builtin_mnemonic':
+      return Icons.vpn_key_outlined;
+    case 'builtin_api_service':
+      return Icons.code_outlined;
+    case 'builtin_payment_card':
+      return Icons.credit_card_outlined;
+    case 'builtin_identity_document':
+      return Icons.badge_outlined;
+    case 'builtin_wifi':
+      return Icons.wifi_outlined;
+    case 'builtin_server_ssh':
+      return Icons.dns_outlined;
+    case 'builtin_software_license':
+      return Icons.key_outlined;
     default:
       return Icons.description_outlined;
   }

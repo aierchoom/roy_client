@@ -18,6 +18,7 @@ import '../models/local_sync_change.dart';
 import '../models/quick_note.dart';
 import '../models/template_conflict_log.dart';
 import '../models/totp_credential.dart';
+import '../utils/template_reference_validator.dart';
 import '../sync/crdt_merge_engine.dart';
 import 'database_file_cipher.dart';
 import 'totp_service.dart';
@@ -61,7 +62,7 @@ class SecureStorageService {
   static const String _databaseName = 'secret_roy_vault.db';
   static const String _encryptedDatabaseName = 'secret_roy_vault.db.enc';
   static const String _workingDatabaseName = 'secret_roy_vault.runtime.db';
-  static const int _databaseVersion = 13;
+  static const int _databaseVersion = 14;
 
   DatabaseFileCipher? _databaseCipher;
 
@@ -750,7 +751,8 @@ class SecureStorageService {
         server_version INTEGER DEFAULT 0,
         sync_status INTEGER DEFAULT 1,
         is_deleted INTEGER DEFAULT 0,
-        delete_hlc TEXT
+        delete_hlc TEXT,
+        parent_template_ids TEXT
       )
     ''');
 
@@ -931,6 +933,12 @@ class SecureStorageService {
 
     if (oldVersion < 13) {
       await _createQuickNotesTable(db);
+    }
+
+    if (oldVersion < 14) {
+      await db.execute(
+        'ALTER TABLE templates ADD COLUMN parent_template_ids TEXT',
+      );
     }
   }
 
@@ -1917,6 +1925,10 @@ class SecureStorageService {
       'sync_status': item.syncStatus.index,
       'is_deleted': item.isDeleted ? 1 : 0,
       'delete_hlc': item.deleteHlc?.toString(),
+      'parent_template_ids':
+          item.parentTemplateIds.isEmpty
+              ? null
+              : jsonEncode(item.parentTemplateIds),
     };
   }
 
@@ -2112,6 +2124,9 @@ class SecureStorageService {
       // Caller has already performed CRDT merge; save directly.
       itemToSave = template;
     } else {
+      // Validate all template references before saving.
+      await _validateTemplateReferences(template);
+
       final newStamp = _syncClock!.send();
       final existing = await loadTemplateById(template.templateId);
       if (existing != null) {
@@ -2157,6 +2172,10 @@ class SecureStorageService {
       'sync_status': itemToSave.syncStatus.index,
       'is_deleted': itemToSave.isDeleted ? 1 : 0,
       'delete_hlc': itemToSave.deleteHlc?.toString(),
+      'parent_template_ids':
+          itemToSave.parentTemplateIds.isEmpty
+              ? null
+              : jsonEncode(itemToSave.parentTemplateIds),
     }, conflictAlgorithm: ConflictAlgorithm.replace);
 
     if (conflictLogs.isNotEmpty) {
@@ -2171,6 +2190,78 @@ class SecureStorageService {
         id: itemToSave.templateId,
       ),
     );
+  }
+
+  Future<void> _validateTemplateReferences(AccountTemplate template) async {
+    final selfId = template.templateId;
+
+    // 1. Self-reference checks.
+    if (template.parentTemplateIds.contains(selfId)) {
+      throw TemplateReferenceException(
+        'Template "$selfId" cannot inherit from itself.',
+      );
+    }
+    for (final f in template.fields) {
+      if (f.attributes.targetTemplateId == selfId) {
+        throw TemplateReferenceException(
+          'Field "${f.label}" cannot reference its own template as target.',
+        );
+      }
+      if (f.attributes.subTemplateId == selfId) {
+        throw TemplateReferenceException(
+          'Field "${f.label}" cannot use its own template as sub-form.',
+        );
+      }
+    }
+
+    // 2. Inheritance cycle detection.
+    final allTemplates = await loadAllTemplates();
+    final parentGraph = <String, List<String>>{};
+    final subFormGraph = <String, String?>{};
+    for (final t in allTemplates) {
+      if (t.isDeleted) continue;
+      parentGraph[t.templateId] = t.parentTemplateIds;
+      for (final f in t.fields) {
+        if (f.attributes.subTemplateId != null) {
+          subFormGraph[t.templateId] = f.attributes.subTemplateId;
+        }
+      }
+    }
+    // Merge incoming template's data.
+    parentGraph[selfId] = template.parentTemplateIds;
+    for (final f in template.fields) {
+      if (f.attributes.subTemplateId != null) {
+        subFormGraph[selfId] = f.attributes.subTemplateId;
+      }
+    }
+
+    for (final parentId in template.parentTemplateIds) {
+      if (TemplateReferenceValidator.wouldCreateInheritanceCycle(
+        selfId: selfId,
+        candidateId: parentId,
+        parentGraph: parentGraph,
+      )) {
+        throw TemplateReferenceException(
+          'Adding "$parentId" as parent of "$selfId" '
+          'would create an inheritance cycle.',
+        );
+      }
+    }
+
+    // 3. SubForm recursion detection.
+    for (final f in template.fields) {
+      if (f.attributes.subTemplateId != null &&
+          TemplateReferenceValidator.wouldCreateSubFormRecursion(
+            selfId: selfId,
+            candidateId: f.attributes.subTemplateId!,
+            subFormTargets: subFormGraph,
+          )) {
+        throw TemplateReferenceException(
+          'Field "${f.label}": sub-form template '
+          '"${f.attributes.subTemplateId}" would create recursive nesting.',
+        );
+      }
+    }
   }
 
   AccountTemplate _stampTemplateChanges(
@@ -2232,6 +2323,56 @@ class SecureStorageService {
   }) async {
     if (!isOpen) return;
 
+    // Reference checks are always performed, even for sync-merge deletes.
+    // (Sync deletes shouldn't leave dangling references in the local vault.)
+    final allTemplates = await loadAllTemplates();
+    final children = allTemplates
+        .where((t) => t.parentTemplateIds.contains(id))
+        .toList();
+    if (children.isNotEmpty) {
+      throw TemplateInUseException(
+        templateId: id,
+        usageCount: 0,
+        customMessage:
+            'Cannot delete: inherited by ${children.map((t) => t.title).join(", ")}',
+      );
+    }
+
+    for (final t in allTemplates) {
+      for (final f in t.fields) {
+        if (f.attributes.targetTemplateId == id) {
+          throw TemplateInUseException(
+            templateId: id,
+            usageCount: 0,
+            customMessage:
+                'Cannot delete: referenced by field "${f.label}" '
+                'in template "${t.title}"',
+          );
+        }
+        if (f.attributes.subTemplateId == id) {
+          throw TemplateInUseException(
+            templateId: id,
+            usageCount: 0,
+            customMessage:
+                'Cannot delete: used as sub-form in field "${f.label}" '
+                'of template "${t.title}"',
+          );
+        }
+      }
+    }
+
+    // Scan sub-form data in accounts for dangling references.
+    final subFormCount = await _countSubFormItemsByTemplate(id);
+    if (subFormCount > 0) {
+      throw TemplateInUseException(
+        templateId: id,
+        usageCount: 0,
+        customMessage:
+            'Cannot delete: $subFormCount sub-form items in accounts '
+            'still use this template.',
+      );
+    }
+
     if (!isSyncMerge) {
       final usageCount = await countAccountsByTemplate(id);
       if (usageCount > 0) {
@@ -2281,6 +2422,9 @@ class SecureStorageService {
               (field) => AccountField.fromJson(field as Map<String, dynamic>),
             )
             .toList(),
+        parentTemplateIds: _parseParentTemplateIds(
+          row['parent_template_ids'] as String?,
+        ),
         isCustom: isCustom,
         createdAt: row['created_at'] as int?,
         modifiedAt: row['modified_at'] as int?,
@@ -2300,6 +2444,50 @@ class SecureStorageService {
     } catch (e) {
       AppLogger.d('Skipping unreadable template row: $e');
       return null;
+    }
+  }
+
+  /// Counts how many sub-form items across all accounts use [templateId]
+  /// as their [AccountFieldType.subForm] template.
+  Future<int> _countSubFormItemsByTemplate(String templateId) async {
+    final accounts = await loadAccounts(includeDeleted: false);
+    if (accounts.isEmpty) return 0;
+
+    // Find all templates that have a subForm field pointing to templateId.
+    final allTemplates = await loadAllTemplates();
+    final subFormFieldKeys = <String, Set<String>>{};
+    for (final t in allTemplates) {
+      for (final f in t.fields) {
+        if (f.attributes.subTemplateId == templateId) {
+          subFormFieldKeys.putIfAbsent(t.templateId, () => {}).add(f.fieldKey);
+        }
+      }
+    }
+
+    if (subFormFieldKeys.isEmpty) return 0;
+
+    var count = 0;
+    for (final account in accounts) {
+      final keys = subFormFieldKeys[account.templateId];
+      if (keys == null) continue;
+      for (final key in keys) {
+        final raw = account.data[key];
+        if (raw == null || raw.toString().isEmpty) continue;
+        try {
+          final items = (jsonDecode(raw.toString()) as List);
+          count += items.length;
+        } catch (_) {}
+      }
+    }
+    return count;
+  }
+
+  List<String> _parseParentTemplateIds(String? raw) {
+    if (raw == null || raw.isEmpty) return const [];
+    try {
+      return (jsonDecode(raw) as List).cast<String>();
+    } catch (_) {
+      return const [];
     }
   }
 
@@ -3228,14 +3416,17 @@ class StorageOpenException implements Exception {
 class TemplateInUseException implements Exception {
   final String templateId;
   final int usageCount;
+  final String? customMessage;
 
   const TemplateInUseException({
     required this.templateId,
     required this.usageCount,
+    this.customMessage,
   });
 
   @override
   String toString() =>
+      customMessage ??
       'TemplateInUseException(templateId: $templateId, usageCount: $usageCount)';
 }
 
@@ -3245,4 +3436,12 @@ class TemplateStaleException implements Exception {
   @override
   String toString() =>
       'TemplateStaleException: Template has been updated by sync. Please reload and retry.';
+}
+
+class TemplateReferenceException implements Exception {
+  final String message;
+  const TemplateReferenceException(this.message);
+
+  @override
+  String toString() => 'TemplateReferenceException: $message';
 }

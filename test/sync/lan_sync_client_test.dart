@@ -246,7 +246,7 @@ void main() {
         templateId: 'tpl-1',
         title: 'Test Template',
         subTitle: '',
-        category: TemplateCategory.login,
+        category: TemplateCategory.access,
         fields: [],
       );
 

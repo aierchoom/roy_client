@@ -305,6 +305,8 @@ class _AccountListTileState extends State<AccountListTile>
       case AccountFieldType.custom:
         return Icons.extension_outlined;
       case AccountFieldType.accountLink:
+      case AccountFieldType.templateRef:
+      case AccountFieldType.subForm:
         return Icons.account_tree_outlined;
       case AccountFieldType.unknown:
         return Icons.help_outline_outlined;

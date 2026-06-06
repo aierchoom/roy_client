@@ -81,6 +81,54 @@ class EnhancedAppProvider extends ChangeNotifier {
   }
 
 
+  /// Resolves all fields for [template] by walking the inheritance chain.
+  ///
+  /// Parent fields come first (recursively resolved), then own fields.
+  /// Own fields with the same [AccountField.fieldKey] override inherited ones.
+  /// Depth is limited to 5 levels to guard against cycles.
+  List<AccountField> resolveFields(AccountTemplate template) {
+    final seen = <String>{};
+    final result = <AccountField>[];
+    _collectInheritedFields(template, seen, result, 0);
+    // Own fields always win over inherited (overwrite by fieldKey).
+    for (final ownField in template.fields) {
+      result.removeWhere((f) => f.fieldKey == ownField.fieldKey);
+      result.add(ownField);
+    }
+    return result;
+  }
+
+  void _collectInheritedFields(
+    AccountTemplate template,
+    Set<String> seenKeys,
+    List<AccountField> result,
+    int depth,
+  ) {
+    if (depth > 5) return; // cycle guard
+    for (final parentId in template.parentTemplateIds) {
+      final parent = getTemplate(parentId);
+      if (parent == null) continue;
+      _collectInheritedFields(parent, seenKeys, result, depth + 1);
+      for (final field in parent.fields) {
+        if (!seenKeys.contains(field.fieldKey)) {
+          seenKeys.add(field.fieldKey);
+          result.add(field);
+        }
+      }
+    }
+  }
+
+  /// Returns templates whose [parentTemplateIds] include [templateId].
+  List<AccountTemplate> getChildTemplates(String templateId) {
+    final children = <AccountTemplate>[];
+    for (final t in allTemplates) {
+      if (t.parentTemplateIds.contains(templateId)) {
+        children.add(t);
+      }
+    }
+    return children;
+  }
+
   AccountItem? getAccount(String id) {
     try {
       return _accounts.firstWhere((account) => account.id == id);

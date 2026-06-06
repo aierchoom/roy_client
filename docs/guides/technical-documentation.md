@@ -355,12 +355,17 @@ deleteHlc
 
 当前内置模板：
 
-| ID | 标题 | 字段 |
-|---|---|---|
-| `builtin_generic_info` | 网站模板 | `website`, `username`, `password`, `totp`, `notes` |
-| `builtin_secure_note` | 通用安全笔记 | `content` |
-| `builtin_mnemonic` | 助记词 | `mnemonic_words` |
-| `builtin_api_service` | API 服务 | `service_name`, `api_keys`, `endpoint` |
+| ID | 标题 | 分类 | 字段 |
+|---|---|---|---|
+| `builtin_generic_info` | 登录凭据 | `access` | `website`, `username`, `password`, `totp`, `notes` |
+| `builtin_api_service` | API 凭据 | `access` | `service_name`, `api_keys`, `endpoint` |
+| `builtin_wifi` | WiFi / 网络 | `access` | `ssid`, `wifi_password`, `admin_url`, `admin_username`, `admin_password` |
+| `builtin_server_ssh` | 服务器 / SSH | `access` | `host`, `ssh_user`, `ssh_port`, `ssh_key`, `notes` |
+| `builtin_secure_note` | 通用安全笔记 | `secret` | `content` |
+| `builtin_mnemonic` | 助记词 | `secret` | `mnemonic_words` |
+| `builtin_payment_card` | 银行卡 | `payment` | `bank_name`, `card_number`, `cvv`, `expiry_date`, `notes` |
+| `builtin_identity_document` | 身份证件 | `identity` | `full_name`, `id_number`, `issuing_authority`, `valid_until`, `notes` |
+| `builtin_software_license` | 软件授权 | `license` | `software_name`, `license_key`, `purchase_email`, `expires_at` |
 
 自定义模板存入 `templates` 表，内置模板来自代码常量 `basicAccountTemplates`。
 

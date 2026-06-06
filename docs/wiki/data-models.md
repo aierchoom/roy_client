@@ -605,29 +605,20 @@ enum TimeFieldFormat {
 
 ```dart
 enum TemplateCategory {
-  /// 登录凭据
-  login,
+  /// 访问凭据：网站、App、API、WiFi、服务器等
+  access,
+
+  /// 密文材料：安全笔记、助记词、恢复码、私钥片段等
+  secret,
 
   /// 支付信息
   payment,
 
-  /// 联系人
-  contact,
-
-  /// 身份信息
+  /// 身份与证件信息
   identity,
 
-  /// 工作相关
-  work,
-
-  /// 购物
-  shopping,
-
-  /// 金融
-  finance,
-
-  /// 安全笔记（助记词、API Key、私钥等）
-  note,
+  /// 授权与许可证信息
+  license,
 
   /// 自定义
   custom,

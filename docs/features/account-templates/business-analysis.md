@@ -41,14 +41,19 @@
 
 ### 1.3 内置模板现状
 
-当前客户端硬编码了 **4 个内置模板**：
+当前客户端硬编码了 **9 个内置模板**：
 
 | 模板 ID | 标题 | 分类 | 字段数 | 特殊字段 |
 |---|---|---|---|---|
-| `builtin_generic_info` | 网站模板 | `login` | 5 | `totp` (custom + isReference) |
-| `builtin_secure_note` | 通用安全笔记 | `note` | 1 | `content` (longText + isSecret) |
-| `builtin_mnemonic` | 助记词 | `note` | 1 | `mnemonic_words` (list + isSecret) |
-| `builtin_api_service` | API 服务 | `note` | 3 | `api_keys` (list + isSecret) |
+| `builtin_generic_info` | 登录凭据 | `access` | 5 | `totp` (custom + isReference) |
+| `builtin_api_service` | API 凭据 | `access` | 3 | `api_keys` (list + isSecret) |
+| `builtin_wifi` | WiFi / 网络 | `access` | 5 | `wifi_password`, `admin_password` (password + isSecret) |
+| `builtin_server_ssh` | 服务器 / SSH | `access` | 5 | `ssh_key` (longText + isSecret) |
+| `builtin_secure_note` | 通用安全笔记 | `secret` | 1 | `content` (longText + isSecret) |
+| `builtin_mnemonic` | 助记词 | `secret` | 1 | `mnemonic_words` (list + isSecret) |
+| `builtin_payment_card` | 银行卡 | `payment` | 5 | `cvv` (password + isSecret) |
+| `builtin_identity_document` | 身份证件 | `identity` | 5 | `id_number` (text + isSecret) |
+| `builtin_software_license` | 软件授权 | `license` | 4 | `license_key` (text + isSecret) |
 
 内置模板字段均携带默认 `Hlc.zero('builtin')`，支持字段级 CRDT 合并。`longText` 和 `list` 类型的值均以普通字符串形式存入 `accounts.data`（`list` 使用 `\n` 分隔），同步协议无需改动。
 
@@ -422,7 +427,7 @@
 - 风险模式和自定义模板相同，但影响面更大
 - 如果代码层移除某个内置模板，相关账户会直接变成"未知模板账户"
 
-当前 4 个内置模板中，`builtin_generic_info` 是最老的内置模板，使用面最广；3 个 `note` 分类模板是新增模板，目前影响面较小。
+当前 9 个内置模板中，`builtin_generic_info` 是最老的内置模板，使用面最广；其余模板按 `access`、`secret`、`payment`、`identity`、`license` 分类补齐常见保存场景。
 
 ### 风险判断
 

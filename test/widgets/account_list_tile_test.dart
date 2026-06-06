@@ -13,7 +13,7 @@ void main() {
       templateId: 'website',
       title: 'Website',
       subTitle: 'Login',
-      category: TemplateCategory.login,
+      category: TemplateCategory.access,
       fields: [
         AccountField(
           fieldKey: 'username',

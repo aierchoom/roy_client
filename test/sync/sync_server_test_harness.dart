@@ -774,7 +774,7 @@ AccountTemplate cleanTemplateWithId(String templateId) {
     templateId: templateId,
     title: 'Template',
     subTitle: 'Test template',
-    category: TemplateCategory.login,
+    category: TemplateCategory.access,
     fields: const [],
     isCustom: true,
     syncStatus: SyncStatus.synchronized,

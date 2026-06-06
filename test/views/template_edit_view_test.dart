@@ -142,7 +142,7 @@ void main() {
         title: 'Existing',
         subTitle: 'Sub',
         iconCodePoint: null,
-        category: TemplateCategory.login,
+        category: TemplateCategory.access,
         fields: [
           AccountField(
             fieldKey: 'username',

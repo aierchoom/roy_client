@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:secret_roy/models/account_item.dart';
 import 'package:secret_roy/models/account_template.dart';
@@ -37,9 +38,7 @@ void main() {
     });
 
     test('copyWith overrides specified fields', () {
-      const attrs = AccountFieldAttributes(
-        type: AccountFieldType.text,
-      );
+      const attrs = AccountFieldAttributes(type: AccountFieldType.text);
       final copied = attrs.copyWith(
         type: AccountFieldType.email,
         isPrimary: true,
@@ -86,16 +85,21 @@ void main() {
   });
 
   group('built-in account templates', () {
-    test('includes website and secure note built-in templates', () {
+    test('includes broad built-in template coverage', () {
       final ids = basicAccountTemplates.map((t) => t.templateId).toList();
       expect(ids, contains('builtin_generic_info'));
       expect(ids, contains('builtin_secure_note'));
       expect(ids, contains('builtin_mnemonic'));
       expect(ids, contains('builtin_api_service'));
-      expect(ids.length, 4);
+      expect(ids, contains('builtin_payment_card'));
+      expect(ids, contains('builtin_identity_document'));
+      expect(ids, contains('builtin_wifi'));
+      expect(ids, contains('builtin_server_ssh'));
+      expect(ids, contains('builtin_software_license'));
+      expect(ids.length, 9);
     });
 
-    test('website template uses a 2FA link field without storing secrets', () {
+    test('access credential template links 2FA without storing secrets', () {
       final passwordField = websiteTemplate.fields.firstWhere(
         (field) => field.fieldKey == 'password',
       );
@@ -104,7 +108,8 @@ void main() {
       );
 
       expect(websiteTemplate.isCustom, isFalse);
-      expect(websiteTemplate.title, '网站模板');
+      expect(websiteTemplate.title, '登录凭据');
+      expect(websiteTemplate.category, TemplateCategory.access);
       expect(websiteTemplate.fields.map((field) => field.fieldKey), [
         'website',
         'username',
@@ -125,24 +130,86 @@ void main() {
       );
     });
 
-    test('secure note templates use longText and list field types', () {
-      final secureNote = secureNoteGenericTemplate;
-      final mnemonic = secureNoteMnemonicTemplate;
-      final apiService = apiServiceTemplate;
-
-      expect(secureNote.category, TemplateCategory.custom);
+    test('secure note and API templates use the current categories', () {
+      expect(secureNoteGenericTemplate.category, TemplateCategory.secret);
       expect(
-        secureNote.fields.first.attributes.type,
+        secureNoteGenericTemplate.fields.first.attributes.type,
         AccountFieldType.longText,
       );
-      expect(mnemonic.fields.first.attributes.type, AccountFieldType.list);
+      expect(secureNoteMnemonicTemplate.category, TemplateCategory.secret);
       expect(
-        apiService.fields.any(
+        secureNoteMnemonicTemplate.fields.first.attributes.type,
+        AccountFieldType.list,
+      );
+      expect(apiServiceTemplate.category, TemplateCategory.access);
+      expect(
+        apiServiceTemplate.fields.any(
           (f) => f.attributes.type == AccountFieldType.list,
         ),
         isTrue,
       );
     });
+
+    test('specialized built-ins use orthogonal categories', () {
+      expect(paymentCardTemplate.category, TemplateCategory.payment);
+      expect(identityDocumentTemplate.category, TemplateCategory.identity);
+      expect(wifiCredentialTemplate.category, TemplateCategory.access);
+      expect(serverCredentialTemplate.category, TemplateCategory.access);
+      expect(softwareLicenseTemplate.category, TemplateCategory.license);
+    });
+
+    test('legacy category strings map onto the current taxonomy', () {
+      expect(templateCategoryFromString('login'), TemplateCategory.access);
+      expect(templateCategoryFromString('work'), TemplateCategory.access);
+      expect(templateCategoryFromString('shopping'), TemplateCategory.access);
+      expect(templateCategoryFromString('contact'), TemplateCategory.identity);
+      expect(templateCategoryFromString('finance'), TemplateCategory.payment);
+      expect(templateCategoryFromString('note'), TemplateCategory.secret);
+    });
+
+    test(
+      'category inference prefers title and fields before icon fallback',
+      () {
+        expect(
+          inferTemplateCategory(
+            title: 'API Key',
+            iconCodePoint: templateIconStorageValue(Icons.key_outlined),
+          ),
+          TemplateCategory.access,
+        );
+        expect(
+          inferTemplateCategory(
+            title: 'Wallet seed phrase',
+            iconCodePoint: templateIconStorageValue(Icons.lock_outline),
+          ),
+          TemplateCategory.secret,
+        );
+        expect(
+          inferTemplateCategory(
+            title: 'Untitled',
+            iconCodePoint: templateIconStorageValue(Icons.vpn_key_outlined),
+          ),
+          TemplateCategory.secret,
+        );
+        expect(
+          inferTemplateCategory(
+            title: 'Untitled',
+            fields: const [
+              AccountField(
+                fieldKey: 'license_key',
+                label: '授权码',
+                attributes: AccountFieldAttributes(
+                  type: AccountFieldType.text,
+                  isSecret: true,
+                ),
+              ),
+            ],
+            iconCodePoint: templateIconStorageValue(Icons.lock_outline),
+          ),
+          TemplateCategory.license,
+        );
+      },
+    );
 
     test('uses a safe sync status fallback for unreadable template data', () {
       final template = AccountTemplate.fromJson({

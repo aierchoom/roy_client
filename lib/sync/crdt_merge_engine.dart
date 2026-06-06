@@ -448,6 +448,9 @@ class CrdtMergeEngine {
         ? remote.category
         : local.category;
     final Hlc mergedHlc = remoteWinsTopLevel ? remoteHlc : localHlc;
+    final List<String> mergedParentTemplateIds = remoteWinsTopLevel
+        ? remote.parentTemplateIds
+        : local.parentTemplateIds;
 
     final localFields = local.fields;
     final remoteFields = remote.fields;
@@ -700,6 +703,7 @@ class CrdtMergeEngine {
         iconCodePoint: mergedIconCodePoint,
         category: mergedCategory,
         fields: resolvedFields,
+        parentTemplateIds: mergedParentTemplateIds,
         isCustom: local.isCustom,
         syncStatus: finalStatus,
         hlc: mergedHlc,

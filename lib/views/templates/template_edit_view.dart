@@ -11,6 +11,7 @@ import '../../widgets/adaptive_page.dart';
 import '../../widgets/edit_metadata_row.dart';
 import '../../widgets/green_add_button.dart';
 import '../../widgets/template_edit_widgets.dart';
+import '../../widgets/template_inheritance_picker.dart';
 import '../../theme/app_design_tokens.dart';
 import '../../theme/app_layout.dart';
 
@@ -28,6 +29,7 @@ class _TemplateEditViewState extends State<TemplateEditView> {
   final _subtitleCtrl = TextEditingController();
 
   List<AccountField> _fields = [];
+  List<String> _parentTemplateIds = [];
 
   @override
   void initState() {
@@ -36,6 +38,7 @@ class _TemplateEditViewState extends State<TemplateEditView> {
       _titleCtrl.text = widget.initial!.title;
       _subtitleCtrl.text = widget.initial!.subTitle;
       _fields = List<AccountField>.of(widget.initial!.fields);
+      _parentTemplateIds = List<String>.of(widget.initial!.parentTemplateIds);
     }
   }
 
@@ -50,12 +53,11 @@ class _TemplateEditViewState extends State<TemplateEditView> {
       return;
     }
 
-    if (_fields.isEmpty) {
+    final resolvedForSave = _getResolvedFields();
+    if (resolvedForSave.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-            '请至少添加一个字段。',
-          ),
+          content: Text('请至少添加一个字段或选择一个父模板。'),
         ),
       );
       return;
@@ -70,6 +72,7 @@ class _TemplateEditViewState extends State<TemplateEditView> {
       iconCodePoint: null,
       category: inferTemplateCategory(title: title, fields: _fields),
       fields: List<AccountField>.of(_fields),
+      parentTemplateIds: List<String>.of(_parentTemplateIds),
       isCustom: true,
       createdAt: widget.initial?.createdAt,
       modifiedAt: widget.initial?.modifiedAt,
@@ -130,6 +133,10 @@ class _TemplateEditViewState extends State<TemplateEditView> {
         return field.attributes.hint ?? '';
       case AccountFieldType.accountLink:
         return '关联账户';
+      case AccountFieldType.templateRef:
+        return '关联模板';
+      case AccountFieldType.subForm:
+        return '嵌套子表单';
       case AccountFieldType.longText:
         return '多行文本';
       case AccountFieldType.list:
@@ -170,6 +177,14 @@ class _TemplateEditViewState extends State<TemplateEditView> {
     );
   }
 
+  List<AccountTemplate> _safeGetAllTemplates() {
+    try {
+      return context.read<EnhancedAppProvider>().allTemplates;
+    } catch (_) {
+      return [];
+    }
+  }
+
   Future<void> _editField({AccountField? initial, int? index}) async {
     final originallyPersisted =
         initial != null &&
@@ -180,11 +195,20 @@ class _TemplateEditViewState extends State<TemplateEditView> {
 
     final result = await showDialog<FieldEditorResult>(
       context: context,
-      builder: (dialogContext) => FieldEditorDialog(
-        initial: initial,
-        originallyPersisted: originallyPersisted,
-        fieldTypeLabelBuilder: fieldTypeLabel,
-      ),
+      builder: (dialogContext) {
+        final templates = _safeGetAllTemplates();
+        final selfId = widget.initial?.templateId;
+        final templateMap = <String, String>{
+          for (final t in templates)
+            if (t.templateId != selfId) t.templateId: t.title,
+        };
+        return FieldEditorDialog(
+          initial: initial,
+          originallyPersisted: originallyPersisted,
+          fieldTypeLabelBuilder: fieldTypeLabel,
+          availableTemplates: templateMap,
+        );
+      },
     );
 
     if (result == null) return;
@@ -594,9 +618,117 @@ class _TemplateEditViewState extends State<TemplateEditView> {
     );
   }
 
-  Widget _buildFieldCard(BuildContext context, int index, AccountField field) {
+  Widget _buildTargetTemplatePreview(
+    BuildContext context,
+    AccountField field,
+    ThemeData theme,
+    Color accent,
+  ) {
+    final targetId = field.attributes.type == AccountFieldType.subForm
+        ? field.attributes.subTemplateId
+        : field.attributes.targetTemplateId;
+    if (targetId == null) return const SizedBox.shrink();
+
+    final templates = _safeGetAllTemplates();
+    final target = templates.cast<AccountTemplate?>().firstWhere(
+          (t) => t?.templateId == targetId,
+          orElse: () => null,
+        );
+    if (target == null) return const SizedBox.shrink();
+
+    final previewFields = target.fields.take(5).toList();
+    final isSubForm = field.attributes.type == AccountFieldType.subForm;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 14),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppSurfaces.soft(theme.colorScheme,
+              tint: accent, tintAlpha: 8),
+          borderRadius: BorderRadius.circular(AppRadii.panel),
+          border: Border.all(color: accent.withAlpha(28)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  isSubForm
+                      ? Icons.dynamic_feed_outlined
+                      : Icons.account_tree_outlined,
+                  size: 16,
+                  color: accent,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    '目标模板: ${target.title}'
+                    '${isSubForm ? " (子表单)" : ""}',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: accent,
+                    ),
+                  ),
+                ),
+                Text(
+                  '${target.fields.length} 字段',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+            if (previewFields.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: previewFields.map((f) {
+                  return Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surface.withAlpha(140),
+                      borderRadius: BorderRadius.circular(AppRadii.chip),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(fieldTypeIcon(f.attributes.type),
+                            size: 12, color: accent),
+                        const SizedBox(width: 4),
+                        Text(
+                          f.label,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFieldCard(
+    BuildContext context,
+    int index,
+    AccountField field, {
+    bool isInherited = false,
+    String? sourceTemplateTitle,
+  }) {
     final theme = Theme.of(context);
-    final accent = field.attributes.isSecret
+    final accent = isInherited
+        ? theme.colorScheme.onSurfaceVariant
+        : field.attributes.isSecret
         ? theme.colorScheme.tertiary
         : field.attributes.isRequired
         ? theme.colorScheme.primary
@@ -804,6 +936,14 @@ class _TemplateEditViewState extends State<TemplateEditView> {
                       ),
                   ],
                 ),
+                if (field.attributes.type == AccountFieldType.templateRef ||
+                    field.attributes.type == AccountFieldType.subForm)
+                  _buildTargetTemplatePreview(
+                    context,
+                    field,
+                    theme,
+                    accent,
+                  ),
                 const SizedBox(height: 14),
                 Container(
                   width: double.infinity,
@@ -851,39 +991,61 @@ class _TemplateEditViewState extends State<TemplateEditView> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () =>
-                            _editField(initial: field, index: index),
-                        icon: const Icon(Icons.edit_outlined),
-                        label: const Text('编辑字段'),
+                if (isInherited) ...[
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Icon(Icons.account_tree_outlined,
+                          size: 14, color: accent),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          sourceTemplateTitle != null
+                              ? '继承自 "$sourceTemplateTitle"'
+                              : '继承字段',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: accent,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    IconButton(
-                      tooltip: '上移',
-                      onPressed: index == 0
-                          ? null
-                          : () => _moveField(index, index - 1),
-                      icon: const Icon(Icons.arrow_upward),
-                    ),
-                    IconButton(
-                      tooltip: '下移',
-                      onPressed: index == _fields.length - 1
-                          ? null
-                          : () => _moveField(index, index + 1),
-                      icon: const Icon(Icons.arrow_downward),
-                    ),
-                    IconButton(
-                      tooltip: '删除字段',
-                      onPressed: () => _confirmRemoveField(index),
-                      icon: const Icon(Icons.delete_outline),
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 14),
+                if (!isInherited)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () =>
+                              _editField(initial: field, index: index),
+                          icon: const Icon(Icons.edit_outlined),
+                          label: const Text('编辑字段'),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      IconButton(
+                        tooltip: '上移',
+                        onPressed: index == 0
+                            ? null
+                            : () => _moveField(index, index - 1),
+                        icon: const Icon(Icons.arrow_upward),
+                      ),
+                      IconButton(
+                        tooltip: '下移',
+                        onPressed: index == _fields.length - 1
+                            ? null
+                            : () => _moveField(index, index + 1),
+                        icon: const Icon(Icons.arrow_downward),
+                      ),
+                      IconButton(
+                        tooltip: '删除字段',
+                        onPressed: () => _confirmRemoveField(index),
+                        icon: const Icon(Icons.delete_outline),
+                      ),
+                    ],
+                  ),
               ],
             ),
           ],
@@ -892,12 +1054,201 @@ class _TemplateEditViewState extends State<TemplateEditView> {
     );
   }
 
+  Widget _buildInheritanceSection(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    EnhancedAppProvider? provider;
+    try {
+      provider = context.read<EnhancedAppProvider>();
+    } catch (_) {
+      return const SizedBox.shrink();
+    }
+    final allTemplates = provider.allTemplates;
+    final parentTemplates = allTemplates
+        .where((t) => _parentTemplateIds.contains(t.templateId))
+        .toList();
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppSurfaces.soft(
+          theme.colorScheme,
+          tint: colors.tertiary,
+          tintAlpha: 10,
+        ),
+        borderRadius: BorderRadius.circular(AppRadii.xl),
+        border: Border.all(color: theme.colorScheme.outlineVariant.withAlpha(88)),
+        boxShadow: AppShadows.card(theme, depth: 0.55),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.account_tree_outlined, color: colors.tertiary),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    '父模板继承',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '选择一个或多个模板作为字段来源。继承字段不可编辑，需在原模板修改。',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colors.onSurfaceVariant,
+                height: 1.35,
+              ),
+            ),
+            if (parentTemplates.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: parentTemplates.map((t) {
+                  return Chip(
+                    label: Text(t.title),
+                    deleteIcon: const Icon(Icons.close, size: 16),
+                    onDeleted: () => setState(() {
+                      _parentTemplateIds.remove(t.templateId);
+                    }),
+                    backgroundColor: colors.tertiary.withAlpha(30),
+                    side: BorderSide(color: colors.tertiary.withAlpha(80)),
+                  );
+                }).toList(),
+              ),
+            ],
+            if (parentTemplates.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                _resolveFieldsPreview(allTemplates),
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: colors.onSurfaceVariant,
+                ),
+              ),
+            ],
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () => _showInheritancePicker(context, allTemplates),
+                  icon: const Icon(Icons.add_outlined, size: 18),
+                  label: const Text('添加父模板'),
+                ),
+                if (_parentTemplateIds.isNotEmpty) ...[
+                  const SizedBox(width: 8),
+                  TextButton(
+                    onPressed: () => setState(() => _parentTemplateIds.clear()),
+                    child: const Text('清除全部'),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Returns all fields visible in this template: inherited fields first,
+  /// then own fields. Own fields with the same [AccountField.fieldKey] as an
+  /// inherited field override it.
+  List<_ResolvedField> _getResolvedFields() {
+    final templates = _safeGetAllTemplates();
+    final templateById = <String, AccountTemplate>{
+      for (final t in templates) t.templateId: t,
+    };
+
+    final inherited = <String, _ResolvedField>{};
+    final seenKeys = <String>{};
+    final visited = <String>{};
+
+    void collect(String id, int depth) {
+      if (depth > 5 || !visited.add(id)) return;
+      final parent = templateById[id];
+      if (parent == null) return;
+      for (final pid in parent.parentTemplateIds) {
+        collect(pid, depth + 1);
+      }
+      for (final field in parent.fields) {
+        if (!seenKeys.contains(field.fieldKey)) {
+          seenKeys.add(field.fieldKey);
+          inherited[field.fieldKey] = _ResolvedField(
+            field: field,
+            sourceTemplateTitle: parent.title,
+            isInherited: true,
+          );
+        }
+      }
+    }
+
+    for (final id in _parentTemplateIds) {
+      collect(id, 0);
+    }
+
+    // Own fields override inherited.
+    for (final own in _fields) {
+      inherited[own.fieldKey] = _ResolvedField(
+        field: own,
+        isInherited: false,
+      );
+    }
+
+    // Return inherited first, then own, preserving order.
+    final result = <_ResolvedField>[];
+    for (final e in inherited.values) {
+      if (e.isInherited) result.add(e);
+    }
+    for (final own in _fields) {
+      result.add(_ResolvedField(field: own, isInherited: false));
+    }
+    return result;
+  }
+
+  String _resolveFieldsPreview(List<AccountTemplate> allTemplates) {
+    final resolved = _getResolvedFields();
+    final inherited = resolved.where((r) => r.isInherited).length;
+    return '已解析字段：${resolved.length} 个（继承 $inherited + 自有 ${_fields.length}）';
+  }
+
+  Future<void> _showInheritancePicker(
+    BuildContext context,
+    List<AccountTemplate> allTemplates,
+  ) async {
+    final parentGraph = <String, List<String>>{};
+    for (final t in allTemplates) {
+      parentGraph[t.templateId] = t.parentTemplateIds;
+    }
+
+    final result = await showDialog<List<String>>(
+      context: context,
+      builder: (_) => TemplateInheritancePicker(
+        availableTemplates: allTemplates,
+        selfTemplateId: widget.initial?.templateId ?? '',
+        currentlySelected: _parentTemplateIds,
+        parentGraph: parentGraph,
+      ),
+    );
+
+    if (result != null && mounted) {
+      setState(() => _parentTemplateIds = result);
+    }
+  }
+
   Widget _buildFieldSectionHeader(BuildContext context) {
     final theme = Theme.of(context);
-    final total = _fields.length;
-    final requiredCount = _fields
-        .where((field) => field.attributes.isRequired)
+    final resolved = _getResolvedFields();
+    final total = resolved.length;
+    final requiredCount = resolved
+        .where((r) => r.field.attributes.isRequired)
         .length;
+    final inheritedCount = resolved.where((r) => r.isInherited).length;
 
     return Container(
       decoration: BoxDecoration(
@@ -945,6 +1296,13 @@ class _TemplateEditViewState extends State<TemplateEditView> {
                         icon: Icons.view_stream_outlined,
                         label: '共 $total 个字段',
                       ),
+                      if (inheritedCount > 0)
+                        _buildToneChip(
+                          context,
+                          icon: Icons.account_tree_outlined,
+                          label: '继承 $inheritedCount',
+                          tint: theme.colorScheme.tertiary,
+                        ),
                       _buildToneChip(
                         context,
                         icon: Icons.star_outline_rounded,
@@ -1085,14 +1443,22 @@ class _TemplateEditViewState extends State<TemplateEditView> {
             ? width
             : (width - (spacing * (columns - 1))) / columns;
 
+        final resolved = _getResolvedFields();
+
         return Wrap(
           spacing: spacing,
           runSpacing: spacing,
           children: [
-            for (final entry in _fields.asMap().entries)
+            for (int i = 0; i < resolved.length; i++)
               SizedBox(
                 width: itemWidth,
-                child: _buildFieldCard(context, entry.key, entry.value),
+                child: _buildFieldCard(
+                  context,
+                  i,
+                  resolved[i].field,
+                  isInherited: resolved[i].isInherited,
+                  sourceTemplateTitle: resolved[i].sourceTemplateTitle,
+                ),
               ),
           ],
         );
@@ -1139,12 +1505,16 @@ class _TemplateEditViewState extends State<TemplateEditView> {
             padding: const EdgeInsets.fromLTRB(0, 16, 0, 120),
             children: [
               _buildTopSection(context),
+              if (widget.initial?.isCustom != false) ...[
+                const SizedBox(height: AppSpacing.xxl),
+                _buildInheritanceSection(context),
+              ],
               const SizedBox(height: AppSpacing.xxl),
               _buildFieldSectionHeader(context),
               const SizedBox(height: AppSpacing.md),
               _buildFieldPresetBar(context),
               const SizedBox(height: AppSpacing.md),
-              if (_fields.isEmpty)
+              if (_getResolvedFields().isEmpty)
                 Container(
                   padding: const EdgeInsets.all(AppSpacing.xxl),
                   decoration: BoxDecoration(
@@ -1219,4 +1589,17 @@ class _TemplateEditViewState extends State<TemplateEditView> {
     _subtitleCtrl.dispose();
     super.dispose();
   }
+}
+
+/// A field with its resolution metadata for template inheritance.
+class _ResolvedField {
+  final AccountField field;
+  final bool isInherited;
+  final String? sourceTemplateTitle;
+
+  const _ResolvedField({
+    required this.field,
+    this.isInherited = false,
+    this.sourceTemplateTitle,
+  });
 }

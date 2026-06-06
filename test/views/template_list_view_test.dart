@@ -17,9 +17,7 @@ import '../fakes/fake_identity_service.dart';
 import '../fakes/fake_sync_service.dart';
 import '../sync/sync_server_test_harness.dart';
 
-EnhancedAppProvider _createTestProvider({
-  FakeSecureStorageService? storage,
-}) {
+EnhancedAppProvider _createTestProvider({FakeSecureStorageService? storage}) {
   final s = storage ?? FakeSecureStorageService();
   final manager = ServiceManager.testable(
     secureStorageService: s,
@@ -94,17 +92,19 @@ AccountTemplate _makeTemplate({
 void _mockClipboard() {
   TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
       .setMockMethodCallHandler(SystemChannels.platform, (call) async {
-    if (call.method == 'Clipboard.setData') return null;
-    if (call.method == 'Clipboard.getData') return null;
-    return null;
-  });
+        if (call.method == 'Clipboard.setData') return null;
+        if (call.method == 'Clipboard.getData') return null;
+        return null;
+      });
 }
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('TemplateListView', () {
-    testWidgets('renders empty custom section and builtin templates', (tester) async {
+    testWidgets('renders empty custom section and builtin templates', (
+      tester,
+    ) async {
       await _pumpTemplateListView(tester, const TemplateListView());
       expect(find.text('还没有自定义模板'), findsOneWidget);
       expect(find.text('自定义模板'), findsOneWidget);
@@ -114,17 +114,24 @@ void main() {
 
     testWidgets('renders hero card stats correctly', (tester) async {
       final storage = FakeSecureStorageService();
-      storage.templates['custom_1'] = _makeTemplate(id: 'custom_1', title: 'C1');
+      storage.templates['custom_1'] = _makeTemplate(
+        id: 'custom_1',
+        title: 'C1',
+      );
       storage.accounts['acc_1'] = _makeAccount(
         id: 'acc_1',
         name: 'A1',
         templateId: 'custom_1',
       );
       final provider = _createTestProvider(storage: storage);
-      await _pumpTemplateListView(tester, const TemplateListView(), provider: provider);
+      await _pumpTemplateListView(
+        tester,
+        const TemplateListView(),
+        provider: provider,
+      );
 
-      // basicAccountTemplates has 4 items + 1 custom = 5 total
-      expect(find.textContaining('5 个模板'), findsOneWidget);
+      // basicAccountTemplates has 9 items + 1 custom = 10 total
+      expect(find.textContaining('10 个模板'), findsOneWidget);
       expect(find.textContaining('1 个自定义'), findsOneWidget);
       expect(find.textContaining('1 个在用'), findsOneWidget);
     });
@@ -143,29 +150,46 @@ void main() {
         ],
       );
       final provider = _createTestProvider(storage: storage);
-      await _pumpTemplateListView(tester, const TemplateListView(), provider: provider);
+      await _pumpTemplateListView(
+        tester,
+        const TemplateListView(),
+        provider: provider,
+      );
 
       expect(find.text('MC'), findsOneWidget);
       expect(find.textContaining('My Custom'), findsOneWidget);
     });
 
-    testWidgets('renders builtin template card without actions', (tester) async {
+    testWidgets('renders builtin template card without actions', (
+      tester,
+    ) async {
       await _pumpTemplateListView(tester, const TemplateListView());
       expect(find.text('内置模板'), findsAtLeastNWidgets(1));
     });
 
-    testWidgets('navigates to TemplateEditView when add button tapped', (tester) async {
+    testWidgets('navigates to TemplateEditView when add button tapped', (
+      tester,
+    ) async {
       await _pumpTemplateListView(tester, const TemplateListView());
       await tester.tap(find.text('新建模板'));
       await tester.pumpAndSettle();
       expect(find.byType(TemplateEditView), findsOneWidget);
     });
 
-    testWidgets('navigates to TemplateEditView when custom card tapped', (tester) async {
+    testWidgets('navigates to TemplateEditView when custom card tapped', (
+      tester,
+    ) async {
       final storage = FakeSecureStorageService();
-      storage.templates['custom_1'] = _makeTemplate(id: 'custom_1', title: 'C1');
+      storage.templates['custom_1'] = _makeTemplate(
+        id: 'custom_1',
+        title: 'C1',
+      );
       final provider = _createTestProvider(storage: storage);
-      await _pumpTemplateListView(tester, const TemplateListView(), provider: provider);
+      await _pumpTemplateListView(
+        tester,
+        const TemplateListView(),
+        provider: provider,
+      );
 
       await tester.tap(find.text('C1'));
       await tester.pumpAndSettle();
@@ -174,9 +198,16 @@ void main() {
 
     testWidgets('deletes custom template after confirmation', (tester) async {
       final storage = FakeSecureStorageService();
-      storage.templates['custom_1'] = _makeTemplate(id: 'custom_1', title: 'C1');
+      storage.templates['custom_1'] = _makeTemplate(
+        id: 'custom_1',
+        title: 'C1',
+      );
       final provider = _createTestProvider(storage: storage);
-      await _pumpTemplateListView(tester, const TemplateListView(), provider: provider);
+      await _pumpTemplateListView(
+        tester,
+        const TemplateListView(),
+        provider: provider,
+      );
 
       // Badge text for 'C1' is 'C1' itself.
       expect(find.text('C1'), findsOneWidget);
@@ -195,14 +226,21 @@ void main() {
 
     testWidgets('shows snackbar when deleting template in use', (tester) async {
       final storage = FakeSecureStorageService();
-      storage.templates['custom_1'] = _makeTemplate(id: 'custom_1', title: 'C1');
+      storage.templates['custom_1'] = _makeTemplate(
+        id: 'custom_1',
+        title: 'C1',
+      );
       storage.accounts['acc_1'] = _makeAccount(
         id: 'acc_1',
         name: 'A1',
         templateId: 'custom_1',
       );
       final provider = _createTestProvider(storage: storage);
-      await _pumpTemplateListView(tester, const TemplateListView(), provider: provider);
+      await _pumpTemplateListView(
+        tester,
+        const TemplateListView(),
+        provider: provider,
+      );
 
       await tester.tap(find.byTooltip('删除模板'));
       await tester.pumpAndSettle();
@@ -213,7 +251,11 @@ void main() {
 
     testWidgets('imports templates successfully', (tester) async {
       final provider = _createTestProvider();
-      await _pumpTemplateListView(tester, const TemplateListView(), provider: provider);
+      await _pumpTemplateListView(
+        tester,
+        const TemplateListView(),
+        provider: provider,
+      );
 
       await tester.tap(find.text('导入模板'));
       await tester.pumpAndSettle();
@@ -234,7 +276,11 @@ void main() {
 
     testWidgets('shows snackbar on invalid import JSON', (tester) async {
       final provider = _createTestProvider();
-      await _pumpTemplateListView(tester, const TemplateListView(), provider: provider);
+      await _pumpTemplateListView(
+        tester,
+        const TemplateListView(),
+        provider: provider,
+      );
 
       await tester.tap(find.text('导入模板'));
       await tester.pumpAndSettle();
@@ -248,11 +294,20 @@ void main() {
       expect(find.textContaining('导入失败'), findsOneWidget);
     });
 
-    testWidgets('batch export dialog disables export when nothing selected', (tester) async {
+    testWidgets('batch export dialog disables export when nothing selected', (
+      tester,
+    ) async {
       final storage = FakeSecureStorageService();
-      storage.templates['custom_1'] = _makeTemplate(id: 'custom_1', title: 'C1');
+      storage.templates['custom_1'] = _makeTemplate(
+        id: 'custom_1',
+        title: 'C1',
+      );
       final provider = _createTestProvider(storage: storage);
-      await _pumpTemplateListView(tester, const TemplateListView(), provider: provider);
+      await _pumpTemplateListView(
+        tester,
+        const TemplateListView(),
+        provider: provider,
+      );
 
       await tester.tap(find.text('导出模板'));
       await tester.pumpAndSettle();
@@ -271,11 +326,20 @@ void main() {
       await tester.pumpAndSettle();
     });
 
-    testWidgets('batch export dialog exports selected templates', (tester) async {
+    testWidgets('batch export dialog exports selected templates', (
+      tester,
+    ) async {
       final storage = FakeSecureStorageService();
-      storage.templates['custom_1'] = _makeTemplate(id: 'custom_1', title: 'C1');
+      storage.templates['custom_1'] = _makeTemplate(
+        id: 'custom_1',
+        title: 'C1',
+      );
       final provider = _createTestProvider(storage: storage);
-      await _pumpTemplateListView(tester, const TemplateListView(), provider: provider);
+      await _pumpTemplateListView(
+        tester,
+        const TemplateListView(),
+        provider: provider,
+      );
 
       _mockClipboard();
       addTearDown(() {

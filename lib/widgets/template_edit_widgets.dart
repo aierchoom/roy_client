@@ -26,6 +26,10 @@ String fieldTypeLabel(AccountFieldType type) {
       return '自定义';
     case AccountFieldType.accountLink:
       return '关联账户';
+    case AccountFieldType.templateRef:
+      return '模板关联';
+    case AccountFieldType.subForm:
+      return '嵌套子表单';
     case AccountFieldType.unknown:
       return '未知';
     case AccountFieldType.longText:
@@ -56,6 +60,10 @@ IconData fieldTypeIcon(AccountFieldType type) {
       return Icons.extension_outlined;
     case AccountFieldType.accountLink:
       return Icons.link_outlined;
+    case AccountFieldType.templateRef:
+      return Icons.account_tree_outlined;
+    case AccountFieldType.subForm:
+      return Icons.dynamic_feed_outlined;
     case AccountFieldType.unknown:
       return Icons.help_outline_outlined;
     case AccountFieldType.longText:
@@ -125,12 +133,16 @@ class FieldEditorDialog extends StatefulWidget {
   final AccountField? initial;
   final bool originallyPersisted;
   final String Function(AccountFieldType) fieldTypeLabelBuilder;
+  /// Map of templateId → template title for the target-template picker
+  /// shown when [AccountFieldType.templateRef] is selected.
+  final Map<String, String> availableTemplates;
 
   const FieldEditorDialog({
     super.key,
     required this.initial,
     required this.originallyPersisted,
     required this.fieldTypeLabelBuilder,
+    this.availableTemplates = const {},
   });
 
   @override
@@ -152,6 +164,9 @@ class _FieldEditorDialogState extends State<FieldEditorDialog> {
   late bool _isPrimary;
   late bool _isReference;
   late TimeFieldFormat _timeFormat;
+  String? _targetTemplateId;
+  String? _subTemplateId;
+  int? _maxSubItems;
 
   String _text(String zh, String en) {
     return Localizations.localeOf(context).languageCode == 'zh' ? zh : en;
@@ -175,6 +190,9 @@ class _FieldEditorDialogState extends State<FieldEditorDialog> {
     _isPrimary = initial?.attributes.isPrimary ?? false;
     _isReference = initial?.attributes.isReference ?? false;
     _timeFormat = initial?.attributes.timeFormat ?? TimeFieldFormat.full;
+    _targetTemplateId = initial?.attributes.targetTemplateId;
+    _subTemplateId = initial?.attributes.subTemplateId;
+    _maxSubItems = initial?.attributes.maxSubItems;
   }
 
   void _submit() {
@@ -207,6 +225,15 @@ class _FieldEditorDialogState extends State<FieldEditorDialog> {
           isReference: _isReference,
           timeFormat: _timeFormat,
           hint: _hintCtrl.text.trim().isEmpty ? null : _hintCtrl.text.trim(),
+          targetTemplateId: _type == AccountFieldType.templateRef
+              ? _targetTemplateId
+              : null,
+          subTemplateId: _type == AccountFieldType.subForm
+              ? _subTemplateId
+              : null,
+          maxSubItems: _type == AccountFieldType.subForm
+              ? _maxSubItems
+              : null,
         ),
       ),
     );
@@ -215,7 +242,9 @@ class _FieldEditorDialogState extends State<FieldEditorDialog> {
   void _setFieldType(AccountFieldType value) {
     setState(() {
       _type = value;
-      if (value == AccountFieldType.accountLink) {
+      if (value == AccountFieldType.accountLink ||
+          value == AccountFieldType.templateRef ||
+          value == AccountFieldType.subForm) {
         _isReference = true;
       }
     });
@@ -300,6 +329,66 @@ class _FieldEditorDialogState extends State<FieldEditorDialog> {
                   onChanged: (value) {
                     if (value == null) return;
                     setState(() => _timeFormat = value);
+                  },
+                ),
+              ],
+              if (_type == AccountFieldType.templateRef) ...[
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: _targetTemplateId,
+                  decoration: const InputDecoration(
+                    labelText: '目标模板',
+                    helperText: '关联账户时将只显示使用此模板的账户',
+                  ),
+                  items: widget.availableTemplates.entries
+                      .map(
+                        (entry) => DropdownMenuItem(
+                          value: entry.key,
+                          child: Text(entry.value),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    setState(() => _targetTemplateId = value);
+                  },
+                ),
+              ],
+              if (_type == AccountFieldType.subForm) ...[
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: _subTemplateId,
+                  decoration: const InputDecoration(
+                    labelText: '子表单模板',
+                    helperText: '子项将使用此模板的字段结构',
+                  ),
+                  items: widget.availableTemplates.entries
+                      .map(
+                        (entry) => DropdownMenuItem(
+                          value: entry.key,
+                          child: Text(entry.value),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    setState(() => _subTemplateId = value);
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: '最大子项数',
+                    helperText: _maxSubItems == null || _maxSubItems == 0
+                        ? '留空表示不限制'
+                        : '当前限制：$_maxSubItems',
+                  ),
+                  onChanged: (value) {
+                    final parsed = int.tryParse(value);
+                    setState(
+                      () => _maxSubItems = (parsed != null && parsed > 0)
+                          ? parsed
+                          : null,
+                    );
                   },
                 ),
               ],

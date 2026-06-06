@@ -6,9 +6,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 
 import '../../l10n/app_text_extension.dart';
+import '../../models/account_item.dart';
 import '../../models/quick_note.dart';
 import '../../services/quick_note_store.dart';
 import '../../services/service_manager.dart';
+import '../../sync/sync_service_types.dart';
 import '../../theme/theme.dart';
 import '../../widgets/adaptive_page.dart';
 
@@ -24,9 +26,8 @@ class QuickNoteView extends StatefulWidget {
 }
 
 class _QuickNoteViewState extends State<QuickNoteView> {
-  final QuickNoteStore _store = QuickNoteStore(
-    serviceManager: ServiceManager.instance,
-  );
+  final ServiceManager _serviceManager = ServiceManager.instance;
+  late final QuickNoteStore _store;
   final List<_MarkdownBlock> _blocks = [];
   final ScrollController _scrollController = ScrollController();
   List<QuickNote> _notes = [];
@@ -37,19 +38,31 @@ class _QuickNoteViewState extends State<QuickNoteView> {
   bool _splittingBlock = false;
   bool _loadingNote = true;
   bool _ensureVisibleQueued = false;
+  bool _manualSyncRunning = false;
   Timer? _saveTimer;
   Timer? _focusLossTimer;
 
   @override
   void initState() {
     super.initState();
+    _store = QuickNoteStore(serviceManager: _serviceManager);
+    _serviceManager.addListener(_handleSyncSignal);
+    _serviceManager.syncService.addListener(_handleSyncSignal);
     _blocks.add(_createBlock(''));
     _loadNotes();
   }
 
   @override
   void dispose() {
-    unawaited(_persistActiveNote(_plainMarkdown));
+    unawaited(
+      _persistActiveNote(_plainMarkdown)
+          .then<void>((_) async {
+            await _store.syncNow();
+          })
+          .whenComplete(_store.dispose),
+    );
+    _serviceManager.syncService.removeListener(_handleSyncSignal);
+    _serviceManager.removeListener(_handleSyncSignal);
     _saveTimer?.cancel();
     _focusLossTimer?.cancel();
     _scrollController.dispose();
@@ -88,6 +101,10 @@ class _QuickNoteViewState extends State<QuickNoteView> {
     return _blocks[_editingIndex];
   }
 
+  void _handleSyncSignal() {
+    if (mounted) setState(() {});
+  }
+
   Future<void> _loadNotes() async {
     final snapshot = await _store.load();
     if (!mounted) return;
@@ -113,6 +130,76 @@ class _QuickNoteViewState extends State<QuickNoteView> {
       if (note.id == activeNoteId) return note;
     }
     return null;
+  }
+
+  bool get _hasPendingQuickNoteSync {
+    return _notes.any(
+      (note) => !note.isDeleted && note.syncStatus != SyncStatus.synchronized,
+    );
+  }
+
+  bool get _hasConflictedQuickNote {
+    return _notes.any((note) => note.syncStatus == SyncStatus.conflict);
+  }
+
+  _QuickNoteSyncStatus _buildSyncStatus(BuildContext context) {
+    if (!_serviceManager.isUnlocked || !_serviceManager.hasIdentity) {
+      return _QuickNoteSyncStatus(
+        icon: Icons.cloud_off_outlined,
+        tone: _QuickNoteSyncTone.muted,
+        tooltip: context.text('保险库未解锁，随手记暂不自动同步', 'Vault locked. Quick notes are not syncing.'),
+      );
+    }
+
+    final state = _serviceManager.syncState;
+    if (_manualSyncRunning ||
+        state == SyncState.connecting ||
+        state == SyncState.pulling ||
+        state == SyncState.pushing ||
+        state == SyncState.conflictRecovery) {
+      return _QuickNoteSyncStatus(
+        icon: Icons.sync_outlined,
+        tone: _QuickNoteSyncTone.info,
+        tooltip: context.text('随手记同步中', 'Quick notes syncing'),
+      );
+    }
+
+    if (state.isError) {
+      final message = _serviceManager.syncStatusNote ??
+          _serviceManager.syncErrorMessage ??
+          context.text('点按重试同步', 'Tap to retry sync');
+      final isUnconfigured = (_serviceManager.syncErrorMessage ?? '')
+          .contains('not configured');
+      return _QuickNoteSyncStatus(
+        icon: isUnconfigured ? Icons.cloud_off_outlined : Icons.error_outline,
+        tone: _QuickNoteSyncTone.error,
+        tooltip: isUnconfigured
+            ? context.text('未配置同步服务，点按后会重试', 'Sync server is not configured. Tap to retry.')
+            : context.text('同步失败：$message', 'Sync failed: $message'),
+      );
+    }
+
+    if (_hasConflictedQuickNote) {
+      return _QuickNoteSyncStatus(
+        icon: Icons.report_problem_outlined,
+        tone: _QuickNoteSyncTone.error,
+        tooltip: context.text('随手记存在同步冲突', 'Quick note sync conflict'),
+      );
+    }
+
+    if (_hasPendingQuickNoteSync || _serviceManager.hasDirtyData) {
+      return _QuickNoteSyncStatus(
+        icon: Icons.cloud_upload_outlined,
+        tone: _QuickNoteSyncTone.warning,
+        tooltip: context.text('有改动等待同步，点按立即同步', 'Changes waiting to sync. Tap to sync now.'),
+      );
+    }
+
+    return _QuickNoteSyncStatus(
+      icon: Icons.cloud_done_outlined,
+      tone: _QuickNoteSyncTone.success,
+      tooltip: context.text('随手记已同步', 'Quick notes synced'),
+    );
   }
 
   void _loadNoteContent(String content) {
@@ -149,6 +236,40 @@ class _QuickNoteViewState extends State<QuickNoteView> {
       _notes = snapshot.notes;
       _activeNoteId = updated.id;
     });
+  }
+
+  Future<void> _syncQuickNotesNow() async {
+    if (_manualSyncRunning) return;
+    setState(() {
+      _manualSyncRunning = true;
+    });
+    _saveTimer?.cancel();
+    var success = false;
+    try {
+      await _persistActiveNote(_plainMarkdown);
+      success = await _store.syncNow();
+      if (!mounted) return;
+      final snapshot = await _store.load();
+      if (!mounted) return;
+      setState(() {
+        _notes = snapshot.notes;
+        _activeNoteId = snapshot.activeNoteId;
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _manualSyncRunning = false;
+        });
+      }
+    }
+    if (!mounted) return;
+    final message = success
+        ? context.text('随手记已同步', 'Quick notes synced')
+        : context.text(
+            '同步暂未完成，请稍后重试',
+            'Sync did not complete. Try again later.',
+          );
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   String _stripMarkdown(String value) {
@@ -839,8 +960,10 @@ class _QuickNoteViewState extends State<QuickNoteView> {
                       editing: _editingIndex >= 0,
                       showTools: _showTools,
                       noteCount: _notes.length,
+                      syncStatus: _buildSyncStatus(context),
                       onNewNoteTap: _createNewNote,
                       onNotesTap: _openNotesSheet,
+                      onSyncTap: _syncQuickNotesNow,
                       onCopyTap: _openCopyActions,
                       onDoneTap: _finishEditing,
                       onToolsTap: _toggleTools,
@@ -1449,14 +1572,30 @@ class _QuickNoteEmptyResult extends StatelessWidget {
   }
 }
 
+enum _QuickNoteSyncTone { muted, success, warning, error, info }
+
+class _QuickNoteSyncStatus {
+  final IconData icon;
+  final _QuickNoteSyncTone tone;
+  final String tooltip;
+
+  const _QuickNoteSyncStatus({
+    required this.icon,
+    required this.tone,
+    required this.tooltip,
+  });
+}
+
 class _QuickNoteTopBar extends StatelessWidget {
   final String title;
   final int characterCount;
   final bool editing;
   final bool showTools;
   final int noteCount;
+  final _QuickNoteSyncStatus syncStatus;
   final VoidCallback onNewNoteTap;
   final VoidCallback onNotesTap;
+  final VoidCallback onSyncTap;
   final VoidCallback onCopyTap;
   final VoidCallback onDoneTap;
   final VoidCallback onToolsTap;
@@ -1467,8 +1606,10 @@ class _QuickNoteTopBar extends StatelessWidget {
     required this.editing,
     required this.showTools,
     required this.noteCount,
+    required this.syncStatus,
     required this.onNewNoteTap,
     required this.onNotesTap,
+    required this.onSyncTap,
     required this.onCopyTap,
     required this.onDoneTap,
     required this.onToolsTap,
@@ -1504,6 +1645,7 @@ class _QuickNoteTopBar extends StatelessWidget {
             ),
           ),
           const SizedBox(width: AppSpacing.sm),
+          _SyncStatusButton(status: syncStatus, onTap: onSyncTap),
           _TopBarButton(
             icon: Icons.note_add_outlined,
             selected: false,
@@ -1807,6 +1949,71 @@ class _AppendBlockSpace extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(AppRadii.button),
       child: const SizedBox(height: 140),
+    );
+  }
+}
+
+class _SyncStatusButton extends StatelessWidget {
+  final _QuickNoteSyncStatus status;
+  final VoidCallback onTap;
+
+  const _SyncStatusButton({required this.status, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final vt = theme.extension<AppVisualTokens>();
+    final tone = switch (status.tone) {
+      _QuickNoteSyncTone.success => vt?.success ?? colors.primary,
+      _QuickNoteSyncTone.warning => vt?.warning ?? colors.tertiary,
+      _QuickNoteSyncTone.error => colors.error,
+      _QuickNoteSyncTone.info => vt?.info ?? colors.primary,
+      _QuickNoteSyncTone.muted => colors.onSurfaceVariant,
+    };
+    final background = switch (status.tone) {
+      _QuickNoteSyncTone.success =>
+        vt?.successContainer ?? colors.primaryContainer,
+      _QuickNoteSyncTone.warning =>
+        vt?.warningContainer ?? colors.tertiaryContainer,
+      _QuickNoteSyncTone.error => colors.errorContainer,
+      _QuickNoteSyncTone.info => vt?.infoContainer ?? colors.primaryContainer,
+      _QuickNoteSyncTone.muted => Colors.transparent,
+    };
+
+    return IconButton(
+      onPressed: onTap,
+      tooltip: status.tooltip,
+      icon: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Icon(status.icon, size: 20),
+          if (status.tone != _QuickNoteSyncTone.success &&
+              status.tone != _QuickNoteSyncTone.muted)
+            Positioned(
+              right: -2,
+              top: -2,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: tone,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: colors.surface, width: 1.5),
+                ),
+                child: const SizedBox(width: 8, height: 8),
+              ),
+            ),
+        ],
+      ),
+      color: tone,
+      style: IconButton.styleFrom(
+        backgroundColor: background.withAlpha(
+          status.tone == _QuickNoteSyncTone.muted
+              ? 0
+              : AppAlphas.tint,
+        ),
+        minimumSize: const Size(36, 36),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
     );
   }
 }

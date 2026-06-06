@@ -21,7 +21,7 @@ void main() {
       templateId: 'login',
       title: 'Login',
       subTitle: 'Website',
-      category: TemplateCategory.login,
+      category: TemplateCategory.access,
       fields: [
         const AccountField(
           fieldKey: 'password',

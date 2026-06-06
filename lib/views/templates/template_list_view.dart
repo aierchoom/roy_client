@@ -16,6 +16,23 @@ import '../../widgets/app_selectable_scrollable.dart';
 
 import 'template_edit_view.dart';
 
+String _templateCategoryLabel(TemplateCategory category) {
+  switch (category) {
+    case TemplateCategory.access:
+      return '访问';
+    case TemplateCategory.secret:
+      return '密文';
+    case TemplateCategory.payment:
+      return '支付';
+    case TemplateCategory.identity:
+      return '身份';
+    case TemplateCategory.license:
+      return '授权';
+    case TemplateCategory.custom:
+      return '自定义';
+  }
+}
+
 class TemplateListBody extends StatefulWidget {
   const TemplateListBody({super.key});
 
@@ -133,11 +150,7 @@ class _TemplateListBodyState extends State<TemplateListBody> {
     if (usageCount > 0) {
       final messenger = ScaffoldMessenger.of(context);
       messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            '该模板仍被 $usageCount 个账户使用，暂时不能删除。',
-          ),
-        ),
+        SnackBar(content: Text('该模板仍被 $usageCount 个账户使用，暂时不能删除。')),
       );
       return;
     }
@@ -146,9 +159,7 @@ class _TemplateListBodyState extends State<TemplateListBody> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('删除模板'),
-        content: Text(
-          '确认删除"${template.title}"吗？',
-        ),
+        content: Text('确认删除"${template.title}"吗？'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
@@ -172,11 +183,7 @@ class _TemplateListBodyState extends State<TemplateListBody> {
         if (!context.mounted) return;
         final messenger = ScaffoldMessenger.of(context);
         messenger.showSnackBar(
-          SnackBar(
-            content: Text(
-              '该模板仍被 ${e.usageCount} 个账户使用，暂时不能删除。',
-            ),
-          ),
+          SnackBar(content: Text('该模板仍被 ${e.usageCount} 个账户使用，暂时不能删除。')),
         );
       }
     }
@@ -230,16 +237,18 @@ class _TemplateListBodyState extends State<TemplateListBody> {
     if (confirmed != true || !context.mounted) return;
 
     try {
-      final existingIds = provider.allTemplates.map((t) => t.templateId).toSet();
+      final existingIds = provider.allTemplates
+          .map((t) => t.templateId)
+          .toSet();
       final templates = parseTemplateExport(
         controller.text,
         existingIds: existingIds,
       );
       if (templates.isEmpty) {
         if (!context.mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.noTemplatesToImport)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l10n.noTemplatesToImport)));
         return;
       }
       for (final template in templates) {
@@ -251,9 +260,9 @@ class _TemplateListBodyState extends State<TemplateListBody> {
       );
     } on FormatException catch (_) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.importFailed)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.importFailed)));
     }
   }
 
@@ -263,9 +272,9 @@ class _TemplateListBodyState extends State<TemplateListBody> {
     final customTemplates = provider.customTemplates;
 
     if (customTemplates.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.noTemplatesToExport)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.noTemplatesToExport)));
       return;
     }
 
@@ -288,25 +297,27 @@ class _TemplateListBodyState extends State<TemplateListBody> {
                     style: Theme.of(dialogContext).textTheme.bodySmall,
                   ),
                   const SizedBox(height: 12),
-                  ...customTemplates.map((t) => CheckboxListTile(
-                    value: selected.contains(t.templateId),
-                    title: Text(t.title),
-                    subtitle: Text(
-                      '${t.fields.length} ${context.text('字段', 'fields')}',
+                  ...customTemplates.map(
+                    (t) => CheckboxListTile(
+                      value: selected.contains(t.templateId),
+                      title: Text(t.title),
+                      subtitle: Text(
+                        '${t.fields.length} ${context.text('字段', 'fields')}',
+                      ),
+                      controlAffinity: ListTileControlAffinity.leading,
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                      onChanged: (v) {
+                        setDialogState(() {
+                          if (v == true) {
+                            selected.add(t.templateId);
+                          } else {
+                            selected.remove(t.templateId);
+                          }
+                        });
+                      },
                     ),
-                    controlAffinity: ListTileControlAffinity.leading,
-                    contentPadding: EdgeInsets.zero,
-                    dense: true,
-                    onChanged: (v) {
-                      setDialogState(() {
-                        if (v == true) {
-                          selected.add(t.templateId);
-                        } else {
-                          selected.remove(t.templateId);
-                        }
-                      });
-                    },
-                  )),
+                  ),
                 ],
               ),
             ),
@@ -459,22 +470,19 @@ class _TemplateListBodyState extends State<TemplateListBody> {
               _buildToneChip(
                 context,
                 icon: Icons.dashboard_customize_outlined,
-                label:
-                    '$totalTemplates ${context.text('个模板', 'Templates')}',
+                label: '$totalTemplates ${context.text('个模板', 'Templates')}',
                 tint: theme.colorScheme.onPrimaryContainer,
               ),
               _buildToneChip(
                 context,
                 icon: Icons.tune_outlined,
-                label:
-                    '$customTemplates ${context.text('个自定义', 'Custom')}',
+                label: '$customTemplates ${context.text('个自定义', 'Custom')}',
                 tint: theme.colorScheme.onPrimaryContainer,
               ),
               _buildToneChip(
                 context,
                 icon: Icons.inventory_2_outlined,
-                label:
-                    '$usedTemplates ${context.text('个在用', 'In Use')}',
+                label: '$usedTemplates ${context.text('个在用', 'In Use')}',
                 tint: theme.colorScheme.onPrimaryContainer,
               ),
             ],
@@ -501,7 +509,11 @@ class _TemplateListBodyState extends State<TemplateListBody> {
         width: double.infinity,
         padding: const EdgeInsets.all(AppSpacing.xxl),
         decoration: BoxDecoration(
-          color: AppSurfaces.soft(theme.colorScheme, tint: accent, tintAlpha: 8),
+          color: AppSurfaces.soft(
+            theme.colorScheme,
+            tint: accent,
+            tintAlpha: 8,
+          ),
           borderRadius: BorderRadius.circular(AppRadii.dialog),
           border: Border.all(color: accent.withAlpha(34)),
           boxShadow: AppShadows.card(theme, depth: 0.64),
@@ -522,26 +534,18 @@ class _TemplateListBodyState extends State<TemplateListBody> {
                 border: Border.all(color: accent.withAlpha(44)),
               ),
               alignment: Alignment.center,
-              child: Icon(
-                Icons.layers_clear_outlined,
-                size: 24,
-                color: accent,
-              ),
+              child: Icon(Icons.layers_clear_outlined, size: 24, color: accent),
             ),
             const SizedBox(height: 12),
             Text(
-              isCustomSection
-                  ? '还没有自定义模板'
-                  : '当前没有可展示的内置模板',
+              isCustomSection ? '还没有自定义模板' : '当前没有可展示的内置模板',
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w600,
               ),
             ),
             const SizedBox(height: 6),
             Text(
-              isCustomSection
-                  ? '创建后会立即出现在这里，作为可复用的模板卡片。'
-                  : '内置模板会自动展示在这里。',
+              isCustomSection ? '创建后会立即出现在这里，作为可复用的模板卡片。' : '内置模板会自动展示在这里。',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
                 height: 1.3,
@@ -666,8 +670,7 @@ class _TemplateListBodyState extends State<TemplateListBody> {
                   _buildSectionHeader(
                     context,
                     title: '自定义模板',
-                    subtitle:
-                        '按你的使用习惯组织字段，做成真正可复用的模板卡片。',
+                    subtitle: '按你的使用习惯组织字段，做成真正可复用的模板卡片。',
                   ),
                   const SizedBox(height: 14),
                   _buildTemplateGrid(
@@ -699,8 +702,7 @@ class _TemplateListBodyState extends State<TemplateListBody> {
                   _buildSectionHeader(
                     context,
                     title: '内置模板',
-                    subtitle:
-                        '常见账户与身份信息的默认模板，可直接作为起点使用。',
+                    subtitle: '常见账户与身份信息的默认模板，可直接作为起点使用。',
                   ),
                   const SizedBox(height: 14),
                   _buildTemplateGrid(
@@ -750,7 +752,11 @@ class _TemplateCard extends StatelessWidget {
         Container(
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
-            color: AppSurfaces.soft(theme.colorScheme, tint: accent, tintAlpha: 6),
+            color: AppSurfaces.soft(
+              theme.colorScheme,
+              tint: accent,
+              tintAlpha: 6,
+            ),
             borderRadius: BorderRadius.circular(AppRadii.xl),
             border: Border.all(color: edgeColor),
             boxShadow: AppShadows.card(theme, depth: 0.7),
@@ -763,7 +769,9 @@ class _TemplateCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    padding: EdgeInsets.all(isDesktop ? AppSpacing.xl : AppSpacing.lg),
+                    padding: EdgeInsets.all(
+                      isDesktop ? AppSpacing.xl : AppSpacing.lg,
+                    ),
                     width: double.infinity,
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
@@ -793,7 +801,9 @@ class _TemplateCard extends StatelessWidget {
                               height: isDesktop ? 44 : 38,
                               decoration: BoxDecoration(
                                 color: accent.withAlpha(255),
-                                borderRadius: BorderRadius.circular(AppRadii.sm),
+                                borderRadius: BorderRadius.circular(
+                                  AppRadii.sm,
+                                ),
                                 boxShadow: [
                                   BoxShadow(
                                     color: accent.withAlpha(100),
@@ -829,7 +839,9 @@ class _TemplateCard extends StatelessWidget {
                                   tint: accent,
                                   tintAlpha: 12,
                                 ),
-                                borderRadius: BorderRadius.circular(AppRadii.sm),
+                                borderRadius: BorderRadius.circular(
+                                  AppRadii.sm,
+                                ),
                                 border: Border.all(
                                   color: accent.withAlpha(70),
                                   width: 1.4,
@@ -847,7 +859,9 @@ class _TemplateCard extends StatelessWidget {
                               ),
                             ),
                           ),
-                        SizedBox(height: isDesktop ? AppSpacing.lg : AppSpacing.md),
+                        SizedBox(
+                          height: isDesktop ? AppSpacing.lg : AppSpacing.md,
+                        ),
                         Padding(
                           padding: EdgeInsets.only(
                             right: template.isCustom
@@ -859,7 +873,9 @@ class _TemplateCard extends StatelessWidget {
                               children: [
                                 TextSpan(
                                   text: context.text('名称：', 'Name: '),
-                                  style: const TextStyle(fontWeight: FontWeight.w900),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w900,
+                                  ),
                                 ),
                                 TextSpan(
                                   text: template.title,
@@ -890,7 +906,9 @@ class _TemplateCard extends StatelessWidget {
                     ),
                   ),
                   Padding(
-                    padding: EdgeInsets.all(isDesktop ? AppSpacing.xl : AppSpacing.lg),
+                    padding: EdgeInsets.all(
+                      isDesktop ? AppSpacing.xl : AppSpacing.lg,
+                    ),
                     child: _TemplateCardContent(
                       template: template,
                       usageCount: usageCount,
@@ -951,13 +969,27 @@ class _TemplateCardContent extends StatelessWidget {
           runSpacing: AppSpacing.sm,
           children: [
             _InfoChip(
-              icon: Icons.tune_outlined,
-              label: '${template.fields.length} ${context.text('字段', 'fields')}',
+              icon: templateCategoryIcon(template.category),
+              label: _templateCategoryLabel(template.category),
               tint: accent,
             ),
             _InfoChip(
+              icon: Icons.tune_outlined,
+              label:
+                  '${template.fields.length} ${context.text('字段', 'fields')}',
+              tint: accent,
+            ),
+            if (template.parentTemplateIds.isNotEmpty)
+              _InfoChip(
+                icon: Icons.account_tree_outlined,
+                label:
+                    '${context.text('继承', 'Inherits')} ${template.parentTemplateIds.length}',
+                tint: accent,
+              ),
+            _InfoChip(
               icon: Icons.inventory_2_outlined,
-              label: '${context.text('已使用', 'Used')} $usageCount ${context.text('次', 'times')}',
+              label:
+                  '${context.text('已使用', 'Used')} $usageCount ${context.text('次', 'times')}',
               tint: accent,
             ),
             if (template.lastEditedAt != null || template.modifiedAt != null)
@@ -1113,6 +1145,10 @@ class _FieldPreviewTags extends StatelessWidget {
         return Icons.extension_rounded;
       case AccountFieldType.accountLink:
         return Icons.account_tree_rounded;
+      case AccountFieldType.templateRef:
+        return Icons.account_tree_rounded;
+      case AccountFieldType.subForm:
+        return Icons.dynamic_feed_rounded;
       case AccountFieldType.longText:
         return Icons.notes_rounded;
       case AccountFieldType.list:
@@ -1134,7 +1170,11 @@ class _FieldPreviewTags extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: AppSurfaces.soft(theme.colorScheme, tint: accent, tintAlpha: 10),
+              color: AppSurfaces.soft(
+                theme.colorScheme,
+                tint: accent,
+                tintAlpha: 10,
+              ),
               borderRadius: BorderRadius.circular(AppRadii.button),
               border: Border.all(color: accent.withAlpha(38)),
             ),
@@ -1250,11 +1290,7 @@ class _IconActionButton extends StatelessWidget {
                   : theme.colorScheme.surfaceContainerHighest.withAlpha(60),
               borderRadius: BorderRadius.circular(AppRadii.button),
             ),
-            child: Icon(
-              icon,
-              size: 18,
-              color: color,
-            ),
+            child: Icon(icon, size: 18, color: color),
           ),
         ),
       ),

@@ -235,6 +235,8 @@ class QaDebugMenu extends StatelessWidget {
       case AccountFieldType.list:
         return List.generate(3, (_) => 'item_${_randHex(4)}').join(', ');
       case AccountFieldType.accountLink:
+      case AccountFieldType.templateRef:
+      case AccountFieldType.subForm:
         return 'acc_${_randHex(6)}';
       case AccountFieldType.unknown:
         return 'unknown_${_randHex(4)}';
@@ -463,11 +465,11 @@ class QaDebugMenu extends StatelessWidget {
     );
     await sm.saveAccount(
       _account('acc_bank', '招商银行')
-          .withTemplateId('builtin_payment')
-          .withField('bankName', '招商银行')
-          .withField('cardNumber', '6225 8888 8888 8888')
+          .withTemplateId('builtin_payment_card')
+          .withField('bank_name', '招商银行')
+          .withField('card_number', '6225 8888 8888 8888')
           .withField('cvv', '888')
-          .withField('expiryDate', '08/29')
+          .withField('expiry_date', '08/29')
           .build(),
     );
     await sm.saveAccount(

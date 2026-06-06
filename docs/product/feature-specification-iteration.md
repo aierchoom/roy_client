@@ -275,14 +275,19 @@ enum AccountFieldType {
 
 ### 3.4 内置模板
 
-实际实现包含 **4 个内置模板**：
+实际实现包含 **9 个内置模板**：
 
 | 模板 ID | 标题 | 分类 | 字段 |
 |---|---|---|---|
-| `builtin_generic_info` | 网站模板 | `login` | `website`(url), `username`(text), `password`(password), `totp`(custom), `notes`(text) |
-| `builtin_secure_note` | 通用安全笔记 | `note` | `content`(longText, isSecret, isRequired) |
-| `builtin_mnemonic` | 助记词 | `note` | `mnemonic_words`(list, isSecret, isRequired) |
-| `builtin_api_service` | API 服务 | `note` | `service_name`(text, isPrimary), `api_keys`(list, isSecret), `endpoint`(url) |
+| `builtin_generic_info` | 登录凭据 | `access` | `website`(url), `username`(text), `password`(password), `totp`(custom), `notes`(text) |
+| `builtin_api_service` | API 凭据 | `access` | `service_name`(text, isPrimary), `api_keys`(list, isSecret), `endpoint`(url) |
+| `builtin_wifi` | WiFi / 网络 | `access` | `ssid`(text), `wifi_password`(password), `admin_url`(url), `admin_username`(text), `admin_password`(password) |
+| `builtin_server_ssh` | 服务器 / SSH | `access` | `host`(url), `ssh_user`(text), `ssh_port`(number), `ssh_key`(longText), `notes`(text) |
+| `builtin_secure_note` | 通用安全笔记 | `secret` | `content`(longText, isSecret, isRequired) |
+| `builtin_mnemonic` | 助记词 | `secret` | `mnemonic_words`(list, isSecret, isRequired) |
+| `builtin_payment_card` | 银行卡 | `payment` | `bank_name`(text), `card_number`(text), `cvv`(password), `expiry_date`(time), `notes`(text) |
+| `builtin_identity_document` | 身份证件 | `identity` | `full_name`(text), `id_number`(text), `issuing_authority`(text), `valid_until`(time), `notes`(text) |
+| `builtin_software_license` | 软件授权 | `license` | `software_name`(text), `license_key`(text), `purchase_email`(email), `expires_at`(time) |
 
 所有内置模板字段均携带 `Hlc.zero('builtin')` 作为默认时间戳，兼容字段级 CRDT 合并。
 
@@ -414,14 +419,14 @@ flowchart TD
 | # | 任务 | 状态 | 验收标准 |
 |---|---|---|---|
 | F3.1 | 在 `AccountFieldType` 增加 `longText` 和 `list` | ✅ | 枚举扩展；现有测试不失败 |
-| F3.2 | 在 `TemplateCategory` 增加 `note` | ✅ | 枚举扩展 |
+| F3.2 | 将 `TemplateCategory` 收敛为 `access`/`secret`/`payment`/`identity`/`license`/`custom` | ✅ | 枚举扩展与旧分类兼容映射 |
 | F3.3 | 实现 `_buildLongTextFieldCard`（多行输入 + 折叠显示） | ✅ | 等宽字体；默认隐藏；编辑/保存/加载与现有字段一致 |
 | F3.4 | 实现 `_buildListFieldCard` + `_ListFieldEditor` | ✅ | 普通列表逐行编辑；助记词模式支持粘贴自动分词 + 网格展示 |
-| F3.5 | 内置 4 个模板（generic + secure_note + mnemonic + api_service） | ✅ | 模板字段使用 `longText`/`list`/`text`/`url`/`password`/`custom` |
+| F3.5 | 内置 9 个模板（访问、密文、支付、身份、授权） | ✅ | 模板字段使用 `longText`/`list`/`text`/`url`/`password`/`custom` |
 | F3.6 | `AccountField` 补全字段级 HLC（labelHlc 等） | ✅ | 兼容 CRDT 合并引擎的逐属性合并 |
 | F3.7 | 复制按钮走 `SensitiveClipboardService` | ✅ | 高风险 45 秒清理；显示 Toast 提示 |
 | F3.8 | 补全 `template_edit_widgets.dart` 类型 exhaustiveness | ✅ | `longText`/`list` 在标签、图标、选择器中均有映射 |
-| F3.9 | 补 `account_template_test.dart` | ✅ | 验证 4 个内置模板、字段类型正确性 |
+| F3.9 | 补 `account_template_test.dart` | ✅ | 验证 9 个内置模板、字段类型和分类推断正确性 |
 | F3.10 | 更新 `docs/wiki/data-models.md` | ✅ | 枚举、模型、版本历史同步 |
 | F3.11 | 创建执行报告 | ✅ | 本 PR 即为记录 |
 

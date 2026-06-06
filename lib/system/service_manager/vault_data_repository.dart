@@ -307,14 +307,17 @@ class VaultDataRepository {
 class TemplateInUseException implements Exception {
   final String templateId;
   final int usageCount;
+  final String? customMessage;
 
   const TemplateInUseException({
     required this.templateId,
     required this.usageCount,
+    this.customMessage,
   });
 
   @override
   String toString() {
-    return 'TemplateInUseException(templateId: $templateId, usageCount: $usageCount)';
+    return customMessage ??
+        'TemplateInUseException(templateId: $templateId, usageCount: $usageCount)';
   }
 }

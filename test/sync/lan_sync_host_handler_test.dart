@@ -286,7 +286,7 @@ void main() {
         templateId: 'tpl-ff-1',
         title: 'FastForwardTemplate',
         subTitle: '',
-        category: TemplateCategory.login,
+        category: TemplateCategory.access,
         fields: [],
       );
       final payload = await _encryptTemplate(template);
