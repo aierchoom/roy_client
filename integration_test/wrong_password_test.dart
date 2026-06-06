@@ -11,18 +11,11 @@ import 'support/smoke_test_helpers.dart';
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('regression: wrong password then correct password', (tester) async {
-    // Cleanup: dispose widget tree first, then destroy the service manager.
-    // addTearDown callbacks run in reverse registration order, so the pump
-    // registered second runs first, disposing the tree before destroy.
-    addTearDown(() async {
-      await ServiceManager.destroyForTesting();
-    });
-    addTearDown(() async {
-      await tester.pumpWidget(const SizedBox());
-      await tester.pumpAndSettle(const Duration(seconds: 3));
-    });
+  tearDown(() async {
+    await ServiceManager.destroyForTesting();
+  });
 
+  testWidgets('regression: wrong password then correct password', (tester) async {
     await configureSmokeSurface(tester);
 
     // 先创建/解锁保险库，确保进入 returning-user 状态
@@ -34,12 +27,9 @@ void main() {
     // 锁定保险库
     await ServiceManager.instance.lock();
 
-    // 先把旧的 MaterialApp 树干掉（pumpWidget(SizedBox) 触发 dispose），
-    // 等 FutureBuilder 等异步任务真正 settle 之后，再渲染 UnlockView，
-    // 避免旧树中的 FutureBuilder 访问已关闭的数据库。
-    await tester.pumpWidget(const SizedBox());
-    await tester.pumpAndSettle(const Duration(seconds: 2));
-
+    // 显式渲染 UnlockView（不依赖 MaterialApp home 自动切换）
+    // 注意：lock() 后不能先 pumpAndSettle，否则旧 HomeView 重建时其中的
+    // FutureBuilder 会尝试访问已关闭的数据库，导致异常。
     await tester.pumpWidget(
       MaterialApp(
         localizationsDelegates: const [
