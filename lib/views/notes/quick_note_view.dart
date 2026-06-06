@@ -643,12 +643,12 @@ class _QuickNoteViewState extends State<QuickNoteView> {
                 enabled: hasParagraph,
                 leading: const Icon(Icons.notes_outlined),
                 title: Text(
-                  context.text('澶嶅埗褰撳墠娈佃惤', 'Copy current paragraph'),
+                  context.text('复制当前段落', 'Copy current paragraph'),
                 ),
                 subtitle: Text(
                   hasParagraph
                       ? paragraph
-                      : context.text('褰撳墠娈佃惤涓虹┖', 'Current paragraph is empty'),
+                      : context.text('当前段落为空', 'Current paragraph is empty'),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -659,11 +659,11 @@ class _QuickNoteViewState extends State<QuickNoteView> {
               ListTile(
                 leading: const Icon(Icons.copy_all_outlined),
                 title: Text(
-                  context.text('澶嶅埗鏁寸瘒 Markdown', 'Copy all Markdown'),
+                  context.text('复制整篇 Markdown', 'Copy all Markdown'),
                 ),
                 subtitle: Text(
                   _displayTitle.isEmpty
-                      ? context.text('闅忔墜璁?', 'Quick Note')
+                      ? context.text('随手记', 'Quick Note')
                       : _displayTitle,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -682,13 +682,13 @@ class _QuickNoteViewState extends State<QuickNoteView> {
         if (!hasParagraph) return;
         await _copyToClipboard(
           paragraph,
-          context.text('褰撳墠娈佃惤宸插鍒?', 'Current paragraph copied'),
+          context.text('当前段落已复制', 'Current paragraph copied'),
         );
         return;
       case _CopyAction.markdown:
         await _copyToClipboard(
           _plainMarkdown,
-          context.text('Markdown 宸插鍒?', 'Markdown copied'),
+          context.text('Markdown 已复制', 'Markdown copied'),
         );
         return;
     }
@@ -1506,7 +1506,7 @@ class _QuickNoteListSheetState extends State<_QuickNoteListSheet> {
                                     children: [
                                       const Icon(Icons.delete_outline),
                                       const SizedBox(width: AppSpacing.sm),
-                                      Text(context.text('鍒犻櫎', 'Delete')),
+                                      Text(context.text('删除', 'Delete')),
                                     ],
                                   ),
                                 ),
