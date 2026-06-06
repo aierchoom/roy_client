@@ -42,11 +42,11 @@ void main() {
   /// Pumps the widget and waits for async _loadNotes to finish.
   Future<void> pumpQuickNote(WidgetTester tester) async {
     await tester.pumpWidget(const MaterialApp(home: QuickNoteView()));
-    // Process the async _loadNotes → setState, then the post-frame _editBlock.
+    // Let real async (SharedPreferences.load, _store.load) complete first.
+    await tester.runAsync(() => Future.delayed(const Duration(milliseconds: 300)));
+    // Then process setState rebuild and post-frame _editBlock callback.
     await tester.pump();
     await tester.pump();
-    // Let any remaining microtasks settle.
-    await tester.pump(const Duration(milliseconds: 50));
   }
 
   Finder previewInkWellFor(Finder child) {
@@ -383,7 +383,7 @@ void main() {
       final editingField = tester.widget<TextField>(find.byType(TextField));
       expect(editingField.controller!.text, 'abcdefghij');
       expect(editingField.controller!.selection.baseOffset, lessThan(4));
-    }, skip: true); // flaky on CI
+    });
 
     testWidgets('right-side preview tap places cursor near end', (
       tester,
@@ -402,7 +402,7 @@ void main() {
       final editingField = tester.widget<TextField>(find.byType(TextField));
       expect(editingField.controller!.text, 'abcdefghij');
       expect(editingField.controller!.selection.baseOffset, greaterThan(6));
-    }, skip: true); // flaky on CI
+    });
   });
 
   group('Code block editing', () {
@@ -423,7 +423,7 @@ void main() {
       expect(editingField.controller!.text, 'code');
       expect(editingField.controller!.selection.baseOffset, 4);
       expect(find.text('```'), findsNWidgets(2));
-    }, skip: true); // flaky on CI
+    });
 
     testWidgets('fenced task text renders as code, not checkbox', (
       tester,
@@ -433,7 +433,7 @@ void main() {
 
       expect(find.byType(Checkbox), findsNothing);
       expect(find.text('- [ ] code task'), findsOneWidget);
-    }, skip: true); // flaky on CI
+    });
   });
 
   group('Mobile keyboard toolbar', () {
@@ -455,7 +455,7 @@ void main() {
       await tester.pump();
 
       expect(find.byType(TextField), findsNothing);
-    }, skip: true); // flaky on CI
+    });
   });
 
   group('Preview link actions', () {
@@ -487,7 +487,7 @@ void main() {
 
       final clipboard = await Clipboard.getData(Clipboard.kTextPlain);
       expect(clipboard?.text, 'https://example.com');
-    }, skip: true); // flaky: SharedPreferences mock state leaks between tests
+    });
 
     testWidgets('edit link action focuses markdown source at link start', (
       tester,
@@ -505,7 +505,7 @@ void main() {
       final editingField = tester.widget<TextField>(find.byType(TextField));
       expect(editingField.controller!.text, '[Docs](https://example.com)');
       expect(editingField.controller!.selection.baseOffset, 0);
-    }, skip: true); // flaky on CI
+    });
   });
 
   group('Long document scroll follow', () {
@@ -533,7 +533,7 @@ void main() {
 
       expect(fieldFinder, findsOneWidget);
       expect(tester.getBottomLeft(fieldFinder).dy, lessThan(700));
-    }, skip: true); // flaky on CI
+    });
   });
 
   group('Product polish actions', () {
@@ -553,7 +553,7 @@ void main() {
 
       final clipboard = await Clipboard.getData(Clipboard.kTextPlain);
       expect(clipboard?.text, 'Alpha paragraph');
-    }, skip: true); // flaky: SharedPreferences mock state leaks between tests
+    });
 
     testWidgets('copy menu still supports copying the whole note', (
       tester,
@@ -569,7 +569,7 @@ void main() {
 
       final clipboard = await Clipboard.getData(Clipboard.kTextPlain);
       expect(clipboard?.text, 'Alpha\nBeta');
-    }, skip: true); // flaky: SharedPreferences mock state leaks between tests
+    });
 
     testWidgets('recent note delete action is hidden behind more menu', (
       tester,
@@ -588,6 +588,6 @@ void main() {
       await tester.pump();
 
       expect(find.byIcon(Icons.delete_outline), findsOneWidget);
-    }, skip: true); // flaky: SharedPreferences mock state leaks between tests
+    });
   });
 }
