@@ -41,6 +41,7 @@ class _QuickNoteViewState extends State<QuickNoteView> {
   bool _manualSyncRunning = false;
   Timer? _saveTimer;
   Timer? _focusLossTimer;
+  StreamSubscription? _storageSub;
 
   @override
   void initState() {
@@ -48,6 +49,9 @@ class _QuickNoteViewState extends State<QuickNoteView> {
     _store = QuickNoteStore(serviceManager: _serviceManager);
     _serviceManager.addListener(_handleSyncSignal);
     _serviceManager.syncService.addListener(_handleSyncSignal);
+    // Listen directly to storage changes — the most reliable notification.
+    _storageSub = _serviceManager.storageService.onChange
+        .listen((_) => _handleSyncSignal());
     _blocks.add(_createBlock(''));
     _loadNotes();
   }
@@ -63,6 +67,7 @@ class _QuickNoteViewState extends State<QuickNoteView> {
     );
     _serviceManager.syncService.removeListener(_handleSyncSignal);
     _serviceManager.removeListener(_handleSyncSignal);
+    _storageSub?.cancel();
     _saveTimer?.cancel();
     _focusLossTimer?.cancel();
     _scrollController.dispose();
