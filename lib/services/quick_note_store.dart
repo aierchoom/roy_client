@@ -307,7 +307,7 @@ class QuickNoteStore {
     final index = _autoSyncFailureCount.clamp(
       0,
       _quickNoteAutoSyncDelays.length - 1,
-    ) as int;
+    );
     return _quickNoteAutoSyncDelays[index];
   }
 
