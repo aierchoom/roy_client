@@ -130,8 +130,25 @@ class VaultUnlockCoordinator {
   // === No-Password Mode ===
 
   /// 启用无密码模式，返回生成的伪密码。
+  ///
+  /// 如果无密码模式已经启用且有已存储的伪密钥，直接返回已有的密钥
+  /// 而不是生成新密钥。否则新密钥会对不上已有的 PBKDF2 哈希，导致
+  /// 无密码解锁失败（报"主密码不正确"）。
   Future<String> enableNoPasswordMode({String? preGeneratedPseudoKey}) async {
     const secureStorage = FlutterSecureStorage();
+
+    // If already enabled with a stored key, return the existing key.
+    if (preGeneratedPseudoKey == null) {
+      final existing = await secureStorage.read(key: _noPasswordPseudoKey);
+      final alreadyEnabled =
+          await secureStorage.read(key: 'no_password_mode');
+      if (existing != null &&
+          existing.isNotEmpty &&
+          alreadyEnabled == 'true') {
+        return existing;
+      }
+    }
+
     await secureStorage.write(key: 'no_password_mode', value: 'true');
     // Biometric unlock with an empty password offers no security benefit;
     // disable it when entering no-password mode.
