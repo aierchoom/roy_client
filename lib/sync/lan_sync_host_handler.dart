@@ -124,8 +124,22 @@ class LanSyncHostHandler {
   }
 
   /// 查询会话状态（供 B 轮询）
+  ///
+  /// 如果还有未处理的 peer payloads（push 阶段结束后）且 merge 尚未开始，
+  /// 自动触发 triggerMerge，避免 host 端无人调用。
   Future<Map<String, dynamic>> handleResultQuery(String sessionId) async {
     final session = _getSession(sessionId);
+
+    // Auto-trigger merge if peer data arrived and merge hasn't started.
+    if (session.peerPayloads.isNotEmpty &&
+        session.phase != LanSyncPhase.merging &&
+        session.phase != LanSyncPhase.pushing &&
+        session.phase != LanSyncPhase.resolving &&
+        session.phase != LanSyncPhase.committing &&
+        session.phase != LanSyncPhase.completed) {
+      await _runMerge(session);
+    }
+
     final result = <String, dynamic>{
       'phase': session.phase.name,
       'conflict_count': session.conflictCount ?? 0,
@@ -185,7 +199,19 @@ class LanSyncHostHandler {
     }
 
     AppLogger.d('[LAN-Host] Pulled ${items.length} items to peer');
-    return {'items': items, 'phase': session.phase.name};
+
+    // Auto-commit after pull completes (no one calls commit() separately).
+    try {
+      await commit(sessionId);
+    } catch (e) {
+      AppLogger.d('[LAN-Host] Auto-commit after pull failed: $e');
+    }
+
+    return {
+      'items': items,
+      'phase': session.phase.name,
+      'session_id': sessionId,
+    };
   }
 
   /// 用户确认冲突后，Host 提交到本地数据库
