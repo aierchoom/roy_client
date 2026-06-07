@@ -192,6 +192,10 @@ class LanSyncClient {
     final totps = await _storage.loadDirtyTotpCredentials();
     final quickNotes = await _storage.loadDirtyQuickNotes();
 
+    AppLogger.d('[LAN-Client] Pushing: ${accounts.length} accounts, '
+        '${templates.length} templates, ${totps.length} totps, '
+        '${quickNotes.length} quickNotes');
+
     final allItems = <dynamic>[
       ...accounts,
       ...templates,
@@ -296,6 +300,10 @@ class LanSyncClient {
   }
 
   Future<void> _commitLocal(List<dynamic> mergedItems) async {
+    final qnCount = mergedItems.whereType<QuickNote>().length;
+    AppLogger.d('[LAN-Client] Committing ${mergedItems.length} items '
+        '($qnCount quickNotes)');
+
     if (mergedItems.isEmpty) {
       await _storage.setSetting(
         'lan_sync_last_${_identity.vaultId}',

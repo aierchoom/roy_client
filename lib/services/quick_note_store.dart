@@ -49,8 +49,10 @@ class QuickNoteStore {
   Future<QuickNotesSnapshot> load() async {
     final manager = _vaultManager;
     if (manager != null) {
+      AppLogger.d('[QuickNoteStore] load: vault path');
       return _loadFromVault(manager);
     }
+    AppLogger.d('[QuickNoteStore] load: SharedPreferences path');
     final preferences = await SharedPreferences.getInstance();
     final encoded = preferences.getString(_notesKey);
     var notes = <QuickNote>[];
@@ -106,6 +108,7 @@ class QuickNoteStore {
   Future<void> saveNote(QuickNote note) async {
     final manager = _vaultManager;
     if (manager != null) {
+      AppLogger.d('[QuickNoteStore] saveNote: vault path (id=${note.id})');
       final preferences = await SharedPreferences.getInstance();
       final existing = await manager.storageService.getQuickNoteById(
         note.id,

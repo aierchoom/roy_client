@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 
+import '../../core/app_logger.dart';
 import '../../l10n/app_text_extension.dart';
 import '../../models/account_item.dart';
 import '../../models/quick_note.dart';
@@ -135,6 +136,8 @@ class _QuickNoteViewState extends State<QuickNoteView> {
     final snapshot = await _store.load();
     if (!mounted) return;
 
+    AppLogger.d('[QuickNoteView] _loadNotes: ${snapshot.notes.length} notes, '
+        'active=${snapshot.activeNoteId}');
     _notes = snapshot.notes;
     _activeNoteId = snapshot.activeNoteId;
     _loadNoteContent(_activeNote?.content ?? '');
