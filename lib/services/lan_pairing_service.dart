@@ -66,6 +66,13 @@ class LanPairingService {
   bool _hostClaimed = false;
   int _hostFailedClaims = 0;
   LanSyncHostHandler? _syncHandler;
+  InternetAddress? _lastHostAddress;
+  int? _lastHostPort;
+
+  /// The host address saved from the last successful claim/discovery.
+  /// Used by requester to start data sync without re-discovering the host.
+  InternetAddress? get lastHostAddress => _lastHostAddress;
+  int? get lastHostPort => _lastHostPort;
 
   LanPairingService({
     Random? random,
@@ -591,10 +598,13 @@ class LanPairingService {
         );
       }
       try {
-        return VaultPairingCrypto.decryptBundle(
+        final code = VaultPairingCrypto.decryptBundle(
           wrappedBundle: wrappedTransferCode,
           keyPair: requesterKeyPair,
         );
+        _lastHostAddress = address;
+        _lastHostPort = port;
+        return code;
       } on VaultPairingCryptoException catch (e) {
         throw LanPairingServiceException(e.message);
       }

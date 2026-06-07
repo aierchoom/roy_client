@@ -122,7 +122,14 @@ class LanSyncCoordinator extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final hostInfo = await _pairing.discoverHost();
+      // Use the host address saved from the pairing claim, falling back to UDP discovery.
+      LanPairingHostInfo? hostInfo = _pairing.lastHostAddress != null
+          ? LanPairingHostInfo(
+              address: _pairing.lastHostAddress!,
+              port: _pairing.lastHostPort ?? 0,
+            )
+          : null;
+      hostInfo ??= await _pairing.discoverHost();
       if (hostInfo == null) {
         throw const LanSyncException('HOST_NOT_FOUND', 'No LAN host discovered');
       }
