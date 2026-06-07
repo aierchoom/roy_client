@@ -628,26 +628,54 @@ class _TemplateListBodyState extends State<TemplateListBody> {
           children: [
             _buildHeroCard(context, provider),
             const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                FilledButton.icon(
-                  onPressed: () => _openEditor(context),
-                  icon: const Icon(Icons.add, size: 18),
-                  label: Text(l10n.addTemplate),
-                ),
-                OutlinedButton.icon(
-                  onPressed: () => _openImportDialog(context),
-                  icon: const Icon(Icons.download_outlined, size: 18),
-                  label: Text(l10n.importTemplate),
-                ),
-                OutlinedButton.icon(
-                  onPressed: () => _openBatchExportDialog(context),
-                  icon: const Icon(Icons.upload_outlined, size: 18),
-                  label: Text(l10n.exportTemplate),
-                ),
-              ],
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final compact = constraints.maxWidth < 520;
+                if (compact) {
+                  return OverflowBar(
+                    spacing: 6,
+                    overflowSpacing: 6,
+                    children: [
+                      ActionChip(
+                        avatar: const Icon(Icons.add, size: 18),
+                        label: Text(l10n.addTemplate),
+                        onPressed: () => _openEditor(context),
+                      ),
+                      ActionChip(
+                        avatar: const Icon(Icons.download_outlined, size: 18),
+                        label: Text(l10n.importTemplate),
+                        onPressed: () => _openImportDialog(context),
+                      ),
+                      ActionChip(
+                        avatar: const Icon(Icons.upload_outlined, size: 18),
+                        label: Text(l10n.exportTemplate),
+                        onPressed: () => _openBatchExportDialog(context),
+                      ),
+                    ],
+                  );
+                }
+                return Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    FilledButton.icon(
+                      onPressed: () => _openEditor(context),
+                      icon: const Icon(Icons.add, size: 18),
+                      label: Text(l10n.addTemplate),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () => _openImportDialog(context),
+                      icon: const Icon(Icons.download_outlined, size: 18),
+                      label: Text(l10n.importTemplate),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () => _openBatchExportDialog(context),
+                      icon: const Icon(Icons.upload_outlined, size: 18),
+                      label: Text(l10n.exportTemplate),
+                    ),
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 22),
             Container(
