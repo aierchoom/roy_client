@@ -607,21 +607,21 @@ class SecureStorageService {
       try {
         await tempFile.rename(targetPath);
       } on FileSystemException catch (_) {
-        // Windows: MoveFileEx can succeed but still throw (e.g. file-system
-        // metadata flush timing). If the target already exists the rename
-        // actually worked — just clean up and move on.
+        // Windows: MoveFileEx can throw even when the OS moved the file.
+        // If the temp is already gone and target exists, it succeeded.
         if (targetFile.existsSync()) {
           try { await tempFile.delete(); } catch (_) {}
-        } else {
-          // Rename genuinely failed. Wait for handle release and fallback to
-          // copy + delete.
+        }
+        // Regardless, ensure target has the new bytes. Use copy as fallback.
+        if (!targetFile.existsSync() || targetFile.lengthSync() != bytes.length) {
           await Future.delayed(const Duration(milliseconds: 50));
-          try {
+          if (tempFile.existsSync()) {
             await tempFile.copy(targetPath);
-            await tempFile.delete();
-          } catch (_) {
-            // If temp is gone and target exists, rename worked after all.
-            if (!targetFile.existsSync()) rethrow;
+            try { await tempFile.delete(); } catch (_) {}
+          } else {
+            // Temp gone — write directly to target.
+            final t = await targetFile.open(mode: FileMode.write);
+            try { await t.writeFrom(bytes); await t.flush(); } finally { await t.close(); }
           }
         }
       }
