@@ -8,6 +8,7 @@ import '../l10n/app_text_extension.dart';
 import '../providers/enhanced_app_provider.dart';
 import '../services/identity_service.dart';
 import '../services/lan_pairing_service.dart';
+import '../sync/lan_sync_coordinator.dart';
 import '../services/service_manager.dart';
 import '../system/service_manager/sync_coordinator.dart';
 import '../system/service_manager/vault_import_export_coordinator.dart';
@@ -34,6 +35,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
   final SyncCoordinator _syncCoordinator = ServiceManager.instance.syncCoordinator;
   final VaultPairingCoordinator _vaultPairingCoordinator = ServiceManager.instance.vaultPairingCoordinator;
   final VaultImportExportCoordinator _vaultImportExportCoordinator = ServiceManager.instance.vaultImportExportCoordinator;
+  final LanSyncCoordinator _lanSyncCoordinator = ServiceManager.instance.lanSyncCoordinator;
 
   _SyncSettingsSection _activeSection = _SyncSettingsSection.sync;
   bool _isLoading = false;
@@ -469,6 +471,9 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
       final session = await _vaultPairingCoordinator.startLanHost();
       if (!mounted) return;
 
+      // Start LAN data sync handler on the pairing server.
+      _lanSyncCoordinator.startAsHost();
+
       await _showGeneratedCodeDialog(
         context.text('面对面链接码', 'Face-to-Face Link Code'),
         context.text(
@@ -531,16 +536,20 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
       await provider.refresh();
       if (!mounted) return;
 
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            context.text(
-              '面对面链接完成。若本次未携带全量数据，可执行一次同步拉取远程数据。',
-              'Face-to-face link complete. Run Sync Now if this import did not include all data.',
-            ),
-          ),
-        ),
-      );
+      // Trigger data sync over the already-paired connection.
+      final syncResult = await _lanSyncCoordinator.startAndRunAsRequester();
+      if (!mounted) return;
+
+      final msg = syncResult.success
+          ? context.text(
+              '面对面同步完成。已拉取 ${syncResult.pulledItems} 条数据。',
+              'Face-to-face sync complete. Pulled ${syncResult.pulledItems} items.',
+            )
+          : context.text(
+              '面对面链接完成。数据同步未成功，可稍后重试。',
+              'Face-to-face link complete. Data sync did not succeed. Try again later.',
+            );
+      messenger.showSnackBar(SnackBar(content: Text(msg)));
     } on LanPairingServiceException catch (e) {
       if (!mounted) return;
       _showError(e.message);
