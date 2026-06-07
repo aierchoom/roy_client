@@ -238,14 +238,44 @@ class QuickNoteStore {
     var notes = await manager.loadQuickNotes();
 
     if (notes.isEmpty) {
-      final legacyDraft = preferences.getString(_legacyDraftKey) ?? '';
-      if (legacyDraft.trim().isNotEmpty) {
-        final migrated = _newNote(content: legacyDraft);
-        await manager.saveQuickNote(migrated);
-        _scheduleAutoSync(manager);
-        notes = [migrated];
-      } else {
-        notes = [_newNote()];
+      // Try migrating the full multi-note list from SharedPreferences first.
+      final spEncoded = preferences.getString(_notesKey);
+      if (spEncoded != null && spEncoded.isNotEmpty) {
+        try {
+          final decoded = jsonDecode(spEncoded);
+          if (decoded is List && decoded.isNotEmpty) {
+            final spNotes = decoded
+                .whereType<Map>()
+                .map((item) =>
+                    QuickNote.fromJson(Map<String, dynamic>.from(item)))
+                .toList();
+            for (final n in spNotes) {
+              await manager.saveQuickNote(
+                n.copyWith(
+                  syncStatus: SyncStatus.pendingPush,
+                  serverVersion: 0,
+                ),
+              );
+            }
+            _scheduleAutoSync(manager);
+            notes = await manager.loadQuickNotes();
+          }
+        } catch (_) {
+          // SP data unreadable; fall through to legacy draft.
+        }
+      }
+
+      // Still empty — try the legacy single-draft migration.
+      if (notes.isEmpty) {
+        final legacyDraft = preferences.getString(_legacyDraftKey) ?? '';
+        if (legacyDraft.trim().isNotEmpty) {
+          final migrated = _newNote(content: legacyDraft);
+          await manager.saveQuickNote(migrated);
+          _scheduleAutoSync(manager);
+          notes = [migrated];
+        } else {
+          notes = [_newNote()];
+        }
       }
     }
 
