@@ -607,14 +607,23 @@ class SecureStorageService {
       try {
         await tempFile.rename(targetPath);
       } on FileSystemException catch (_) {
-        // Windows: rename can fail if the file is still locked or across
-        // volumes. Wait a tick for the handle to clear, then fallback to
-        // copy + delete.
-        await Future.delayed(const Duration(milliseconds: 50));
-        await tempFile.copy(targetPath);
-        try {
-          await tempFile.delete();
-        } catch (_) {}
+        // Windows: MoveFileEx can succeed but still throw (e.g. file-system
+        // metadata flush timing). If the target already exists the rename
+        // actually worked — just clean up and move on.
+        if (targetFile.existsSync()) {
+          try { await tempFile.delete(); } catch (_) {}
+        } else {
+          // Rename genuinely failed. Wait for handle release and fallback to
+          // copy + delete.
+          await Future.delayed(const Duration(milliseconds: 50));
+          try {
+            await tempFile.copy(targetPath);
+            await tempFile.delete();
+          } catch (_) {
+            // If temp is gone and target exists, rename worked after all.
+            if (!targetFile.existsSync()) rethrow;
+          }
+        }
       }
       await _restrictFilePermissions(targetPath);
       if (backupFile.existsSync()) {
